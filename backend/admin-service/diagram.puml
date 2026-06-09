@@ -1,0 +1,464 @@
+@startuml admin-service
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam ArrowColor #555555
+skinparam ClassBorderColor #888888
+skinparam ClassBackgroundColor #FAFAFA
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #CCAA00
+
+title Admin Service — Class Diagram (port 8086)
+
+' ═══════════════════════════════════════════════════════════════
+' ENTITIES  (mirror read-model — same DB tables as other services)
+' ═══════════════════════════════════════════════════════════════
+package "com.library.admin.entity" {
+
+    class User <<Entity>> {
+        + id          : UUID
+        + mobile      : String
+        + email       : String
+        + name        : String
+        + address     : String
+        + photoUrl    : String
+        + dateOfBirth : LocalDate
+        + gender      : String
+        + isActive    : Boolean
+        + role        : Role
+        + createdAt   : LocalDateTime
+        .. Lombok: @Data @Builder ..
+    }
+
+    enum UserRole <<Enum>> {
+        STUDENT
+        ADMIN
+    }
+
+    class Membership <<Entity>> {
+        + id           : UUID
+        + userId       : UUID
+        + planId       : UUID
+        + seatId       : UUID
+        + seatNumber   : String
+        + shift        : String
+        + startDate    : LocalDate
+        + endDate      : LocalDate
+        + status       : MembershipStatus
+        + reminderSent : boolean
+        + createdAt    : LocalDateTime
+        .. Lombok: @Data @Builder ..
+    }
+
+    note right of Membership
+        reminderSent lifecycle:
+        false -> set to true by ExpiryReminderScheduler
+        only at the 7-day or 3-day threshold.
+        sendBulkReminders() never sets this flag.
+        Filtered out of all future scheduler runs once true.
+    end note
+
+    enum MembershipStatus <<Enum>> {
+        PENDING
+        ACTIVE
+        EXPIRED
+        CANCELLED
+    }
+
+    class Plan <<Entity>> {
+        + id          : UUID
+        + name        : String
+        + planType    : PlanType
+        + price       : BigDecimal
+        + durationDays: Integer
+        + isActive    : Boolean
+        .. Lombok: @Data @Builder ..
+    }
+
+    enum PlanType <<Enum>> {
+        HALF_DAY
+        FULL_DAY
+    }
+
+    class Payment <<Entity>> {
+        + id               : UUID
+        + membershipId     : UUID
+        + userId           : UUID
+        + amount           : BigDecimal
+        + paymentGateway   : String
+        + gatewayOrderId   : String
+        + gatewayPaymentId : String
+        + status           : PaymentStatus
+        + createdAt        : LocalDateTime
+        .. Lombok: @Data @Builder ..
+    }
+
+    enum PaymentStatus <<Enum>> {
+        PENDING
+        SUCCESS
+        FAILED
+        REFUNDED
+    }
+
+    User      --> UserRole          : role
+    Membership --> MembershipStatus : status
+    Plan      --> PlanType          : planType
+    Payment   --> PaymentStatus     : status
+}
+
+note bottom of Payment
+    Mirror read-model design: all four entity classes
+    map to the same PostgreSQL tables used by user-service,
+    membership-service, and seat-service.
+    No @GeneratedValue on User.id — admin-service never inserts users.
+    Cross-service references are bare UUIDs; no JPA @ManyToOne
+    across service boundaries.
+end note
+
+' ═══════════════════════════════════════════════════════════════
+' REPOSITORIES
+' ═══════════════════════════════════════════════════════════════
+package "com.library.admin.repository" {
+
+    interface UserRepository <<Repository>> {
+        + findStudentsByStatus(status : String, pageable : Pageable) : Page<User>
+        + countActiveStudents() : long
+        + countAllStudents() : long
+        .. inherited from JpaRepository ..
+        + findById(id : UUID) : Optional<User>
+        + findAllById(ids : Iterable<UUID>) : List<User>
+        + save(entity : User) : User
+    }
+
+    interface MembershipRepository <<Repository>> {
+        + findByUserIdAndStatus(userId : UUID, status : MembershipStatus) : Optional<Membership>
+        + findMembershipsExpiringBefore(upTo : LocalDate) : List<Membership>
+        + findExpiringMemberships(from : LocalDate, to : LocalDate) : List<Membership>
+        + countActiveMemberships() : long
+        + countExpiredMemberships() : long
+        .. inherited from JpaRepository ..
+        + findAllById(ids : Iterable<UUID>) : List<Membership>
+        + save(entity : Membership) : Membership
+    }
+
+    note right of MembershipRepository
+        findExpiringMemberships: WHERE reminderSent = false,
+        status = ACTIVE, endDate BETWEEN :from AND :to.
+        Used exclusively by ExpiryReminderScheduler.
+
+        findMembershipsExpiringBefore: does NOT filter on
+        reminderSent. Used by sendBulkReminders, getSeatMap,
+        getExpiringMemberships, and getDashboardStats.
+    end note
+
+    interface PlanRepository <<Repository>> {
+        .. inherits JpaRepository<Plan, UUID> ..
+        .. no custom queries defined ..
+    }
+
+    interface PaymentRepository <<Repository>> {
+        + sumRevenueForPeriod(from : LocalDateTime, to : LocalDateTime) : BigDecimal
+        + countSuccessfulPayments(from : LocalDateTime, to : LocalDateTime) : long
+    }
+
+    note right of PaymentRepository
+        sumRevenueForPeriod may return null
+        (not zero) when no rows match.
+        AdminService null-coalesces to BigDecimal.ZERO.
+    end note
+}
+
+' ═══════════════════════════════════════════════════════════════
+' DTOs
+' ═══════════════════════════════════════════════════════════════
+package "com.library.admin.dto" {
+
+    class DashboardDto <<DTO>> {
+        + totalStudents     : long
+        + activeStudents    : long
+        + activeMemberships : long
+        + expiredMemberships: long
+        + expiringThisWeek  : long
+        + totalSeats        : long
+        + occupiedSeats     : long
+        + availableSeats    : long
+        + revenueToday      : BigDecimal
+        + revenueThisMonth  : BigDecimal
+        + paymentsThisMonth : long
+        .. Lombok: @Data @Builder ..
+    }
+
+    note right of DashboardDto
+        totalSeats is always 110L — hardcoded in
+        AdminService.getDashboardStats(), not derived from
+        the seats table. occupiedSeats = activeMemberships.
+    end note
+
+    class StudentDto <<DTO>> {
+        + id              : String
+        + name            : String
+        + mobile          : String
+        + email           : String
+        + address         : String
+        + gender          : String
+        + dateOfBirth     : String
+        + photoUrl        : String
+        + isActive        : boolean
+        + joinedAt        : String
+        + membershipId    : String
+        + planName        : String
+        + planType        : String
+        + seatNumber      : String
+        + shift           : String
+        + membershipStart : String
+        + membershipEnd   : String
+        + membershipStatus: String
+        + daysRemaining   : int
+        + {static} fromEntities(user : User, membership : Membership) : StudentDto
+        .. Lombok: @Data @Builder ..
+    }
+
+    class SeatMapDto <<DTO>> {
+        + shift         : String
+        + date          : String
+        + totalSeats    : int
+        + occupiedSeats : int
+        + availableSeats: int
+        + seatsByRow    : Map<String, List<SeatInfoDto>>
+        .. Lombok: @Data @Builder ..
+    }
+
+    class SeatInfoDto <<DTO>> {
+        + seatNumber    : String
+        + isOccupied    : boolean
+        + studentName   : String
+        + studentMobile : String
+        + shift         : String
+        + membershipEnd : String
+        .. Lombok: @Data @Builder ..
+        .. static inner class of SeatMapDto ..
+    }
+
+    class RevenueReportDto <<DTO>> {
+        + fromDate         : String
+        + toDate           : String
+        + totalRevenue     : BigDecimal
+        + totalTransactions: long
+        + halfDayRevenue   : BigDecimal
+        + fullDayRevenue   : BigDecimal
+        + dailyBreakdown   : List<DailyRevenueDto>
+        .. Lombok: @Data @Builder ..
+    }
+
+    class DailyRevenueDto <<DTO>> {
+        + date  : String
+        + amount: BigDecimal
+        + count : long
+        .. Lombok: @Data @Builder ..
+        .. static inner class of RevenueReportDto ..
+    }
+
+    class SendReminderRequest <<DTO>> {
+        + userIds : List<String>
+        .. Lombok: @Data ..
+    }
+
+    note right of SendReminderRequest
+        null / empty list -> broadcast to all students
+        with memberships expiring within 7 days.
+        Non-empty -> targeted send only.
+    end note
+
+    class UpdateStatusRequest <<DTO>> {
+        + active : boolean
+        .. Lombok: @Data ..
+    }
+
+    class RenewalReminderEvent <<KafkaEvent>> {
+        + userId        : String
+        + membershipId  : String
+        + userName      : String
+        + userMobile    : String
+        + userEmail     : String
+        + seatNumber    : String
+        + expiryDate    : String
+        + daysRemaining : int
+        + eventType     : String
+        .. Lombok: @Data @Builder ..
+    }
+
+    note right of RenewalReminderEvent
+        Published to Kafka topic "renewal-reminder".
+        Consumed by notification-service to send
+        WhatsApp + email renewal reminders.
+        eventType is always "RENEWAL_REMINDER".
+    end note
+
+    class "ApiResponse<T>" <<DTO>> {
+        + success  : boolean
+        + message  : String
+        + data     : T
+        + timestamp: String
+        + {static} success(data : T) : ApiResponse<T>
+        + {static} error(message : String) : ApiResponse<T>
+        .. Lombok: @Data @Builder ..
+    }
+
+    SeatMapDto       *-- SeatInfoDto     : inner class >
+    RevenueReportDto *-- DailyRevenueDto : inner class >
+}
+
+' ═══════════════════════════════════════════════════════════════
+' EXCEPTION
+' ═══════════════════════════════════════════════════════════════
+package "com.library.admin.exception" {
+
+    class ResourceNotFoundException {
+        + ResourceNotFoundException(message : String)
+    }
+}
+
+' ═══════════════════════════════════════════════════════════════
+' SERVICE
+' ═══════════════════════════════════════════════════════════════
+package "com.library.admin.service" {
+
+    class AdminService <<Service>> {
+        - userRepository       : UserRepository
+        - membershipRepository : MembershipRepository
+        - paymentRepository    : PaymentRepository
+        - planRepository       : PlanRepository
+        - kafkaTemplate        : KafkaTemplate<String, Object>
+        + getDashboardStats()  : DashboardDto
+        + getAllStudents(page : int, size : int, status : String) : List<StudentDto>
+        + getStudentDetails(userId : String) : StudentDto
+        + updateStudentStatus(userId : String, active : boolean) : void
+        + getSeatMap(shift : String, dateStr : String) : SeatMapDto
+        + getExpiringMemberships(withinDays : int) : List<StudentDto>
+        + sendBulkReminders(userIds : List<String>) : int
+        + getRevenueReport(fromStr : String, toStr : String) : RevenueReportDto
+        .. Lombok: @RequiredArgsConstructor @Slf4j ..
+    }
+
+    note right of AdminService
+        getSeatMap limitation: loads all ACTIVE memberships
+        expiring before today+1yr, then filters shift/date
+        in-memory. Acceptable at 110-seat scale; push filter
+        into JPA query if membership table grows large.
+
+        sendBulkReminders does NOT set reminderSent = true.
+        That flag is exclusively managed by ExpiryReminderScheduler.
+    end note
+}
+
+' ═══════════════════════════════════════════════════════════════
+' SCHEDULER
+' ═══════════════════════════════════════════════════════════════
+package "com.library.admin.scheduler" {
+
+    class ExpiryReminderScheduler <<Scheduler>> {
+        - membershipRepository : MembershipRepository
+        - userRepository       : UserRepository
+        - kafkaTemplate        : KafkaTemplate<String, Object>
+        + sendExpiryReminders() : void
+        .. Lombok: @RequiredArgsConstructor @Slf4j ..
+    }
+
+    note right of ExpiryReminderScheduler
+        @Scheduled(cron = "0 0 9 * * *") — fires daily at 9:00 AM.
+        Step 1: findExpiringMemberships(today, today+7) — reminderSent=false only.
+        Step 2: compute daysLeft per membership.
+        Step 3: ONLY publish Kafka event when daysLeft == 7 OR daysLeft == 3.
+          On other days (6,5,4,2,1): skip record, do NOT set reminderSent,
+          so tomorrow's run reconsiders it.
+        Step 4: after publishing, set membership.reminderSent = true and save.
+        Bulk-loads users via findAllById to avoid N+1 queries.
+        Requires replicas=1 in Kubernetes to prevent duplicate sends.
+        If scaled, add ShedLock distributed lock.
+    end note
+}
+
+' ═══════════════════════════════════════════════════════════════
+' CONTROLLER
+' ═══════════════════════════════════════════════════════════════
+package "com.library.admin.controller" {
+
+    class AdminController <<Controller>> {
+        - adminService : AdminService
+        + getDashboard() : ResponseEntity<ApiResponse<DashboardDto>>
+        + getAllStudents(page : int, size : int, status : String) : ResponseEntity<ApiResponse<List<StudentDto>>>
+        + getStudent(userId : String) : ResponseEntity<ApiResponse<StudentDto>>
+        + updateStudentStatus(userId : String, request : UpdateStatusRequest) : ResponseEntity<ApiResponse<String>>
+        + getSeatMap(shift : String, date : String) : ResponseEntity<ApiResponse<SeatMapDto>>
+        + getExpiringMemberships(withinDays : int) : ResponseEntity<ApiResponse<List<StudentDto>>>
+        + sendBulkReminders(request : SendReminderRequest) : ResponseEntity<ApiResponse<String>>
+        + getRevenueReport(from : String, to : String) : ResponseEntity<ApiResponse<RevenueReportDto>>
+        .. @RestController @RequestMapping("/api/admin") ..
+    }
+
+    note left of AdminController
+        All routes require X-User-Role: ADMIN
+        enforced upstream by AdminRoleFilter at api-gateway.
+
+        GET  /api/admin/dashboard
+        GET  /api/admin/students?page=&size=&status=
+        GET  /api/admin/students/{userId}
+        PATCH /api/admin/students/{userId}/status
+        GET  /api/admin/seats/map?shift=&date=
+        GET  /api/admin/memberships/expiring?withinDays=7
+        POST /api/admin/reminders/send
+        GET  /api/admin/reports/revenue?from=&to=
+    end note
+}
+
+' ═══════════════════════════════════════════════════════════════
+' RELATIONSHIPS
+' ═══════════════════════════════════════════════════════════════
+
+' Cross-entity bare-UUID references (no JPA FK across service boundary)
+Membership ..> Plan    : planId (UUID ref)
+Membership ..> User    : userId (UUID ref)
+Payment    ..> Membership : membershipId (UUID ref)
+Payment    ..> User    : userId (UUID ref)
+
+' Repository manages entity
+UserRepository       ..> User       : manages
+MembershipRepository ..> Membership : manages
+PlanRepository       ..> Plan       : manages
+PaymentRepository    ..> Payment    : manages
+
+' Service depends on repositories (composition via constructor injection)
+AdminService o-- UserRepository
+AdminService o-- MembershipRepository
+AdminService o-- PaymentRepository
+AdminService o-- PlanRepository
+
+' Service produces / throws
+AdminService ..> DashboardDto         : returns
+AdminService ..> StudentDto           : returns
+AdminService ..> SeatMapDto           : returns
+AdminService ..> RevenueReportDto     : returns
+AdminService ..> RenewalReminderEvent : publishes to Kafka
+AdminService ..> ResourceNotFoundException : throws
+
+' StudentDto static factory reads entities
+StudentDto ..> User       : fromEntities()
+StudentDto ..> Membership : fromEntities()
+
+' Controller uses service (composition)
+AdminController o-- AdminService
+
+' Controller uses request/response DTOs
+AdminController ..> UpdateStatusRequest  : RequestBody
+AdminController ..> SendReminderRequest  : RequestBody
+AdminController ..> "ApiResponse<T>"     : wraps responses
+
+' Scheduler uses repositories
+ExpiryReminderScheduler o-- MembershipRepository
+ExpiryReminderScheduler o-- UserRepository
+ExpiryReminderScheduler ..> RenewalReminderEvent : publishes to Kafka
+ExpiryReminderScheduler ..> Membership           : sets reminderSent=true
+
+@enduml

@@ -1,0 +1,151 @@
+@startuml api-gateway-classes
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam ArrowColor #444444
+skinparam ClassBorderColor #666666
+skinparam NoteBackgroundColor #FFFFEE
+skinparam NoteBorderColor #CCCC99
+
+title API Gateway — Class Diagram\n(com.library.gateway  |  Spring Cloud Gateway / WebFlux)
+
+' ─────────────────────────────────────────────
+' External Spring types referenced for context
+' ─────────────────────────────────────────────
+namespace org.springframework.cloud.gateway.filter.factory {
+    abstract class AbstractGatewayFilterFactory<C> {
+        +apply(config: C): GatewayFilter
+    }
+}
+
+namespace org.springframework.cloud.gateway.filter {
+    interface GatewayFilter {
+        +filter(exchange: ServerWebExchange,\n        chain: GatewayFilterChain): Mono<Void>
+    }
+}
+
+' ─────────────────────────────────────────────
+' com.library.gateway  (root)
+' ─────────────────────────────────────────────
+package "com.library.gateway" {
+
+    class ApiGatewayApplication <<SpringBootApplication>> {
+        +{static} main(args: String[]): void
+    }
+
+    note right of ApiGatewayApplication
+        Entry point.
+        Starts the reactive (WebFlux) Spring
+        Cloud Gateway on port 8080.
+        No business logic; no database.
+    end note
+}
+
+' ─────────────────────────────────────────────
+' com.library.gateway.filter
+' ─────────────────────────────────────────────
+package "com.library.gateway.filter" {
+
+    ' ── AuthFilter ──────────────────────────
+    class AuthFilter <<Filter>> <<Component>> {
+        - jwtSecret: String
+        - {static} PUBLIC_PATHS: List<String>
+        --
+        +AuthFilter()
+        +apply(config: Config): GatewayFilter
+        -parseToken(token: String): Claims
+        -onError(exchange: ServerWebExchange,\n         message: String,\n         status: HttpStatus): Mono<Void>
+    }
+
+    class "AuthFilter.Config" as AuthFilterConfig {
+    }
+
+    note right of AuthFilter
+        PUBLIC_PATHS (bypass JWT check):
+          • /api/auth/send-otp
+          • /api/auth/verify-otp
+          • /api/auth/register
+          • /api/auth/login
+          • /api/plans
+
+        On valid JWT:
+          Injects X-User-Id  (= JWT sub claim)
+          Injects X-User-Role (= JWT "role" claim)
+          into the forwarded request.
+
+        Returns HTTP 401 on:
+          • Missing / malformed Authorization header
+          • Invalid / expired JWT
+    end note
+
+    ' ── AdminRoleFilter ─────────────────────
+    class AdminRoleFilter <<Filter>> <<Component>> {
+        --
+        +AdminRoleFilter()
+        +apply(config: Config): GatewayFilter
+        -onError(exchange: ServerWebExchange,\n         status: HttpStatus): Mono<Void>
+    }
+
+    class "AdminRoleFilter.Config" as AdminRoleFilterConfig {
+    }
+
+    note right of AdminRoleFilter
+        Applied only on /api/admin/** routes,
+        always after AuthFilter.
+
+        Reads X-User-Role header (set by AuthFilter).
+        Returns HTTP 403 if value != "ADMIN".
+    end note
+}
+
+' ─────────────────────────────────────────────
+' Inheritance relationships
+' ─────────────────────────────────────────────
+org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory <|-- AuthFilter : extends
+org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory <|-- AdminRoleFilter : extends
+
+' ─────────────────────────────────────────────
+' Inner Config classes (static nested)
+' ─────────────────────────────────────────────
+AuthFilter +-- AuthFilterConfig
+AdminRoleFilter +-- AdminRoleFilterConfig
+
+' ─────────────────────────────────────────────
+' apply() returns a GatewayFilter (dependency)
+' ─────────────────────────────────────────────
+AuthFilter ..> org.springframework.cloud.gateway.filter.GatewayFilter : <<creates>>
+AdminRoleFilter ..> org.springframework.cloud.gateway.filter.GatewayFilter : <<creates>>
+
+' ─────────────────────────────────────────────
+' Route → Filter associations (from application.yml)
+' ─────────────────────────────────────────────
+together {
+    note as RouteNote
+        Routes defined in application.yml
+        ─────────────────────────────────────────
+        auth-service-public   /api/auth/**
+            → AUTH_SERVICE_URL:8081  (no filter)
+
+        user-service          /api/users/**
+            → USER_SERVICE_URL:8082  + AuthFilter
+
+        membership-service    /api/memberships/**
+                              /api/plans/**
+                              /api/payments/**
+            → MEMBERSHIP_SERVICE_URL:8083  + AuthFilter
+
+        seat-service          /api/seats/**
+            → SEAT_SERVICE_URL:8084  + AuthFilter
+
+        admin-service         /api/admin/**
+            → ADMIN_SERVICE_URL:8086
+              + AuthFilter + AdminRoleFilter
+
+        All routes: StripPrefix=0 (path forwarded as-is)
+        CORS: localhost:3000, frontend:3000 (all methods)
+    end note
+}
+
+@enduml

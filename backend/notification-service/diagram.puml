@@ -1,0 +1,323 @@
+@startuml notification-service
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+skinparam wrapWidth 240
+skinparam class {
+    BackgroundColor White
+    BorderColor #444444
+    ArrowColor #444444
+    FontSize 12
+}
+skinparam note {
+    BackgroundColor #FFFDE7
+    BorderColor #F9A825
+}
+skinparam package {
+    BorderColor #777777
+}
+
+title Notification Service — Class Diagram\n(com.library.notification)
+
+' ─────────────────────────────────────────────────
+' ENUMS
+' ─────────────────────────────────────────────────
+
+package "com.library.notification.enums" {
+
+    enum Channel <<enumeration>> {
+        EMAIL
+        WHATSAPP
+        SMS
+    }
+
+    enum DeliveryStatus <<enumeration>> {
+        PENDING
+        SENT
+        FAILED
+    }
+}
+
+' ─────────────────────────────────────────────────
+' ENTITY
+' ─────────────────────────────────────────────────
+
+package "com.library.notification.entity" {
+
+    class NotificationLog <<Entity>> <<Builder>> {
+        - id          : UUID
+        - userId      : UUID
+        - recipient   : String
+        - message     : String
+        - event       : String
+        ~ channel     : Channel
+        ~ status      : DeliveryStatus
+        - errorMessage : String
+        - sentAt      : LocalDateTime
+        - createdAt   : LocalDateTime
+        __
+        ~ prePersist() : void
+    }
+
+    note right of NotificationLog
+        @Table(name = "notification_logs")
+        @GeneratedValue(strategy = UUID)
+        @Enumerated(EnumType.STRING) on channel and status
+        @PrePersist sets createdAt = LocalDateTime.now()
+        Lombok: @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    end note
+}
+
+' ─────────────────────────────────────────────────
+' REPOSITORY
+' ─────────────────────────────────────────────────
+
+package "com.library.notification.repository" {
+
+    interface NotificationLogRepository <<Repository>> {
+        + findByUserIdOrderByCreatedAtDesc(userId : UUID) : List<NotificationLog>
+        + findByUserIdAndChannelOrderByCreatedAtDesc(userId : UUID, channel : Channel) : List<NotificationLog>
+        + findByEventOrderByCreatedAtDesc(event : String) : List<NotificationLog>
+        + countByStatusAndEvent(status : DeliveryStatus, event : String) : long
+        + countByStatus(status : DeliveryStatus) : long
+        + findByStatusOrderByCreatedAtDesc(status : DeliveryStatus) : List<NotificationLog>
+    }
+}
+
+' ─────────────────────────────────────────────────
+' DTOs / KAFKA EVENT PAYLOADS
+' ─────────────────────────────────────────────────
+
+package "com.library.notification.dto" {
+
+    class BookingConfirmedEvent <<DTO>> <<KafkaEvent>> {
+        + userId       : String
+        + membershipId : String
+        + userName     : String
+        + userMobile   : String
+        + userEmail    : String
+        + planName     : String
+        + planType     : String
+        + seatNumber   : String
+        + shift        : String
+        + startDate    : String
+        + endDate      : String
+        + amountPaid   : BigDecimal
+        + eventType    : String
+    }
+
+    note right of BookingConfirmedEvent
+        Consumed from topics:
+          - "booking-confirmed" (membership-service)
+          - "user-registered"   (auth-service, subset of fields used)
+        userId / membershipId are bare UUID strings —
+        no foreign-key relationship to other services.
+        Lombok: @Data
+    end note
+
+    class RenewalReminderEvent <<DTO>> <<KafkaEvent>> {
+        + userId        : String
+        + membershipId  : String
+        + userName      : String
+        + userMobile    : String
+        + userEmail     : String
+        + seatNumber    : String
+        + expiryDate    : String
+        + daysRemaining : int
+        + eventType     : String
+    }
+
+    note right of RenewalReminderEvent
+        Consumed from topic: "renewal-reminder"
+        Published by admin-service ExpiryReminderScheduler
+        at 7-day and 3-day thresholds.
+        daysRemaining <= 3 triggers URGENT urgency label.
+        Lombok: @Data
+    end note
+}
+
+' ─────────────────────────────────────────────────
+' SERVICES
+' ─────────────────────────────────────────────────
+
+package "com.library.notification.service" {
+
+    class WhatsAppService <<Service>> {
+        - logRepository  : NotificationLogRepository
+        - accountSid     : String
+        - authToken      : String
+        - whatsappFrom   : String
+        - twilioEnabled  : boolean
+        __
+        + init() : void
+        + send(mobile : String, message : String, userId : String, event : String) : void
+        - formatNumber(mobile : String) : String
+        - saveLog(userId : String, recipient : String, message : String,\n    event : String, status : DeliveryStatus, errorMessage : String) : void
+    }
+
+    note bottom of WhatsAppService
+        @PostConstruct init(): checks TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN.
+        Dev mode (blank creds): logs "[DEV] WhatsApp → ..." to console, no real send.
+        send(): exceptions caught internally — never rethrown to Kafka consumer.
+        formatNumber(): strips non-numeric/+, prepends "+91" if no leading "+".
+        saveLog(): DB failures are swallowed (try-catch) so log write
+          never crashes the delivery path.
+    end note
+
+    class EmailService <<Service>> {
+        - logRepository  : NotificationLogRepository
+        - sendgridApiKey : String
+        - fromEmail      : String
+        - fromName       : String
+        __
+        + sendText(to : String, subject : String, body : String,\n    userId : String, event : String) : void
+        + sendHtml(to : String, subject : String, htmlBody : String,\n    userId : String, event : String) : void
+        - send(to : String, subject : String, textBody : String,\n    htmlBody : String, userId : String, event : String) : void
+        - saveLog(userId : String, recipient : String, message : String,\n    event : String, status : DeliveryStatus, errorMessage : String) : void
+    }
+
+    note bottom of EmailService
+        Dev mode (SENDGRID_API_KEY blank): logs "[DEV] Email → ..." to console, no real send.
+        send(): IOException caught internally — never rethrown to Kafka consumer.
+        saveLog(): message body truncated to 1000 chars before DB persist
+          to avoid bloating the DB with full HTML email bodies.
+        DB write failures are swallowed (try-catch).
+        sendText() and sendHtml() both delegate to private send().
+    end note
+
+    class NotificationService <<Service>> {
+        - whatsAppService : WhatsAppService
+        - emailService    : EmailService
+        - adminEmail      : String
+        - adminWhatsapp   : String
+        __
+        + sendBookingConfirmation(event : BookingConfirmedEvent) : void
+        + sendWelcomeNotification(event : BookingConfirmedEvent) : void
+        + sendRenewalReminder(event : RenewalReminderEvent) : void
+        - buildBookingWhatsApp(e : BookingConfirmedEvent) : String
+        - buildBookingEmail(e : BookingConfirmedEvent) : String
+        - formatShift(shift : String) : String
+        - hasValue(s : String) : boolean
+    }
+
+    note right of NotificationService
+        sendBookingConfirmation():
+          - Student WhatsApp (if userMobile present)
+          - Student email    (if userEmail present)
+          - Admin WhatsApp   (if ADMIN_WHATSAPP configured)
+          - Admin email      (always, to adminEmail)
+        sendWelcomeNotification():
+          - Student WhatsApp + email only (no admin alert)
+        sendRenewalReminder():
+          - urgency = URGENT if daysRemaining <= 3, else Reminder
+          - Student WhatsApp + email only
+    end note
+}
+
+' ─────────────────────────────────────────────────
+' KAFKA CONSUMER
+' ─────────────────────────────────────────────────
+
+package "com.library.notification.consumer" {
+
+    class NotificationConsumer <<KafkaConsumer>> {
+        - notificationService : NotificationService
+        __
+        + handleBookingConfirmed(\n    event : BookingConfirmedEvent,\n    topic : String,\n    partition : int,\n    offset : long) : void
+        + handleUserRegistered(\n    event : BookingConfirmedEvent,\n    topic : String,\n    offset : long) : void
+        + handleRenewalReminder(\n    event : RenewalReminderEvent,\n    topic : String,\n    offset : long) : void
+    }
+
+    note right of NotificationConsumer
+        handleBookingConfirmed():
+          @KafkaListener topic="booking-confirmed"
+          group="notification-booking-group"
+          factory=bookingKafkaListenerContainerFactory
+        handleUserRegistered():
+          @KafkaListener topic="user-registered"
+          group="notification-booking-group"
+          factory=bookingKafkaListenerContainerFactory
+          (reuses BookingConfirmedEvent shape; only
+           userName/userMobile/userEmail fields used)
+        handleRenewalReminder():
+          @KafkaListener topic="renewal-reminder"
+          group="notification-reminder-group"
+          factory=reminderKafkaListenerContainerFactory
+
+        All three handlers wrap service calls in try-catch.
+        Exceptions are logged but NOT rethrown — prevents
+        Kafka from re-delivering the message indefinitely.
+        (Production TODO: push failures to *.DLT topic)
+    end note
+}
+
+' ─────────────────────────────────────────────────
+' KAFKA CONFIGURATION
+' ─────────────────────────────────────────────────
+
+package "com.library.notification.config" {
+
+    class KafkaConfig <<Configuration>> {
+        + bookingKafkaListenerContainerFactory(\n    consumerFactory : ConsumerFactory<String,Object>)\n    : ConcurrentKafkaListenerContainerFactory<String,Object>
+        + reminderKafkaListenerContainerFactory(\n    consumerFactory : ConsumerFactory<String,Object>)\n    : ConcurrentKafkaListenerContainerFactory<String,Object>
+    }
+
+    note right of KafkaConfig
+        bookingKafkaListenerContainerFactory:
+          concurrency=3, AckMode=BATCH
+          Used by: booking-confirmed, user-registered
+        reminderKafkaListenerContainerFactory:
+          concurrency=2, AckMode=BATCH
+          Used by: renewal-reminder
+
+        Both factories share the auto-configured ConsumerFactory.
+        spring.json.use.type.headers=false — deserialization
+          driven by @Payload type, not Kafka headers.
+        spring.json.trusted.packages="com.library.*"
+    end note
+}
+
+' ─────────────────────────────────────────────────
+' RELATIONSHIPS
+' ─────────────────────────────────────────────────
+
+' Entity uses enums
+NotificationLog *-- Channel         : channel
+NotificationLog *-- DeliveryStatus  : status
+
+' Repository extends JpaRepository (abbreviated)
+NotificationLogRepository ..> NotificationLog  : manages
+
+' WhatsAppService composes repository, depends on enums/entity
+WhatsAppService *-- NotificationLogRepository   : logRepository
+WhatsAppService ..> NotificationLog             : creates via builder
+WhatsAppService ..> DeliveryStatus              : uses
+WhatsAppService ..> Channel                     : uses (WHATSAPP)
+
+' EmailService composes repository, depends on enums/entity
+EmailService *-- NotificationLogRepository      : logRepository
+EmailService ..> NotificationLog                : creates via builder
+EmailService ..> DeliveryStatus                 : uses
+EmailService ..> Channel                        : uses (EMAIL)
+
+' NotificationService composes both channel services
+NotificationService *-- WhatsAppService         : whatsAppService
+NotificationService *-- EmailService            : emailService
+
+' NotificationService depends on event DTOs
+NotificationService ..> BookingConfirmedEvent   : uses
+NotificationService ..> RenewalReminderEvent    : uses
+
+' Consumer composes NotificationService
+NotificationConsumer *-- NotificationService    : notificationService
+
+' Consumer depends on event DTOs (inbound Kafka payloads)
+NotificationConsumer ..> BookingConfirmedEvent  : @Payload
+NotificationConsumer ..> RenewalReminderEvent   : @Payload
+
+@enduml

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.library</groupId>
+    <artifactId>library-system</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>backend/user-service</module>
+        <module>backend/admin-service</module>
+        <module>backend/api-gateway</module>
+        <module>backend/auth-service</module>
+        <module>backend/membership-service</module>
+        <module>backend/notification-service</module>
+        <module>backend/seat-service</module>
+    </modules>
+</project>

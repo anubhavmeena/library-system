@@ -1,0 +1,44 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/library_db}
+    username: ${DB_USERNAME:library_user}
+    password: ${DB_PASSWORD:library_pass}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      #ddl-auto: validate
+      ddl-auto: update
+    show-sql: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      #host: ${REDIS_HOST:library-redis}
+      port: ${REDIS_PORT:6379}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:library-jwt-secret-key-2024-change-in-production}
+    expiration: 86400000
+
+twilio:
+  account-sid: ${TWILIO_ACCOUNT_SID:}
+  auth-token: ${TWILIO_AUTH_TOKEN:}
+  phone-number: ${TWILIO_PHONE_NUMBER:}
+
+sendgrid:
+  api-key: ${SENDGRID_API_KEY:}
+
+notification:
+  from-email: ${FROM_EMAIL:noreply@library.com}
+  from-name: ${FROM_NAME:Library System}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -1,0 +1,150 @@
+lqibrary-system/
+│
+├── README.md
+├── docker-compose.infra.yml          # PostgreSQL, Redis, Kafka, Zookeeper
+├── docker-compose.services.yml       # All 6 microservices + frontend
+│
+├── backend/
+│   │
+│   ├── api-gateway/                  ── Spring Cloud Gateway (port 8080)
+│   │   ├── Dockerfile
+│   │   ├── pom.xml
+│   │   └── src/main/
+│   │       ├── java/com/library/gateway/
+│   │       │   ├── ApiGatewayApplication.java
+│   │       │   └── filter/
+│   │       │       ├── AuthFilter.java         # JWT validation on all routes
+│   │       │       └── AdminRoleFilter.java    # Role guard for /api/admin/**
+│   │       └── resources/
+│   │           └── application.yml            # Route definitions
+│   │
+│   ├── auth-service/                 ── OTP + JWT Auth (port 8081)
+│   │   ├── Dockerfile
+│   │   ├── pom.xml
+│   │   └── src/main/
+│   │       ├── java/com/library/auth/
+│   │       │   ├── AuthServiceApplication.java
+│   │       │   ├── controller/
+│   │       │   │   └── AuthController.java    # send-otp, verify-otp, register, login
+│   │       │   ├── dto/
+│   │       │   │   ├── ApiResponse.java
+│   │       │   │   ├── AuthResponse.java
+│   │       │   │   ├── LoginRequest.java
+│   │       │   │   ├── OtpVerifyResponse.java
+│   │       │   │   ├── RegisterRequest.java
+│   │       │   │   ├── SendOtpRequest.java
+│   │       │   │   ├── UserInfoDto.java
+│   │       │   │   └── VerifyOtpRequest.java
+│   │       │   ├── entity/
+│   │       │   │   └── User.java
+│   │       │   ├── repository/
+│   │       │   │   └── UserRepository.java
+│   │       │   └── service/
+│   │       │       ├── AuthService.java       # OTP flow, JWT generation
+│   │       │       └── OtpService.java        # Twilio SMS sender
+│   │       └── resources/
+│   │           └── application.yml
+│   │
+│   ├── user-service/                 ── Profile management (port 8082)
+│   │   ├── Dockerfile
+│   │   └── src/  [entity, controller, service, repo, dto]
+│   │
+│   ├── membership-service/           ── Plans, payments, Kafka producer (port 8083)
+│   │   ├── Dockerfile
+│   │   ├── pom.xml
+│   │   └── src/main/
+│   │       ├── java/com/library/membership/
+│   │       │   ├── MembershipServiceApplication.java
+│   │       │   ├── controller/
+│   │       │   │   └── MembershipController.java   # /plans, /memberships, /payments
+│   │       │   ├── event/
+│   │       │   │   └── BookingConfirmedEvent.java  # Kafka event model
+│   │       │   └── service/
+│   │       │       └── PaymentService.java         # Razorpay + Kafka publish
+│   │       └── resources/
+│   │           └── application.yml
+│   │
+│   ├── seat-service/                 ── Seat availability & booking (port 8084)
+│   │   ├── Dockerfile
+│   │   └── src/  [entity, controller, service, repo, dto]
+│   │
+│   ├── notification-service/         ── Kafka consumer → WhatsApp + Email (port 8085)
+│   │   ├── Dockerfile
+│   │   └── src/main/
+│   │       └── java/com/library/notification/
+│   │           ├── NotificationServiceApplication.java
+│   │           ├── consumer/
+│   │           │   └── NotificationConsumer.java  # Listens: booking-confirmed, renewal-reminder
+│   │           ├── dto/  [BookingConfirmedEvent, RenewalReminderEvent]
+│   │           └── service/
+│   │               └── NotificationService.java   # Twilio WhatsApp + SendGrid Email
+│   │
+│   ├── admin-service/                ── Admin dashboard & scheduler (port 8086)
+│   │   ├── Dockerfile
+│   │   └── src/main/
+│   │       └── java/com/library/admin/
+│   │           ├── controller/
+│   │           │   └── AdminController.java       # dashboard, students, seat-map, reminders
+│   │           └── scheduler/
+│   │               └── ExpiryReminderScheduler.java  # Daily 9AM Kafka publish
+│   │
+│   └── common-lib/
+│       └── src/main/resources/db/
+│           └── init.sql                           # Full DB schema + seed data
+│
+├── frontend/                         ── React 18 + Vite + Tailwind (port 3000)
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── tailwind.config.js
+│   └── src/
+│       ├── main.jsx                  # Redux Provider + BrowserRouter + Toaster
+│       ├── App.jsx                   # All routes + ProtectedRoute guard
+│       ├── index.css                 # Global styles + design system
+│       │
+│       ├── store/
+│       │   ├── index.js              # configureStore
+│       │   └── slices/
+│       │       ├── authSlice.js      # sendOtp, verifyOtp, register, login, logout
+│       │       ├── membershipSlice.js # plans, membership, payment order
+│       │       └── seatSlice.js      # availability, seat selection
+│       │
+│       ├── services/
+│       │   └── api.js               # Axios instance with JWT interceptor
+│       │
+│       ├── layouts/
+│       │   ├── StudentLayout.jsx    # Sidebar nav for students
+│       │   └── AdminLayout.jsx      # Sidebar nav for admin
+│       │
+│       └── pages/
+│           ├── LandingPage.jsx      # Public homepage
+│           │
+│           ├── auth/
+│           │   ├── LoginPage.jsx    # OTP login (mobile/email)
+│           │   └── RegisterPage.jsx # 3-step: verify → profile → done
+│           │
+│           ├── student/
+│           │   ├── DashboardPage.jsx      # Stats, quick actions, expiry alert
+│           │   ├── BookingPage.jsx        # Plan → Cinema seat grid → Pay
+│           │   ├── MembershipPage.jsx     # Current plan + history
+│           │   ├── ProfilePage.jsx        # Edit details, photo upload
+│           │   ├── FacilitiesPage.jsx     # Library info, amenities
+│           │   └── PaymentSuccessPage.jsx # Post-payment confirmation
+│           │
+│           └── admin/
+│               ├── AdminLoginPage.jsx     # Admin OTP login
+│               ├── AdminDashboardPage.jsx # Stats: enrolled, revenue, occupancy
+│               ├── AdminStudentsPage.jsx  # Student list with filters
+│               ├── AdminSeatsPage.jsx     # Live seat occupancy map
+│               └── AdminRemindersPage.jsx # Expiring memberships + bulk send
+│
+└── k8s/                              ── Kubernetes manifests
+    ├── namespace.yaml
+    ├── configmap.yaml
+    ├── secret.yaml
+    ├── postgres.yaml
+    ├── redis.yaml
+    ├── kafka.yaml
+    └── library-system.yaml          # All 7 service Deployments + Services

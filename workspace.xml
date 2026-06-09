@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="ed67c347-ec27-454a-b0cb-041cb03d835e" name="Changes" comment="" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="KubernetesApiPersistence">{}</component>
+  <component name="KubernetesApiProvider">{
+  &quot;isMigrated&quot;: true
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 1
+}</component>
+  <component name="ProjectId" id="3EZzhYv30ssq8WjIU17XBig0Z6o" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RequestMappingsPanelOrder0&quot;: &quot;0&quot;,
+    &quot;RequestMappingsPanelOrder1&quot;: &quot;1&quot;,
+    &quot;RequestMappingsPanelWidth0&quot;: &quot;75&quot;,
+    &quot;RequestMappingsPanelWidth1&quot;: &quot;75&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;Spring Boot.AdminServiceApplication.executor&quot;: &quot;Debug&quot;,
+    &quot;Spring Boot.ApiGatewayApplication.executor&quot;: &quot;Debug&quot;,
+    &quot;Spring Boot.AuthServiceApplication.executor&quot;: &quot;Debug&quot;,
+    &quot;Spring Boot.MembershipServiceApplication.executor&quot;: &quot;Debug&quot;,
+    &quot;Spring Boot.NotificationServiceApplication.executor&quot;: &quot;Debug&quot;,
+    &quot;Spring Boot.SeatServiceApplication.executor&quot;: &quot;Debug&quot;,
+    &quot;Spring Boot.UserServiceApplication.executor&quot;: &quot;Debug&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;run.configurations.included.in.services&quot;: &quot;true&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="ReactorSettings">
+    <option name="notificationShown" value="true" />
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\anubh\library-system" />
+    </key>
+  </component>
+  <component name="RunDashboard">
+    <option name="configurationTypes">
+      <set>
+        <option value="KtorApplicationConfigurationType" />
+        <option value="MicronautRunConfigurationType" />
+        <option value="QuarkusRunConfigurationType" />
+        <option value="SpringBootApplicationConfigurationType" />
+      </set>
+    </option>
+  </component>
+  <component name="RunManager" selected="Spring Boot.ApiGatewayApplication">
+    <configuration name="AdminServiceApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <envs>
+        <env name="ADMIN_EMAIL" value="admin@vidyalibrary.com" />
+        <env name="ADMIN_SERVICE_URL" value="http://localhost:8086" />
+        <env name="AUTH_SERVICE_URL" value="http://localhost:8081" />
+        <env name="DB_PASSWORD" value="library_pass" />
+        <env name="DB_URL" value="jdbc:postgresql://localhost:5432/library_db" />
+        <env name="DB_USERNAME" value="library_user" />
+        <env name="JWT_SECRET" value="library-jwt-secret-key-local-development-32chars" />
+        <env name="KAFKA_BOOTSTRAP_SERVERS" value="localhost:9092" />
+        <env name="MEMBERSHIP_SERVICE_URL" value="http://localhost:8083" />
+        <env name="NOTIFICATION_SERVICE_URL" value="http://localhost:8085" />
+        <env name="REDIS_HOST" value="localhost" />
+        <env name="REDIS_PORT" value="6379" />
+        <env name="SEAT_SERVICE_URL" value="http://localhost:8084" />
+        <env name="SPRING_PROFILES_ACTIVE" value="dev" />
+        <env name="UPLOAD_DIR" value="&quot;C:\Users\anubh\library-system\uploads&quot;" />
+        <env name="USER_SERVICE_URL" value="http://localhost:8082" />
+      </envs>
+      <module name="admin-service" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.library.admin.AdminServiceApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ApiGatewayApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <envs>
+        <env name="ADMIN_EMAIL" value="admin@vidyalibrary.com" />
+        <env name="ADMIN_SERVICE_URL" value="http://localhost:8086" />
+        <env name="AUTH_SERVICE_URL" value="http://localhost:8081" />
+        <env name="DB_PASSWORD" value="library_pass" />
+        <env name="DB_URL" value="jdbc:postgresql://localhost:5432/library_db" />
+        <env name="DB_USERNAME" value="library_user" />
+        <env name="JWT_SECRET" value="library-jwt-secret-key-local-development-32chars" />
+        <env name="KAFKA_BOOTSTRAP_SERVERS" value="localhost:9092" />
+        <env name="MEMBERSHIP_SERVICE_URL" value="http://localhost:8083" />
+        <env name="NOTIFICATION_SERVICE_URL" value="http://localhost:8085" />
+        <env name="REDIS_HOST" value="localhost" />
+        <env name="REDIS_PORT" value="6379" />
+        <env name="SEAT_SERVICE_URL" value="http://localhost:8084" />
+        <env name="SPRING_PROFILES_ACTIVE" value="dev" />
+        <env name="UPLOAD_DIR" value="C:\Users\anubh\library-system\uploads" />
+        <env name="USER_SERVICE_URL" value="http://localhost:8082" />
+      </envs>
+      <module name="api-gateway" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.library.gateway.ApiGatewayApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="AuthServiceApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <envs>
+        <env name="ADMIN_EMAIL" value="admin@vidyalibrary.com" />
+        <env name="ADMIN_SERVICE_URL" value="http://localhost:8086" />
+        <env name="AUTH_SERVICE_URL" value="http://localhost:8081" />
+        <env name="DB_PASSWORD" value="library_pass" />
+        <env name="DB_URL" value="jdbc:postgresql://localhost:5432/library_db" />
+        <env name="DB_USERNAME" value="library_user" />
+        <env name="JWT_SECRET" value="library-jwt-secret-key-local-development-32chars" />
+        <env name="KAFKA_BOOTSTRAP_SERVERS" value="localhost:9092" />
+        <env name="MEMBERSHIP_SERVICE_URL" value="http://localhost:8083" />
+        <env name="NOTIFICATION_SERVICE_URL" value="http://localhost:8085" />
+        <env name="REDIS_HOST" value="localhost" />
+        <env name="REDIS_PORT" value="6379" />
+        <env name="SEAT_SERVICE_URL" value="http://localhost:8084" />
+        <env name="SPRING_PROFILES_ACTIVE" value="dev" />
+        <env name="UPLOAD_DIR" value="C:\Users\anubh\library-system\uploads" />
+        <env name="USER_SERVICE_URL" value="http://localhost:8082" />
+      </envs>
+      <module name="auth-service" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.library.auth.AuthServiceApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="MembershipServiceApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <envs>
+        <env name="ADMIN_EMAIL" value="admin@vidyalibrary.com" />
+        <env name="ADMIN_SERVICE_URL" value="http://localhost:8086" />
+        <env name="AUTH_SERVICE_URL" value="http://localhost:8081" />
+        <env name="DB_PASSWORD" value="library_pass" />
+        <env name="DB_URL" value="jdbc:postgresql://localhost:5432/library_db" />
+        <env name="DB_USERNAME" value="library_user" />
+        <env name="JWT_SECRET" value="library-jwt-secret-key-local-development-32chars" />
+        <env name="KAFKA_BOOTSTRAP_SERVERS" value="localhost:9092" />
+        <env name="MEMBERSHIP_SERVICE_URL" value="http://localhost:8083" />
+        <env name="NOTIFICATION_SERVICE_URL" value="http://localhost:8085" />
+        <env name="REDIS_HOST" value="localhost" />
+        <env name="REDIS_PORT" value="6379" />
+        <env name="SEAT_SERVICE_URL" value="http://localhost:8084" />
+        <env name="SPRING_PROFILES_ACTIVE" value="dev" />
+        <env name="UPLOAD_DIR" value="C:\Users\anubh\library-system\uploads" />
+        <env name="USER_SERVICE_URL" value="http://localhost:8082" />
+      </envs>
+      <module name="membership-service" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.library.membership.MembershipServiceApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="NotificationServiceApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <envs>
+        <env name="ADMIN_EMAIL" value="admin@vidyalibrary.com" />
+        <env name="ADMIN_SERVICE_URL" value="http://localhost:8086" />
+        <env name="AUTH_SERVICE_URL" value="http://localhost:8081" />
+        <env name="DB_PASSWORD" value="library_pass" />
+        <env name="DB_URL" value="jdbc:postgresql://localhost:5432/library_db" />
+        <env name="DB_USERNAME" value="library_user" />
+        <env name="JWT_SECRET" value="library-jwt-secret-key-local-development-32chars" />
+        <env name="KAFKA_BOOTSTRAP_SERVERS" value="localhost:9092" />
+        <env name="MEMBERSHIP_SERVICE_URL" value="http://localhost:8083" />
+        <env name="NOTIFICATION_SERVICE_URL" value="http://localhost:8085" />
+        <env name="REDIS_HOST" value="localhost" />
+        <env name="REDIS_PORT" value="6379" />
+        <env name="SEAT_SERVICE_URL" value="http://localhost:8084" />
+        <env name="SPRING_PROFILES_ACTIVE" value="dev" />
+        <env name="UPLOAD_DIR" value="C:\Users\anubh\library-system\uploads" />
+        <env name="USER_SERVICE_URL" value="http://localhost:8082" />
+      </envs>
+      <module name="notification-service" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.library.notification.NotificationServiceApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="SeatServiceApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <envs>
+        <env name="ADMIN_EMAIL" value="admin@vidyalibrary.com" />
+        <env name="ADMIN_SERVICE_URL" value="http://localhost:8086" />
+        <env name="AUTH_SERVICE_URL" value="http://localhost:8081" />
+        <env name="DB_PASSWORD" value="library_pass" />
+        <env name="DB_URL" value="jdbc:postgresql://localhost:5432/library_db" />
+        <env name="DB_USERNAME" value="library_user" />
+        <env name="JWT_SECRET" value="library-jwt-secret-key-local-development-32chars" />
+        <env name="KAFKA_BOOTSTRAP_SERVERS" value="localhost:9092" />
+        <env name="MEMBERSHIP_SERVICE_URL" value="http://localhost:8083" />
+        <env name="NOTIFICATION_SERVICE_URL" value="http://localhost:8085" />
+        <env name="REDIS_HOST" value="localhost" />
+        <env name="REDIS_PORT" value="6379" />
+        <env name="SEAT_SERVICE_URL" value="http://localhost:8084" />
+        <env name="SPRING_PROFILES_ACTIVE" value="dev" />
+        <env name="UPLOAD_DIR" value="C:\Users\anubh\library-system\uploads" />
+        <env name="USER_SERVICE_URL" value="http://localhost:8082" />
+      </envs>
+      <module name="seat-service" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.library.seat.SeatServiceApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="UserServiceApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <envs>
+        <env name="ADMIN_EMAIL" value="admin@vidyalibrary.com" />
+        <env name="ADMIN_SERVICE_URL" value="http://localhost:8086" />
+        <env name="AUTH_SERVICE_URL" value="http://localhost:8081" />
+        <env name="DB_PASSWORD" value="library_pass" />
+        <env name="DB_URL" value="jdbc:postgresql://localhost:5432/library_db" />
+        <env name="DB_USERNAME" value="library_user" />
+        <env name="JWT_SECRET" value="library-jwt-secret-key-local-development-32chars" />
+        <env name="KAFKA_BOOTSTRAP_SERVERS" value="localhost:9092" />
+        <env name="MEMBERSHIP_SERVICE_URL" value="http://localhost:8083" />
+        <env name="NOTIFICATION_SERVICE_URL" value="http://localhost:8085" />
+        <env name="REDIS_HOST" value="localhost" />
+        <env name="REDIS_PORT" value="6379" />
+        <env name="SEAT_SERVICE_URL" value="http://localhost:8084" />
+        <env name="SPRING_PROFILES_ACTIVE" value="dev" />
+        <env name="UPLOAD_DIR" value="C:\Users\anubh\library-system\uploads" />
+        <env name="USER_SERVICE_URL" value="http://localhost:8082" />
+      </envs>
+      <module name="user-service" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.library.user.UserServiceApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <list>
+      <item itemvalue="Spring Boot.AdminServiceApplication" />
+      <item itemvalue="Spring Boot.ApiGatewayApplication" />
+      <item itemvalue="Spring Boot.AuthServiceApplication" />
+      <item itemvalue="Spring Boot.MembershipServiceApplication" />
+      <item itemvalue="Spring Boot.NotificationServiceApplication" />
+      <item itemvalue="Spring Boot.SeatServiceApplication" />
+      <item itemvalue="Spring Boot.UserServiceApplication" />
+    </list>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-9823dce3aa75-28b599e66164-intellij.indexing.shared.core-IU-242.26775.15" />
+        <option value="bundled-js-predefined-d6986cc7102b-5c90d61e3bab-JavaScript-IU-242.26775.15" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="ed67c347-ec27-454a-b0cb-041cb03d835e" name="Changes" comment="" />
+      <created>1780401006099</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1780401006099</updated>
+      <workItem from="1780401008012" duration="7542000" />
+      <workItem from="1780484159176" duration="3931000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="UnknownFeatures">
+    <option featureType="dependencySupport" implementationName="java:org.springframework:spring-core" />
+    <option featureType="dependencySupport" implementationName="javascript:npm:react" />
+    <option featureType="dependencySupport" implementationName="java:org.apache.kafka:kafka_2.13" />
+    <option featureType="dependencySupport" implementationName="java:jakarta.validation:jakarta.validation-api" />
+    <option featureType="dependencySupport" implementationName="javascript:npm:tailwindcss" />
+    <option featureType="dependencySupport" implementationName="javascript:npm:vite" />
+    <option featureType="dependencySupport" implementationName="java:io.projectreactor:reactor-core" />
+    <option featureType="dependencySupport" implementationName="java:org.springframework.data:spring-data-commons" />
+    <option featureType="dependencySupport" implementationName="executable:kubectl" />
+    <option featureType="dependencySupport" implementationName="java:org.springframework.cloud:spring-cloud-context" />
+    <option featureType="dependencySupport" implementationName="java:org.hibernate.validator:hibernate-validator" />
+    <option featureType="dependencySupport" implementationName="java:org.springframework:spring-webmvc" />
+    <option featureType="dependencySupport" implementationName="java:org.projectlombok:lombok" />
+    <option featureType="dependencySupport" implementationName="executable:docker" />
+    <option featureType="dependencySupport" implementationName="java:jakarta.persistence:jakarta.persistence-api" />
+    <option featureType="dependencySupport" implementationName="java:org.springframework:spring-messaging" />
+    <option featureType="dependencySupport" implementationName="java:org.springframework.boot:spring-boot" />
+    <option featureType="dependencySupport" implementationName="javascript:npm:postcss" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/auth-service/src/main/java/com/library/auth/controller/AuthController.java</url>
+          <line>31</line>
+          <option name="timeStamp" value="2" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/auth-service/src/main/java/com/library/auth/controller/AuthController.java</url>
+          <line>37</line>
+          <option name="timeStamp" value="3" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/admin-service/src/main/java/com/library/admin/controller/AdminController.java</url>
+          <line>24</line>
+          <option name="timeStamp" value="6" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/membership-service/src/main/java/com/library/membership/controller/MembershipController.java</url>
+          <line>26</line>
+          <option name="timeStamp" value="7" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/membership-service/src/main/java/com/library/membership/controller/MembershipController.java</url>
+          <line>35</line>
+          <option name="timeStamp" value="8" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/notification-service/src/main/java/com/library/notification/consumer/NotificationConsumer.java</url>
+          <line>34</line>
+          <option name="timeStamp" value="9" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/notification-service/src/main/java/com/library/notification/consumer/NotificationConsumer.java</url>
+          <line>84</line>
+          <option name="timeStamp" value="10" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/seat-service/src/main/java/com/library/seat/controller/SeatController.java</url>
+          <line>26</line>
+          <option name="timeStamp" value="12" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/seat-service/src/main/java/com/library/seat/controller/SeatController.java</url>
+          <line>38</line>
+          <option name="timeStamp" value="13" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/seat-service/src/main/java/com/library/seat/controller/SeatController.java</url>
+          <line>73</line>
+          <option name="timeStamp" value="14" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/user-service/src/main/java/com/library/user/controller/UserController.java</url>
+          <line>25</line>
+          <option name="timeStamp" value="15" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/user-service/src/main/java/com/library/user/controller/UserController.java</url>
+          <line>38</line>
+          <option name="timeStamp" value="16" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/user-service/src/main/java/com/library/user/controller/UserController.java</url>
+          <line>31</line>
+          <option name="timeStamp" value="17" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/auth-service/src/main/java/com/library/auth/controller/AuthController.java</url>
+          <line>32</line>
+          <option name="timeStamp" value="18" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/auth-service/src/main/java/com/library/auth/controller/AuthController.java</url>
+          <line>49</line>
+          <option name="timeStamp" value="19" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/auth-service/src/main/java/com/library/auth/controller/AuthController.java</url>
+          <line>43</line>
+          <option name="timeStamp" value="20" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/auth-service/src/main/java/com/library/auth/controller/AuthController.java</url>
+          <line>19</line>
+          <option name="timeStamp" value="21" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/auth-service/src/main/java/com/library/auth/controller/AuthController.java</url>
+          <line>25</line>
+          <option name="timeStamp" value="22" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/auth-service/src/main/java/com/library/auth/service/AuthService.java</url>
+          <line>48</line>
+          <option name="timeStamp" value="23" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/auth-service/src/main/java/com/library/auth/service/AuthService.java</url>
+          <line>46</line>
+          <option name="timeStamp" value="24" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/auth-service/src/main/java/com/library/auth/service/AuthService.java</url>
+          <line>175</line>
+          <option name="timeStamp" value="25" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/auth-service/src/main/java/com/library/auth/service/AuthService.java</url>
+          <line>38</line>
+          <option name="timeStamp" value="26" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/auth-service/src/main/java/com/library/auth/service/AuthService.java</url>
+          <line>72</line>
+          <option name="timeStamp" value="27" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/backend/auth-service/src/main/java/com/library/auth/service/AuthService.java</url>
+          <line>109</line>
+          <option name="timeStamp" value="28" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+</project>

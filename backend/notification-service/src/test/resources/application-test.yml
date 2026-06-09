@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  kafka:
+    bootstrap-servers: localhost:19099
+    listener:
+      auto-startup: false
+
+twilio:
+  account-sid:
+  auth-token:
+  whatsapp-from: whatsapp:+14155238886
+
+sendgrid:
+  api-key:
+
+notification:
+  from-email: noreply@test.com
+  from-name: Test Library
+  admin-email: admin@test.com
+  admin-whatsapp:

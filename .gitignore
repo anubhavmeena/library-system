@@ -1,0 +1,40 @@
+# ── Environment / Secrets ─────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Maven build outputs ────────────────────────────────────────────────────────
+**/target/
+**/*.jar
+**/*.war
+**/*.class
+
+# ── Node / Frontend ────────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+# (Dockerfiles are committed; ignore local override files)
+docker-compose.override.yml
+
+# ── IDE / Editor ──────────────────────────────────────────────────────────────
+.idea/
+**/.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*.un~
+workspace.xml
+
+# ── Claude Code (AI assistant files — not project source) ─────────────────────
+.claude/
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/

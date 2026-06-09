@@ -1,0 +1,282 @@
+@startuml diagram
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+skinparam class {
+    BackgroundColor White
+    BorderColor #444444
+    ArrowColor #444444
+    HeaderBackgroundColor #DDEEFF
+}
+
+title User-Service Class Diagram (port 8082)
+
+' ─────────────────────────────────────────────
+' ENTITY
+' ─────────────────────────────────────────────
+package "com.library.user.entity" {
+
+    enum Role <<Enum>> {
+        STUDENT
+        ADMIN
+    }
+
+    class User <<Entity>> {
+        ' Lombok: @Data @Builder @NoArgsConstructor @AllArgsConstructor
+        ' Table: users  (shared with auth-service — see note)
+        - id         : UUID
+        - mobile     : String
+        - email      : String
+        - name       : String
+        - address    : String
+        - photoUrl   : String
+        - dateOfBirth: LocalDate
+        - gender     : String
+        - isActive   : Boolean
+        - role       : Role
+        - createdAt  : LocalDateTime
+        - updatedAt  : LocalDateTime
+        # onCreate() : void
+        # onUpdate() : void
+    }
+
+    note right of User
+        **@PrePersist** onCreate():
+          sets createdAt = updatedAt = now()
+        **@PreUpdate** onUpdate():
+          sets updatedAt = now()
+        Shared table **users** with auth-service.
+        auth-service owns: role, isActive, mobile,
+          email, name at registration.
+        user-service owns: name, address, gender,
+          dateOfBirth, email, photoUrl after registration.
+        No cross-service FK enforcement.
+    end note
+
+    User +-- Role
+}
+
+' ─────────────────────────────────────────────
+' REPOSITORY
+' ─────────────────────────────────────────────
+package "com.library.user.repository" {
+
+    interface UserRepository <<Repository>> {
+        + findByMobile(mobile: String)  : Optional<User>
+        + findByEmail(email: String)    : Optional<User>
+        + existsByMobile(mobile: String): boolean
+        + existsByEmail(email: String)  : boolean
+        ' Inherited from JpaRepository<User, UUID>:
+        + findById(id: UUID)            : Optional<User>
+        + save(entity: User)            : User
+        + deleteById(id: UUID)          : void
+    }
+}
+
+' ─────────────────────────────────────────────
+' SERVICE
+' ─────────────────────────────────────────────
+package "com.library.user.service" {
+
+    class UserService <<Service>> {
+        ' Lombok: @RequiredArgsConstructor @Slf4j
+        - userRepository : UserRepository
+        - uploadDir      : String
+        - allowedTypes   : String
+        + getProfile(userId: String)                              : UserDto
+        + updateProfile(userId: String, request: UpdateProfileRequest) : UserDto
+        + uploadPhoto(userId: String, file: MultipartFile)        : PhotoUploadResponse
+        + deletePhoto(userId: String)                             : void
+        - findUser(userId: String)                                : User
+        - getExtension(filename: String)                          : String
+    }
+
+    note right of UserService
+        **uploadDir**: injected from ${app.upload.dir}
+          default: /app/uploads
+        **allowedTypes**: ${app.upload.allowed-types}
+          default: image/jpeg,image/png,image/webp
+        **uploadPhoto** enforces:
+          - MIME type in allowedTypes list
+          - file.size <= 5 242 880 bytes (5 MB)
+          - stored at {uploadDir}/photos/user_{userId}_{8-char-uuid}.{ext}
+          - photoUrl saved as /uploads/photos/{filename}
+          - old photo file deleted before new one is written
+        **updateProfile** is a partial update:
+          - only non-null/non-blank fields are applied
+          - email uniqueness checked across users table;
+            rejects if email belongs to a different userId
+          - dateOfBirth parsed as yyyy-MM-dd
+    end note
+}
+
+' ─────────────────────────────────────────────
+' CONTROLLER
+' ─────────────────────────────────────────────
+package "com.library.user.controller" {
+
+    class UserController <<Controller>> {
+        ' Lombok: @RequiredArgsConstructor
+        ' @RestController @RequestMapping("/api/users") @CrossOrigin(origins="*")
+        - userService : UserService
+        + getMyProfile(userId: String)                         : ResponseEntity<ApiResponse<UserDto>>
+        + getUserById(userId: String, role: String)            : ResponseEntity<ApiResponse<UserDto>>
+        + updateProfile(userId: String, request: UpdateProfileRequest) : ResponseEntity<ApiResponse<UserDto>>
+        + uploadPhoto(userId: String, file: MultipartFile)     : ResponseEntity<ApiResponse<PhotoUploadResponse>>
+        + deletePhoto(userId: String)                          : ResponseEntity<ApiResponse<String>>
+    }
+
+    note right of UserController
+        Identity headers injected by API Gateway (AuthFilter):
+          **X-User-Id**   → userId param on /me endpoints
+          **X-User-Role** → role param on /{userId} endpoint
+        Endpoint map:
+          GET  /api/users/me          → getMyProfile
+          GET  /api/users/{userId}    → getUserById
+          PATCH /api/users/me         → updateProfile
+          POST  /api/users/me/photo   → uploadPhoto (multipart/form-data)
+          DELETE /api/users/me/photo  → deletePhoto
+    end note
+}
+
+' ─────────────────────────────────────────────
+' DTOs
+' ─────────────────────────────────────────────
+package "com.library.user.dto" {
+
+    class ApiResponse<T> <<DTO>> {
+        ' Lombok: @Data @Builder @NoArgsConstructor @AllArgsConstructor
+        - success  : boolean
+        - message  : String
+        - data     : T
+        - timestamp: String
+        + {static} success(data: T)       : ApiResponse<T>
+        + {static} error(message: String) : ApiResponse<T>
+    }
+
+    class UserDto <<DTO>> {
+        ' Lombok: @Data @Builder @NoArgsConstructor @AllArgsConstructor
+        - id         : String
+        - name       : String
+        - mobile     : String
+        - email      : String
+        - address    : String
+        - photoUrl   : String
+        - dateOfBirth: String
+        - gender     : String
+        - role       : String
+        - isActive   : boolean
+        - createdAt  : String
+        + {static} fromEntity(user: User) : UserDto
+    }
+
+    class UpdateProfileRequest <<DTO>> {
+        ' Lombok: @Data
+        ' Validation: @Size on name (2-100), address (max 500), email (max 255)
+        - name       : String
+        - address    : String
+        - dateOfBirth: String
+        - gender     : String
+        - email      : String
+    }
+
+    note bottom of UpdateProfileRequest
+        All fields are optional (partial update).
+        **dateOfBirth** must be **yyyy-MM-dd** format.
+        **gender** accepted values: Male, Female, Other
+          (no enum constraint enforced server-side).
+    end note
+
+    class PhotoUploadResponse <<DTO>> {
+        ' Lombok: @Data @Builder @NoArgsConstructor @AllArgsConstructor
+        - photoUrl: String
+        - message : String
+    }
+}
+
+' ─────────────────────────────────────────────
+' EXCEPTIONS
+' ─────────────────────────────────────────────
+package "com.library.user.exception" {
+
+    class ResourceNotFoundException <<Exception>> {
+        + ResourceNotFoundException(message: String)
+    }
+
+    class GlobalExceptionHandler <<Component>> {
+        ' @RestControllerAdvice @Slf4j
+        + handleNotFound(ex: ResourceNotFoundException)           : ResponseEntity<ApiResponse<Void>>
+        + handleBadRequest(ex: IllegalArgumentException)          : ResponseEntity<ApiResponse<Void>>
+        + handleValidation(ex: MethodArgumentNotValidException)   : ResponseEntity<ApiResponse<Void>>
+        + handleFileTooLarge(ex: MaxUploadSizeExceededException)  : ResponseEntity<ApiResponse<Void>>
+        + handleGeneral(ex: Exception)                            : ResponseEntity<ApiResponse<Void>>
+    }
+
+    note right of GlobalExceptionHandler
+        HTTP status mapping:
+          ResourceNotFoundException       → 404 Not Found
+          IllegalArgumentException        → 400 Bad Request
+          MethodArgumentNotValidException → 400 Bad Request
+          MaxUploadSizeExceededException  → 413 Payload Too Large
+          Exception (catch-all)           → 500 Internal Server Error
+        All error bodies are wrapped in ApiResponse.error(message).
+    end note
+}
+
+' ─────────────────────────────────────────────
+' ENTRY POINT
+' ─────────────────────────────────────────────
+package "com.library.user" {
+    class UserServiceApplication {
+        + {static} main(args: String[]) : void
+    }
+}
+
+' ─────────────────────────────────────────────
+' RELATIONSHIPS
+' ─────────────────────────────────────────────
+
+' Inheritance
+ResourceNotFoundException --|> RuntimeException
+
+' Interface implementation
+UserRepository ..|> "JpaRepository<User,UUID>"
+
+' Composition (controller owns service)
+UserController *-- UserService : uses
+
+' Composition (service owns repository)
+UserService *-- UserRepository : uses
+
+' Entity association: repository operates on User
+UserRepository ..> User : manages
+
+' Service → entity dependency (findUser returns User)
+UserService ..> User : reads/writes
+
+' Service → DTO dependencies
+UserService ..> UserDto           : returns
+UserService ..> UpdateProfileRequest : accepts
+UserService ..> PhotoUploadResponse  : returns
+
+' Controller → DTO dependencies
+UserController ..> ApiResponse    : wraps responses
+UserController ..> UserDto        : uses
+UserController ..> UpdateProfileRequest : accepts
+UserController ..> PhotoUploadResponse  : uses
+
+' DTO factory: UserDto.fromEntity depends on User
+UserDto ..> User : fromEntity()
+
+' Exception handler depends on ApiResponse for error envelope
+GlobalExceptionHandler ..> ApiResponse : builds
+
+' Service throws ResourceNotFoundException
+UserService ..> ResourceNotFoundException : throws
+
+@enduml

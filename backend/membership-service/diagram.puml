@@ -1,0 +1,417 @@
+@startuml membership-service
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam arrowColor #555555
+skinparam classBackgroundColor #FAFAFA
+skinparam classBorderColor #AAAAAA
+skinparam packageBackgroundColor #F5F5FF
+skinparam noteFontSize 10
+skinparam noteBackgroundColor #FFFFEE
+skinparam noteBorderColor #CCCCAA
+
+' ─────────────────────────────────────────────────────────────
+' ENTITIES
+' ─────────────────────────────────────────────────────────────
+package "com.library.membership.entity" {
+
+    enum PlanType <<enumeration>> {
+        HALF_DAY
+        FULL_DAY
+    }
+
+    class Plan <<Entity>> {
+        - id          : UUID
+        - name        : String
+        - planType    : PlanType
+        - price       : BigDecimal
+        - durationDays: Integer
+        - description : String
+        - isActive    : Boolean = true
+        ' table: membership_plans
+        ' Lombok: @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    }
+
+    enum "Membership.Status" as MembershipStatus <<enumeration>> {
+        PENDING
+        ACTIVE
+        EXPIRED
+        CANCELLED
+    }
+
+    class Membership <<Entity>> {
+        - id          : UUID
+        - userId      : UUID
+        - seatId      : UUID
+        - seatNumber  : String
+        - shift       : String
+        - startDate   : LocalDate
+        - endDate     : LocalDate
+        - status      : Status = PENDING
+        - reminderSent: boolean = false
+        - createdAt   : LocalDateTime
+        ' table: memberships
+        ' @ManyToOne(fetch=EAGER) plan
+        # onCreate() : void
+        ' Lombok: @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    }
+
+    enum "Payment.Status" as PaymentStatus <<enumeration>> {
+        PENDING
+        SUCCESS
+        FAILED
+        REFUNDED
+    }
+
+    class Payment <<Entity>> {
+        - id               : UUID
+        - membershipId     : UUID
+        - userId           : UUID
+        - amount           : BigDecimal
+        - paymentGateway   : String = "RAZORPAY"
+        - gatewayOrderId   : String
+        - gatewayPaymentId : String
+        - status           : Status = PENDING
+        - createdAt        : LocalDateTime
+        - updatedAt        : LocalDateTime
+        ' table: payments
+        # onCreate() : void
+        # onUpdate() : void
+        ' Lombok: @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    }
+
+    ' Enum relationships
+    Plan          *-- PlanType         : planType
+    Membership    *-- MembershipStatus : status
+    Payment       *-- PaymentStatus    : status
+
+    ' @ManyToOne — plan_id FK in memberships table
+    ' Cross-service IDs (userId, seatId, membershipId) are bare UUIDs, not FK refs
+    Membership    "many" *-- "1" Plan  : @ManyToOne plan\n(JoinColumn plan_id)
+}
+
+note right of Membership
+  userId, seatId are bare UUIDs —
+  no FK to other services.
+  shift values: MORNING | EVENING | FULL_DAY
+end note
+
+note right of Payment
+  membershipId and userId are bare UUIDs —
+  no FK to other services.
+  paymentGateway always "RAZORPAY"
+end note
+
+' ─────────────────────────────────────────────────────────────
+' REPOSITORIES
+' ─────────────────────────────────────────────────────────────
+package "com.library.membership.repository" {
+
+    interface PlanRepository <<Repository>> {
+        + findByIsActiveTrue() : List<Plan>
+        ' Inherits: JpaRepository<Plan, UUID>
+    }
+
+    interface MembershipRepository <<Repository>> {
+        + findByUserIdOrderByCreatedAtDesc(userId: UUID) : List<Membership>
+        + findActiveByUserId(userId: UUID) : Optional<Membership>
+        + findActiveBySeatId(seatId: UUID) : Optional<Membership>
+        + existsBySeatIdAndStatus(seatId: UUID, status: Membership.Status) : boolean
+        ' @Query on findActiveByUserId: WHERE status='ACTIVE' ORDER BY endDate DESC
+        ' @Query on findActiveBySeatId: WHERE status='ACTIVE'
+    }
+
+    interface PaymentRepository <<Repository>> {
+        + findByGatewayOrderId(gatewayOrderId: String) : Optional<Payment>
+        + findByUserIdOrderByCreatedAtDesc(userId: UUID) : List<Payment>
+        + findByMembershipId(membershipId: UUID) : Optional<Payment>
+        ' Inherits: JpaRepository<Payment, UUID>
+    }
+}
+
+note bottom of MembershipRepository
+  findActiveByUserId uses @Query:
+  "SELECT m FROM Membership m WHERE
+  m.userId = :userId AND m.status = 'ACTIVE'
+  ORDER BY m.endDate DESC"
+end note
+
+' ─────────────────────────────────────────────────────────────
+' DTOs
+' ─────────────────────────────────────────────────────────────
+package "com.library.membership.dto" {
+
+    class "ApiResponse<T>" as ApiResponse <<DTO>> {
+        - success  : boolean
+        - message  : String
+        - data     : T
+        - timestamp: String
+        + {static} success(data: T) : ApiResponse<T>
+        + {static} error(message: String) : ApiResponse<T>
+    }
+
+    class PlanDto <<DTO>> {
+        - id         : String
+        - name       : String
+        - planType   : String
+        - price      : BigDecimal
+        - durationDays: Integer
+        - description: String
+        - isActive   : boolean
+        + {static} fromEntity(plan: Plan) : PlanDto
+    }
+
+    class MembershipDto <<DTO>> {
+        - id        : String
+        - userId    : String
+        - planId    : String
+        - planName  : String
+        - planType  : String
+        - seatId    : String
+        - seatNumber: String
+        - shift     : String
+        - startDate : String
+        - endDate   : String
+        - status    : String
+        - createdAt : String
+        + {static} fromEntity(m: Membership) : MembershipDto
+    }
+
+    class PaymentDto <<DTO>> {
+        - id              : String
+        - membershipId    : String
+        - amount          : BigDecimal
+        - paymentGateway  : String
+        - gatewayOrderId  : String
+        - gatewayPaymentId: String
+        - status          : String
+        - createdAt       : String
+        + {static} fromEntity(p: Payment) : PaymentDto
+    }
+
+    class CreateOrderRequest <<DTO>> {
+        - planId     : String   ' @NotBlank
+        - seatId     : String
+        - seatNumber : String
+        - shift      : String
+        ' shift required when planType = HALF_DAY
+    }
+
+    class CreateOrderResponse <<DTO>> {
+        - orderId      : String
+        - membershipId : String
+        - amount       : BigDecimal
+        - currency     : String
+        - razorpayKeyId: String
+        ' orderId = "dev_order_xxx" in dev mode
+    }
+
+    class PaymentVerifyRequest <<DTO>> {
+        - gatewayOrderId   : String   ' @NotBlank
+        - gatewayPaymentId : String   ' @NotBlank
+        - signature        : String
+        - membershipId     : String
+        ' signature = HMAC-SHA256(orderId+"|"+paymentId, keySecret)
+    }
+}
+
+note bottom of CreateOrderResponse
+  orderId = "dev_order_<8chars>" when
+  RAZORPAY_KEY_ID is blank (dev mode).
+  Frontend uses this to open Razorpay checkout.
+end note
+
+note bottom of PaymentVerifyRequest
+  HMAC-SHA256 verification:
+  HMAC(orderId + "|" + paymentId, keySecret)
+  Skipped if orderId starts with "dev_"
+  or if razorpayKeySecret is blank.
+end note
+
+' ─────────────────────────────────────────────────────────────
+' EVENTS
+' ─────────────────────────────────────────────────────────────
+package "com.library.membership.event" {
+
+    class BookingConfirmedEvent <<KafkaEvent>> {
+        - userId      : String
+        - membershipId: String
+        - userName    : String
+        - userMobile  : String
+        - userEmail   : String
+        - planName    : String
+        - planType    : String
+        - seatNumber  : String
+        - shift       : String
+        - startDate   : String
+        - endDate     : String
+        - amountPaid  : BigDecimal
+        - eventType   : String
+        ' Lombok: @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    }
+}
+
+note right of BookingConfirmedEvent
+  Published to Kafka topic: "booking-confirmed"
+  Key: userId
+  userName/userMobile/userEmail are null here —
+  notification-service fetches them from
+  user-service via GET /api/users/{userId}
+  to avoid coupling this service to user-service.
+end note
+
+' ─────────────────────────────────────────────────────────────
+' EXCEPTIONS
+' ─────────────────────────────────────────────────────────────
+package "com.library.membership.exception" {
+
+    class ResourceNotFoundException {
+        + ResourceNotFoundException(message: String)
+    }
+
+    class GlobalExceptionHandler <<RestControllerAdvice>> {
+        + handleNotFound(ex: ResourceNotFoundException)        : ResponseEntity<ApiResponse<Void>>
+        + handleBadRequest(ex: IllegalArgumentException)       : ResponseEntity<ApiResponse<Void>>
+        + handleValidation(ex: MethodArgumentNotValidException): ResponseEntity<ApiResponse<Void>>
+        + handleRuntime(ex: RuntimeException)                  : ResponseEntity<ApiResponse<Void>>
+        + handleGeneral(ex: Exception)                         : ResponseEntity<ApiResponse<Void>>
+    }
+
+    ResourceNotFoundException --|> RuntimeException
+}
+
+' ─────────────────────────────────────────────────────────────
+' SERVICES
+' ─────────────────────────────────────────────────────────────
+package "com.library.membership.service" {
+
+    class PlanService <<Service>> {
+        - planRepository: PlanRepository
+        + getAllActivePlans() : List<PlanDto>
+    }
+
+    class MembershipService <<Service>> {
+        - membershipRepository: MembershipRepository
+        - paymentRepository   : PaymentRepository
+        + getUserActiveMembership(userId: String) : MembershipDto
+        + getUserMemberships(userId: String)      : List<MembershipDto>
+        + getUserPayments(userId: String)         : List<PaymentDto>
+    }
+
+    class PaymentService <<Service>> {
+        - membershipRepository: MembershipRepository
+        - paymentRepository   : PaymentRepository
+        - planRepository      : PlanRepository
+        - kafkaTemplate       : KafkaTemplate<String, Object>
+        - razorpayKeyId       : String
+        - razorpayKeySecret   : String
+        + createOrder(userId: String, request: CreateOrderRequest)             : CreateOrderResponse
+        + verifyAndActivateMembership(userId: String, request: PaymentVerifyRequest) : MembershipDto
+        - verifySignature(orderId: String, paymentId: String, signature: String) : void
+    }
+}
+
+note right of MembershipService
+  getUserActiveMembership() returns null
+  (not a 404 exception) when no active
+  membership exists. Frontend checks for
+  null and shows "Get a plan" CTA.
+end note
+
+note right of PaymentService
+  createOrder() dev mode path:
+    generates "dev_order_<8chars>" when
+    RAZORPAY_KEY_ID is blank — no real
+    gateway call is made.
+  verifySignature() computes:
+    HMAC-SHA256(orderId + "|" + paymentId,
+    razorpayKeySecret) and compares to
+    the signature from Razorpay callback.
+  Publishes to Kafka topic "booking-confirmed"
+  with key = userId after successful payment.
+end note
+
+' ─────────────────────────────────────────────────────────────
+' CONTROLLER
+' ─────────────────────────────────────────────────────────────
+package "com.library.membership.controller" {
+
+    class MembershipController <<Controller>> {
+        - membershipService: MembershipService
+        - planService      : PlanService
+        - paymentService   : PaymentService
+        + getPlans()                                                                    : ResponseEntity<ApiResponse<List<PlanDto>>>
+        + getMyActiveMembership(userId: String)                                         : ResponseEntity<ApiResponse<MembershipDto>>
+        + getAllMyMemberships(userId: String)                                            : ResponseEntity<ApiResponse<List<MembershipDto>>>
+        + getMyPayments(userId: String)                                                 : ResponseEntity<ApiResponse<List<PaymentDto>>>
+        + createOrder(userId: String, request: CreateOrderRequest)                      : ResponseEntity<ApiResponse<CreateOrderResponse>>
+        + verifyPayment(userId: String, request: PaymentVerifyRequest)                  : ResponseEntity<ApiResponse<MembershipDto>>
+    }
+}
+
+note bottom of MembershipController
+  All protected endpoints read userId from
+  X-User-Id header (injected by API Gateway
+  after JWT validation — never re-validated here).
+  GET /api/plans is public — no auth header needed.
+  Port: 8083
+end note
+
+' ─────────────────────────────────────────────────────────────
+' CROSS-PACKAGE DEPENDENCY RELATIONSHIPS
+' ─────────────────────────────────────────────────────────────
+
+' Controller -> Services
+MembershipController ..> MembershipService : uses
+MembershipController ..> PlanService       : uses
+MembershipController ..> PaymentService    : uses
+
+' Controller -> DTOs (request/response)
+MembershipController ..> ApiResponse           : wraps responses in
+MembershipController ..> CreateOrderRequest    : @RequestBody
+MembershipController ..> PaymentVerifyRequest  : @RequestBody
+MembershipController ..> CreateOrderResponse   : returns
+MembershipController ..> MembershipDto         : returns
+MembershipController ..> PlanDto               : returns
+MembershipController ..> PaymentDto            : returns
+
+' Service -> Repositories
+PlanService       ..> PlanRepository       : uses
+MembershipService ..> MembershipRepository : uses
+MembershipService ..> PaymentRepository    : uses
+PaymentService    ..> MembershipRepository : uses
+PaymentService    ..> PaymentRepository    : uses
+PaymentService    ..> PlanRepository       : uses
+
+' Service -> DTOs (return types)
+PlanService       ..> PlanDto          : returns
+MembershipService ..> MembershipDto    : returns
+MembershipService ..> PaymentDto       : returns
+PaymentService    ..> CreateOrderResponse : returns
+PaymentService    ..> MembershipDto    : returns
+
+' Service -> Entities (direct manipulation)
+PaymentService    ..> Membership           : creates / updates
+PaymentService    ..> Payment              : creates / updates
+PaymentService    ..> Plan                 : reads
+
+' Service -> Events
+PaymentService    ..> BookingConfirmedEvent : publishes
+
+' Repository -> Entities
+PlanRepository       ..> Plan       : manages
+MembershipRepository ..> Membership : manages
+PaymentRepository    ..> Payment    : manages
+
+' DTO static factory methods reference entities
+PlanDto       ..> Plan       : fromEntity()
+MembershipDto ..> Membership : fromEntity()
+PaymentDto    ..> Payment    : fromEntity()
+
+' Exception handler uses ApiResponse
+GlobalExceptionHandler ..> ApiResponse           : wraps errors in
+GlobalExceptionHandler ..> ResourceNotFoundException : handles
+
+@enduml

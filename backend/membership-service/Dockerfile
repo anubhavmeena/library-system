@@ -1,0 +1,17 @@
+FROM maven:3.9-eclipse-temurin-17 AS builder
+WORKDIR /build
+COPY common-lib/pom.xml common-lib/pom.xml
+COPY common-lib/src common-lib/src
+RUN mvn -f common-lib/pom.xml install -DskipTests -q
+COPY membership-service/pom.xml membership-service/pom.xml
+RUN mvn -f membership-service/pom.xml dependency:go-offline -q
+COPY membership-service/src membership-service/src
+RUN mvn -f membership-service/pom.xml package -DskipTests -q
+
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring
+COPY --from=builder /build/membership-service/target/*.jar app.jar
+EXPOSE 8083
+ENTRYPOINT ["java", "-jar", "-Dspring.profiles.active=docker", "app.jar"]

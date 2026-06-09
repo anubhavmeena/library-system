@@ -1,0 +1,925 @@
+@startuml Library_System_All_Microservices
+
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+skinparam classFontSize 10
+skinparam classFontName Arial
+skinparam packageFontSize 12
+skinparam packageFontStyle bold
+skinparam ArrowColor #444444
+skinparam ClassBorderColor #888888
+skinparam stereotypeCBackgroundColor #E8E8E8
+skinparam NoteBackgroundColor #FFFFCC
+skinparam NoteBorderColor #AAAAAA
+skinparam linetype ortho
+
+hide empty members
+
+' ================================================================
+'  API GATEWAY  (:8080)
+' ================================================================
+package "api-gateway [:8080]" as gateway #D6EAF8 {
+
+    abstract class AbstractGatewayFilterFactory<C>
+
+    class AuthFilter {
+        - jwtSecret : String
+        - PUBLIC_PATHS : List<String>
+        + apply(config : Config) : GatewayFilter
+        - parseToken(token : String) : Claims
+        - onError(exchange, status : HttpStatus) : Mono<Void>
+    }
+    note right of AuthFilter
+        Public paths (bypass JWT):
+          /api/auth/send-otp
+          /api/auth/verify-otp
+          /api/auth/register
+          /api/auth/login
+          /api/plans
+        Adds X-User-Id & X-User-Role headers
+    end note
+
+    class AdminRoleFilter {
+        + apply(config : Config) : GatewayFilter
+        - onError(exchange, status : HttpStatus) : Mono<Void>
+    }
+    note right of AdminRoleFilter
+        Reads X-User-Role (set by AuthFilter).
+        Returns HTTP 403 if != "ADMIN"
+    end note
+
+    AuthFilter     --|> AbstractGatewayFilterFactory
+    AdminRoleFilter --|> AbstractGatewayFilterFactory
+}
+
+' ================================================================
+'  AUTH SERVICE  (:8081)
+' ================================================================
+package "auth-service [:8081]" as authPkg #FEF9E7 {
+
+    enum AuthRole <<enumeration>> {
+        STUDENT
+        ADMIN
+    }
+
+    class AuthUserEntity <<Entity>> {
+        - id : UUID
+        - mobile : String
+        - email : String
+        - name : String
+        - address : String
+        - photoUrl : String
+        - dateOfBirth : LocalDate
+        - gender : String
+        - isActive : Boolean = true
+        - role : AuthRole = STUDENT
+        - createdAt : LocalDateTime
+        - updatedAt : LocalDateTime
+        # onCreate()
+        # onUpdate()
+    }
+
+    interface AuthUserRepository <<Repository>> {
+        + findByMobileOrEmail(mobile : String, email : String) : Optional<User>
+        + existsByMobileOrEmail(mobile : String, email : String) : boolean
+    }
+
+    class AuthService <<Service>> {
+        - userRepository : AuthUserRepository
+        - redisTemplate : RedisTemplate<String, String>
+        - otpService : OtpService
+        - jwtSecret : String
+        - jwtExpiration : Long
+        + sendOtp(contact : String, contactType : String)
+        + verifyOtp(contact : String, otp : String) : OtpVerifyResponse
+        + register(request : RegisterRequest) : AuthResponse
+        + login(request : LoginRequest) : AuthResponse
+        + adminLogin(request : LoginRequest) : AuthResponse
+        + refreshToken(token : String) : AuthResponse
+        - generateJwt(user : AuthUserEntity) : String
+        - buildAuthResponse(token : String, user : AuthUserEntity) : AuthResponse
+        - generateOtp() : String
+    }
+
+    class OtpService <<Service>> {
+        - accountSid : String
+        - authToken : String
+        - fromPhone : String
+        + init()
+        + sendOtp(contact : String, contactType : String, otp : String)
+        - sendSms(mobile : String, message : String, otp : String)
+    }
+    note right of OtpService
+        Blank TWILIO_ACCOUNT_SID → dev mode:
+        logs OTP to console, no real SMS.
+        Auto-prefixes +91 for 10-digit numbers.
+    end note
+
+    class AuthController <<Controller>> {
+        - authService : AuthService
+        + sendOtp(request : SendOtpRequest) : ResponseEntity
+        + verifyOtp(request : VerifyOtpRequest) : ResponseEntity
+        + register(request : RegisterRequest) : ResponseEntity
+        + login(request : LoginRequest) : ResponseEntity
+        + adminLogin(request : LoginRequest) : ResponseEntity
+        + refresh(authHeader : String) : ResponseEntity
+    }
+
+    class OtpVerifyResponse <<DTO>> {
+        + verified : boolean
+        + sessionToken : String
+        + isNewUser : boolean
+    }
+
+    class AuthResponse <<DTO>> {
+        + accessToken : String
+        + tokenType : String
+        + expiresIn : Long
+        + user : UserInfoDto
+    }
+
+    class UserInfoDto <<DTO>> {
+        + id : String
+        + name : String
+        + mobile : String
+        + email : String
+        + role : String
+        + photoUrl : String
+    }
+
+    AuthUserEntity "1" *-- "1" AuthRole : role
+
+    AuthService       --> AuthUserRepository : queries
+    AuthService       --> OtpService         : delegates send
+    AuthController    --> AuthService
+    AuthService      ..> OtpVerifyResponse   : creates
+    AuthService      ..> AuthResponse        : creates
+    AuthResponse     *-- UserInfoDto
+}
+
+' ================================================================
+'  USER SERVICE  (:8082)
+' ================================================================
+package "user-service [:8082]" as userPkg #EAFAF1 {
+
+    class UserSvcEntity <<Entity>> {
+        - id : UUID
+        - mobile : String
+        - email : String
+        - name : String
+        - address : String
+        - photoUrl : String
+        - dateOfBirth : LocalDate
+        - gender : String
+        - isActive : Boolean
+        - role : String
+        - createdAt : LocalDateTime
+        - updatedAt : LocalDateTime
+        # onCreate()
+        # onUpdate()
+    }
+    note right of UserSvcEntity
+        Same 'users' table as auth-service.
+        user-service owns: name, address,
+        gender, dateOfBirth, email, photoUrl.
+    end note
+
+    interface UserSvcRepository <<Repository>> {
+        + findById(id : UUID) : Optional<User>
+        + findByEmail(email : String) : Optional<User>
+        + save(user : User) : User
+    }
+
+    class UserService <<Service>> {
+        - userRepository : UserSvcRepository
+        - uploadDir : String
+        - allowedTypes : String
+        + getProfile(userId : String) : UserDto
+        + updateProfile(userId : String, req : UpdateProfileRequest) : UserDto
+        + uploadPhoto(userId : String, file : MultipartFile) : PhotoUploadResponse
+        + deletePhoto(userId : String)
+        - findUser(userId : String) : UserSvcEntity
+        - getExtension(filename : String) : String
+    }
+    note right of UserService
+        Photo upload: JPEG/PNG/WebP, max 5 MB.
+        Saved to ${UPLOAD_DIR}/photos/
+        Old photo deleted before saving new.
+    end note
+
+    class UserController <<Controller>> {
+        - userService : UserService
+        + getMyProfile(userId : String) : ResponseEntity
+        + getUserById(userId : String, role : String) : ResponseEntity
+        + updateProfile(userId : String, req : UpdateProfileRequest) : ResponseEntity
+        + uploadPhoto(userId : String, file : MultipartFile) : ResponseEntity
+        + deletePhoto(userId : String) : ResponseEntity
+    }
+
+    class UserDto <<DTO>> {
+        + id : String
+        + name : String
+        + email : String
+        + mobile : String
+        + photoUrl : String
+        + gender : String
+        + address : String
+        + dateOfBirth : LocalDate
+        + role : String
+        + isActive : Boolean
+        + {static} fromEntity(user : UserSvcEntity) : UserDto
+    }
+
+    class UpdateProfileRequest <<DTO>> {
+        + name : String
+        + email : String
+        + address : String
+        + gender : String
+        + dateOfBirth : String
+    }
+
+    class PhotoUploadResponse <<DTO>> {
+        + photoUrl : String
+        + message : String
+    }
+
+    UserService    --> UserSvcRepository : queries
+    UserController --> UserService
+    UserService   ..> UserDto             : creates
+    UserService   ..> PhotoUploadResponse : creates
+}
+
+' ================================================================
+'  MEMBERSHIP SERVICE  (:8083)
+' ================================================================
+package "membership-service [:8083]" as memPkg #FDEDEC {
+
+    enum MemPlanType <<enumeration>> {
+        HALF_DAY
+        FULL_DAY
+    }
+
+    enum MemStatus <<enumeration>> {
+        PENDING
+        ACTIVE
+        EXPIRED
+        CANCELLED
+    }
+
+    enum MemPayStatus <<enumeration>> {
+        PENDING
+        SUCCESS
+        FAILED
+        REFUNDED
+    }
+
+    class Plan <<Entity>> {
+        - id : UUID
+        - name : String
+        - planType : MemPlanType
+        - price : BigDecimal
+        - durationDays : Integer
+        - description : String
+        - isActive : Boolean = true
+    }
+
+    class Membership <<Entity>> {
+        - id : UUID
+        - userId : UUID
+        - plan : Plan
+        - seatId : UUID
+        - seatNumber : String
+        - shift : String
+        - startDate : LocalDate
+        - endDate : LocalDate
+        - status : MemStatus = PENDING
+        - reminderSent : boolean = false
+        - createdAt : LocalDateTime
+        # onCreate()
+    }
+
+    class Payment <<Entity>> {
+        - id : UUID
+        - membershipId : UUID
+        - userId : UUID
+        - amount : BigDecimal
+        - paymentGateway : String = "RAZORPAY"
+        - gatewayOrderId : String
+        - gatewayPaymentId : String
+        - status : MemPayStatus = PENDING
+        - createdAt : LocalDateTime
+        - updatedAt : LocalDateTime
+        # onCreate()
+        # onUpdate()
+    }
+
+    interface MemPlanRepository <<Repository>> {
+        + findByIsActiveTrue() : List<Plan>
+        + findById(id : UUID) : Optional<Plan>
+    }
+
+    interface MemMembershipRepository <<Repository>> {
+        + findByUserIdOrderByCreatedAtDesc(userId : UUID) : List<Membership>
+        + findActiveByUserId(userId : UUID) : Optional<Membership>
+        + findActiveBySeatId(seatId : UUID) : Optional<Membership>
+        + existsBySeatIdAndStatus(seatId : UUID, status : Status) : boolean
+        + save(m : Membership) : Membership
+    }
+
+    interface MemPaymentRepository <<Repository>> {
+        + findByGatewayOrderId(orderId : String) : Optional<Payment>
+        + findByUserIdOrderByCreatedAtDesc(userId : UUID) : List<Payment>
+        + save(p : Payment) : Payment
+    }
+
+    class PlanService <<Service>> {
+        - planRepository : MemPlanRepository
+        + getAllActivePlans() : List<PlanDto>
+    }
+
+    class MembershipService <<Service>> {
+        - membershipRepository : MemMembershipRepository
+        - paymentRepository : MemPaymentRepository
+        + getUserActiveMembership(userId : String) : MembershipDto
+        + getUserMemberships(userId : String) : List<MembershipDto>
+        + getUserPayments(userId : String) : List<PaymentDto>
+    }
+    note right of MembershipService
+        getUserActiveMembership returns null
+        (not 404) when no active membership.
+        Frontend checks null for CTA display.
+    end note
+
+    class PaymentService <<Service>> {
+        - membershipRepository : MemMembershipRepository
+        - paymentRepository : MemPaymentRepository
+        - planRepository : MemPlanRepository
+        - kafkaTemplate : KafkaTemplate<String, Object>
+        - razorpayKeyId : String
+        - razorpayKeySecret : String
+        + createOrder(userId : String, req : CreateOrderRequest) : CreateOrderResponse
+        + verifyAndActivateMembership(userId : String, req : PaymentVerifyRequest) : MembershipDto
+        - verifySignature(orderId : String, paymentId : String, sig : String)
+    }
+    note right of PaymentService
+        Blank RAZORPAY_KEY_ID → dev mode:
+        generates "dev_order_*" ID.
+        HMAC check skipped for dev_ prefix.
+        Amount sent to Razorpay in paise (×100).
+    end note
+
+    class MembershipController <<Controller>> {
+        - membershipService : MembershipService
+        - planService : PlanService
+        - paymentService : PaymentService
+        + getPlans() : ResponseEntity
+        + getMyActiveMembership(userId : String) : ResponseEntity
+        + getAllMyMemberships(userId : String) : ResponseEntity
+        + getMyPayments(userId : String) : ResponseEntity
+        + createOrder(userId : String, req : CreateOrderRequest) : ResponseEntity
+        + verifyPayment(userId : String, req : PaymentVerifyRequest) : ResponseEntity
+    }
+
+    class BookingConfirmedEvent <<KafkaEvent>> {
+        + userId : String
+        + membershipId : String
+        + userName : String
+        + userMobile : String
+        + userEmail : String
+        + planName : String
+        + planType : String
+        + seatNumber : String
+        + shift : String
+        + startDate : String
+        + endDate : String
+        + amountPaid : BigDecimal
+        + eventType : String
+    }
+    note bottom of BookingConfirmedEvent
+        userName/userMobile/userEmail are null
+        when published by membership-service.
+        Topic: booking-confirmed
+        Key: userId
+    end note
+
+    class CreateOrderRequest <<DTO>> {
+        + planId : String
+        + seatId : String
+        + seatNumber : String
+        + shift : String
+    }
+
+    class CreateOrderResponse <<DTO>> {
+        + orderId : String
+        + membershipId : String
+        + amount : BigDecimal
+        + currency : String
+        + razorpayKeyId : String
+    }
+
+    Membership "many" --> "1" Plan            : uses
+    Membership "1"    *-- "1" MemStatus
+    Plan       "1"    *-- "1" MemPlanType
+    Payment    "1"    *-- "1" MemPayStatus
+
+    PlanService       --> MemPlanRepository
+    MembershipService --> MemMembershipRepository
+    MembershipService --> MemPaymentRepository
+    PaymentService    --> MemMembershipRepository
+    PaymentService    --> MemPaymentRepository
+    PaymentService    --> MemPlanRepository
+    PaymentService   ..> BookingConfirmedEvent : publishes to Kafka
+
+    MembershipController --> MembershipService
+    MembershipController --> PlanService
+    MembershipController --> PaymentService
+}
+
+' ================================================================
+'  SEAT SERVICE  (:8084)
+' ================================================================
+package "seat-service [:8084]" as seatPkg #E8F8F5 {
+
+    enum SeatBookStatus <<enumeration>> {
+        ACTIVE
+        RELEASED
+        EXPIRED
+    }
+
+    class Seat <<Entity>> {
+        - id : UUID
+        - seatNumber : String
+        - rowLabel : String
+        - seatIndex : Integer
+        - isActive : Boolean = true
+    }
+    note right of Seat
+        110 fixed seats: rows A(28),
+        B(28), C(28), D(26).
+        seatNumber format: "A1" … "D26"
+    end note
+
+    class SeatBooking <<Entity>> {
+        - id : UUID
+        - seat : Seat
+        - userId : UUID
+        - membershipId : UUID
+        - shift : String
+        - bookingDate : LocalDate
+        - endDate : LocalDate
+        - status : SeatBookStatus = ACTIVE
+        - createdAt : LocalDateTime
+        # onCreate()
+    }
+    note right of SeatBooking
+        UniqueConstraint:
+        (seat_id, shift, booking_date)
+    end note
+
+    interface SeatRepository <<Repository>> {
+        + findBySeatNumber(num : String) : Optional<Seat>
+        + findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc() : List<Seat>
+        + findByRowLabelAndIsActiveTrueOrderBySeatIndexAsc(row : String) : List<Seat>
+        + countActiveSeats() : long
+    }
+
+    interface SeatBookingRepository <<Repository>> {
+        + findActiveBookingsForShiftAndDate(shift : String, date : LocalDate) : List<SeatBooking>
+        + findBookedSeatIds(shift : String, date : LocalDate) : List<UUID>
+        + findByMembershipId(membershipId : UUID) : Optional<SeatBooking>
+        + findByUserIdAndStatus(userId : UUID, status : Status) : List<SeatBooking>
+        + existsBySeatIdAndShiftAndStatus\nAndBookingDateLTEAndEndDateGTE(...) : boolean
+    }
+
+    class RedisConfig <<Configuration>> {
+        + redisTemplate(factory : RedisConnectionFactory) : RedisTemplate<String, Object>
+    }
+    note right of RedisConfig
+        Keys: StringRedisSerializer
+        Values: GenericJackson2JsonRedisSerializer
+        (human-readable JSON in redis-cli)
+    end note
+
+    class SeatService <<Service>> {
+        - seatRepository : SeatRepository
+        - seatBookingRepository : SeatBookingRepository
+        - redisTemplate : RedisTemplate<String, Object>
+        - cacheTtlSeconds : long = 300
+        + getAvailability(shift : String, dateStr : String) : SeatAvailabilityDto
+        + bookSeat(userId : String, req : BookSeatRequest) : SeatBookingDto
+        + releaseSeat(membershipId : String)
+        + getMyBookings(userId : String) : List<SeatBookingDto>
+        + getBookingsForShiftAndDate(shift : String, dateStr : String) : List<SeatBookingDto>
+        - resolveShift(shift : String) : String
+        - invalidateCache(shift : String, start : LocalDate, end : LocalDate)
+    }
+    note right of SeatService
+        Cache key: seats:availability:<SHIFT>:<date>
+        TTL: 5 min (app.seat.cache-ttl)
+        FULL_DAY booking also busts
+        MORNING & EVENING keys.
+    end note
+
+    class SeatController <<Controller>> {
+        - seatService : SeatService
+        + getAvailability(shift : String, date : String) : ResponseEntity
+        + bookSeat(userId : String, req : BookSeatRequest) : ResponseEntity
+        + releaseSeat(membershipId : String, role : String) : ResponseEntity
+        + getMyBookings(userId : String) : ResponseEntity
+        + getBookingsForShift(shift : String, date : String, role : String) : ResponseEntity
+    }
+
+    class SeatAvailabilityDto <<DTO>> {
+        + shift : String
+        + date : String
+        + totalSeats : int
+        + bookedSeats : int
+        + availableSeats : int
+        + seats : List<SeatDto>
+        + seatsByRow : Map<String, List<SeatDto>>
+    }
+
+    class SeatDto <<DTO>> {
+        + id : UUID
+        + seatNumber : String
+        + rowLabel : String
+        + seatIndex : int
+        + isBooked : boolean
+        + {static} fromEntity(seat : Seat, isBooked : boolean) : SeatDto
+    }
+
+    class SeatBookingDto <<DTO>> {
+        + id : UUID
+        + seatNumber : String
+        + shift : String
+        + bookingDate : LocalDate
+        + endDate : LocalDate
+        + status : String
+        + {static} fromEntity(booking : SeatBooking) : SeatBookingDto
+    }
+
+    class BookSeatRequest <<DTO>> {
+        + seatNumber : String
+        + membershipId : String
+        + shift : String
+        + startDate : String
+        + endDate : String
+    }
+
+    SeatBooking "many" --> "1" Seat          : belongs to
+    SeatBooking "1"    *-- "1" SeatBookStatus
+
+    SeatService    --> SeatRepository
+    SeatService    --> SeatBookingRepository
+    SeatController --> SeatService
+    SeatService   ..> SeatAvailabilityDto : creates
+    SeatService   ..> SeatBookingDto      : creates
+    SeatAvailabilityDto "1" *-- "many" SeatDto
+}
+
+' ================================================================
+'  NOTIFICATION SERVICE  (:8085)
+' ================================================================
+package "notification-service [:8085]" as notifPkg #FFF8F0 {
+
+    enum NotifChannel <<enumeration>> {
+        EMAIL
+        WHATSAPP
+    }
+
+    enum DeliveryStatus <<enumeration>> {
+        SENT
+        FAILED
+        PENDING
+    }
+
+    class NotificationLog <<Entity>> {
+        - id : UUID
+        - userId : UUID
+        - recipient : String
+        - message : String
+        - event : String
+        - channel : NotifChannel
+        - status : DeliveryStatus
+        - errorMessage : String
+        - sentAt : LocalDateTime
+        - createdAt : LocalDateTime
+        # prePersist()
+    }
+    note right of NotificationLog
+        message truncated to 1000 chars
+        (prevents large HTML bodies
+        from bloating the table).
+    end note
+
+    interface NotifLogRepository <<Repository>> {
+        + save(log : NotificationLog) : NotificationLog
+    }
+
+    class BookingConfirmedEventDto <<DTO>> {
+        + userId : String
+        + membershipId : String
+        + planName : String
+        + planType : String
+        + seatNumber : String
+        + shift : String
+        + startDate : String
+        + endDate : String
+        + amountPaid : BigDecimal
+        + userName : String
+        + userMobile : String
+        + userEmail : String
+        + eventType : String
+    }
+
+    class RenewalReminderEventDto <<DTO>> {
+        + userId : String
+        + membershipId : String
+        + userName : String
+        + userMobile : String
+        + userEmail : String
+        + seatNumber : String
+        + expiryDate : String
+        + daysRemaining : int
+        + eventType : String
+    }
+
+    class WhatsAppService <<Service>> {
+        - logRepository : NotifLogRepository
+        - accountSid : String
+        - authToken : String
+        - whatsappFrom : String
+        - twilioEnabled : boolean = false
+        + init()
+        + send(mobile : String, message : String, userId : String, event : String)
+        - formatNumber(mobile : String) : String
+        - saveLog(userId, recipient, message, event, status, errorMsg)
+    }
+    note right of WhatsAppService
+        Blank TWILIO_ACCOUNT_SID → dev mode:
+        logs "[DEV] WhatsApp → ..." to console.
+        Exception on send does NOT rethrow —
+        notification failure must not crash consumer.
+    end note
+
+    class EmailService <<Service>> {
+        - logRepository : NotifLogRepository
+        - sendgridApiKey : String
+        - fromEmail : String
+        - fromName : String
+        + sendText(to, subject, body, userId, event)
+        + sendHtml(to, subject, htmlBody, userId, event)
+        - send(to, subject, textBody, htmlBody, userId, event)
+        - saveLog(userId, recipient, message, event, status, errorMsg)
+    }
+    note right of EmailService
+        Blank SENDGRID_API_KEY → dev mode:
+        logs "[DEV] Email → ..." to console.
+        Exception does NOT rethrow.
+    end note
+
+    class NotificationService <<Service>> {
+        - whatsAppService : WhatsAppService
+        - emailService : EmailService
+        - adminEmail : String
+        - adminWhatsapp : String
+        + sendBookingConfirmation(event : BookingConfirmedEventDto)
+        + sendWelcomeNotification(event : BookingConfirmedEventDto)
+        + sendRenewalReminder(event : RenewalReminderEventDto)
+        - buildBookingWhatsApp(e : BookingConfirmedEventDto) : String
+        - buildBookingEmail(e : BookingConfirmedEventDto) : String
+        - formatShift(shift : String) : String
+        - hasValue(s : String) : boolean
+    }
+
+    class NotificationConsumer <<KafkaConsumer>> {
+        - notificationService : NotificationService
+        + handleBookingConfirmed(event, topic, partition, offset)
+        + handleUserRegistered(event, topic, offset)
+        + handleRenewalReminder(event, topic, offset)
+    }
+    note right of NotificationConsumer
+        Topics consumed:
+          booking-confirmed  (group: notification-booking-group)
+          user-registered    (group: notification-booking-group)
+          renewal-reminder   (group: notification-reminder-group)
+        Exceptions caught & logged — never rethrown.
+    end note
+
+    class KafkaConfig <<Configuration>> {
+        + bookingKafkaListenerContainerFactory(factory) : ConcurrentKafkaListenerContainerFactory
+        + reminderKafkaListenerContainerFactory(factory) : ConcurrentKafkaListenerContainerFactory
+    }
+    note right of KafkaConfig
+        booking factory: concurrency=3, BATCH ack
+        reminder factory: concurrency=2, BATCH ack
+    end note
+
+    NotificationLog "1" *-- "1" NotifChannel
+    NotificationLog "1" *-- "1" DeliveryStatus
+
+    WhatsAppService    --> NotifLogRepository
+    EmailService       --> NotifLogRepository
+    NotificationService --> WhatsAppService
+    NotificationService --> EmailService
+    NotificationConsumer --> NotificationService
+    NotificationConsumer ..> BookingConfirmedEventDto : deserialises
+    NotificationConsumer ..> RenewalReminderEventDto  : deserialises
+}
+
+' ================================================================
+'  ADMIN SERVICE  (:8086)
+' ================================================================
+package "admin-service [:8086]" as adminPkg #F4ECF7 {
+
+    class AdminUserEntity <<Entity>> {
+        - id : UUID
+        - mobile : String
+        - email : String
+        - name : String
+        - address : String
+        - isActive : Boolean
+        - role : String
+        - createdAt : LocalDateTime
+    }
+    note right of AdminUserEntity
+        Mirror of auth-service User.
+        Same 'users' table — read model.
+        Writes only: setIsActive()
+    end note
+
+    class AdminMembershipEntity <<Entity>> {
+        - id : UUID
+        - userId : UUID
+        - plan : AdminPlanEntity
+        - seatNumber : String
+        - shift : String
+        - startDate : LocalDate
+        - endDate : LocalDate
+        - status : String
+        - reminderSent : boolean
+    }
+
+    class AdminPlanEntity <<Entity>> {
+        - id : UUID
+        - name : String
+        - planType : String
+        - price : BigDecimal
+        - durationDays : Integer
+        - isActive : Boolean
+    }
+
+    class AdminPaymentEntity <<Entity>> {
+        - id : UUID
+        - membershipId : UUID
+        - userId : UUID
+        - amount : BigDecimal
+        - status : String
+        - createdAt : LocalDateTime
+        - updatedAt : LocalDateTime
+    }
+
+    interface AdminUserRepository <<Repository>> {
+        + findById(id : UUID) : Optional<AdminUserEntity>
+        + findAllById(ids : Iterable<UUID>) : List<AdminUserEntity>
+        + findStudentsByStatus(status : String, pageable : Pageable) : Page<AdminUserEntity>
+        + countActiveStudents() : long
+        + countAllStudents() : long
+        + save(u : AdminUserEntity) : AdminUserEntity
+    }
+
+    interface AdminMembershipRepository <<Repository>> {
+        + findByUserIdAndStatus(userId : UUID, status : Status) : Optional<AdminMembershipEntity>
+        + findMembershipsExpiringBefore(upTo : LocalDate) : List<AdminMembershipEntity>
+        + findExpiringMemberships(from : LocalDate, to : LocalDate) : List<AdminMembershipEntity>
+        + countActiveMemberships() : long
+        + countExpiredMemberships() : long
+        + save(m : AdminMembershipEntity) : AdminMembershipEntity
+    }
+
+    interface AdminPaymentRepository <<Repository>> {
+        + sumRevenueForPeriod(from : LocalDateTime, to : LocalDateTime) : BigDecimal
+        + countSuccessfulPayments(from : LocalDateTime, to : LocalDateTime) : long
+    }
+
+    class AdminService <<Service>> {
+        - userRepository : AdminUserRepository
+        - membershipRepository : AdminMembershipRepository
+        - paymentRepository : AdminPaymentRepository
+        - kafkaTemplate : KafkaTemplate<String, Object>
+        + getDashboardStats() : DashboardDto
+        + getAllStudents(page : int, size : int, status : String) : List<StudentDto>
+        + getStudentDetails(userId : String) : StudentDto
+        + updateStudentStatus(userId : String, active : boolean)
+        + getSeatMap(shift : String, dateStr : String) : SeatMapDto
+        + getExpiringMemberships(withinDays : int) : List<StudentDto>
+        + sendBulkReminders(userIds : List<String>) : int
+        + getRevenueReport(from : String, to : String) : RevenueReportDto
+    }
+
+    class AdminController <<Controller>> {
+        - adminService : AdminService
+        + getDashboard() : ResponseEntity
+        + getAllStudents(page, size, status) : ResponseEntity
+        + getStudent(userId : String) : ResponseEntity
+        + updateStudentStatus(userId : String, req : UpdateStatusRequest) : ResponseEntity
+        + getSeatMap(shift : String, date : String) : ResponseEntity
+        + getExpiringMemberships(withinDays : int) : ResponseEntity
+        + sendBulkReminders(req : SendReminderRequest) : ResponseEntity
+        + getRevenueReport(from : String, to : String) : ResponseEntity
+    }
+
+    class ExpiryReminderScheduler <<Scheduler>> {
+        - membershipRepository : AdminMembershipRepository
+        - userRepository : AdminUserRepository
+        - kafkaTemplate : KafkaTemplate<String, Object>
+        + sendExpiryReminders()
+    }
+    note right of ExpiryReminderScheduler
+        Cron: 0 0 9 * * * (daily at 9 AM).
+        Only fires at daysLeft == 7 or == 3.
+        Sets reminderSent = true after firing.
+        Must run at replicas=1 — add ShedLock
+        before scaling to multiple pods.
+    end note
+
+    class DashboardDto <<DTO>> {
+        + totalStudents : long
+        + activeStudents : long
+        + activeMemberships : long
+        + expiredMemberships : long
+        + expiringThisWeek : long
+        + totalSeats : long
+        + occupiedSeats : long
+        + availableSeats : long
+        + revenueToday : BigDecimal
+        + revenueThisMonth : BigDecimal
+        + paymentsThisMonth : long
+    }
+
+    class StudentDto <<DTO>> {
+        + id : String
+        + name : String
+        + mobile : String
+        + email : String
+        + isActive : Boolean
+        + membershipStatus : String
+        + seatNumber : String
+        + shift : String
+        + membershipEnd : String
+        + {static} fromEntities(user, membership) : StudentDto
+    }
+
+    class RenewalReminderEvent <<KafkaEvent>> {
+        + userId : String
+        + membershipId : String
+        + userName : String
+        + userMobile : String
+        + userEmail : String
+        + seatNumber : String
+        + expiryDate : String
+        + daysRemaining : int
+        + eventType : String
+    }
+    note bottom of RenewalReminderEvent
+        Topic: renewal-reminder
+        Key: userId
+        Published by scheduler (7/3-day thresholds)
+        and by sendBulkReminders (manual override,
+        ignores reminderSent flag).
+    end note
+
+    AdminMembershipEntity "many" --> "1" AdminPlanEntity : uses
+
+    AdminService     --> AdminUserRepository
+    AdminService     --> AdminMembershipRepository
+    AdminService     --> AdminPaymentRepository
+    AdminService    ..> RenewalReminderEvent        : publishes to Kafka
+    AdminController  --> AdminService
+    ExpiryReminderScheduler --> AdminMembershipRepository
+    ExpiryReminderScheduler --> AdminUserRepository
+    ExpiryReminderScheduler ..> RenewalReminderEvent : publishes to Kafka
+}
+
+' ================================================================
+'  CROSS-SERVICE KAFKA EVENT FLOWS
+' ================================================================
+PaymentService       ..> NotificationConsumer : "<<Kafka>>  booking-confirmed"
+ExpiryReminderScheduler ..> NotificationConsumer : "<<Kafka>>  renewal-reminder"
+AdminService         ..> NotificationConsumer : "<<Kafka>>  renewal-reminder"
+
+note as KafkaNote
+    Kafka Topics Summary
+    ─────────────────────────────────────────────
+    booking-confirmed  →  membership-service publishes
+                          after Razorpay payment verified.
+                          notification-service consumes.
+    user-registered    →  auth-service publishes after
+                          new student registration.
+                          notification-service consumes.
+    renewal-reminder   →  admin-service scheduler (daily 9AM)
+                          + manual POST /api/admin/reminders/send.
+                          notification-service consumes.
+end note
+
+@enduml

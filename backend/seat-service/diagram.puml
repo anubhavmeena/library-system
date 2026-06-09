@@ -1,0 +1,322 @@
+@startuml seat-service-classes
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam ArrowColor #444444
+skinparam ClassBorderColor #555555
+skinparam ClassBackgroundColor #FAFAFA
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+
+title Seat Service — Class Diagram\ncom.library.seat (port 8084)
+
+' ─────────────────────────────────────────
+' ENTITIES
+' ─────────────────────────────────────────
+package "com.library.seat.entity" {
+
+    class Seat <<Entity>> <<Data>> <<Builder>> {
+        - id          : UUID
+        - seatNumber  : String
+        - rowLabel    : String
+        - seatIndex   : Integer
+        - isActive    : Boolean = true
+    }
+    note right of Seat
+      @Table(name="seats")
+      seatNumber has UNIQUE constraint
+      Layout: A(28), B(28), C(28), D(26)
+      seatNumber format: "<rowLabel><seatIndex>"
+      e.g. "A1", "B14", "D26"
+    end note
+
+    class SeatBooking <<Entity>> <<Data>> <<Builder>> {
+        - id           : UUID
+        - userId       : UUID
+        - membershipId : UUID
+        - shift        : String
+        - bookingDate  : LocalDate
+        - endDate      : LocalDate
+        - status       : Status = ACTIVE
+        - createdAt    : LocalDateTime
+        __
+        # onCreate() : void
+    }
+    note right of SeatBooking
+      @Table(name="seat_bookings")
+      UNIQUE constraint: (seat_id, shift, booking_date)
+      shift values: MORNING | EVENING | FULL_DAY
+      userId / membershipId are bare UUIDs —
+      no FK to other services
+    end note
+
+    enum Status <<enumeration>> {
+        ACTIVE
+        RELEASED
+        EXPIRED
+    }
+
+    SeatBooking +-- Status
+    SeatBooking "*" *-- "1" Seat : @ManyToOne(LAZY)\n@JoinColumn(seat_id)
+}
+
+' ─────────────────────────────────────────
+' REPOSITORIES
+' ─────────────────────────────────────────
+package "com.library.seat.repository" {
+
+    interface SeatRepository <<Repository>> {
+        + findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc() : List<Seat>
+        + findBySeatNumber(seatNumber : String) : Optional<Seat>
+        + findByRowLabelAndIsActiveTrueOrderBySeatIndexAsc(rowLabel : String) : List<Seat>
+        + countActiveSeats() : long
+    }
+    note bottom of SeatRepository
+      countActiveSeats() uses
+      @Query("SELECT COUNT(s) FROM Seat s WHERE s.isActive = true")
+    end note
+
+    interface SeatBookingRepository <<Repository>> {
+        + findActiveBookingsForShiftAndDate(shift : String, date : LocalDate) : List<SeatBooking>
+        + findBookedSeatIds(shift : String, date : LocalDate) : List<UUID>
+        + findByMembershipId(membershipId : UUID) : Optional<SeatBooking>
+        + findByUserIdAndStatus(userId : UUID, status : Status) : List<SeatBooking>
+        + existsBySeatIdAndShiftAndStatusAndBookingDateLessThanEqualAndEndDateGreaterThanEqual(\n    seatId : UUID, shift : String, status : Status,\n    bookingDate : LocalDate, endDate : LocalDate) : boolean
+    }
+    note bottom of SeatBookingRepository
+      findActiveBookingsForShiftAndDate — @Query, cross-shift SQL:
+        AND (sb.shift = :shift OR sb.shift = 'FULL_DAY' OR :shift = 'FULL_DAY')
+      findBookedSeatIds — @Query returning UUID only (no JOIN fetch),
+        efficient for 110-seat availability grid
+      existsBy...  — Spring Data derived query,
+        detects date-range overlap for same seat+shift (conflict check)
+    end note
+
+    SeatRepository ..> Seat : manages
+    SeatBookingRepository ..> SeatBooking : manages
+}
+
+' ─────────────────────────────────────────
+' CONFIGURATION
+' ─────────────────────────────────────────
+package "com.library.seat.config" {
+
+    class RedisConfig <<Configuration>> {
+        + redisTemplate(factory : RedisConnectionFactory) : RedisTemplate<String, Object>
+    }
+    note right of RedisConfig
+      keySerializer   : StringRedisSerializer
+      valueSerializer : GenericJackson2JsonRedisSerializer
+      hashKeySerializer   : StringRedisSerializer
+      hashHashValueSerializer : GenericJackson2JsonRedisSerializer
+      Values are stored as JSON — human-readable in redis-cli
+    end note
+}
+
+' ─────────────────────────────────────────
+' DTOs
+' ─────────────────────────────────────────
+package "com.library.seat.dto" {
+
+    class ApiResponse<T> <<DTO>> <<Data>> <<Builder>> {
+        - success   : boolean
+        - message   : String
+        - data      : T
+        - timestamp : String
+        __
+        + {static} success(data : T) : ApiResponse<T>
+        + {static} error(message : String) : ApiResponse<T>
+    }
+
+    class SeatDto <<DTO>> <<Data>> <<Builder>> {
+        - id         : String
+        - seatNumber : String
+        - rowLabel   : String
+        - seatIndex  : Integer
+        - isBooked   : boolean
+        - isActive   : boolean
+        __
+        + {static} fromEntity(seat : Seat, isBooked : boolean) : SeatDto
+    }
+
+    class SeatAvailabilityDto <<DTO>> <<Data>> <<Builder>> {
+        - shift          : String
+        - date           : String
+        - totalSeats     : int
+        - bookedSeats    : int
+        - availableSeats : int
+        - seats          : List<SeatDto>
+        - seatsByRow     : Map<String, List<SeatDto>>
+    }
+
+    class BookSeatRequest <<DTO>> <<Data>> {
+        - seatNumber  : String
+        - membershipId : String
+        - shift        : String
+        - startDate    : String
+        - endDate      : String
+    }
+    note right of BookSeatRequest
+      All fields annotated @NotBlank
+      seatNumber  : e.g. "B14"
+      membershipId: UUID string of active membership
+      shift       : MORNING | EVENING | FULL_DAY
+      startDate / endDate : yyyy-MM-dd
+    end note
+
+    class SeatBookingDto <<DTO>> <<Data>> <<Builder>> {
+        - id           : String
+        - seatId       : String
+        - seatNumber   : String
+        - rowLabel     : String
+        - userId       : String
+        - membershipId : String
+        - shift        : String
+        - bookingDate  : String
+        - endDate      : String
+        - status       : String
+        __
+        + {static} fromEntity(booking : SeatBooking) : SeatBookingDto
+    }
+
+    SeatAvailabilityDto o-- SeatDto : seats / seatsByRow
+    SeatDto ..> Seat : fromEntity()
+    SeatBookingDto ..> SeatBooking : fromEntity()
+}
+
+' ─────────────────────────────────────────
+' EXCEPTIONS
+' ─────────────────────────────────────────
+package "com.library.seat.exception" {
+
+    class ResourceNotFoundException {
+        + ResourceNotFoundException(message : String)
+    }
+    note right of ResourceNotFoundException
+      HTTP 404 — seat not found by seatNumber
+    end note
+
+    class SeatAlreadyBookedException {
+        + SeatAlreadyBookedException(seatNumber : String, shift : String)
+    }
+    note right of SeatAlreadyBookedException
+      HTTP 409 — conflict detected by
+      existsBy...() derived query
+    end note
+
+    class GlobalExceptionHandler <<RestControllerAdvice>> {
+        + handleNotFound(ex : ResourceNotFoundException) : ResponseEntity<ApiResponse<Void>>
+        + handleSeatBooked(ex : SeatAlreadyBookedException) : ResponseEntity<ApiResponse<Void>>
+        + handleBadRequest(ex : IllegalArgumentException) : ResponseEntity<ApiResponse<Void>>
+        + handleValidation(ex : MethodArgumentNotValidException) : ResponseEntity<ApiResponse<Void>>
+        + handleGeneral(ex : Exception) : ResponseEntity<ApiResponse<Void>>
+    }
+
+    ResourceNotFoundException --|> RuntimeException
+    SeatAlreadyBookedException --|> RuntimeException
+
+    GlobalExceptionHandler ..> ResourceNotFoundException : handles -> 404
+    GlobalExceptionHandler ..> SeatAlreadyBookedException : handles -> 409
+    GlobalExceptionHandler ..> ApiResponse : wraps errors in
+}
+
+' ─────────────────────────────────────────
+' SERVICE
+' ─────────────────────────────────────────
+package "com.library.seat.service" {
+
+    class SeatService <<Service>> <<Transactional>> {
+        - seatRepository        : SeatRepository
+        - seatBookingRepository : SeatBookingRepository
+        - redisTemplate         : RedisTemplate<String, Object>
+        - cacheTtlSeconds       : long
+        __
+        + getAvailability(shift : String, dateStr : String) : SeatAvailabilityDto
+        + bookSeat(userId : String, request : BookSeatRequest) : SeatBookingDto
+        + releaseSeat(membershipId : String) : void
+        + getMyBookings(userId : String) : List<SeatBookingDto>
+        + getBookingsForShiftAndDate(shift : String, dateStr : String) : List<SeatBookingDto>
+        - resolveShift(shift : String) : String
+        - invalidateCache(shift : String, start : LocalDate, end : LocalDate) : void
+    }
+    note right of SeatService
+      cacheTtlSeconds: @Value("${app.seat.cache-ttl:300}") — 5 min default
+
+      Cache key pattern: "seats:availability:<SHIFT>:<yyyy-MM-dd>"
+      Cache hit path: redisTemplate.opsForValue().get(cacheKey)
+      Cache write: set(cacheKey, result, Duration.ofSeconds(cacheTtlSeconds))
+
+      resolveShift(): null | unknown -> "FULL_DAY"
+        "MORNING" -> "MORNING", "EVENING" -> "EVENING"
+
+      invalidateCache() iterates every date in [start..end]:
+        deletes key for given shift
+        if shift == FULL_DAY: also deletes MORNING + EVENING keys
+        for the same date (FULL_DAY occupies both sub-shifts)
+
+      bookSeat() conflict check uses derived query:
+        existsBySeatIdAndShiftAndStatus
+        AndBookingDateLessThanEqualAndEndDateGreaterThanEqual()
+      Throws SeatAlreadyBookedException -> HTTP 409 on conflict
+      @Transactional on bookSeat() and releaseSeat()
+    end note
+
+    SeatService *-- SeatRepository
+    SeatService *-- SeatBookingRepository
+    SeatService ..> RedisConfig : uses RedisTemplate bean from
+    SeatService ..> SeatAvailabilityDto : returns
+    SeatService ..> SeatBookingDto : returns
+    SeatService ..> BookSeatRequest : consumes
+    SeatService ..> ResourceNotFoundException : throws
+    SeatService ..> SeatAlreadyBookedException : throws
+}
+
+' ─────────────────────────────────────────
+' CONTROLLER
+' ─────────────────────────────────────────
+package "com.library.seat.controller" {
+
+    class SeatController <<Controller>> <<RestController>> {
+        - seatService : SeatService
+        __
+        + getAvailability(shift : String, date : String) : ResponseEntity<ApiResponse<SeatAvailabilityDto>>
+        + bookSeat(userId : String, request : BookSeatRequest) : ResponseEntity<ApiResponse<SeatBookingDto>>
+        + releaseSeat(membershipId : String, role : String) : ResponseEntity<ApiResponse<String>>
+        + getMyBookings(userId : String) : ResponseEntity<ApiResponse<List<SeatBookingDto>>>
+        + getBookingsForShift(shift : String, date : String, role : String) : ResponseEntity<ApiResponse<List<SeatBookingDto>>>
+    }
+    note right of SeatController
+      @RequestMapping("/api/seats")
+
+      GET  /api/seats/availability?shift=&date=
+        Redis-cached — reads X-User-Id not required
+      POST /api/seats/book
+        @RequestHeader("X-User-Id") injected by API Gateway
+      DELETE /api/seats/release/{membershipId}
+        @RequestHeader("X-User-Role") — admin only
+      GET  /api/seats/my
+        @RequestHeader("X-User-Id")
+      GET  /api/seats/admin/bookings?shift=&date=
+        @RequestHeader("X-User-Role") — admin only
+    end note
+
+    SeatController *-- SeatService
+    SeatController ..> ApiResponse : wraps all responses
+    SeatController ..> BookSeatRequest : @RequestBody
+    SeatController ..> SeatAvailabilityDto : returns
+    SeatController ..> SeatBookingDto : returns
+}
+
+' ─────────────────────────────────────────
+' ENTRY POINT
+' ─────────────────────────────────────────
+package "com.library.seat" {
+    class SeatServiceApplication <<SpringBootApplication>> {
+        + {static} main(args : String[]) : void
+    }
+}
+
+@enduml

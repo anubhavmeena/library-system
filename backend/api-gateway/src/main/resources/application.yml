@@ -1,0 +1,80 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:3000"
+              - "http://frontend:3000"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+      routes:
+        # Auth Service Routes (public)
+        - id: auth-service-public
+          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - StripPrefix=0
+
+        # User Service Routes (protected)
+        - id: user-service
+          uri: ${USER_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - StripPrefix=0
+            - name: AuthFilter
+
+        # Membership Service Routes (protected)
+        - id: membership-service
+          uri: ${MEMBERSHIP_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/memberships/**, /api/plans/**, /api/payments/**
+          filters:
+            - StripPrefix=0
+            - name: AuthFilter
+
+        # Seat Service Routes (protected)
+        - id: seat-service
+          uri: ${SEAT_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/seats/**
+          filters:
+            - StripPrefix=0
+            - name: AuthFilter
+
+        # Admin Service Routes (admin only)
+        - id: admin-service
+          uri: ${ADMIN_SERVICE_URL:http://localhost:8086}
+          predicates:
+            - Path=/api/admin/**
+          filters:
+            - StripPrefix=0
+            - name: AuthFilter
+            - name: AdminRoleFilter
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:library-jwt-secret-key-2024-change-in-production}
+    expiration: 86400000 # 24 hours
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

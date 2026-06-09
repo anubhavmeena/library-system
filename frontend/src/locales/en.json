@@ -1,0 +1,526 @@
+{
+  "language": { "en": "EN", "hi": "हिं", "switchTo": "Switch language" },
+  "nav": { "admin": "Admin", "getStarted": "Get Started →" },
+  "landing": {
+    "badge": "Your Premier Study Destination",
+    "heroTitle": "Study Smarter,",
+    "heroHighlight": "Book Your Seat",
+    "heroDesc": "Reserve your dedicated study spot at Target Zone Library. Choose your plan, pick your seat like a cinema ticket, and focus on what matters most.",
+    "registerNow": "Register Now",
+    "viewPlans": "View Plans",
+    "stats": { "seats": "Total Seats", "shifts": "Flexible Shifts", "startingFrom": "Starting From" },
+    "features": {
+      "title": "Everything You Need",
+      "subtitle": "Designed for serious students who demand the best",
+      "flexibleShifts": { "title": "Flexible Shifts", "desc": "Morning (6AM–2PM) or Evening (2PM–10PM) or Full Day access" },
+      "wifi": { "title": "High-Speed Wi-Fi", "desc": "Blazing fast internet for uninterrupted study sessions" },
+      "refreshment": { "title": "Refreshment Zone", "desc": "Tea, coffee and snacks available throughout the day" },
+      "seats": { "title": "110 Seats", "desc": "Spacious seating across 4 rows with aisle comfort" }
+    },
+    "plans": {
+      "title": "Simple Pricing",
+      "subtitle": "Flat monthly plans. No hidden fees.",
+      "popular": "POPULAR",
+      "perMonth": "/month",
+      "getStarted": "Get Started",
+      "halfDay": { "name": "Half Day", "f1": "One shift (Morning or Evening)", "f2": "Dedicated seat booking", "f3": "Wi-Fi access", "f4": "WhatsApp confirmation" },
+      "fullDay": { "name": "Full Day", "f1": "All-day access (6AM–10PM)", "f2": "Priority seat booking", "f3": "Wi-Fi + locker access", "f4": "WhatsApp + Email confirmation" }
+    },
+    "footer": { "tagline": "Your dedicated space for learning and growth." }
+  },
+  "auth": {
+    "login": {
+      "title": "Welcome Back",
+      "subtitle": "Sign in to your library account",
+      "mobile": "📱 Mobile",
+      "email": "📧 Email",
+      "mobileLabel": "Mobile Number",
+      "emailLabel": "Email Address",
+      "mobilePlaceholder": "9876543210",
+      "emailPlaceholder": "you@gmail.com",
+      "sendOtp": "Send OTP",
+      "sendingOtp": "Sending OTP...",
+      "otpSentTo": "OTP sent to",
+      "enterOtp": "Enter OTP",
+      "otpValid": "Valid for 5 minutes",
+      "signIn": "Sign In",
+      "verifying": "Verifying...",
+      "changeContact": "← Change contact",
+      "newStudent": "New student?",
+      "registerHere": "Register here",
+      "backHome": "← Back to Home",
+      "toasts": {
+        "enterContact": "Enter your mobile number or email",
+        "enter6Otp": "Enter the 6-digit OTP",
+        "otpSent": "OTP sent!",
+        "welcomeBack": "Welcome back!",
+        "failedOtp": "Failed to send OTP"
+      }
+    },
+    "register": {
+      "title": "Create Account",
+      "subtitle": "Join Target Zone Library today",
+      "steps": ["Verify", "Profile", "Done"],
+      "sendOtp": "Send OTP →",
+      "sending": "Sending...",
+      "verifyOtp": "Verify OTP →",
+      "verifying": "Verifying...",
+      "changeContact": "← Change contact",
+      "alreadyRegistered": "Already registered?",
+      "signIn": "Sign in",
+      "otpSentTo": "OTP sent to",
+      "enterOtp": "Enter OTP",
+      "mobileLabel": "Mobile Number",
+      "emailLabel": "Email Address",
+      "fullName": "Full Name *",
+      "fullNamePlaceholder": "Your full name",
+      "emailOptional": "Email (optional)",
+      "dob": "Date of Birth",
+      "gender": "Gender",
+      "genderSelect": "Select",
+      "address": "Address",
+      "addressPlaceholder": "Your address",
+      "completeReg": "Complete Registration 🎉",
+      "creatingAccount": "Creating account...",
+      "backHome": "← Back to Home",
+      "toasts": {
+        "enterContact": "Enter your contact",
+        "enter6Otp": "Enter 6-digit OTP",
+        "nameRequired": "Name is required",
+        "otpSent": "OTP sent!",
+        "otpVerified": "OTP verified!",
+        "accountExists": "Account exists. Please login.",
+        "registered": "Registered successfully!"
+      }
+    },
+    "adminLogin": {
+      "title": "Admin Login",
+      "subtitle": "Library Control Panel",
+      "label": "Admin Email / Mobile",
+      "placeholder": "admin@library.com or 9999999999",
+      "sendOtp": "Send OTP",
+      "sendingOtp": "Sending OTP...",
+      "otpSentTo": "OTP sent to",
+      "enterOtp": "Enter OTP",
+      "loginBtn": "Login as Admin",
+      "verifying": "Verifying...",
+      "back": "← Back",
+      "backHome": "← Back to Home",
+      "toasts": {
+        "enterContact": "Enter admin email or mobile",
+        "enter6Otp": "Enter 6-digit OTP",
+        "otpSent": "OTP sent!",
+        "loginSuccess": "Admin login successful",
+        "failed": "Failed",
+        "loginFailed": "Login failed"
+      }
+    }
+  },
+  "student": {
+    "sidebar": {
+      "brandMain": "Target Zone",
+      "brandSub": "Library",
+      "defaultName": "Student",
+      "nav": {
+        "dashboard": "Dashboard",
+        "membership": "Membership",
+        "booking": "Book a Seat",
+        "facilities": "Facilities",
+        "profile": "My Profile"
+      },
+      "logout": "Logout",
+      "mobileTitle": "Target Zone Library"
+    }
+  },
+  "admin": {
+    "sidebar": {
+      "brandMain": "Admin",
+      "brandSub": "Control Panel",
+      "defaultName": "Admin",
+      "role": "Administrator",
+      "mobileTitle": "Admin Panel",
+      "adminBadge": "ADMIN",
+      "nav": {
+        "dashboard": "Dashboard",
+        "students": "Students",
+        "seats": "Seat Map",
+        "reminders": "Reminders"
+      },
+      "logout": "Logout"
+    }
+  },
+  "dashboard": {
+    "greeting": "Good morning, {{name}} 👋",
+    "subtitle": "Here's your library overview",
+    "stats": {
+      "plan": "Plan",
+      "seat": "Seat",
+      "daysLeft": "Days Left",
+      "status": "Status",
+      "noActivePlan": "No active plan",
+      "noMembership": "No membership",
+      "activeMembership": "Active membership",
+      "getPlan": "Get a plan",
+      "fullDay": "Full Day",
+      "halfDay": "Half Day",
+      "inactive": "Inactive",
+      "fullDayShift": "Full day",
+      "morning": "6AM–2PM",
+      "evening": "2PM–10PM",
+      "expires": "Expires {{date}}"
+    },
+    "noMembership": {
+      "title": "Start Your Study Journey",
+      "desc": "Choose a membership plan and book your dedicated seat",
+      "cta": "Book a Seat Now"
+    },
+    "expiring": {
+      "title": "Membership expiring in {{count}} days",
+      "desc": "Renew now to keep your seat {{seatNumber}}",
+      "renew": "Renew"
+    },
+    "quickActions": {
+      "title": "Quick Actions",
+      "booking": { "label": "Book / Change Seat", "desc": "Select your preferred seat" },
+      "membership": { "label": "Membership Details", "desc": "View plan and payment history" },
+      "profile": { "label": "Edit Profile", "desc": "Update your personal details" },
+      "facilities": { "label": "Library Facilities", "desc": "What we offer" }
+    },
+    "hours": {
+      "title": "Library Hours",
+      "morning": { "label": "Morning Shift", "time": "6:00 AM – 2:00 PM" },
+      "evening": { "label": "Evening Shift", "time": "2:00 PM – 10:00 PM" },
+      "fullDay": { "label": "Full Day", "time": "6:00 AM – 10:00 PM" },
+      "open": "Open",
+      "note": "📍 Library is open 7 days a week including holidays"
+    }
+  },
+  "booking": {
+    "title": "Book Your Seat",
+    "subtitle": "Choose your plan and reserve your dedicated spot",
+    "steps": ["Choose Plan", "Select Seat", "Confirm"],
+    "activeMembership": {
+      "title": "Active Membership",
+      "desc": "You already have an active {{planName}} plan. You can purchase a new plan once your current membership expires.",
+      "seat": "Seat",
+      "shift": "Shift",
+      "expiresOn": "Expires on",
+      "viewMembership": "View Membership"
+    },
+    "plan": {
+      "perMonth": "per month",
+      "halfDayFeatures": ["Choose morning or evening shift", "110 seats available", "30 day validity"],
+      "fullDayFeatures": ["Access both shifts all day", "Priority seat selection", "30 day validity", "Best value"],
+      "popular": "Most Popular"
+    },
+    "seat": {
+      "morning": "🌅 Morning (6AM–2PM)",
+      "evening": "🌆 Evening (2PM–10PM)",
+      "selectTitle": "Select Your Seat",
+      "availableCount": "{{count}} of 110 available",
+      "selectedSeat": "Seat {{seatNumber}} selected",
+      "selectedInfo": "Row {{row}} · {{shift}}",
+      "shiftMorning": "Morning 6AM–2PM",
+      "shiftEvening": "Evening 2PM–10PM",
+      "shiftFullDay": "Full Day 6AM–10PM",
+      "continue": "Continue →",
+      "backToPlans": "← Back to plans",
+      "legendAvailable": "Available",
+      "legendSelected": "Selected",
+      "legendBooked": "Booked"
+    },
+    "summary": {
+      "title": "Booking Summary",
+      "plan": "Plan",
+      "seatNumber": "Seat Number",
+      "shift": "Shift",
+      "shiftMorning": "Morning (6AM–2PM)",
+      "shiftEvening": "Evening (2PM–10PM)",
+      "shiftFullDay": "Full Day (6AM–10PM)",
+      "duration": "Duration",
+      "duration30": "30 days",
+      "startDate": "Start Date",
+      "totalAmount": "Total Amount",
+      "disclaimer": "By proceeding, you'll receive a WhatsApp and email confirmation. Membership is non-refundable once activated.",
+      "payBtn": "Pay ₹{{amount}} →",
+      "processing": "Processing...",
+      "changeSeat": "← Change seat"
+    },
+    "toasts": {
+      "selectSeat": "Please select a seat",
+      "paymentFailed": "Payment failed",
+      "verifyFailed": "Payment verification failed",
+      "confirmed": "Booking confirmed! 🎉"
+    }
+  },
+  "membership": {
+    "title": "Membership",
+    "subtitle": "Your current plan and payment history",
+    "activeMembership": "Active Membership",
+    "planType": "Plan Type",
+    "seatNumber": "Seat Number",
+    "shift": "Shift",
+    "startDate": "Start Date",
+    "expiryDate": "Expiry Date",
+    "daysLeft": "days left",
+    "expiringSoon": "Expiring soon — renew now!",
+    "readyToRenew": "Ready to renew?",
+    "renewBtn": "Renew Membership",
+    "noActive": {
+      "title": "No Active Membership",
+      "desc": "Choose a plan and book your seat to get started",
+      "cta": "Get a Membership"
+    },
+    "plans": {
+      "title": "Available Plans",
+      "perMonth": "/ month",
+      "popular": "Most Popular",
+      "halfDayFeatures": ["Choose morning or evening shift", "30 days validity", "110 seats available"],
+      "fullDayFeatures": ["Full day 6AM–10PM access", "30 days validity", "Best value plan"]
+    },
+    "history": { "title": "Membership History" },
+    "shifts": {
+      "MORNING": "Morning (6AM–2PM)",
+      "EVENING": "Evening (2PM–10PM)",
+      "FULL_DAY": "Full Day (6AM–10PM)"
+    },
+    "planTypes": { "FULL_DAY": "Full Day", "HALF_DAY": "Half Day" }
+  },
+  "profile": {
+    "title": "My Profile",
+    "subtitle": "Manage your personal details and photo",
+    "memberSince": "Member since",
+    "changePhoto": "📷 Change Photo",
+    "uploading": "Uploading...",
+    "removePhoto": "Remove photo",
+    "personalDetails": "Personal Details",
+    "edit": "✏️ Edit",
+    "cancel": "Cancel",
+    "saveChanges": "Save Changes",
+    "saving": "Saving...",
+    "notProvided": "Not provided",
+    "mobileNote": "* Mobile number cannot be changed. Contact admin if needed.",
+    "addressPlaceholder": "Your full address",
+    "fields": {
+      "fullName": "Full Name",
+      "fatherName": "Father's Name",
+      "email": "Email Address",
+      "mobile": "Mobile Number",
+      "dob": "Date of Birth",
+      "gender": "Gender",
+      "address": "Address"
+    },
+    "gender": { "male": "Male", "female": "Female", "other": "Other" },
+    "selectGender": "Select Gender",
+    "toasts": {
+      "profileUpdated": "Profile updated!",
+      "photoUpdated": "Photo updated!",
+      "photoRemoved": "Photo removed",
+      "fileTooLarge": "File must be under 5MB",
+      "loadFailed": "Failed to load profile",
+      "updateFailed": "Update failed",
+      "uploadFailed": "Upload failed",
+      "removeFailed": "Failed to remove photo"
+    }
+  },
+  "facilities": {
+    "title": "Library Facilities",
+    "subtitle": "Everything we offer to make your study experience perfect",
+    "hours": {
+      "title": "Operating Hours",
+      "openNote": "📅 Open 7 days a week · All holidays · 365 days a year",
+      "morning": { "label": "Morning Shift", "time": "6:00 AM – 2:00 PM", "plan": "Half-day ₹400" },
+      "evening": { "label": "Evening Shift", "time": "2:00 PM – 10:00 PM", "plan": "Half-day ₹400" },
+      "fullDay": { "label": "Full Day", "time": "6:00 AM – 10:00 PM", "plan": "Full-day ₹600" }
+    },
+    "offer": "What We Offer",
+    "items": {
+      "wifi":        { "title": "High-Speed WiFi",             "desc": "Dedicated 100 Mbps fibre internet across all floors. Stream lectures, download resources, attend online classes without interruption." },
+      "ac":          { "title": "Air Conditioning",            "desc": "Climate-controlled environment maintained at a comfortable 22°C throughout the day, keeping you focused during long study sessions." },
+      "power":       { "title": "Power Outlets at Every Seat", "desc": "Each of the 110 seats has a dedicated power socket and USB charging port so your devices never run out of battery." },
+      "books":       { "title": "Reference Book Collection",   "desc": "Over 5,000 academic and competitive exam books available for in-library reading. Covers UPSC, JEE, NEET, banking, and more." },
+      "printing":    { "title": "Printing & Scanning",         "desc": "Black-and-white and colour printing available at nominal cost. A4 and A3 scanning free of charge for all members." },
+      "refreshment": { "title": "Refreshment Zone",            "desc": "A dedicated refreshment corner with hot beverages, snacks, and a water purifier — available during both shifts." },
+      "lockers":     { "title": "Secure Lockers",              "desc": "Day-use lockers available for all students. Store your bags, laptops, and valuables safely while you take breaks." },
+      "washrooms":   { "title": "Clean Washrooms",             "desc": "Separate, well-maintained washrooms for male and female students, cleaned every two hours throughout the day." },
+      "cctv":        { "title": "24×7 CCTV Surveillance",      "desc": "The entire library premises including entrance, study hall, and common areas are under continuous CCTV monitoring." },
+      "quiet":       { "title": "Green & Quiet Environment",   "desc": "No-noise zone policy strictly enforced. Phone calls must be taken outside. Designed for deep, distraction-free focus." },
+      "parking":     { "title": "Free Parking",                "desc": "Dedicated two-wheeler parking space for all members. Car parking available on first-come basis." },
+      "access":      { "title": "Differently Abled Access",    "desc": "Ramp access at entrance, wide aisles between rows, and reserved seats near the entrance for differently abled students." }
+    },
+    "seating": {
+      "title": "Seating Layout",
+      "subtitle": "110 seats across 4 rows with a central pathway",
+      "seats": "{{count}} seats",
+      "rows": {
+        "A": "Front row, near whiteboard",
+        "B": "Second row, standard zone",
+        "C": "Third row, quiet zone",
+        "D": "Rear row, near exit"
+      }
+    },
+    "rules": {
+      "title": "Library Rules & Guidelines",
+      "violation": "⚠️ Violation of rules may result in membership cancellation without refund.",
+      "items": [
+        "Maintain complete silence in the study hall at all times",
+        "Mobile phones must be kept on silent mode",
+        "Food and beverages are not allowed at study seats",
+        "Keep your seat and surroundings clean",
+        "No marking or writing in library books",
+        "Report any technical issues to the front desk",
+        "Membership card must be shown at entry",
+        "Guests are not permitted inside the study hall"
+      ]
+    }
+  },
+  "payment": {
+    "title": "Booking Confirmed!",
+    "subtitle": "Your seat has been reserved. A confirmation has been sent to your WhatsApp and email.",
+    "details": {
+      "plan": "Plan",
+      "seat": "Seat",
+      "shift": "Shift",
+      "validTill": "Valid Till",
+      "status": "Status",
+      "shiftMorning": "Morning (6AM–2PM)",
+      "shiftEvening": "Evening (2PM–10PM)",
+      "shiftFullDay": "Full Day (6AM–10PM)"
+    },
+    "dashboard": "Go to Dashboard",
+    "viewMembership": "View Membership"
+  },
+  "adminDashboard": {
+    "title": "Admin Dashboard",
+    "subtitle": "Library overview at a glance",
+    "refresh": "Refresh",
+    "students": "Students",
+    "seats": "Seats",
+    "revenue": "Revenue",
+    "stats": {
+      "totalStudents": "Total Students",
+      "activeStudents": "Active Students",
+      "activeMemberships": "Active Memberships",
+      "expiringThisWeek": "Expiring This Week",
+      "needsAttention": "Needs attention",
+      "totalSeats": "Total Seats",
+      "occupied": "Occupied",
+      "available": "Available",
+      "revenueToday": "Revenue Today",
+      "revenueMonth": "Revenue This Month",
+      "transactions": "{{count}} transactions"
+    },
+    "occupancy": {
+      "title": "Seat Occupancy",
+      "occupied": "{{count}} occupied",
+      "available": "{{count}} available"
+    },
+    "quickLinks": {
+      "manageStudents": { "label": "Manage Students", "desc": "View and manage all students" },
+      "seatMap":        { "label": "Seat Map",         "desc": "Live seat occupancy view" },
+      "sendReminders":  { "label": "Send Reminders",   "desc": "Alert expiring members" },
+      "revenueReport":  { "label": "Revenue Report",   "desc": "Track payments & earnings" }
+    },
+    "loadFailed": "Failed to load dashboard"
+  },
+  "adminStudents": {
+    "title": "Students",
+    "subtitle": "{{count}} students loaded",
+    "refresh": "Refresh",
+    "searchPlaceholder": "🔍 Search name, mobile, email...",
+    "filters": {
+      "all": "All",
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "table": {
+      "student": "Student",
+      "contact": "Contact",
+      "seatShift": "Seat & Shift",
+      "membership": "Membership",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "empty": "No students found",
+    "joined": "Joined",
+    "shifts": { "MORNING": "6AM–2PM", "EVENING": "2PM–10PM", "FULL_DAY": "6AM–10PM" },
+    "expires": "Expires",
+    "daysLeft": "{{count}}d left",
+    "noPlan": "No plan",
+    "active": "Active",
+    "inactive": "Inactive",
+    "view": "View",
+    "enable": "Enable",
+    "disable": "Disable",
+    "page": "Page {{page}}",
+    "prev": "Prev",
+    "next": "Next",
+    "modal": {
+      "title": "Student Details",
+      "mobile": "Mobile",
+      "email": "Email",
+      "address": "Address",
+      "gender": "Gender",
+      "seat": "Seat",
+      "plan": "Plan",
+      "expires": "Expires",
+      "daysLeftLabel": "Days Left",
+      "daysLeft": "{{count}} days",
+      "joined": "Joined",
+      "noSeat": "No seat",
+      "noPlan": "No plan"
+    },
+    "toasts": {
+      "activated": "{{name}} activated",
+      "deactivated": "{{name}} deactivated",
+      "loadFailed": "Failed to load students",
+      "updateFailed": "Failed to update status"
+    }
+  },
+  "adminSeats": {
+    "title": "Seat Occupancy Map",
+    "subtitle": "Live view of all 110 seats",
+    "shifts": { "MORNING": "Morning", "EVENING": "Evening", "FULL_DAY": "Full Day" },
+    "refresh": "Refresh",
+    "stats": { "total": "Total Seats", "occupied": "Occupied", "available": "Available" },
+    "occupancy": "Occupancy",
+    "entrance": "← ENTRANCE / FRONT →",
+    "legend": {
+      "available": "Available",
+      "occupied": "Occupied (click for details)"
+    },
+    "modal": {
+      "seat": "Seat {{seatNumber}}",
+      "student": "Student", "mobile": "Mobile", "shift": "Shift", "expires": "Expires"
+    },
+    "loadFailed": "Failed to load seat map"
+  },
+  "adminReminders": {
+    "title": "Renewal Reminders",
+    "subtitle": "Send WhatsApp & email reminders to students with expiring memberships",
+    "showWithin": "Show expiring within:",
+    "days": "d",
+    "deselectAll": "Deselect All",
+    "selectAll": "Select All",
+    "sendAll": "Send All Reminders",
+    "sendSelected": "Send to {{count}} Reminders",
+    "sending": "Sending...",
+    "stats": {
+      "total": "Total Expiring",
+      "critical": "Critical (≤3d)",
+      "warning": "Warning (≤7d)"
+    },
+    "empty": {
+      "title": "No expiring memberships",
+      "desc": "All students are well within their membership period"
+    },
+    "table": {
+      "student": "Student", "contact": "Contact", "seat": "Seat", "expires": "Expires", "daysLeft": "Days Left"
+    },
+    "daysLeft": "{{count}}d left",
+    "toasts": {
+      "loadFailed": "Failed to load expiring memberships",
+      "sendFailed": "Failed to send reminders"
+    }
+  }
+}

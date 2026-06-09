@@ -1,0 +1,282 @@
+@startuml diagram
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam ArrowColor #444444
+skinparam ClassBorderColor #555555
+skinparam ClassBackgroundColor #FAFAFA
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+
+title Auth Service — Class Diagram\ncom.library.auth  |  Port 8081
+
+' ═══════════════════════════════════════════════════
+' ENTITY
+' ═══════════════════════════════════════════════════
+package "com.library.auth.entity" {
+
+    enum Role <<enumeration>> {
+        STUDENT
+        ADMIN
+    }
+
+    class User <<Entity>> {
+        + id          : UUID
+        + mobile      : String
+        + email       : String
+        + name        : String
+        + address     : String
+        + photoUrl    : String
+        + dateOfBirth : LocalDate
+        + gender      : String
+        + isActive    : Boolean
+        + role        : Role
+        + createdAt   : LocalDateTime
+        + updatedAt   : LocalDateTime
+        __
+        # onCreate()  : void   <<@PrePersist>>
+        # onUpdate()  : void   <<@PreUpdate>>
+    }
+
+    note right of User
+        Table: "users"
+        id  -> UUID PK, auto-generated (Hibernate UUIDGenerator)
+        mobile + email each carry @Column(unique = true)
+        role defaults to STUDENT; stored as EnumType.STRING
+        @Data @Builder @NoArgsConstructor @AllArgsConstructor (Lombok)
+    end note
+
+    User --> Role : role
+}
+
+' ═══════════════════════════════════════════════════
+' REPOSITORY
+' ═══════════════════════════════════════════════════
+package "com.library.auth.repository" {
+
+    interface UserRepository <<Repository>> {
+        + findByMobile(mobile : String)                          : Optional~User~
+        + findByEmail(email : String)                            : Optional~User~
+        + findByMobileOrEmail(contact : String, email : String)  : Optional~User~
+        + existsByMobileOrEmail(mobile : String, email : String) : boolean
+    }
+
+    note right of UserRepository
+        Extends JpaRepository<User, UUID>
+        findByMobileOrEmail uses custom @Query:
+          SELECT u FROM User u WHERE u.mobile = :contact OR u.email = :email
+        existsByMobileOrEmail uses @Query with COUNT aggregate
+    end note
+}
+
+' ═══════════════════════════════════════════════════
+' SERVICES
+' ═══════════════════════════════════════════════════
+package "com.library.auth.service" {
+
+    class AuthService <<Service>> {
+        - userRepository : UserRepository
+        - redisTemplate  : RedisTemplate
+        - otpService     : OtpService
+        - jwtSecret      : String
+        - jwtExpiration  : Long
+        __
+        + sendOtp(contact : String, contactType : String)   : void
+        + verifyOtp(contact : String, otp : String)         : OtpVerifyResponse
+        + register(request : RegisterRequest)               : AuthResponse
+        + login(request : LoginRequest)                     : AuthResponse
+        + adminLogin(request : LoginRequest)                : AuthResponse
+        + refreshToken(token : String)                      : AuthResponse
+        - generateJwt(user : User)                          : String
+        - buildAuthResponse(token : String, user : User)    : AuthResponse
+        - generateOtp()                                     : String
+    }
+
+    note right of AuthService
+        Redis key patterns:
+          "otp:<contact>"   -> OTP string, TTL 5 min
+          "session:<token>" -> contact string, TTL 15 min
+        generateOtp() returns "123456" when
+          SPRING_PROFILES_ACTIVE == "dev"  (dev mode shortcut)
+        refreshToken() always throws UnsupportedOperationException
+        adminLogin() skips OTP entirely — looks up user by contact,
+          asserts role == ADMIN, issues JWT directly
+        JWT (HS256) claims: sub=userId(UUID), role, name, email, mobile
+          Expiry: 86400 s (24 h). Shared JWT_SECRET with api-gateway.
+    end note
+
+    class OtpService <<Service>> {
+        - accountSid : String
+        - authToken  : String
+        - fromPhone  : String
+        __
+        + init()                                                         : void  <<@PostConstruct>>
+        + sendOtp(contact : String, contactType : String, otp : String)  : void
+        - sendSms(mobile : String, message : String, otp : String)       : void
+    }
+
+    note right of OtpService
+        @PostConstruct init(): calls Twilio.init() only when
+          accountSid is non-blank; logs dev-mode warning otherwise
+        sendSms(): auto-prefixes "+91" if number lacks "+" prefix
+        contactType "EMAIL" -> console log only (SendGrid not wired)
+        accountSid blank -> log OTP to console, skip Twilio API call
+    end note
+}
+
+' ═══════════════════════════════════════════════════
+' DTOs
+' ═══════════════════════════════════════════════════
+package "com.library.auth.dto" {
+
+    class ApiResponse <<DTO>> {
+        + success   : boolean
+        + message   : String
+        + data      : T
+        + timestamp : String
+        __
+        + {static} success(data : T)       : ApiResponse
+        + {static} error(message : String) : ApiResponse
+    }
+
+    note right of ApiResponse
+        Generic wrapper: ApiResponse<T>
+        All controller endpoints return ResponseEntity<ApiResponse<X>>.
+        Frontend reads: response.data.data
+    end note
+
+    class AuthResponse <<DTO>> {
+        + accessToken : String
+        + tokenType   : String
+        + expiresIn   : Long
+        + user        : UserInfoDto
+    }
+
+    class UserInfoDto <<DTO>> {
+        + id       : String
+        + name     : String
+        + mobile   : String
+        + email    : String
+        + role     : String
+        + photoUrl : String
+    }
+
+    class OtpVerifyResponse <<DTO>> {
+        + verified     : boolean
+        + sessionToken : String
+        + isNewUser    : boolean
+    }
+
+    note right of OtpVerifyResponse
+        sessionToken is a random UUID stored in Redis
+        under key "session:<token>" with 15-min TTL.
+        Frontend passes it to /register to complete signup.
+    end note
+
+    class SendOtpRequest <<DTO>> {
+        + contact     : String
+        + contactType : String
+    }
+
+    note right of SendOtpRequest
+        @NotBlank on both fields.
+        contactType: "MOBILE" or "EMAIL"
+    end note
+
+    class VerifyOtpRequest <<DTO>> {
+        + contact : String
+        + otp     : String
+    }
+
+    class LoginRequest <<DTO>> {
+        + contact : String
+        + otp     : String
+    }
+
+    note right of LoginRequest
+        @NotBlank on both fields.
+        Used for POST /login and POST /admin/login.
+        adminLogin() ignores otp field at service level.
+    end note
+
+    class RegisterRequest <<DTO>> {
+        + name         : String
+        + mobile       : String
+        + email        : String
+        + sessionToken : String
+        + dateOfBirth  : String
+        + gender       : String
+        + address      : String
+    }
+
+    note right of RegisterRequest
+        @NotBlank on name and sessionToken.
+        sessionToken exchanged for contact via Redis "session:<token>".
+        Token consumed (deleted from Redis) after successful register.
+        contact containing "@" treated as email, else mobile.
+    end note
+}
+
+' ═══════════════════════════════════════════════════
+' CONTROLLER
+' ═══════════════════════════════════════════════════
+package "com.library.auth.controller" {
+
+    class AuthController <<Controller>> {
+        - authService : AuthService
+        __
+        + sendOtp(request : SendOtpRequest)      : ResponseEntity
+        + verifyOtp(request : VerifyOtpRequest)  : ResponseEntity
+        + register(request : RegisterRequest)    : ResponseEntity
+        + login(request : LoginRequest)          : ResponseEntity
+        + adminLogin(request : LoginRequest)     : ResponseEntity
+        + refresh(token : String)                : ResponseEntity
+    }
+
+    note right of AuthController
+        @RestController @RequestMapping("/api/auth") @CrossOrigin(origins="*")
+        All paths are public (no JWT filter within this service itself).
+        Endpoint map:
+          POST /api/auth/send-otp     -> sendOtp()
+          POST /api/auth/verify-otp  -> verifyOtp()
+          POST /api/auth/register    -> register()
+          POST /api/auth/login       -> login()
+          POST /api/auth/admin/login -> adminLogin()
+          POST /api/auth/refresh     -> refresh()  [NOT IMPLEMENTED - throws]
+    end note
+}
+
+' ═══════════════════════════════════════════════════
+' RELATIONSHIPS
+' ═══════════════════════════════════════════════════
+
+' Repository manages entity
+UserRepository ..> User : <<manages>>
+
+' AuthService compositions and dependencies
+AuthService *-- UserRepository    : userRepository
+AuthService *-- OtpService        : otpService
+AuthService ..> User              : reads / saves
+AuthService ..> OtpVerifyResponse : returns
+AuthService ..> AuthResponse      : returns
+AuthService ..> UserInfoDto       : builds
+AuthService ..> RegisterRequest   : <<param>>
+AuthService ..> LoginRequest      : <<param>>
+AuthService ..> ApiResponse       : builds
+
+' Controller depends on service and DTOs
+AuthController *-- AuthService      : authService
+AuthController ..> SendOtpRequest   : <<param>>
+AuthController ..> VerifyOtpRequest : <<param>>
+AuthController ..> RegisterRequest  : <<param>>
+AuthController ..> LoginRequest     : <<param>>
+AuthController ..> OtpVerifyResponse : uses
+AuthController ..> AuthResponse     : uses
+AuthController ..> ApiResponse      : wraps response
+
+' DTO internal composition
+AuthResponse *-- UserInfoDto : user
+
+@enduml

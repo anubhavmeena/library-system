@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: library-system
+  labels:
+    name: library-system
+    app.kubernetes.io/part-of: target-zone

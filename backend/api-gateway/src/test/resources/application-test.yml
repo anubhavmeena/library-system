@@ -1,0 +1,3 @@
+app:
+  jwt:
+    secret: test-jwt-secret-key-for-unit-testing-purposes-only!
