@@ -1,5 +1,6 @@
 package com.library.admin.service;
 
+import com.library.admin.dto.ChangeSeatRequest;
 import com.library.admin.dto.CreateCashMembershipRequest;
 import com.library.admin.dto.MembershipDto;
 import com.library.admin.entity.*;
@@ -141,5 +142,58 @@ public class AdminMembershipService {
         }
 
         return MembershipDto.fromEntity(membership, plan.getName());
+    }
+
+    @Transactional
+    public MembershipDto changeSeat(String membershipId, ChangeSeatRequest req) {
+
+        // 1. Load membership
+        Membership membership = membershipRepository.findById(UUID.fromString(membershipId))
+                .orElseThrow(() -> new ResourceNotFoundException("Membership not found: " + membershipId));
+        if (membership.getStatus() != Membership.Status.ACTIVE) {
+            throw new IllegalArgumentException("Seat can only be changed for an ACTIVE membership");
+        }
+
+        // 2. Load new seat
+        Seat newSeat = seatRepository.findBySeatNumber(req.getSeatNumber())
+                .orElseThrow(() -> new ResourceNotFoundException("Seat not found: " + req.getSeatNumber()));
+        if (!Boolean.TRUE.equals(newSeat.getIsActive())) {
+            throw new IllegalArgumentException("Seat " + req.getSeatNumber() + " is not active");
+        }
+
+        // 3. Conflict check — exclude this membership's own booking
+        List<SeatBooking> conflicts = seatBookingRepository
+                .findActiveBookingsForSeat(newSeat.getId(), membership.getStartDate(), membership.getEndDate());
+        String shift = membership.getShift();
+        boolean hasConflict = conflicts.stream()
+                .filter(b -> !b.getMembershipId().equals(membership.getId()))
+                .anyMatch(b -> b.getShift().equals("FULL_DAY") ||
+                               shift.equals("FULL_DAY") ||
+                               b.getShift().equals(shift));
+        if (hasConflict) {
+            throw new IllegalArgumentException(
+                    "Seat " + req.getSeatNumber() + " is already booked for the selected shift and dates");
+        }
+
+        // 4. Update Membership
+        membership.setSeatId(newSeat.getId());
+        membership.setSeatNumber(newSeat.getSeatNumber());
+        membershipRepository.save(membership);
+
+        // 5. Update SeatBooking
+        seatBookingRepository
+                .findFirstByMembershipIdAndStatus(membership.getId(), SeatBooking.Status.ACTIVE)
+                .ifPresent(b -> {
+                    b.setSeatId(newSeat.getId());
+                    seatBookingRepository.save(b);
+                });
+
+        log.info("Seat changed for membership {} from {} to {}",
+                membershipId, membership.getSeatNumber(), req.getSeatNumber());
+
+        // Resolve plan name for DTO
+        String planName = planRepository.findById(membership.getPlanId())
+                .map(Plan::getName).orElse(null);
+        return MembershipDto.fromEntity(membership, planName);
     }
 }

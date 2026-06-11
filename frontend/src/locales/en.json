@@ -147,7 +147,8 @@
         "seats": "Seat Map",
         "reminders": "Reminders",
         "feedback": "Feedback",
-        "newMembership": "New Membership"
+        "newMembership": "New Membership",
+        "broadcast": "Broadcast"
       },
       "logout": "Logout"
     }
@@ -464,6 +465,7 @@
       "contact": "Contact",
       "seatShift": "Seat & Shift",
       "membership": "Membership",
+      "payment": "Payment",
       "status": "Status",
       "actions": "Actions"
     },
@@ -475,9 +477,22 @@
     "noPlan": "No plan",
     "active": "Enabled",
     "inactive": "Disabled",
+    "cash": "Cash",
+    "online": "Online",
     "view": "View",
+    "changeSeat": "Change Seat",
     "enable": "Enable",
     "disable": "Disable",
+    "changeSeatModal": {
+      "title": "Change Seat",
+      "current": "Current Seat",
+      "entrance": "Entrance",
+      "available": "Available",
+      "booked": "Booked",
+      "selected": "Selected",
+      "confirm": "Confirm Change",
+      "confirming": "Changing..."
+    },
     "page": "Page {{page}}",
     "prev": "Prev",
     "next": "Next",
@@ -492,18 +507,22 @@
       "expires": "Expires",
       "daysLeftLabel": "Days Left",
       "daysLeft": "{{count}} days",
+      "payment": "Payment Mode",
       "joined": "Joined",
       "noSeat": "No seat",
       "noPlan": "No plan",
       "aadhaar": "Aadhaar",
       "aadhaarView": "View document",
-      "aadhaarNone": "Not uploaded"
+      "aadhaarNone": "Not uploaded",
+      "cancel": "Cancel"
     },
     "toasts": {
       "activated": "{{name}} activated",
       "deactivated": "{{name}} deactivated",
       "loadFailed": "Failed to load students",
-      "updateFailed": "Failed to update status"
+      "updateFailed": "Failed to update status",
+      "seatChanged": "Seat changed to {{seat}}",
+      "seatChangeFailed": "Failed to change seat"
     }
   },
   "adminSeats": {
@@ -626,6 +645,34 @@
     "toasts": {
       "loadFailed": "Failed to load expiring memberships",
       "sendFailed": "Failed to send reminders"
+    }
+  },
+  "adminBroadcast": {
+    "title": "Broadcast Message",
+    "subtitle": "Send a WhatsApp notification to all active members at once",
+    "notice": {
+      "title": "Sent via WhatsApp",
+      "desc": "Message will be delivered to all students with an active membership on their registered mobile number."
+    },
+    "messageLabel": "Message",
+    "messagePlaceholder": "Type your message here — e.g. 'Library will be closed on 15 Aug for maintenance...'",
+    "send": "Send to All Members",
+    "sending": "Sending...",
+    "clear": "Clear",
+    "lastSent": "Message queued for {{count}} members",
+    "preview": {
+      "title": "WhatsApp Preview",
+      "empty": "Your message will appear here..."
+    },
+    "history": {
+      "title": "Recent Broadcasts",
+      "recipients": "{{count}} members",
+      "load": "Load"
+    },
+    "toasts": {
+      "sent": "Message queued for {{count}} members",
+      "failed": "Failed to send broadcast",
+      "tooShort": "Message must be at least 5 characters"
     }
   },
   "adminNewMembership": {

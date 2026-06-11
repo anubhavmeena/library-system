@@ -1,6 +1,7 @@
 package com.library.notification.service;
 
 import com.library.notification.dto.BookingConfirmedEvent;
+import com.library.notification.dto.BroadcastNotificationEvent;
 import com.library.notification.dto.RenewalReminderEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -152,6 +153,24 @@ public class NotificationService {
 
         log.info("Renewal reminder sent for user: {} ({} days left)",
                 event.getUserId(), event.getDaysRemaining());
+    }
+
+    // ── Broadcast (admin → all active members) ────────────────────────────────
+
+    public void sendBroadcast(BroadcastNotificationEvent event) {
+        String msg = String.format(
+                "📢 *Target Zone Library*\n\n%s\n\n— Library Management",
+                event.getMessage()
+        );
+
+        if (hasValue(event.getMobile())) {
+            whatsAppService.send(
+                    event.getMobile(), msg,
+                    event.getUserId(), "ADMIN_BROADCAST"
+            );
+        }
+
+        log.info("Broadcast sent to user: {}", event.getUserId());
     }
 
     // ── Message Builders ──────────────────────────────────────────────────────

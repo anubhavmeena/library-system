@@ -3,6 +3,7 @@ package com.library.admin.controller;
 import com.library.admin.dto.*;
 import com.library.admin.service.AdminService;
 import com.library.common.dto.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -85,6 +86,22 @@ public class AdminController {
         int count = adminService.sendBulkReminders(request.getUserIds());
         return ResponseEntity.ok(ApiResponse.success(
                 "Reminders queued for " + count + " students"));
+    }
+
+    // ── Broadcast Notification ────────────────────────────────────────────────
+    // Sends a custom WhatsApp message to all students with active memberships
+
+    @PostMapping("/broadcast")
+    public ResponseEntity<ApiResponse<String>> broadcastNotification(
+            @Valid @RequestBody BroadcastRequest request) {
+        int count = adminService.broadcastNotification(request);
+        return ResponseEntity.ok(ApiResponse.success(
+                "Message queued for " + count + " active members"));
+    }
+
+    @GetMapping("/broadcast/history")
+    public ResponseEntity<ApiResponse<List<BroadcastHistoryDto>>> getBroadcastHistory() {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getBroadcastHistory()));
     }
 
     // ── Revenue Report ────────────────────────────────────────────────────────

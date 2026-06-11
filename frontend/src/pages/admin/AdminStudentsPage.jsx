@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
+const ROWS = ['A', 'B', 'C', 'D']
+
 export default function AdminStudentsPage() {
     const [students, setStudents] = useState([])
     const [loading, setLoading]   = useState(true)
@@ -11,6 +13,13 @@ export default function AdminStudentsPage() {
     const [membershipFilter, setMembershipFilter] = useState('')
     const [search, setSearch]         = useState('')
     const [detail, setDetail]     = useState(null)
+
+    const [changeSeatFor, setChangeSeatFor]               = useState(null)
+    const [changeSeatGrid, setChangeSeatGrid]             = useState(null)
+    const [changeSeatGridLoading, setChangeSeatGridLoading] = useState(false)
+    const [newSeat, setNewSeat]                           = useState(null)
+    const [changeSeatSubmitting, setChangeSeatSubmitting] = useState(false)
+
     const { t } = useTranslation()
 
     const fetchStudents = async () => {
@@ -42,6 +51,38 @@ export default function AdminStudentsPage() {
         return '—'
     }
 
+    const openChangeSeat = async (student) => {
+        setChangeSeatFor(student)
+        setNewSeat(null)
+        setChangeSeatGrid(null)
+        setChangeSeatGridLoading(true)
+        try {
+            const date = student.membershipStart || new Date().toISOString().split('T')[0]
+            const res = await api.get(`/seats/availability?shift=${student.shift}&date=${date}`)
+            setChangeSeatGrid(res.data.data)
+        } catch {
+            toast.error(t('adminStudents.toasts.seatChangeFailed'))
+            setChangeSeatFor(null)
+        } finally {
+            setChangeSeatGridLoading(false)
+        }
+    }
+
+    const handleChangeSeat = async () => {
+        if (!newSeat || !changeSeatFor) return
+        setChangeSeatSubmitting(true)
+        try {
+            await api.patch(`/admin/memberships/${changeSeatFor.membershipId}/seat`, { seatNumber: newSeat })
+            toast.success(t('adminStudents.toasts.seatChanged', { seat: newSeat }))
+            setChangeSeatFor(null)
+            fetchStudents()
+        } catch {
+            toast.error(t('adminStudents.toasts.seatChangeFailed'))
+        } finally {
+            setChangeSeatSubmitting(false)
+        }
+    }
+
     const filtered = students.filter(s =>
         !search || s.name?.toLowerCase().includes(search.toLowerCase()) ||
         s.mobile?.includes(search) || s.email?.toLowerCase().includes(search.toLowerCase())
@@ -64,6 +105,7 @@ export default function AdminStudentsPage() {
         t('adminStudents.table.contact'),
         t('adminStudents.table.seatShift'),
         t('adminStudents.table.membership'),
+        t('adminStudents.table.payment'),
         t('adminStudents.table.status'),
         t('adminStudents.table.actions'),
     ]
@@ -159,17 +201,32 @@ export default function AdminStudentsPage() {
                                         ) : <span className="text-primary-600 text-xs">{t('adminStudents.noPlan')}</span>}
                                     </td>
                                     <td className="p-4">
+                                        {s.paymentMode === 'CASH' ? (
+                                            <span className="text-xs px-2 py-1 rounded-full border bg-amber-500/20 text-amber-400 border-amber-500/30">💵 {t('adminStudents.cash')}</span>
+                                        ) : s.paymentMode === 'ONLINE' ? (
+                                            <span className="text-xs px-2 py-1 rounded-full border bg-indigo-500/20 text-indigo-400 border-indigo-500/30">💳 {t('adminStudents.online')}</span>
+                                        ) : (
+                                            <span className="text-primary-600 text-xs">—</span>
+                                        )}
+                                    </td>
+                                    <td className="p-4">
                                         <span className={`badge border text-xs px-2 py-1 rounded-full
                         ${s.isActive ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
                                             {s.isActive ? t('adminStudents.active') : t('adminStudents.inactive')}
                                         </span>
                                     </td>
                                     <td className="p-4">
-                                        <div className="flex gap-2">
+                                        <div className="flex flex-wrap gap-2">
                                             <button onClick={() => setDetail(s)}
                                                     className="text-xs px-3 py-1.5 rounded-lg bg-primary-700/50 text-primary-300 hover:text-white border border-primary-700/40 transition-all">
                                                 {t('adminStudents.view')}
                                             </button>
+                                            {s.membershipId && (
+                                                <button onClick={() => openChangeSeat(s)}
+                                                        className="text-xs px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 transition-all">
+                                                    {t('adminStudents.changeSeat')}
+                                                </button>
+                                            )}
                                             <button onClick={() => handleToggleStatus(s)}
                                                     className={`text-xs px-3 py-1.5 rounded-lg border transition-all
                             ${s.isActive ? 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'}`}>
@@ -189,6 +246,92 @@ export default function AdminStudentsPage() {
                                     className="btn-ghost disabled:opacity-40 text-sm px-3 py-1.5 border border-primary-700/40 rounded-lg">← {t('adminStudents.prev')}</button>
                             <button onClick={() => setPage(p => p + 1)} disabled={students.length < 20}
                                     className="btn-ghost disabled:opacity-40 text-sm px-3 py-1.5 border border-primary-700/40 rounded-lg">{t('adminStudents.next')} →</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {changeSeatFor && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setChangeSeatFor(null)}>
+                    <div className="card p-6 w-full max-w-2xl border-indigo-900/30 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 className="section-title">{t('adminStudents.changeSeatModal.title')}</h3>
+                                <p className="text-primary-400 text-sm mt-1">
+                                    {changeSeatFor.name} &mdash; {t('adminStudents.changeSeatModal.current')}: <span className="text-white font-mono">{changeSeatFor.seatNumber}</span>
+                                </p>
+                            </div>
+                            <button onClick={() => setChangeSeatFor(null)} className="text-primary-400 hover:text-white">✕</button>
+                        </div>
+
+                        {changeSeatGridLoading ? (
+                            <div className="shimmer h-48 rounded-xl" />
+                        ) : changeSeatGrid ? (
+                            <div className="overflow-x-auto">
+                                <div className="flex justify-center mb-3">
+                                    <div className="px-8 py-1.5 rounded-lg bg-primary-700/40 border border-primary-600/30 text-primary-400 text-xs tracking-widest uppercase">
+                                        {t('adminStudents.changeSeatModal.entrance')}
+                                    </div>
+                                </div>
+                                <div className="space-y-2 min-w-[520px]">
+                                    {ROWS.map(row => {
+                                        const seats = changeSeatGrid.seatsByRow?.[row] || []
+                                        const half  = Math.ceil(seats.length / 2)
+                                        const left  = seats.slice(0, half)
+                                        const right = seats.slice(half)
+                                        const renderSeat = s => {
+                                            const isCurrent  = s.seatNumber === changeSeatFor.seatNumber
+                                            const isSelected = newSeat === s.seatNumber
+                                            return (
+                                                <button
+                                                    key={s.seatNumber}
+                                                    disabled={s.isBooked && !isCurrent}
+                                                    onClick={() => !isCurrent && setNewSeat(s.seatNumber)}
+                                                    title={isCurrent ? `${s.seatNumber} (current)` : s.isBooked ? `${s.seatNumber} (booked)` : s.seatNumber}
+                                                    className={`w-8 h-8 rounded-lg text-xs font-medium border transition-all
+                                                        ${isCurrent
+                                                            ? 'bg-indigo-500/30 border-indigo-400/60 text-indigo-300 cursor-default'
+                                                            : isSelected
+                                                                ? 'bg-amber-400/30 border-amber-400/70 text-amber-300'
+                                                                : s.isBooked
+                                                                    ? 'bg-red-500/30 border-red-500/50 text-red-400 cursor-not-allowed opacity-60'
+                                                                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 cursor-pointer'}`}>
+                                                    {s.seatNumber.substring(1)}
+                                                </button>
+                                            )
+                                        }
+                                        return (
+                                            <div key={row} className="flex items-center gap-3">
+                                                <span className="text-primary-400 font-mono text-sm w-5 text-center">{row}</span>
+                                                <div className="flex gap-1">{left.map(renderSeat)}</div>
+                                                <div className="w-6" />
+                                                <div className="flex gap-1">{right.map(renderSeat)}</div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                                <div className="flex items-center gap-4 mt-4 text-xs text-primary-400">
+                                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-indigo-500/30 border border-indigo-400/60 inline-block" /> {t('adminStudents.changeSeatModal.current')}</span>
+                                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-500/10 border border-emerald-500/30 inline-block" /> {t('adminStudents.changeSeatModal.available')}</span>
+                                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-400/30 border border-amber-400/70 inline-block" /> {t('adminStudents.changeSeatModal.selected')}</span>
+                                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-500/30 border border-red-500/50 inline-block" /> {t('adminStudents.changeSeatModal.booked')}</span>
+                                </div>
+                            </div>
+                        ) : null}
+
+                        <div className="flex gap-3 mt-5 pt-4 border-t border-primary-700/30">
+                            <button onClick={() => setChangeSeatFor(null)}
+                                    className="btn-ghost border border-primary-700/40 px-5 py-2 rounded-xl text-sm">
+                                {t('adminStudents.modal.cancel') || 'Cancel'}
+                            </button>
+                            <button
+                                onClick={handleChangeSeat}
+                                disabled={!newSeat || changeSeatSubmitting}
+                                className="btn-primary px-5 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                                {changeSeatSubmitting
+                                    ? t('adminStudents.changeSeatModal.confirming')
+                                    : t('adminStudents.changeSeatModal.confirm')}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -223,6 +366,7 @@ export default function AdminStudentsPage() {
                                 { l: t('adminStudents.modal.plan'),     v: detail.planName || t('adminStudents.modal.noPlan') },
                                 { l: t('adminStudents.modal.expires'),  v: detail.membershipEnd || '—' },
                                 { l: t('adminStudents.modal.daysLeftLabel'), v: detail.daysRemaining ? t('adminStudents.modal.daysLeft', { count: detail.daysRemaining }) : '—' },
+                                { l: t('adminStudents.modal.payment'),  v: detail.paymentMode === 'CASH' ? `💵 ${t('adminStudents.cash')}` : detail.paymentMode === 'ONLINE' ? `💳 ${t('adminStudents.online')}` : '—' },
                                 { l: t('adminStudents.modal.joined'),   v: detail.joinedAt?.split('T')[0] || '—' },
                             ].map(({ l, v }) => (
                                 <div key={l} className="flex justify-between py-1.5 border-b border-primary-700/20 last:border-0 text-sm">

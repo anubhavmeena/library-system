@@ -1,6 +1,7 @@
 package com.library.notification.consumer;
 
 import com.library.notification.dto.BookingConfirmedEvent;
+import com.library.notification.dto.BroadcastNotificationEvent;
 import com.library.notification.dto.RenewalReminderEvent;
 import com.library.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +65,28 @@ public class NotificationConsumer {
             notificationService.sendWelcomeNotification(event);
         } catch (Exception e) {
             log.error("Failed to process user-registered for user {}: {}",
+                    event.getUserId(), e.getMessage(), e);
+        }
+    }
+
+    // ── broadcast-notification → admin broadcast to all active members ─────────
+    // Published by admin-service POST /api/admin/broadcast
+
+    @KafkaListener(
+            topics = "broadcast-notification",
+            groupId = "notification-broadcast-group",
+            containerFactory = "broadcastKafkaListenerContainerFactory"
+    )
+    public void handleBroadcast(
+            @Payload BroadcastNotificationEvent event,
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(KafkaHeaders.OFFSET) long offset) {
+
+        log.info("Consumed [{}] offset={} userId={}", topic, offset, event.getUserId());
+        try {
+            notificationService.sendBroadcast(event);
+        } catch (Exception e) {
+            log.error("Failed to process broadcast for user {}: {}",
                     event.getUserId(), e.getMessage(), e);
         }
     }

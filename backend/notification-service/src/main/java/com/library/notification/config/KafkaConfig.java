@@ -38,4 +38,19 @@ public class KafkaConfig {
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.BATCH);
         return factory;
     }
+
+    /**
+     * Factory for admin broadcast notifications (concurrency 3 — high-volume fan-out)
+     */
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, Object> broadcastKafkaListenerContainerFactory(
+            ConsumerFactory<String, Object> consumerFactory) {
+
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory);
+        factory.setConcurrency(3);
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.BATCH);
+        return factory;
+    }
 }

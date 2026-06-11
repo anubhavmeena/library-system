@@ -2,6 +2,7 @@ package com.library.admin.service;
 
 import com.library.admin.dto.*;
 import com.library.admin.entity.*;
+import com.library.admin.event.BroadcastNotificationEvent;
 import com.library.admin.exception.ResourceNotFoundException;
 import com.library.admin.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -23,10 +24,11 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AdminService {
 
-    private final UserRepository        userRepository;
-    private final MembershipRepository  membershipRepository;
-    private final PaymentRepository     paymentRepository;
-    private final PlanRepository        planRepository;
+    private final UserRepository              userRepository;
+    private final MembershipRepository        membershipRepository;
+    private final PaymentRepository           paymentRepository;
+    private final PlanRepository              planRepository;
+    private final BroadcastMessageRepository  broadcastMessageRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
@@ -79,7 +81,13 @@ public class AdminService {
             Membership mem = membershipRepository
                     .findByUserIdAndStatus(user.getId(), Membership.Status.ACTIVE)
                     .orElse(null);
-            return StudentDto.fromEntities(user, mem);
+            StudentDto dto = StudentDto.fromEntities(user, mem);
+            if (mem != null) {
+                dto.setPaymentMode(paymentRepository.findFirstByMembershipId(mem.getId())
+                        .map(p -> "CASH".equalsIgnoreCase(p.getPaymentGateway()) ? "CASH" : "ONLINE")
+                        .orElse(null));
+            }
+            return dto;
         }).collect(Collectors.toList());
     }
 
@@ -92,7 +100,13 @@ public class AdminService {
                 .findByUserIdAndStatus(user.getId(), Membership.Status.ACTIVE)
                 .orElse(null);
 
-        return StudentDto.fromEntities(user, mem);
+        StudentDto dto = StudentDto.fromEntities(user, mem);
+        if (mem != null) {
+            dto.setPaymentMode(paymentRepository.findFirstByMembershipId(mem.getId())
+                    .map(p -> "CASH".equalsIgnoreCase(p.getPaymentGateway()) ? "CASH" : "ONLINE")
+                    .orElse(null));
+        }
+        return dto;
     }
 
     // ── Seat Map ──────────────────────────────────────────────────────────────
@@ -312,5 +326,37 @@ public class AdminService {
         user.setIsActive(active);
         userRepository.save(user);
         log.info("Student {} set to {}", userId, active ? "ACTIVE" : "INACTIVE");
+    }
+
+    // ── Broadcast Notification ────────────────────────────────────────────────
+
+    public int broadcastNotification(BroadcastRequest req) {
+        List<User> recipients = userRepository.findStudentsWithActiveMemberships();
+        for (User user : recipients) {
+            BroadcastNotificationEvent event = BroadcastNotificationEvent.builder()
+                    .userId(user.getId().toString())
+                    .mobile(user.getMobile())
+                    .userName(user.getName())
+                    .message(req.getMessage())
+                    .build();
+            try {
+                kafkaTemplate.send("broadcast-notification", user.getId().toString(), event);
+            } catch (Exception e) {
+                log.warn("Failed to queue broadcast for user {}: {}", user.getId(), e.getMessage());
+            }
+        }
+        broadcastMessageRepository.save(BroadcastMessage.builder()
+                .message(req.getMessage())
+                .recipientCount(recipients.size())
+                .build());
+        log.info("Broadcast queued for {} active members", recipients.size());
+        return recipients.size();
+    }
+
+    public List<BroadcastHistoryDto> getBroadcastHistory() {
+        return broadcastMessageRepository.findTop5ByOrderBySentAtDesc()
+                .stream()
+                .map(BroadcastHistoryDto::fromEntity)
+                .collect(Collectors.toList());
     }
 }

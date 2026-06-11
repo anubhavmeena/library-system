@@ -32,6 +32,7 @@ public class StudentDto {
     private String membershipEnd;
     private String membershipStatus;  // ACTIVE | EXPIRED | PENDING | CANCELLED
     private int    daysRemaining;
+    private String paymentMode;       // CASH | ONLINE | null
 
     public static StudentDto fromEntities(User user, Membership membership) {
         StudentDtoBuilder b = StudentDto.builder()

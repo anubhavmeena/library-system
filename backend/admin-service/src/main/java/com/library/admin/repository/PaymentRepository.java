@@ -7,10 +7,13 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, UUID> {
+
+    Optional<Payment> findFirstByMembershipId(UUID membershipId);
 
     // Total revenue for a time window — used by getDashboardStats and getRevenueReport
     @Query("""

@@ -1,5 +1,6 @@
 package com.library.admin.controller;
 
+import com.library.admin.dto.ChangeSeatRequest;
 import com.library.admin.dto.CreateCashMembershipRequest;
 import com.library.admin.dto.MembershipDto;
 import com.library.admin.service.AdminMembershipService;
@@ -22,5 +23,13 @@ public class AdminMembershipController {
             @Valid @RequestBody CreateCashMembershipRequest req) {
         return ResponseEntity.ok(
                 ApiResponse.success(adminMembershipService.createCashMembership(req)));
+    }
+
+    @PatchMapping("/{membershipId}/seat")
+    public ResponseEntity<ApiResponse<MembershipDto>> changeSeat(
+            @PathVariable String membershipId,
+            @Valid @RequestBody ChangeSeatRequest req) {
+        return ResponseEntity.ok(
+                ApiResponse.success(adminMembershipService.changeSeat(membershipId, req)));
     }
 }
