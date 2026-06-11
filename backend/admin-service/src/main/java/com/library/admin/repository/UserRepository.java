@@ -12,20 +12,31 @@ import java.util.UUID;
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
 
-    // Paginated list of all students with optional status filter
-    // status = null   → all students
-    // status = ACTIVE → isActive = true
-    // status = INACTIVE → isActive = false
+    // Paginated list of all students with optional account-status + membership-status filters
+    // status           = null/ACTIVE/INACTIVE  → filters by user.isActive
+    // membershipStatus = null/ACTIVE/INACTIVE  → filters by whether student has a live membership
     @Query("""
         SELECT u FROM User u
         WHERE u.role = 'STUDENT'
           AND (:status IS NULL
                OR (:status = 'ACTIVE'   AND u.isActive = true)
                OR (:status = 'INACTIVE' AND u.isActive = false))
+          AND (:membershipStatus IS NULL
+               OR (:membershipStatus = 'ACTIVE' AND EXISTS (
+                       SELECT m FROM Membership m
+                       WHERE m.userId = u.id
+                         AND m.status = 'ACTIVE'
+                         AND m.endDate >= CURRENT_DATE))
+               OR (:membershipStatus = 'INACTIVE' AND NOT EXISTS (
+                       SELECT m FROM Membership m
+                       WHERE m.userId = u.id
+                         AND m.status = 'ACTIVE'
+                         AND m.endDate >= CURRENT_DATE)))
         ORDER BY u.createdAt DESC
         """)
     Page<User> findStudentsByStatus(
-            @Param("status") String status,
+            @Param("status")           String status,
+            @Param("membershipStatus") String membershipStatus,
             Pageable pageable
     );
 

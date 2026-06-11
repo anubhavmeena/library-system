@@ -2,6 +2,7 @@ package com.library.admin.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.GenericGenerator;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -12,6 +13,8 @@ import java.util.UUID;
 public class Payment {
 
     @Id
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
     @Column(updatable = false, nullable = false)
     private UUID id;
 
@@ -26,7 +29,12 @@ public class Payment {
     @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING;
 
-    @Column(name = "created_at") private LocalDateTime createdAt;
+    @Column(name = "created_at", updatable = false) private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
+    }
 
     public enum Status { PENDING, SUCCESS, FAILED, REFUNDED }
 }

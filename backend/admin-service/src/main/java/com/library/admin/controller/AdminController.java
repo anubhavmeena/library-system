@@ -32,9 +32,10 @@ public class AdminController {
     public ResponseEntity<ApiResponse<List<StudentDto>>> getAllStudents(
             @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false)    String status) {   // ACTIVE | INACTIVE | null = all
+            @RequestParam(required = false)    String status,            // ACTIVE | INACTIVE | null = all (account)
+            @RequestParam(required = false)    String membershipStatus) { // ACTIVE | INACTIVE | null = all (membership)
         return ResponseEntity.ok(ApiResponse.success(
-                adminService.getAllStudents(page, size, status)));
+                adminService.getAllStudents(page, size, status, membershipStatus)));
     }
 
     @GetMapping("/students/{userId}")

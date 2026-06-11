@@ -70,9 +70,9 @@ public class AdminService {
 
     // ── Students ──────────────────────────────────────────────────────────────
 
-    public List<StudentDto> getAllStudents(int page, int size, String status) {
+    public List<StudentDto> getAllStudents(int page, int size, String status, String membershipStatus) {
         List<User> users = userRepository
-                .findStudentsByStatus(status, PageRequest.of(page, size))
+                .findStudentsByStatus(status, membershipStatus, PageRequest.of(page, size))
                 .getContent();
 
         return users.stream().map(user -> {

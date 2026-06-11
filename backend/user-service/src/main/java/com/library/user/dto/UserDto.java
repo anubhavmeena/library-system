@@ -12,6 +12,7 @@ public class UserDto {
     private String email;
     private String address;
     private String photoUrl;
+    private String aadhaarUrl;
     private String dateOfBirth;
     private String gender;
     private String role;
@@ -27,6 +28,7 @@ public class UserDto {
                 .fatherName(user.getFatherName())
                 .address(user.getAddress())
                 .photoUrl(user.getPhotoUrl())
+                .aadhaarUrl(user.getAadhaarUrl())
                 .dateOfBirth(user.getDateOfBirth() != null ? user.getDateOfBirth().toString() : null)
                 .gender(user.getGender())
                 .role(user.getRole().name())

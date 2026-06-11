@@ -63,7 +63,7 @@ export default function LandingPage() {
                         {t('landing.heroDesc')}
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                        <Link to="/login" className="btn-primary flex items-center gap-2 text-base py-3.5 px-8">
+                        <Link to="/register" className="btn-primary flex items-center gap-2 text-base py-3.5 px-8">
                             {t('landing.registerNow')} <ArrowRight size={18} />
                         </Link>
                         <a href="#plans" className="btn-outline flex items-center gap-2 text-base py-3.5 px-8">{t('landing.viewPlans')}</a>

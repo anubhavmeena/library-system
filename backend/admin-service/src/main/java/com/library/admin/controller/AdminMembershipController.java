@@ -1,0 +1,26 @@
+package com.library.admin.controller;
+
+import com.library.admin.dto.CreateCashMembershipRequest;
+import com.library.admin.dto.MembershipDto;
+import com.library.admin.service.AdminMembershipService;
+import com.library.common.dto.ApiResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/admin/memberships")
+@RequiredArgsConstructor
+@CrossOrigin(origins = "*")
+public class AdminMembershipController {
+
+    private final AdminMembershipService adminMembershipService;
+
+    @PostMapping("/cash")
+    public ResponseEntity<ApiResponse<MembershipDto>> createCashMembership(
+            @Valid @RequestBody CreateCashMembershipRequest req) {
+        return ResponseEntity.ok(
+                ApiResponse.success(adminMembershipService.createCashMembership(req)));
+    }
+}

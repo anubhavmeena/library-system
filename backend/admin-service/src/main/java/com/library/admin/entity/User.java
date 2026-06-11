@@ -22,6 +22,7 @@ public class User {
 
     private String address;
     @Column(name = "photo_url")     private String    photoUrl;
+    @Column(name = "aadhaar_url")   private String    aadhaarUrl;
     @Column(name = "date_of_birth") private LocalDate dateOfBirth;
     private String gender;
 

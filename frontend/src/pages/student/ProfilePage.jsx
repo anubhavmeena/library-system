@@ -40,9 +40,11 @@ export default function ProfilePage() {
     const [editing, setEditing]     = useState(false)
     const [loading, setLoading]     = useState(true)
     const [saving, setSaving]       = useState(false)
-    const [uploading, setUploading] = useState(false)
+    const [uploading, setUploading]           = useState(false)
+    const [uploadingAadhaar, setUploadingAadhaar] = useState(false)
     const [form, setForm] = useState({ name:'', fatherName:'', address:'', gender:'', dateOfBirth:'', email:'' })
-    const fileRef = useRef()
+    const fileRef        = useRef()
+    const aadhaarFileRef = useRef()
 
     useEffect(() => {
         api.get('/users/me').then(r => {
@@ -79,6 +81,27 @@ export default function ProfilePage() {
         } catch (e) {
             toast.error(e.response?.data?.message || t('profile.toasts.uploadFailed'))
         } finally { setUploading(false) }
+    }
+
+    const handleAadhaar = async (e) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+        if (!allowed.includes(file.type)) return toast.error(t('profile.aadhaar.toasts.invalidType'))
+        if (file.size > 5 * 1024 * 1024) return toast.error(t('profile.aadhaar.toasts.fileTooLarge'))
+        const formData = new FormData()
+        formData.append('file', file)
+        setUploadingAadhaar(true)
+        try {
+            const r = await api.post('/users/me/aadhaar', formData)
+            setProfile(p => ({ ...p, aadhaarUrl: r.data.data.photoUrl }))
+            toast.success(t('profile.aadhaar.toasts.uploaded'))
+        } catch (e) {
+            toast.error(e.response?.data?.message || t('profile.aadhaar.toasts.uploadFailed'))
+        } finally {
+            setUploadingAadhaar(false)
+            e.target.value = ''
+        }
     }
 
     if (loading) return (
@@ -207,6 +230,51 @@ export default function ProfilePage() {
                     {editing && (
                         <p className="text-primary-500 text-xs mt-4">{t('profile.mobileNote')}</p>
                     )}
+                </div>
+            </div>
+
+            {/* Aadhaar Card */}
+            <div className="card p-6 mt-6">
+                <h2 className="section-title mb-4">{t('profile.aadhaar.title')}</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex items-center gap-3 flex-1">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-xl
+                            ${profile?.aadhaarUrl
+                                ? 'bg-emerald-500/20 border border-emerald-500/30'
+                                : 'bg-primary-800/60 border border-primary-700/30'}`}>
+                            🪪
+                        </div>
+                        <div>
+                            {profile?.aadhaarUrl ? (
+                                <>
+                                    <p className="text-emerald-400 text-sm font-medium">{t('profile.aadhaar.uploaded')}</p>
+                                    <p className="text-primary-500 text-xs mt-0.5">{t('profile.aadhaar.hint')}</p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-primary-300 text-sm font-medium">{t('profile.aadhaar.notUploaded')}</p>
+                                    <p className="text-primary-500 text-xs mt-0.5">{t('profile.aadhaar.hint')}</p>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                        {profile?.aadhaarUrl && (
+                            <a href={profile.aadhaarUrl} target="_blank" rel="noopener noreferrer"
+                                className="btn-outline text-sm px-4 py-2">
+                                {t('profile.aadhaar.view')}
+                            </a>
+                        )}
+                        <input ref={aadhaarFileRef} type="file"
+                            accept="image/jpeg,image/png,image/webp,application/pdf"
+                            className="hidden" onChange={handleAadhaar} />
+                        <button
+                            onClick={() => aadhaarFileRef.current?.click()}
+                            disabled={uploadingAadhaar}
+                            className="btn-primary text-sm px-4 py-2 disabled:opacity-50">
+                            {uploadingAadhaar ? t('profile.aadhaar.uploading') : t('profile.aadhaar.upload')}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -18,6 +18,7 @@ public class StudentDto {
     private String  gender;
     private String  dateOfBirth;
     private String  photoUrl;
+    private String  aadhaarUrl;
     private Boolean isActive;
     private String  joinedAt;
 
@@ -44,6 +45,7 @@ public class StudentDto {
                         user.getDateOfBirth() != null
                                 ? user.getDateOfBirth().toString() : null)
                 .photoUrl(user.getPhotoUrl())
+                .aadhaarUrl(user.getAadhaarUrl())
                 .isActive(Boolean.TRUE.equals(user.getIsActive()))
                 .joinedAt(
                         user.getCreatedAt() != null

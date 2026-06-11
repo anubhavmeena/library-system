@@ -6,22 +6,23 @@ import toast from 'react-hot-toast'
 export default function AdminStudentsPage() {
     const [students, setStudents] = useState([])
     const [loading, setLoading]   = useState(true)
-    const [page, setPage]         = useState(0)
-    const [status, setStatus]     = useState('')
-    const [search, setSearch]     = useState('')
+    const [page, setPage]             = useState(0)
+    const [status, setStatus]         = useState('')
+    const [membershipFilter, setMembershipFilter] = useState('')
+    const [search, setSearch]         = useState('')
     const [detail, setDetail]     = useState(null)
     const { t } = useTranslation()
 
     const fetchStudents = async () => {
         setLoading(true)
         try {
-            const res = await api.get(`/admin/students?page=${page}&size=20${status ? `&status=${status}` : ''}`)
+            const res = await api.get(`/admin/students?page=${page}&size=20${status ? `&status=${status}` : ''}${membershipFilter ? `&membershipStatus=${membershipFilter}` : ''}`)
             setStudents(res.data.data || [])
         } catch { toast.error(t('adminStudents.toasts.loadFailed')) }
         finally { setLoading(false) }
     }
 
-    useEffect(() => { fetchStudents() }, [page, status])
+    useEffect(() => { fetchStudents() }, [page, status, membershipFilter])
 
     const handleToggleStatus = async (student) => {
         try {
@@ -52,6 +53,12 @@ export default function AdminStudentsPage() {
         { v: 'INACTIVE', l: t('adminStudents.filters.inactive') },
     ]
 
+    const membershipFilters = [
+        { v: '',         l: t('adminStudents.filters.membershipAll') },
+        { v: 'ACTIVE',   l: t('adminStudents.filters.membershipActive') },
+        { v: 'INACTIVE', l: t('adminStudents.filters.membershipInactive') },
+    ]
+
     const headers = [
         t('adminStudents.table.student'),
         t('adminStudents.table.contact'),
@@ -71,14 +78,27 @@ export default function AdminStudentsPage() {
                 <button onClick={fetchStudents} className="btn-ghost border border-primary-700/40 text-sm px-4 py-2 rounded-xl">↻ {t('adminStudents.refresh')}</button>
             </div>
 
-            <div className="flex flex-wrap gap-3 mb-6">
+            <div className="flex flex-wrap gap-3 mb-3">
                 <input className="input w-64 text-sm py-2" placeholder={t('adminStudents.searchPlaceholder')}
                        value={search} onChange={e => setSearch(e.target.value)} />
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
+                    <span className="text-primary-500 text-xs">{t('adminStudents.filters.accountLabel')}</span>
                     {filters.map(({ v, l }) => (
                         <button key={v} onClick={() => { setStatus(v); setPage(0) }}
-                                className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all
+                                className={`px-3 py-2 rounded-xl text-sm font-medium border transition-all
                 ${status === v ? 'bg-red-500/20 border-red-400/60 text-red-400' : 'border-primary-700/40 text-primary-400 hover:text-white'}`}>
+                            {l}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            <div className="flex flex-wrap gap-2 mb-6">
+                <div className="flex items-center gap-2">
+                    <span className="text-primary-500 text-xs">{t('adminStudents.filters.membershipLabel')}</span>
+                    {membershipFilters.map(({ v, l }) => (
+                        <button key={v} onClick={() => { setMembershipFilter(v); setPage(0) }}
+                                className={`px-3 py-2 rounded-xl text-sm font-medium border transition-all
+                ${membershipFilter === v ? 'bg-amber-500/20 border-amber-400/60 text-amber-400' : 'border-primary-700/40 text-primary-400 hover:text-white'}`}>
                             {l}
                         </button>
                     ))}
@@ -210,6 +230,17 @@ export default function AdminStudentsPage() {
                                     <span className="text-white text-right max-w-[55%] truncate">{v}</span>
                                 </div>
                             ))}
+                            <div className="flex justify-between py-1.5 text-sm">
+                                <span className="text-primary-400">{t('adminStudents.modal.aadhaar')}</span>
+                                {detail.aadhaarUrl ? (
+                                    <a href={detail.aadhaarUrl} target="_blank" rel="noopener noreferrer"
+                                        className="text-emerald-400 hover:text-emerald-300 underline text-xs">
+                                        {t('adminStudents.modal.aadhaarView')}
+                                    </a>
+                                ) : (
+                                    <span className="text-primary-600 text-xs">{t('adminStudents.modal.aadhaarNone')}</span>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

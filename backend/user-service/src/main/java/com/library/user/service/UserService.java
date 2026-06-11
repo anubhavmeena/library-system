@@ -103,6 +103,52 @@ public class UserService {
     }
 
     @Transactional
+    public PhotoUploadResponse uploadAadhaar(String userId, MultipartFile file) throws IOException {
+        User user = findUser(userId);
+
+        String contentType = file.getContentType();
+        List<String> allowed = List.of("image/jpeg", "image/png", "image/webp", "application/pdf");
+        if (contentType == null || !allowed.contains(contentType))
+            throw new IllegalArgumentException("Invalid file type. Only JPEG, PNG, WebP, or PDF allowed.");
+
+        if (file.getSize() > 5_242_880)
+            throw new IllegalArgumentException("File must not exceed 5MB.");
+
+        Path uploadPath = Paths.get(uploadDir, "aadhaar");
+        Files.createDirectories(uploadPath);
+
+        if (user.getAadhaarUrl() != null) {
+            try {
+                Files.deleteIfExists(uploadPath.resolve(
+                        Paths.get(user.getAadhaarUrl()).getFileName().toString()));
+            } catch (Exception ignored) {}
+        }
+
+        String ext      = getExtension(file.getOriginalFilename());
+        String fileName = "aadhaar_" + userId + "_" + UUID.randomUUID().toString().substring(0, 8) + ext;
+        Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+
+        String aadhaarUrl = "/uploads/aadhaar/" + fileName;
+        user.setAadhaarUrl(aadhaarUrl);
+        userRepository.save(user);
+
+        log.info("Aadhaar uploaded for user {}: {}", userId, aadhaarUrl);
+        return PhotoUploadResponse.builder().photoUrl(aadhaarUrl).message("Aadhaar uploaded successfully").build();
+    }
+
+    @Transactional
+    public void deleteAadhaar(String userId) throws IOException {
+        User user = findUser(userId);
+        if (user.getAadhaarUrl() == null) throw new IllegalArgumentException("No Aadhaar card on file.");
+
+        Path uploadPath = Paths.get(uploadDir, "aadhaar");
+        Files.deleteIfExists(uploadPath.resolve(Paths.get(user.getAadhaarUrl()).getFileName().toString()));
+        user.setAadhaarUrl(null);
+        userRepository.save(user);
+        log.info("Aadhaar deleted for user: {}", userId);
+    }
+
+    @Transactional
     public void deletePhoto(String userId) throws IOException {
         User user = findUser(userId);
         if (user.getPhotoUrl() == null) throw new IllegalArgumentException("No photo to delete.");

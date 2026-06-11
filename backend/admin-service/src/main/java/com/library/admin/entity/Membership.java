@@ -2,6 +2,7 @@ package com.library.admin.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.GenericGenerator;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -12,6 +13,8 @@ import java.util.UUID;
 public class Membership {
 
     @Id
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
     @Column(updatable = false, nullable = false)
     private UUID id;
 
@@ -33,7 +36,12 @@ public class Membership {
     @Column(name = "reminder_sent")
     private boolean reminderSent = false;
 
-    @Column(name = "created_at") private LocalDateTime createdAt;
+    @Column(name = "created_at", updatable = false) private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
+    }
 
     public enum Status { PENDING, ACTIVE, EXPIRED, CANCELLED }
 }

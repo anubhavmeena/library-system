@@ -55,4 +55,18 @@ public class UserController {
         userService.deletePhoto(userId);
         return ResponseEntity.ok(ApiResponse.success("Photo removed successfully"));
     }
+
+    @PostMapping(value = "/me/aadhaar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<PhotoUploadResponse>> uploadAadhaar(
+            @RequestHeader("X-User-Id") String userId,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(ApiResponse.success(userService.uploadAadhaar(userId, file)));
+    }
+
+    @DeleteMapping("/me/aadhaar")
+    public ResponseEntity<ApiResponse<String>> deleteAadhaar(
+            @RequestHeader("X-User-Id") String userId) throws IOException {
+        userService.deleteAadhaar(userId);
+        return ResponseEntity.ok(ApiResponse.success("Aadhaar removed successfully"));
+    }
 }

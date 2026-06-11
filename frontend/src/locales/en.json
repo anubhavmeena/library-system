@@ -126,7 +126,8 @@
         "membership": "Membership",
         "booking": "Book a Seat",
         "facilities": "Facilities",
-        "profile": "My Profile"
+        "profile": "My Profile",
+        "feedback": "Feedback"
       },
       "logout": "Logout",
       "mobileTitle": "Target Zone Library"
@@ -144,7 +145,9 @@
         "dashboard": "Dashboard",
         "students": "Students",
         "seats": "Seat Map",
-        "reminders": "Reminders"
+        "reminders": "Reminders",
+        "feedback": "Feedback",
+        "newMembership": "New Membership"
       },
       "logout": "Logout"
     }
@@ -300,6 +303,24 @@
     "saving": "Saving...",
     "notProvided": "Not provided",
     "mobileNote": "* Mobile number cannot be changed. Contact admin if needed.",
+    "aadhaar": {
+      "title": "Aadhaar Card",
+      "uploaded": "Aadhaar uploaded",
+      "notUploaded": "No Aadhaar on file",
+      "upload": "Upload Aadhaar",
+      "uploading": "Uploading...",
+      "view": "View",
+      "remove": "Remove",
+      "hint": "Accepted: JPEG, PNG, WebP, PDF · Max 5 MB",
+      "toasts": {
+        "uploaded": "Aadhaar uploaded!",
+        "removed": "Aadhaar removed",
+        "uploadFailed": "Upload failed",
+        "removeFailed": "Failed to remove Aadhaar",
+        "fileTooLarge": "File must be under 5 MB",
+        "invalidType": "Only JPEG, PNG, WebP, or PDF allowed"
+      }
+    },
     "addressPlaceholder": "Your full address",
     "fields": {
       "fullName": "Full Name",
@@ -430,8 +451,13 @@
     "searchPlaceholder": "🔍 Search name, mobile, email...",
     "filters": {
       "all": "All",
-      "active": "Active",
-      "inactive": "Inactive"
+      "active": "Enabled",
+      "inactive": "Disabled",
+      "accountLabel": "Account:",
+      "membershipLabel": "Membership:",
+      "membershipAll": "All",
+      "membershipActive": "Active",
+      "membershipInactive": "Inactive"
     },
     "table": {
       "student": "Student",
@@ -447,8 +473,8 @@
     "expires": "Expires",
     "daysLeft": "{{count}}d left",
     "noPlan": "No plan",
-    "active": "Active",
-    "inactive": "Inactive",
+    "active": "Enabled",
+    "inactive": "Disabled",
     "view": "View",
     "enable": "Enable",
     "disable": "Disable",
@@ -468,7 +494,10 @@
       "daysLeft": "{{count}} days",
       "joined": "Joined",
       "noSeat": "No seat",
-      "noPlan": "No plan"
+      "noPlan": "No plan",
+      "aadhaar": "Aadhaar",
+      "aadhaarView": "View document",
+      "aadhaarNone": "Not uploaded"
     },
     "toasts": {
       "activated": "{{name}} activated",
@@ -494,6 +523,82 @@
       "student": "Student", "mobile": "Mobile", "shift": "Shift", "expires": "Expires"
     },
     "loadFailed": "Failed to load seat map"
+  },
+  "feedback": {
+    "title": "Feedback & Complaints",
+    "subtitle": "Submit your feedback or complaints to the library admin",
+    "newBtn": "+ New Submission",
+    "cancel": "Cancel",
+    "formTitle": "New Submission",
+    "adminResponse": "Admin Response:",
+    "types": {
+      "FEEDBACK": "Feedback",
+      "COMPLAINT": "Complaint"
+    },
+    "statuses": {
+      "OPEN": "Open",
+      "UNDER_REVIEW": "Under Review",
+      "RESOLVED": "Resolved"
+    },
+    "form": {
+      "subject": "Subject",
+      "subjectPlaceholder": "Brief summary of your feedback",
+      "description": "Description",
+      "descriptionPlaceholder": "Describe your feedback or complaint in detail...",
+      "submit": "Submit",
+      "submitting": "Submitting..."
+    },
+    "empty": {
+      "title": "No submissions yet",
+      "desc": "Use the button above to submit your first feedback or complaint"
+    },
+    "modal": {
+      "title": "Submission Details",
+      "submitted": "Submitted on",
+      "adminResponse": "Admin Response"
+    },
+    "toasts": {
+      "submitted": "Submitted successfully!",
+      "submitFailed": "Failed to submit",
+      "fillRequired": "Please fill in subject and description",
+      "loadFailed": "Failed to load submissions"
+    }
+  },
+  "adminFeedback": {
+    "title": "Feedback & Complaints",
+    "subtitle": "{{count}} submissions",
+    "refresh": "Refresh",
+    "respond": "Respond",
+    "filters": {
+      "allTypes": "All Types",
+      "allStatuses": "All Statuses"
+    },
+    "table": {
+      "student": "Student",
+      "type": "Type",
+      "subject": "Subject",
+      "status": "Status",
+      "date": "Date",
+      "actions": "Actions"
+    },
+    "empty": {
+      "title": "No feedback found",
+      "desc": "No submissions match the selected filters"
+    },
+    "modal": {
+      "title": "Respond to Submission",
+      "status": "Update Status",
+      "notes": "Admin Notes / Response",
+      "notesPlaceholder": "Write your response or internal note...",
+      "save": "Save Changes",
+      "saving": "Saving...",
+      "cancel": "Cancel"
+    },
+    "toasts": {
+      "updated": "Updated successfully",
+      "updateFailed": "Failed to update",
+      "loadFailed": "Failed to load feedback"
+    }
   },
   "adminReminders": {
     "title": "Renewal Reminders",
@@ -521,6 +626,73 @@
     "toasts": {
       "loadFailed": "Failed to load expiring memberships",
       "sendFailed": "Failed to send reminders"
+    }
+  },
+  "adminNewMembership": {
+    "title": "New Membership",
+    "subtitle": "Create a cash membership for a student",
+    "steps": {
+      "student": "Student",
+      "plan": "Plan",
+      "seat": "Seat",
+      "confirm": "Confirm"
+    },
+    "hasMembership": "Has Membership",
+    "noPlan": "No Plan",
+    "change": "Change",
+    "back": "Back",
+    "next": "Continue",
+    "shifts": {
+      "MORNING": "Morning",
+      "EVENING": "Evening",
+      "FULL_DAY": "Full Day"
+    },
+    "step1": {
+      "title": "Find Student",
+      "searchPlaceholder": "Search by name, mobile, or email...",
+      "empty": "No students found"
+    },
+    "step2": {
+      "selectPlan": "Select Plan",
+      "selectShift": "Select Shift",
+      "startDate": "Start Date",
+      "days": "days",
+      "fullDay": "Full Day",
+      "halfDay": "Half Day",
+      "endDateLabel": "Membership ends:"
+    },
+    "step3": {
+      "title": "Select Seat",
+      "entrance": "Entrance",
+      "available": "Available",
+      "booked": "Booked",
+      "selected": "Selected",
+      "selectedSeat": "Selected: {{seat}}"
+    },
+    "step4": {
+      "title": "Review & Confirm",
+      "cashConfirmation": "I confirm that cash payment of ₹{{amount}} has been collected from {{name}}",
+      "create": "Create Membership",
+      "creating": "Creating..."
+    },
+    "summary": {
+      "student": "Student",
+      "plan": "Plan",
+      "shift": "Shift",
+      "seat": "Seat",
+      "start": "Start Date",
+      "end": "End Date",
+      "dates": "Dates",
+      "amount": "Amount",
+      "payment": "Payment Mode",
+      "cash": "Cash"
+    },
+    "toasts": {
+      "loadStudentsFailed": "Failed to load students",
+      "loadPlansFailed": "Failed to load plans",
+      "loadSeatsFailed": "Failed to load seat availability",
+      "created": "Membership created successfully",
+      "createFailed": "Failed to create membership"
     }
   }
 }

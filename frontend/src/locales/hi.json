@@ -126,7 +126,8 @@
         "membership": "सदस्यता",
         "booking": "सीट बुक करें",
         "facilities": "सुविधाएं",
-        "profile": "मेरी प्रोफाइल"
+        "profile": "मेरी प्रोफाइल",
+        "feedback": "फीडबैक"
       },
       "logout": "लॉग आउट",
       "mobileTitle": "Target Zone Library"
@@ -144,7 +145,9 @@
         "dashboard": "डैशबोर्ड",
         "students": "छात्र",
         "seats": "सीट मैप",
-        "reminders": "रिमाइंडर"
+        "reminders": "रिमाइंडर",
+        "feedback": "फीडबैक",
+        "newMembership": "नई सदस्यता"
       },
       "logout": "लॉग आउट"
     }
@@ -299,6 +302,24 @@
     "saveChanges": "बदलाव सहेजें",
     "saving": "सहेज रहे हैं...",
     "notProvided": "नहीं दिया गया",
+    "aadhaar": {
+      "title": "आधार कार्ड",
+      "uploaded": "आधार अपलोड हो गया",
+      "notUploaded": "आधार अपलोड नहीं हुआ",
+      "upload": "आधार अपलोड करें",
+      "uploading": "अपलोड हो रहा है...",
+      "view": "देखें",
+      "remove": "हटाएं",
+      "hint": "स्वीकृत: JPEG, PNG, WebP, PDF · अधिकतम 5 MB",
+      "toasts": {
+        "uploaded": "आधार अपलोड हो गया!",
+        "removed": "आधार हटा दिया गया",
+        "uploadFailed": "अपलोड विफल",
+        "removeFailed": "आधार हटाने में विफल",
+        "fileTooLarge": "फ़ाइल 5 MB से कम होनी चाहिए",
+        "invalidType": "केवल JPEG, PNG, WebP, या PDF अनुमत है"
+      }
+    },
     "mobileNote": "* मोबाइल नंबर नहीं बदला जा सकता। ज़रूरत पड़ने पर एडमिन से संपर्क करें।",
     "addressPlaceholder": "आपका पूरा पता",
     "fields": {
@@ -430,8 +451,13 @@
     "searchPlaceholder": "🔍 नाम, मोबाइल, ईमेल खोजें...",
     "filters": {
       "all": "सभी",
-      "active": "सक्रिय",
-      "inactive": "निष्क्रिय"
+      "active": "सक्षम",
+      "inactive": "अक्षम",
+      "accountLabel": "खाता:",
+      "membershipLabel": "सदस्यता:",
+      "membershipAll": "सभी",
+      "membershipActive": "सक्रिय",
+      "membershipInactive": "निष्क्रिय"
     },
     "table": {
       "student": "छात्र",
@@ -447,8 +473,8 @@
     "expires": "समाप्ति",
     "daysLeft": "{{count}}दि बचे",
     "noPlan": "कोई प्लान नहीं",
-    "active": "सक्रिय",
-    "inactive": "निष्क्रिय",
+    "active": "सक्षम",
+    "inactive": "अक्षम",
     "view": "देखें",
     "enable": "सक्रिय करें",
     "disable": "निष्क्रिय करें",
@@ -468,7 +494,10 @@
       "daysLeft": "{{count}} दिन",
       "joined": "जुड़े",
       "noSeat": "कोई सीट नहीं",
-      "noPlan": "कोई प्लान नहीं"
+      "noPlan": "कोई प्लान नहीं",
+      "aadhaar": "आधार",
+      "aadhaarView": "दस्तावेज़ देखें",
+      "aadhaarNone": "अपलोड नहीं हुआ"
     },
     "toasts": {
       "activated": "{{name}} सक्रिय किया गया",
@@ -494,6 +523,65 @@
       "student": "छात्र", "mobile": "मोबाइल", "shift": "शिफ्ट", "expires": "समाप्ति"
     },
     "loadFailed": "सीट मैप लोड करने में विफल"
+  },
+  "feedback": {
+    "title": "फीडबैक और शिकायतें",
+    "subtitle": "लाइब्रेरी एडमिन को अपना फीडबैक या शिकायत भेजें",
+    "newBtn": "+ नई सबमिशन",
+    "cancel": "रद्द करें",
+    "formTitle": "नई सबमिशन",
+    "adminResponse": "एडमिन का जवाब:",
+    "types": { "FEEDBACK": "फीडबैक", "COMPLAINT": "शिकायत" },
+    "statuses": { "OPEN": "खुला", "UNDER_REVIEW": "समीक्षाधीन", "RESOLVED": "हल हो गया" },
+    "form": {
+      "subject": "विषय",
+      "subjectPlaceholder": "आपके फीडबैक का संक्षिप्त विवरण",
+      "description": "विवरण",
+      "descriptionPlaceholder": "अपना फीडबैक या शिकायत विस्तार से बताएं...",
+      "submit": "सबमिट करें",
+      "submitting": "सबमिट हो रहा है..."
+    },
+    "empty": {
+      "title": "अभी तक कोई सबमिशन नहीं",
+      "desc": "पहली फीडबैक या शिकायत दर्ज करने के लिए ऊपर बटन दबाएं"
+    },
+    "modal": {
+      "title": "सबमिशन विवरण",
+      "submitted": "सबमिट किया गया",
+      "adminResponse": "एडमिन का जवाब"
+    },
+    "toasts": {
+      "submitted": "सफलतापूर्वक सबमिट हुआ!",
+      "submitFailed": "सबमिट करने में विफल",
+      "fillRequired": "कृपया विषय और विवरण भरें",
+      "loadFailed": "सबमिशन लोड करने में विफल"
+    }
+  },
+  "adminFeedback": {
+    "title": "फीडबैक और शिकायतें",
+    "subtitle": "{{count}} सबमिशन",
+    "refresh": "रिफ्रेश",
+    "respond": "जवाब दें",
+    "filters": { "allTypes": "सभी प्रकार", "allStatuses": "सभी स्थिति" },
+    "table": {
+      "student": "छात्र", "type": "प्रकार", "subject": "विषय",
+      "status": "स्थिति", "date": "तारीख", "actions": "कार्रवाई"
+    },
+    "empty": { "title": "कोई फीडबैक नहीं मिला", "desc": "चुने गए फिल्टर से कोई सबमिशन मेल नहीं खाती" },
+    "modal": {
+      "title": "सबमिशन का जवाब दें",
+      "status": "स्थिति अपडेट करें",
+      "notes": "एडमिन नोट्स / जवाब",
+      "notesPlaceholder": "अपना जवाब या आंतरिक नोट लिखें...",
+      "save": "बदलाव सहेजें",
+      "saving": "सहेज रहा है...",
+      "cancel": "रद्द करें"
+    },
+    "toasts": {
+      "updated": "सफलतापूर्वक अपडेट हुआ",
+      "updateFailed": "अपडेट करने में विफल",
+      "loadFailed": "फीडबैक लोड करने में विफल"
+    }
   },
   "adminReminders": {
     "title": "नवीनीकरण रिमाइंडर",
@@ -521,6 +609,73 @@
     "toasts": {
       "loadFailed": "समाप्त होने वाली सदस्यताएं लोड करने में विफल",
       "sendFailed": "रिमाइंडर भेजने में विफल"
+    }
+  },
+  "adminNewMembership": {
+    "title": "नई सदस्यता",
+    "subtitle": "किसी छात्र के लिए नकद सदस्यता बनाएं",
+    "steps": {
+      "student": "छात्र",
+      "plan": "प्लान",
+      "seat": "सीट",
+      "confirm": "पुष्टि"
+    },
+    "hasMembership": "सक्रिय सदस्यता",
+    "noPlan": "कोई योजना नहीं",
+    "change": "बदलें",
+    "back": "वापस",
+    "next": "जारी रखें",
+    "shifts": {
+      "MORNING": "सुबह",
+      "EVENING": "शाम",
+      "FULL_DAY": "पूरा दिन"
+    },
+    "step1": {
+      "title": "छात्र खोजें",
+      "searchPlaceholder": "नाम, मोबाइल या ईमेल से खोजें...",
+      "empty": "कोई छात्र नहीं मिला"
+    },
+    "step2": {
+      "selectPlan": "प्लान चुनें",
+      "selectShift": "शिफ्ट चुनें",
+      "startDate": "प्रारंभ तिथि",
+      "days": "दिन",
+      "fullDay": "पूरा दिन",
+      "halfDay": "आधा दिन",
+      "endDateLabel": "सदस्यता समाप्त:"
+    },
+    "step3": {
+      "title": "सीट चुनें",
+      "entrance": "प्रवेश",
+      "available": "उपलब्ध",
+      "booked": "बुक्ड",
+      "selected": "चुनी गई",
+      "selectedSeat": "चुनी गई: {{seat}}"
+    },
+    "step4": {
+      "title": "समीक्षा और पुष्टि",
+      "cashConfirmation": "मैं पुष्टि करता/करती हूं कि {{name}} से ₹{{amount}} नकद प्राप्त हो चुका है",
+      "create": "सदस्यता बनाएं",
+      "creating": "बन रहा है..."
+    },
+    "summary": {
+      "student": "छात्र",
+      "plan": "प्लान",
+      "shift": "शिफ्ट",
+      "seat": "सीट",
+      "start": "प्रारंभ तिथि",
+      "end": "समाप्ति तिथि",
+      "dates": "तिथियां",
+      "amount": "राशि",
+      "payment": "भुगतान मोड",
+      "cash": "नकद"
+    },
+    "toasts": {
+      "loadStudentsFailed": "छात्र लोड करने में विफल",
+      "loadPlansFailed": "प्लान लोड करने में विफल",
+      "loadSeatsFailed": "सीट उपलब्धता लोड करने में विफल",
+      "created": "सदस्यता सफलतापूर्वक बनाई गई",
+      "createFailed": "सदस्यता बनाने में विफल"
     }
   }
 }

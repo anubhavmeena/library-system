@@ -146,11 +146,11 @@ class AdminServiceTest {
         Membership mem = buildActiveMembership(uid, LocalDate.now().plusDays(10));
 
         Page<User> page = new PageImpl<>(List.of(user));
-        when(userRepository.findStudentsByStatus(isNull(), any(Pageable.class))).thenReturn(page);
+        when(userRepository.findStudentsByStatus(isNull(), isNull(), any(Pageable.class))).thenReturn(page);
         when(membershipRepository.findByUserIdAndStatus(uid, Membership.Status.ACTIVE))
                 .thenReturn(Optional.of(mem));
 
-        List<StudentDto> result = adminService.getAllStudents(0, 20, null);
+        List<StudentDto> result = adminService.getAllStudents(0, 20, null, null);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getMembershipId()).isEqualTo(mem.getId().toString());
@@ -160,11 +160,11 @@ class AdminServiceTest {
     void getAllStudents_studentWithNoMembership_hasMembershipFieldsNull() {
         UUID uid = UUID.randomUUID();
         Page<User> page = new PageImpl<>(List.of(buildUser(uid)));
-        when(userRepository.findStudentsByStatus(any(), any(Pageable.class))).thenReturn(page);
+        when(userRepository.findStudentsByStatus(any(), any(), any(Pageable.class))).thenReturn(page);
         when(membershipRepository.findByUserIdAndStatus(uid, Membership.Status.ACTIVE))
                 .thenReturn(Optional.empty());
 
-        List<StudentDto> result = adminService.getAllStudents(0, 20, null);
+        List<StudentDto> result = adminService.getAllStudents(0, 20, null, null);
 
         assertThat(result.get(0).getMembershipId()).isNull();
         assertThat(result.get(0).getDaysRemaining()).isZero();
@@ -172,20 +172,20 @@ class AdminServiceTest {
 
     @Test
     void getAllStudents_forwardsStatusParamToRepo() {
-        when(userRepository.findStudentsByStatus(eq("ACTIVE"), any(Pageable.class)))
+        when(userRepository.findStudentsByStatus(eq("ACTIVE"), isNull(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        adminService.getAllStudents(0, 10, "ACTIVE");
+        adminService.getAllStudents(0, 10, "ACTIVE", null);
 
-        verify(userRepository).findStudentsByStatus(eq("ACTIVE"), any(Pageable.class));
+        verify(userRepository).findStudentsByStatus(eq("ACTIVE"), isNull(), any(Pageable.class));
     }
 
     @Test
     void getAllStudents_emptyPage_returnsEmptyList() {
-        when(userRepository.findStudentsByStatus(any(), any(Pageable.class)))
+        when(userRepository.findStudentsByStatus(any(), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        List<StudentDto> result = adminService.getAllStudents(0, 20, null);
+        List<StudentDto> result = adminService.getAllStudents(0, 20, null, null);
 
         assertThat(result).isEmpty();
     }
