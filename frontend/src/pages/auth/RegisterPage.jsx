@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -44,14 +44,32 @@ export default function RegisterPage() {
     const [contact, setContact] = useState('')
     const [otp, setOtp] = useState('')
     const [form, setForm] = useState({ name:'', email:'', dateOfBirth:'', gender:'', address:'' })
+    const [resendCooldown, setResendCooldown] = useState(0)
 
     const steps = t('auth.register.steps', { returnObjects: true })
+
+    useEffect(() => {
+        if (step !== 1) return
+        setResendCooldown(30)
+        const timer = setInterval(() => {
+            setResendCooldown(prev => { if (prev <= 1) { clearInterval(timer); return 0 } return prev - 1 })
+        }, 1000)
+        return () => clearInterval(timer)
+    }, [step])
 
     const handleSendOtp = async () => {
         if (!contact.trim()) return toast.error(t('auth.register.toasts.enterContact'))
         const res = await dispatch(sendOtp({ contact: contact.trim(), contactType }))
         if (sendOtp.fulfilled.match(res)) { toast.success(t('auth.register.toasts.otpSent')); setStep(1) }
         else toast.error(res.payload)
+    }
+
+    const handleResendOtp = async () => {
+        const res = await dispatch(sendOtp({ contact: contact.trim(), contactType }))
+        if (sendOtp.fulfilled.match(res)) {
+            toast.success(t('auth.register.toasts.otpSent'))
+            setResendCooldown(30)
+        } else toast.error(res.payload)
     }
 
     const handleVerifyOtp = async () => {
@@ -127,7 +145,13 @@ export default function RegisterPage() {
                             <button onClick={handleVerifyOtp} disabled={isLoading} className="btn-primary w-full">
                                 {isLoading? t('auth.register.verifying') : t('auth.register.verifyOtp')}
                             </button>
-                            <button onClick={()=>{setStep(0);setOtp('');dispatch(resetAuthState())}} className="w-full text-primary-400 text-sm hover:text-white transition-colors">{t('auth.register.changeContact')}</button>
+                            <div className="flex items-center justify-between">
+                                <button onClick={()=>{setStep(0);setOtp('');dispatch(resetAuthState())}} className="text-primary-400 text-sm hover:text-white transition-colors">{t('auth.register.changeContact')}</button>
+                                <button onClick={handleResendOtp} disabled={resendCooldown > 0 || isLoading}
+                                        className="text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-amber-400 hover:text-amber-300 disabled:text-primary-500">
+                                    {resendCooldown > 0 ? t('auth.register.resendIn', { seconds: resendCooldown }) : t('auth.register.resendOtp')}
+                                </button>
+                            </div>
                         </div>
                     )}
                     {step === 2 && (

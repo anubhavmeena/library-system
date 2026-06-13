@@ -25,6 +25,13 @@ app:
     secret: ${JWT_SECRET:library-jwt-secret-key-2024-change-in-production}
     expiration: 86400000
 
+meta:
+  whatsapp:
+    token: ${META_WHATSAPP_TOKEN:}
+    phone-number-id: ${META_WHATSAPP_PHONE_NUMBER_ID:}
+    template-name: ${META_WHATSAPP_TEMPLATE_NAME:library_otp}
+    api-version: v19.0
+
 twilio:
   account-sid: ${TWILIO_ACCOUNT_SID:}
   auth-token: ${TWILIO_AUTH_TOKEN:}

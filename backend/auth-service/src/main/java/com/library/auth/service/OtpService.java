@@ -1,5 +1,6 @@
 package com.library.auth.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sendgrid.Method;
 import com.sendgrid.Request;
 import com.sendgrid.Response;
@@ -12,13 +13,22 @@ import com.twilio.rest.api.v2010.account.Message;
 import com.twilio.type.PhoneNumber;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @Slf4j
 public class OtpService {
 
+    // ── Twilio SMS ────────────────────────────────────────────────────────────
     @Value("${twilio.account-sid:}")
     private String accountSid;
 
@@ -28,6 +38,20 @@ public class OtpService {
     @Value("${twilio.phone-number:}")
     private String fromPhone;
 
+    // ── Meta WhatsApp Cloud API ───────────────────────────────────────────────
+    @Value("${meta.whatsapp.token:}")
+    private String metaToken;
+
+    @Value("${meta.whatsapp.phone-number-id:}")
+    private String metaPhoneNumberId;
+
+    @Value("${meta.whatsapp.template-name:library_otp}")
+    private String metaTemplateName;
+
+    @Value("${meta.whatsapp.api-version:v19.0}")
+    private String metaApiVersion;
+
+    // ── SendGrid Email ────────────────────────────────────────────────────────
     @Value("${sendgrid.api-key:}")
     private String sendGridApiKey;
 
@@ -37,26 +61,83 @@ public class OtpService {
     @Value("${notification.from-name:Library System}")
     private String fromName;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private HttpClient httpClient;
+
     @PostConstruct
     public void init() {
+        httpClient = HttpClient.newHttpClient();
+
+        if (!metaToken.isBlank() && !metaPhoneNumberId.isBlank()) {
+            log.info("Meta WhatsApp Cloud API configured — will be used as default OTP channel");
+        } else {
+            log.warn("Meta WhatsApp not configured — will fall back to Twilio SMS");
+        }
+
         if (!accountSid.isBlank() && !authToken.isBlank()) {
             Twilio.init(accountSid, authToken);
-            log.info("Twilio initialized successfully");
+            log.info("Twilio SMS initialized as fallback OTP channel");
         } else {
-            log.warn("Twilio credentials not configured — OTP logged only (dev mode)");
+            log.warn("Twilio credentials not configured — SMS fallback unavailable (dev mode)");
         }
     }
 
     public void sendOtp(String contact, String contactType, String otp) {
-        String message = String.format(
-                "📚 Library OTP Verification\n\nYour OTP is: *%s*\n\nValid for 5 minutes. Do not share.",
-                otp
-        );
         if ("MOBILE".equalsIgnoreCase(contactType)) {
-            sendSms(contact, message, otp);
+            if (!metaToken.isBlank() && !metaPhoneNumberId.isBlank()) {
+                try {
+                    sendWhatsAppMeta(contact, otp);
+                    return;
+                } catch (Exception e) {
+                    log.warn("Meta WhatsApp failed for {}, falling back to Twilio SMS: {}", contact, e.getMessage());
+                }
+            }
+            String smsBody = String.format(
+                    "Library OTP: %s\nValid for 5 minutes. Do not share.", otp);
+            sendSms(contact, smsBody, otp);
         } else if ("EMAIL".equalsIgnoreCase(contactType)) {
-            sendEmail(contact, message, otp);
+            String emailBody = String.format(
+                    "📚 Library OTP Verification\n\nYour OTP is: %s\n\nValid for 5 minutes. Do not share.", otp);
+            sendEmail(contact, emailBody, otp);
         }
+    }
+
+    public boolean isLiveConfigured() {
+        return (!metaToken.isBlank() && !metaPhoneNumberId.isBlank())
+                || (!accountSid.isBlank() && !authToken.isBlank());
+    }
+
+    private void sendWhatsAppMeta(String mobile, String otp) throws Exception {
+        String to = mobile.startsWith("+") ? mobile.substring(1) : "91" + mobile;
+        Map<String, Object> body = Map.of(
+                "messaging_product", "whatsapp",
+                "to", to,
+                "type", "template",
+                "template", Map.of(
+                        "name", metaTemplateName,
+                        "language", Map.of("code", "en"),
+                        "components", List.of(
+                                Map.of("type", "body",
+                                        "parameters", List.of(
+                                                Map.of("type", "text", "text", otp)
+                                        )
+                                )
+                        )
+                )
+        );
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create("https://graph.facebook.com/" + metaApiVersion + "/" + metaPhoneNumberId + "/messages"))
+                .header("Authorization", "Bearer " + metaToken)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+                .build();
+        HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+        if (resp.statusCode() >= 400) {
+            throw new RuntimeException("Meta API error " + resp.statusCode() + ": " + resp.body());
+        }
+        log.info("WhatsApp OTP sent to {} via Meta Cloud API", mobile);
     }
 
     private void sendSms(String mobile, String message, String otp) {

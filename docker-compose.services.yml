@@ -97,9 +97,12 @@ services:
       REDIS_HOST:          redis
       REDIS_PORT:          6379
       JWT_SECRET:          ${JWT_SECRET:-library-jwt-secret-key-2024-change-in-production}
-      TWILIO_ACCOUNT_SID:  ${TWILIO_ACCOUNT_SID:-}
-      TWILIO_AUTH_TOKEN:   ${TWILIO_AUTH_TOKEN:-}
-      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
+      META_WHATSAPP_TOKEN:          ${META_WHATSAPP_TOKEN:-}
+      META_WHATSAPP_PHONE_NUMBER_ID: ${META_WHATSAPP_PHONE_NUMBER_ID:-}
+      META_WHATSAPP_TEMPLATE_NAME:  ${META_WHATSAPP_TEMPLATE_NAME:-library_otp}
+      TWILIO_ACCOUNT_SID:           ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN:            ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_PHONE_NUMBER:          ${TWILIO_PHONE_NUMBER:-}
     networks:
       - library-network
     healthcheck:

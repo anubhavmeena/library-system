@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -14,12 +14,30 @@ export default function LoginPage() {
     const [contact, setContact] = useState('')
     const [otp, setOtp] = useState('')
     const [step, setStep] = useState(1)
+    const [resendCooldown, setResendCooldown] = useState(0)
+
+    useEffect(() => {
+        if (step !== 2) return
+        setResendCooldown(30)
+        const timer = setInterval(() => {
+            setResendCooldown(prev => { if (prev <= 1) { clearInterval(timer); return 0 } return prev - 1 })
+        }, 1000)
+        return () => clearInterval(timer)
+    }, [step])
 
     const handleSendOtp = async () => {
         if (!contact.trim()) return toast.error(t('auth.login.toasts.enterContact'))
         const res = await dispatch(sendOtp({ contact: contact.trim(), contactType }))
         if (sendOtp.fulfilled.match(res)) { toast.success(t('auth.login.toasts.otpSent')); setStep(2) }
         else toast.error(res.payload || t('auth.login.toasts.failedOtp'))
+    }
+
+    const handleResendOtp = async () => {
+        const res = await dispatch(sendOtp({ contact: contact.trim(), contactType }))
+        if (sendOtp.fulfilled.match(res)) {
+            toast.success(t('auth.login.toasts.otpSent'))
+            setResendCooldown(30)
+        } else toast.error(res.payload || t('auth.login.toasts.failedOtp'))
     }
 
     const handleLogin = async () => {
@@ -77,10 +95,16 @@ export default function LoginPage() {
                             <button onClick={handleLogin} disabled={isLoading} className="btn-primary w-full">
                                 {isLoading ? t('auth.login.verifying') : t('auth.login.signIn')}
                             </button>
-                            <button onClick={() => { setStep(1); setOtp(''); dispatch(resetAuthState()) }}
-                                    className="w-full text-primary-400 text-sm hover:text-white transition-colors">
-                                {t('auth.login.changeContact')}
-                            </button>
+                            <div className="flex items-center justify-between">
+                                <button onClick={() => { setStep(1); setOtp(''); dispatch(resetAuthState()) }}
+                                        className="text-primary-400 text-sm hover:text-white transition-colors">
+                                    {t('auth.login.changeContact')}
+                                </button>
+                                <button onClick={handleResendOtp} disabled={resendCooldown > 0 || isLoading}
+                                        className="text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-amber-400 hover:text-amber-300 disabled:text-primary-500">
+                                    {resendCooldown > 0 ? t('auth.login.resendIn', { seconds: resendCooldown }) : t('auth.login.resendOtp')}
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>

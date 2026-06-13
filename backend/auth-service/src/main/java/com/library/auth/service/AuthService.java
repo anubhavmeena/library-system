@@ -35,9 +35,14 @@ public class AuthService {
     // ── OTP Flow ──────────────────────────────────────────────────────────────
 
     public void sendOtp(String contact, String contactType) {
+        String cooldownKey = "otp:cooldown:" + contact;
+        Long ttl = redisTemplate.getExpire(cooldownKey, TimeUnit.SECONDS);
+        if (ttl != null && ttl > 0) {
+            throw new IllegalArgumentException("Please wait " + ttl + " more seconds before requesting a new OTP.");
+        }
         String otp = generateOtp();
-        String redisKey = "otp:" + contact;
-        redisTemplate.opsForValue().set(redisKey, otp, 5, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set("otp:" + contact, otp, 5, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set(cooldownKey, "1", 30, TimeUnit.SECONDS);
         otpService.sendOtp(contact, contactType, otp);
         log.info("OTP sent to {} ({})", contact, contactType);
     }
@@ -174,7 +179,7 @@ public class AuthService {
 
     private String generateOtp() {
         String profile = System.getenv("SPRING_PROFILES_ACTIVE");
-        if ("dev".equals(profile)) return "123456";
+        if ("dev".equals(profile) && !otpService.isLiveConfigured()) return "123456";
         return String.format("%06d", new Random().nextInt(999999));
     }
 }
