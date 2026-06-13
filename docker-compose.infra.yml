@@ -10,6 +10,13 @@
 
 version: '3.8'
 
+x-logging: &default-logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "50m"
+      max-file: "3"
+
 networks:
   library-network:
     driver: bridge
@@ -36,6 +43,7 @@ services:
     image: postgres:15-alpine
     container_name: library-postgres
     restart: unless-stopped
+    <<: *default-logging
     environment:
       POSTGRES_USER:     library_user
       POSTGRES_PASSWORD: library_pass
@@ -66,6 +74,7 @@ services:
     image: redis:7-alpine
     container_name: library-redis
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "6379:6379"
     volumes:
@@ -92,6 +101,7 @@ services:
     image: confluentinc/cp-zookeeper:7.4.0
     container_name: library-zookeeper
     restart: unless-stopped
+    <<: *default-logging
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME:   2000
@@ -120,6 +130,7 @@ services:
     image: confluentinc/cp-kafka:7.4.0
     container_name: library-kafka
     restart: unless-stopped
+    <<: *default-logging
     depends_on:
       zookeeper:
         condition: service_healthy
@@ -134,8 +145,10 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME:       PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE:        'true'
-      KAFKA_LOG_RETENTION_HOURS:              168
-      KAFKA_LOG_SEGMENT_BYTES:                1073741824
+      KAFKA_LOG_RETENTION_HOURS:              72
+      KAFKA_LOG_RETENTION_BYTES:              536870912
+      KAFKA_LOG_SEGMENT_BYTES:                104857600
+      KAFKA_LOG_SEGMENT_MS:                   3600000
       KAFKA_LOG4J_ROOT_LOGLEVEL:              WARN
       KAFKA_LOG4J_LOGGERS:                    >-
         kafka.controller=WARN,
@@ -161,6 +174,7 @@ services:
     image: provectuslabs/kafka-ui:latest
     container_name: library-kafka-ui
     restart: unless-stopped
+    <<: *default-logging
     depends_on:
       kafka:
         condition: service_healthy

@@ -24,6 +24,14 @@ volumes:
   uploads-data:
     name: library-uploads-data
 
+# ── Shared logging anchor ──────────────────────────────────────────────────
+x-logging: &default-logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "50m"
+      max-file: "3"
+
 # ── Shared environment anchors ─────────────────────────────────────────────
 x-db-env: &db-env
   DB_URL:        jdbc:postgresql://postgres:5432/library_db
@@ -51,6 +59,7 @@ services:
     image: target-zone/api-gateway:latest
     container_name: library-api-gateway
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "8080:8080"
     environment:
@@ -90,6 +99,7 @@ services:
     image: target-zone/auth-service:latest
     container_name: library-auth-service
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "8081:8081"
     environment:
@@ -124,6 +134,7 @@ services:
     image: target-zone/user-service:latest
     container_name: library-user-service
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "8082:8082"
     environment:
@@ -152,6 +163,7 @@ services:
     image: target-zone/membership-service:latest
     container_name: library-membership-service
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "8083:8083"
     environment:
@@ -180,6 +192,7 @@ services:
     image: target-zone/seat-service:latest
     container_name: library-seat-service
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "8084:8084"
     environment:
@@ -210,6 +223,7 @@ services:
     image: target-zone/notification-service:latest
     container_name: library-notification-service
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "8085:8085"
     environment:
@@ -244,6 +258,7 @@ services:
     image: target-zone/admin-service:latest
     container_name: library-admin-service
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "8086:8086"
     environment:
@@ -273,6 +288,7 @@ services:
     image: target-zone/frontend:latest
     container_name: library-frontend
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "3000:80"
     networks:
