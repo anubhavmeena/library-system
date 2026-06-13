@@ -11,7 +11,7 @@
 INSERT INTO users (id, mobile, email, name, role, is_active, created_at, updated_at)
 VALUES (
     'a0000000-0000-0000-0000-000000000001',
-    '9999999999',             -- TODO: replace with real admin mobile before going live
+    '9071356842',
     'admin@targetzone.co.in', -- TODO: replace with real admin email before going live
     'Admin',
     'ADMIN',
