@@ -42,7 +42,7 @@ x-kafka-env: &kafka-env
   KAFKA_BOOTSTRAP_SERVERS: kafka:29092
 
 x-spring-env: &spring-env
-  SPRING_PROFILES_ACTIVE: dev
+  SPRING_PROFILES_ACTIVE: prod 
 
 services:
 
