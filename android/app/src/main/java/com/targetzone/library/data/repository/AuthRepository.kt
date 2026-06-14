@@ -7,8 +7,8 @@ import com.targetzone.library.data.model.*
 class AuthRepository(private val tokenManager: TokenManager) {
     private val api = ApiClient.service
 
-    suspend fun sendOtp(mobile: String): Result<Unit> = runCatching {
-        val res = api.sendOtp(SendOtpRequest(contact = mobile))
+    suspend fun sendOtp(contact: String, contactType: String = "MOBILE"): Result<Unit> = runCatching {
+        val res = api.sendOtp(SendOtpRequest(contact = contact, contactType = contactType))
         if (!res.isSuccessful) throw Exception(res.errorBody()?.string() ?: "Failed to send OTP")
     }
 
@@ -33,8 +33,8 @@ class AuthRepository(private val tokenManager: TokenManager) {
         auth
     }
 
-    suspend fun adminLogin(email: String, password: String): Result<AuthResponse> = runCatching {
-        val res = api.adminLogin(AdminLoginRequest(email = email, password = password))
+    suspend fun adminLogin(contact: String, otp: String): Result<AuthResponse> = runCatching {
+        val res = api.adminLogin(AdminLoginRequest(contact = contact, otp = otp))
         val auth = res.body()?.data ?: throw Exception(res.body()?.message ?: "Admin login failed")
         tokenManager.saveToken(auth.accessToken)
         tokenManager.saveUser(auth.user)

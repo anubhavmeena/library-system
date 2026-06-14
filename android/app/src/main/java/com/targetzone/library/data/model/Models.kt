@@ -152,7 +152,7 @@ data class SendOtpRequest(val contact: String, val contactType: String = "MOBILE
 data class VerifyOtpRequest(val contact: String, val otp: String)
 data class RegisterRequest(val name: String, val email: String?, val sessionToken: String, val dateOfBirth: String? = null, val gender: String? = null, val address: String? = null)
 data class LoginRequest(val sessionToken: String)
-data class AdminLoginRequest(val email: String, val password: String)
+data class AdminLoginRequest(val contact: String, val otp: String)
 data class CreateOrderRequest(val planId: String, val seatNumber: String, val shift: String)
 data class VerifyPaymentRequest(val gatewayOrderId: String, val gatewayPaymentId: String, val signature: String, val membershipId: String)
 data class BookSeatRequest(val seatNumber: String, val membershipId: String, val shift: String, val startDate: String, val endDate: String)

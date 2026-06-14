@@ -5,16 +5,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -25,9 +20,8 @@ import com.targetzone.library.ui.theme.*
 @Composable
 fun AdminLoginScreen(vm: AuthViewModel, onSuccess: () -> Unit, onBack: () -> Unit) {
     val state by vm.state.collectAsState()
-    var email    by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var showPwd  by remember { mutableStateOf(false) }
+    var contact by remember { mutableStateOf("") }
+    var otp     by remember { mutableStateOf("") }
 
     LaunchedEffect(state.isLoggedIn) { if (state.isLoggedIn) onSuccess() }
 
@@ -43,38 +37,64 @@ fun AdminLoginScreen(vm: AuthViewModel, onSuccess: () -> Unit, onBack: () -> Uni
         Text("🔐", fontSize = 48.sp, textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
         Text("Admin Portal", style = MaterialTheme.typography.headlineMedium, color = Amber, textAlign = TextAlign.Center)
-        Text("Sign in with your admin credentials", color = TextSub, fontSize = 13.sp, textAlign = TextAlign.Center)
+        Text(
+            if (!state.otpSent) "Enter your email or mobile number" else "Enter the OTP sent to $contact",
+            color = TextSub, fontSize = 13.sp, textAlign = TextAlign.Center
+        )
         Spacer(Modifier.height(32.dp))
 
         state.error?.let {
-            Card(colors = CardDefaults.cardColors(containerColor = RedFaint), modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = RedFaint),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+            ) {
                 Text(it, color = RedAlert, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
             }
         }
 
-        AppTextField(value = email, onValueChange = { email = it }, label = "Email Address")
-        Spacer(Modifier.height(16.dp))
-        OutlinedTextField(
-            value = password, onValueChange = { password = it },
-            label = { Text("Password", color = TextSub) },
-            visualTransformation = if (showPwd) VisualTransformation.None else PasswordVisualTransformation(),
-            trailingIcon = {
-                IconButton(onClick = { showPwd = !showPwd }) {
-                    Icon(if (showPwd) Icons.Default.Visibility else Icons.Default.VisibilityOff, null, tint = TextSub)
-                }
-            },
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber, unfocusedBorderColor = DividerColor, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary, cursorColor = Amber),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.height(28.dp))
+        if (!state.otpSent) {
+            AppTextField(
+                value = contact,
+                onValueChange = { contact = it.trim() },
+                label = "Email or Mobile Number",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+            )
+            Spacer(Modifier.height(28.dp))
+            PrimaryButton(
+                text = if (state.isLoading) "Sending OTP…" else "Send OTP",
+                enabled = contact.isNotBlank() && !state.isLoading,
+                onClick = {
+                    val contactType = if (contact.contains("@")) "EMAIL" else "MOBILE"
+                    vm.sendOtp(contact, contactType)
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            AppTextField(
+                value = otp,
+                onValueChange = { otp = it.filter(Char::isDigit).take(6) },
+                label = "6-digit OTP",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                trailingIcon = if (otp.isNotEmpty()) {
+                    { TextButton(onClick = { otp = "" }) { Text("Clear", color = Amber, fontSize = 12.sp) } }
+                } else null
+            )
+            Spacer(Modifier.height(28.dp))
+            PrimaryButton(
+                text = if (state.isLoading) "Logging in…" else "Login",
+                enabled = otp.length == 6 && !state.isLoading,
+                onClick = { vm.adminLogin(contact, otp) },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(12.dp))
+            TextButton(
+                onClick = { vm.resetOtpState(); otp = "" },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("← Change Contact", color = TextSub)
+            }
+        }
 
-        PrimaryButton(
-            text = if (state.isLoading) "Signing in…" else "Sign In",
-            enabled = email.isNotBlank() && password.isNotBlank() && !state.isLoading,
-            onClick = { vm.adminLogin(email.trim(), password) },
-            modifier = Modifier.fillMaxWidth()
-        )
         Spacer(Modifier.height(16.dp))
         TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
             Text("← Student Login", color = TextMuted)

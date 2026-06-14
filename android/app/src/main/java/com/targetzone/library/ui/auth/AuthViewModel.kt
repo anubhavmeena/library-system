@@ -23,9 +23,9 @@ class AuthViewModel(private val repo: AuthRepository) : ViewModel() {
     private val _state = MutableStateFlow(AuthState())
     val state: StateFlow<AuthState> = _state
 
-    fun sendOtp(mobile: String) = viewModelScope.launch {
+    fun sendOtp(contact: String, contactType: String = "MOBILE") = viewModelScope.launch {
         _state.value = _state.value.copy(isLoading = true, error = null)
-        repo.sendOtp(mobile)
+        repo.sendOtp(contact, contactType)
             .onSuccess { _state.value = _state.value.copy(isLoading = false, otpSent = true) }
             .onFailure { _state.value = _state.value.copy(isLoading = false, error = it.message) }
     }
@@ -56,9 +56,9 @@ class AuthViewModel(private val repo: AuthRepository) : ViewModel() {
             .onFailure { _state.value = _state.value.copy(isLoading = false, error = it.message) }
     }
 
-    fun adminLogin(email: String, password: String) = viewModelScope.launch {
+    fun adminLogin(contact: String, otp: String) = viewModelScope.launch {
         _state.value = _state.value.copy(isLoading = true, error = null)
-        repo.adminLogin(email, password)
+        repo.adminLogin(contact, otp)
             .onSuccess { auth -> _state.value = _state.value.copy(isLoading = false, isLoggedIn = true, user = auth.user) }
             .onFailure { _state.value = _state.value.copy(isLoading = false, error = it.message) }
     }
