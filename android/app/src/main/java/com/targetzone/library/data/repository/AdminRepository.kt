@@ -34,9 +34,31 @@ class AdminRepository {
         res.body()?.data ?: res.body()?.message ?: "Reminders sent"
     }
 
+    suspend fun getAdminSeatMap(shift: String, date: String?): Result<List<Seat>> = runCatching {
+        val res = api.getAdminSeatMap(shift, date)
+        val dto = res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to load seat map")
+        dto.seatsByRow.flatMap { (row, seatList) ->
+            seatList.map { s ->
+                Seat(
+                    seatNumber = s.seatNumber,
+                    row = row,
+                    isBooked = s.isOccupied,
+                    studentName = s.studentName,
+                    studentMobile = s.studentMobile,
+                    membershipEnd = s.membershipEnd
+                )
+            }
+        }
+    }
+
     suspend fun getAllFeedback(): Result<List<FeedbackItem>> = runCatching {
         val res = api.getAllFeedback()
         res.body()?.data ?: emptyList()
+    }
+
+    suspend fun updateFeedback(id: String, status: String, adminNotes: String?): Result<FeedbackItem> = runCatching {
+        val res = api.updateFeedback(id, UpdateFeedbackRequest(status = status, adminNotes = adminNotes))
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Update failed")
     }
 
     suspend fun sendBroadcast(message: String, targetGroup: String): Result<String> = runCatching {

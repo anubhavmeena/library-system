@@ -1,6 +1,5 @@
 package com.targetzone.library.data.model
 
-import com.google.gson.annotations.SerializedName
 
 data class ApiResponse<T>(
     val success: Boolean,
@@ -61,7 +60,30 @@ data class Seat(
     val id: String? = null,
     val seatNumber: String = "",
     val row: String = "",
-    val isBooked: Boolean = false
+    val isBooked: Boolean = false,
+    // populated only from /admin/seats/map
+    val studentName: String? = null,
+    val studentMobile: String? = null,
+    val membershipEnd: String? = null
+)
+
+// admin seat-map API response shape
+data class SeatMapDto(
+    val shift: String = "",
+    val date: String = "",
+    val totalSeats: Int = 0,
+    val occupiedSeats: Int = 0,
+    val availableSeats: Int = 0,
+    val seatsByRow: Map<String, List<SeatInfoItem>> = emptyMap()
+)
+
+data class SeatInfoItem(
+    val seatNumber: String = "",
+    val isOccupied: Boolean = false,
+    val studentName: String? = null,
+    val studentMobile: String? = null,
+    val shift: String? = null,
+    val membershipEnd: String? = null
 )
 
 data class PaymentOrder(
@@ -101,11 +123,17 @@ data class StudentSummary(
 
 data class FeedbackItem(
     val id: String = "",
-    val userId: String = "",
-    val userName: String? = null,
-    val message: String = "",
-    val rating: Int = 5,
-    val createdAt: String = ""
+    val userId: String? = null,
+    val type: String = "",          // FEEDBACK or COMPLAINT
+    val subject: String = "",
+    val description: String = "",
+    val status: String = "",        // OPEN, UNDER_REVIEW, RESOLVED
+    val adminNotes: String? = null,
+    val createdAt: String = "",
+    val updatedAt: String? = null,
+    // admin-only fields (from /admin/feedback)
+    val studentName: String? = null,
+    val studentMobile: String? = null
 )
 
 data class ReminderStudent(
@@ -122,7 +150,7 @@ data class ReminderStudent(
 // Request bodies
 data class SendOtpRequest(val contact: String, val contactType: String = "MOBILE")
 data class VerifyOtpRequest(val contact: String, val otp: String)
-data class RegisterRequest(val name: String, val email: String?, val sessionToken: String)
+data class RegisterRequest(val name: String, val email: String?, val sessionToken: String, val dateOfBirth: String? = null, val gender: String? = null, val address: String? = null)
 data class LoginRequest(val sessionToken: String)
 data class AdminLoginRequest(val email: String, val password: String)
 data class CreateOrderRequest(val planId: String, val seatNumber: String, val shift: String)
@@ -133,5 +161,6 @@ data class ToggleStatusRequest(val active: Boolean)
 data class ChangeSeatRequest(val seatNumber: String)
 data class SendReminderRequest(val userIds: List<String>)
 data class BroadcastRequest(val message: String, val targetGroup: String = "ALL")
-data class SubmitFeedbackRequest(val message: String, val rating: Int)
+data class SubmitFeedbackRequest(val type: String, val subject: String, val description: String)
+data class UpdateFeedbackRequest(val status: String, val adminNotes: String?)
 data class CreateMembershipRequest(val userId: String, val planId: String, val seatNumber: String, val shift: String, val startDate: String)

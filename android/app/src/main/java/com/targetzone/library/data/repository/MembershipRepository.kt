@@ -31,9 +31,9 @@ class MembershipRepository {
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Payment verification failed")
     }
 
-    suspend fun submitFeedback(message: String, rating: Int): Result<FeedbackItem> = runCatching {
-        val res = api.submitFeedback(SubmitFeedbackRequest(message = message, rating = rating))
-        res.body()?.data ?: throw Exception("Failed to submit feedback")
+    suspend fun submitFeedback(type: String, subject: String, description: String): Result<FeedbackItem> = runCatching {
+        val res = api.submitFeedback(SubmitFeedbackRequest(type = type, subject = subject, description = description))
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to submit feedback")
     }
 
     suspend fun getMyFeedback(): Result<List<FeedbackItem>> = runCatching {

@@ -26,7 +26,8 @@ private val ROWS = listOf("A", "B", "C", "D")
 fun SeatGrid(
     seats: List<Seat>,
     selectedSeatNumber: String?,
-    onSeatClick: (Seat) -> Unit
+    onSeatClick: (Seat) -> Unit,
+    onBookedSeatClick: ((Seat) -> Unit)? = null
 ) {
     val seatMap = seats.associateBy { it.seatNumber }
 
@@ -59,9 +60,9 @@ fun SeatGrid(
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     for (i in 1..half) {
                         val seatNum = "$row$i"
-                        SeatButton(seatNum, seatMap[seatNum]?.isBooked == true, selectedSeatNumber == seatNum) {
-                            if (seatMap[seatNum]?.isBooked != true)
-                                onSeatClick(seatMap[seatNum] ?: Seat(seatNumber = seatNum, row = row))
+                        val seat = seatMap[seatNum] ?: Seat(seatNumber = seatNum, row = row)
+                        SeatButton(seatNum, seat.isBooked, selectedSeatNumber == seatNum, bookedClickable = onBookedSeatClick != null) {
+                            if (seat.isBooked) onBookedSeatClick?.invoke(seat) else onSeatClick(seat)
                         }
                     }
                 }
@@ -74,9 +75,9 @@ fun SeatGrid(
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     for (i in (half + 1)..total) {
                         val seatNum = "$row$i"
-                        SeatButton(seatNum, seatMap[seatNum]?.isBooked == true, selectedSeatNumber == seatNum) {
-                            if (seatMap[seatNum]?.isBooked != true)
-                                onSeatClick(seatMap[seatNum] ?: Seat(seatNumber = seatNum, row = row))
+                        val seat = seatMap[seatNum] ?: Seat(seatNumber = seatNum, row = row)
+                        SeatButton(seatNum, seat.isBooked, selectedSeatNumber == seatNum, bookedClickable = onBookedSeatClick != null) {
+                            if (seat.isBooked) onBookedSeatClick?.invoke(seat) else onSeatClick(seat)
                         }
                     }
                 }
@@ -93,7 +94,7 @@ fun SeatGrid(
 }
 
 @Composable
-private fun SeatButton(label: String, booked: Boolean, selected: Boolean, onClick: () -> Unit) {
+private fun SeatButton(label: String, booked: Boolean, selected: Boolean, bookedClickable: Boolean = false, onClick: () -> Unit) {
     val (bg, border, textColor) = when {
         booked   -> Triple(RedFaint, RedAlert.copy(alpha = 0.3f), RedAlert.copy(alpha = 0.5f))
         selected -> Triple(AmberFaint, Amber, Amber)
@@ -105,7 +106,7 @@ private fun SeatButton(label: String, booked: Boolean, selected: Boolean, onClic
             .clip(RoundedCornerShape(6.dp))
             .background(bg)
             .border(1.dp, border, RoundedCornerShape(6.dp))
-            .clickable(enabled = !booked, onClick = onClick),
+            .clickable(enabled = !booked || bookedClickable, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(label.drop(1), fontSize = 9.sp, color = textColor, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)

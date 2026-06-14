@@ -42,9 +42,9 @@ class AuthViewModel(private val repo: AuthRepository) : ViewModel() {
             .onFailure { _state.value = _state.value.copy(isLoading = false, error = it.message) }
     }
 
-    fun register(name: String, email: String?, sessionToken: String) = viewModelScope.launch {
+    fun register(name: String, email: String?, sessionToken: String, dateOfBirth: String? = null, gender: String? = null, address: String? = null) = viewModelScope.launch {
         _state.value = _state.value.copy(isLoading = true, error = null)
-        repo.register(name, email, sessionToken)
+        repo.register(name, email, sessionToken, dateOfBirth, gender, address)
             .onSuccess { auth -> _state.value = _state.value.copy(isLoading = false, isLoggedIn = true, user = auth.user) }
             .onFailure { _state.value = _state.value.copy(isLoading = false, error = it.message) }
     }

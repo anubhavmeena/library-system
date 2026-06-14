@@ -1,7 +1,13 @@
 package com.targetzone.library.ui.student
 
+import android.app.DownloadManager
+import android.content.Context
+import android.net.Uri
+import android.os.Environment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.targetzone.library.data.TokenManager
+import com.targetzone.library.data.api.BASE_URL
 import com.targetzone.library.data.model.*
 import com.targetzone.library.data.repository.MembershipRepository
 import com.targetzone.library.data.repository.SeatRepository
@@ -11,11 +17,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import java.io.File
 
 class StudentViewModel(
     private val membershipRepo: MembershipRepository = MembershipRepository(),
     private val seatRepo: SeatRepository = SeatRepository(),
-    private val userRepo: UserRepository = UserRepository()
+    private val userRepo: UserRepository = UserRepository(),
+    private val tokenManager: TokenManager? = null
 ) : ViewModel() {
 
     val membership    = MutableStateFlow<Membership?>(null)
@@ -92,13 +100,38 @@ class StudentViewModel(
             .onFailure { error.value = it.message; isLoading.value = false }
     }
 
+    fun uploadPhoto(file: File) = viewModelScope.launch {
+        isLoading.value = true
+        userRepo.uploadPhoto(file)
+            .onSuccess { loadProfile(); isLoading.value = false }
+            .onFailure { error.value = it.message; isLoading.value = false }
+    }
+
+    fun uploadAadhaar(file: File) = viewModelScope.launch {
+        isLoading.value = true
+        userRepo.uploadAadhaar(file)
+            .onSuccess { loadProfile(); isLoading.value = false }
+            .onFailure { error.value = it.message; isLoading.value = false }
+    }
+
+    fun downloadIdCard(context: Context) = viewModelScope.launch {
+        val token = tokenManager?.getTokenBlocking() ?: return@launch
+        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val request = DownloadManager.Request(Uri.parse("${BASE_URL}memberships/my/id-card"))
+            .addRequestHeader("Authorization", "Bearer $token")
+            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "library-id-card.pdf")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setMimeType("application/pdf")
+        dm.enqueue(request)
+    }
+
     fun loadFeedback() = viewModelScope.launch {
         membershipRepo.getMyFeedback().onSuccess { myFeedback.value = it }
     }
 
-    fun submitFeedback(message: String, rating: Int, onDone: () -> Unit) = viewModelScope.launch {
+    fun submitFeedback(type: String, subject: String, description: String, onDone: () -> Unit) = viewModelScope.launch {
         isLoading.value = true
-        membershipRepo.submitFeedback(message, rating)
+        membershipRepo.submitFeedback(type, subject, description)
             .onSuccess { isLoading.value = false; loadFeedback(); onDone() }
             .onFailure { error.value = it.message; isLoading.value = false }
     }

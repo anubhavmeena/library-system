@@ -70,10 +70,10 @@ interface ApiService {
     suspend fun bookSeat(@Body req: BookSeatRequest): Response<ApiResponse<Any?>>
 
     // Feedback
-    @GET("feedback")
+    @GET("users/feedback/my")
     suspend fun getMyFeedback(): Response<ApiResponse<List<FeedbackItem>>>
 
-    @POST("feedback")
+    @POST("users/feedback")
     suspend fun submitFeedback(@Body req: SubmitFeedbackRequest): Response<ApiResponse<FeedbackItem>>
 
     // Admin
@@ -109,8 +109,20 @@ interface ApiService {
     @POST("admin/reminders/send")
     suspend fun sendReminders(@Body req: SendReminderRequest): Response<ApiResponse<String?>>
 
+    @GET("admin/seats/map")
+    suspend fun getAdminSeatMap(
+        @Query("shift") shift: String,
+        @Query("date") date: String? = null
+    ): Response<ApiResponse<SeatMapDto>>
+
     @GET("admin/feedback")
     suspend fun getAllFeedback(): Response<ApiResponse<List<FeedbackItem>>>
+
+    @PATCH("admin/feedback/{id}")
+    suspend fun updateFeedback(
+        @Path("id") id: String,
+        @Body req: UpdateFeedbackRequest
+    ): Response<ApiResponse<FeedbackItem>>
 
     @POST("admin/broadcast")
     suspend fun sendBroadcast(@Body req: BroadcastRequest): Response<ApiResponse<String?>>

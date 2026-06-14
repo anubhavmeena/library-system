@@ -9,7 +9,9 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.targetzone.library.data.model.User
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "auth")
 
@@ -19,6 +21,8 @@ class TokenManager(private val context: Context) {
     private val USER_KEY = stringPreferencesKey("user")
 
     fun getToken(): Flow<String?> = context.dataStore.data.map { it[TOKEN_KEY] }
+
+    fun getTokenBlocking(): String? = runBlocking { getToken().first() }
 
     fun getUser(): Flow<User?> = context.dataStore.data.map { prefs ->
         prefs[USER_KEY]?.let { gson.fromJson(it, User::class.java) }

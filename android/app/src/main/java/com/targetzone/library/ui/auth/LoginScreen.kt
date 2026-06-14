@@ -60,7 +60,11 @@ fun LoginScreen(
             AppTextField(
                 value = mobile, onValueChange = { mobile = it.filter(Char::isDigit).take(10) },
                 label = "Mobile Number",
-                trailingIcon = { Text("+91", color = TextSub, modifier = Modifier.padding(end = 8.dp)) }
+                leadingIcon = {
+                    Text("+91", color = TextSub, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(start = 4.dp))
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
             )
             Spacer(Modifier.height(20.dp))
             PrimaryButton(

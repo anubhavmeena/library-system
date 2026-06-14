@@ -3,10 +3,13 @@ package com.targetzone.library.ui.student
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -19,6 +22,7 @@ import kotlin.math.max
 fun MembershipScreen(vm: StudentViewModel, onBookNow: () -> Unit) {
     val membership by vm.membership.collectAsState()
     val history    by vm.membershipHistory.collectAsState()
+    val context    = LocalContext.current
 
     LaunchedEffect(Unit) { vm.loadDashboard(); vm.loadMembershipHistory() }
 
@@ -67,6 +71,18 @@ fun MembershipScreen(vm: StudentViewModel, onBookNow: () -> Unit) {
                                 trackColor = CardBg
                             )
                         }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = { vm.downloadIdCard(context) },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Amber.copy(alpha = 0.5f)),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth().height(40.dp)
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Download ID Card", fontSize = 13.sp)
                     }
                 }
                 Spacer(Modifier.height(16.dp))

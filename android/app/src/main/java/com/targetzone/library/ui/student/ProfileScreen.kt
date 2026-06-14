@@ -1,5 +1,6 @@
 package com.targetzone.library.ui.student
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,23 +37,30 @@ import java.io.File
 
 @Composable
 fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
-    val profile  by vm.profile.collectAsState()
+    val profile   by vm.profile.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
-    val context  = LocalContext.current
-    var editing  by remember { mutableStateOf(false) }
+    val context   = LocalContext.current
+    var editing   by remember { mutableStateOf(false) }
 
-    var name        by remember(profile) { mutableStateOf(profile?.name ?: "") }
-    var fatherName  by remember(profile) { mutableStateOf(profile?.fatherName ?: "") }
-    var email       by remember(profile) { mutableStateOf(profile?.email ?: "") }
-    var address     by remember(profile) { mutableStateOf(profile?.address ?: "") }
-    var dob         by remember(profile) { mutableStateOf(profile?.dateOfBirth ?: "") }
+    var name       by remember(profile) { mutableStateOf(profile?.name ?: "") }
+    var fatherName by remember(profile) { mutableStateOf(profile?.fatherName ?: "") }
+    var email      by remember(profile) { mutableStateOf(profile?.email ?: "") }
+    var address    by remember(profile) { mutableStateOf(profile?.address ?: "") }
+    var dob        by remember(profile) { mutableStateOf(profile?.dateOfBirth ?: "") }
 
     LaunchedEffect(Unit) { vm.loadProfile() }
 
     val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
             val file = uriToFile(context, it) ?: return@let
-            // Upload in a coroutine via a side-effect
+            vm.uploadPhoto(file)
+        }
+    }
+
+    val aadhaarLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let {
+            val file = uriToFile(context, it) ?: return@let
+            vm.uploadAadhaar(file)
         }
     }
 
@@ -131,6 +139,37 @@ fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
             }
         }
 
+        Spacer(Modifier.height(16.dp))
+
+        // Aadhaar card section
+        AppCard(Modifier.fillMaxWidth()) {
+            Text("Aadhaar Card", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(10.dp))
+            if (!profile?.aadhaarUrl.isNullOrBlank()) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("✓ Uploaded", color = Emerald, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    TextButton(onClick = {
+                        val url = profile!!.aadhaarUrl!!
+                        val fullUrl = if (url.startsWith("http")) url else "https://targetzone.co.in$url"
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(fullUrl)))
+                    }) { Text("View", color = Amber) }
+                }
+                Spacer(Modifier.height(6.dp))
+            } else {
+                Text("Not uploaded", color = TextMuted, fontSize = 13.sp)
+                Spacer(Modifier.height(8.dp))
+            }
+            OutlinedButton(
+                onClick = { aadhaarLauncher.launch("*/*") },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
+                border = BorderStroke(1.dp, Amber.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth().height(40.dp)
+            ) {
+                Text(if (profile?.aadhaarUrl.isNullOrBlank()) "Upload Aadhaar" else "Replace Aadhaar", fontSize = 13.sp)
+            }
+        }
+
         if (isLoading) {
             Spacer(Modifier.height(16.dp))
             CircularProgressIndicator(color = Amber, modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -163,7 +202,8 @@ private fun InfoRowLocal(label: String, value: String) {
 
 private fun uriToFile(context: android.content.Context, uri: Uri): File? = runCatching {
     val inputStream = context.contentResolver.openInputStream(uri) ?: return null
-    val file = File(context.cacheDir, "upload_${System.currentTimeMillis()}.jpg")
+    val ext = context.contentResolver.getType(uri)?.substringAfter("/") ?: "jpg"
+    val file = File(context.cacheDir, "upload_${System.currentTimeMillis()}.$ext")
     file.outputStream().use { inputStream.copyTo(it) }
     file
 }.getOrNull()

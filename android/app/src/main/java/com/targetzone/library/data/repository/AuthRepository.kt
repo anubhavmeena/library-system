@@ -17,8 +17,8 @@ class AuthRepository(private val tokenManager: TokenManager) {
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Invalid OTP")
     }
 
-    suspend fun register(name: String, email: String?, sessionToken: String): Result<AuthResponse> = runCatching {
-        val res = api.register(RegisterRequest(name = name, email = email, sessionToken = sessionToken))
+    suspend fun register(name: String, email: String?, sessionToken: String, dateOfBirth: String? = null, gender: String? = null, address: String? = null): Result<AuthResponse> = runCatching {
+        val res = api.register(RegisterRequest(name = name, email = email, sessionToken = sessionToken, dateOfBirth = dateOfBirth, gender = gender, address = address))
         val auth = res.body()?.data ?: throw Exception(res.body()?.message ?: "Registration failed")
         tokenManager.saveToken(auth.accessToken)
         tokenManager.saveUser(auth.user)

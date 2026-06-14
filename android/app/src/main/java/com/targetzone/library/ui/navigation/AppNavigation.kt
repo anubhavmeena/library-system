@@ -60,7 +60,7 @@ fun AppNavigation(tokenManager: TokenManager) {
     LaunchedEffect(savedUser) { currentUser = savedUser }
 
     val authVm = remember { AuthViewModel(authRepo) }
-    val studentVm = remember { StudentViewModel() }
+    val studentVm = remember { StudentViewModel(tokenManager = tokenManager) }
     val adminVm = remember { AdminViewModel() }
 
     val startDest = when {

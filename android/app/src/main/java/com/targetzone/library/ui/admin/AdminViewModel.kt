@@ -17,7 +17,8 @@ class AdminViewModel(
 
     val stats        = MutableStateFlow<AdminStats?>(null)
     val students     = MutableStateFlow<List<StudentSummary>>(emptyList())
-    val seats        = MutableStateFlow<List<Seat>>(emptyList())
+    val seats        = MutableStateFlow<List<Seat>>(emptyList())    // student-facing availability
+    val adminSeats   = MutableStateFlow<List<Seat>>(emptyList())    // admin seat map with student details
     val expiring     = MutableStateFlow<List<ReminderStudent>>(emptyList())
     val feedback     = MutableStateFlow<List<FeedbackItem>>(emptyList())
     val plans        = MutableStateFlow<List<Plan>>(emptyList())
@@ -78,9 +79,23 @@ class AdminViewModel(
         isLoading.value = false
     }
 
+    fun loadAdminSeats(shift: String, date: String? = null) = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.getAdminSeatMap(shift, date)
+            .onSuccess { adminSeats.value = it }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
     fun loadFeedback() = viewModelScope.launch {
         adminRepo.getAllFeedback()
             .onSuccess { feedback.value = it }
+            .onFailure { error.value = it.message }
+    }
+
+    fun updateFeedback(id: String, status: String, adminNotes: String?, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.updateFeedback(id, status, adminNotes)
+            .onSuccess { loadFeedback(); onDone() }
             .onFailure { error.value = it.message }
     }
 
