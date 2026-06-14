@@ -121,38 +121,42 @@ fun AppNavigation(tokenManager: TokenManager) {
                 )
             }
 
+            val logout: () -> Unit = {
+                scope.launch { authRepo.logout(); currentUser = null; navController.navigate("login") { popUpTo(0) { inclusive = true } } }
+            }
+
             // Student routes
             composable("dashboard")       { DashboardScreen(studentVm, currentUser) { route -> navController.navigate(route) } }
             composable("booking")         { BookingScreen(studentVm) { navController.navigate("payment-success") { popUpTo("booking") { inclusive = true } } } }
             composable("membership")      { MembershipScreen(studentVm) { navController.navigate("booking") } }
-            composable("profile")         { ProfileScreen(studentVm) }
+            composable("profile")         { ProfileScreen(studentVm, onLogout = logout) }
             composable("facilities")      { FacilitiesScreen() }
             composable("feedback")        { FeedbackScreen(studentVm) }
             composable("payment-success") { PaymentSuccessScreen(studentVm) { navController.navigate("dashboard") { popUpTo("payment-success") { inclusive = true } } } }
 
             // Admin routes
             composable("admin/dashboard") {
-                AdminScaffold("Admin Dashboard", onLogout = {
-                    scope.launch { authRepo.logout(); currentUser = null; navController.navigate("login") { popUpTo(0) { inclusive = true } } }
-                }) { AdminDashboardScreen(adminVm) { route -> navController.navigate(if (route.startsWith("admin/")) route else "admin/$route") } }
+                AdminScaffold("Admin Dashboard", onLogout = logout) {
+                    AdminDashboardScreen(adminVm) { route -> navController.navigate(if (route.startsWith("admin/")) route else "admin/$route") }
+                }
             }
             composable("admin/students")  {
-                AdminScaffold("Students") { AdminStudentsScreen(adminVm) }
+                AdminScaffold("Students", onLogout = logout) { AdminStudentsScreen(adminVm) }
             }
             composable("admin/seats")     {
-                AdminScaffold("Seat Map") { AdminSeatsScreen(adminVm) }
+                AdminScaffold("Seat Map", onLogout = logout) { AdminSeatsScreen(adminVm) }
             }
             composable("admin/reminders") {
-                AdminScaffold("Reminders") { AdminRemindersScreen(adminVm) }
+                AdminScaffold("Reminders", onLogout = logout) { AdminRemindersScreen(adminVm) }
             }
             composable("admin/feedback")  {
-                AdminScaffold("Feedback") { AdminFeedbackScreen(adminVm) }
+                AdminScaffold("Feedback", onLogout = logout) { AdminFeedbackScreen(adminVm) }
             }
             composable("admin/broadcast") {
-                AdminScaffold("Broadcast") { AdminBroadcastScreen(adminVm) }
+                AdminScaffold("Broadcast", onLogout = logout) { AdminBroadcastScreen(adminVm) }
             }
             composable("admin/memberships/new") {
-                AdminScaffold("Create Membership") { AdminCreateMembershipScreen(adminVm) { navController.popBackStack() } }
+                AdminScaffold("Create Membership", onLogout = logout) { AdminCreateMembershipScreen(adminVm) { navController.popBackStack() } }
             }
         }
     }

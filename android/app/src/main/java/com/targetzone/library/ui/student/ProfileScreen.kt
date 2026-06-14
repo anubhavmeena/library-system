@@ -11,9 +11,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,7 +35,7 @@ import com.targetzone.library.ui.theme.*
 import java.io.File
 
 @Composable
-fun ProfileScreen(vm: StudentViewModel) {
+fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
     val profile  by vm.profile.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
     val context  = LocalContext.current
@@ -133,6 +135,20 @@ fun ProfileScreen(vm: StudentViewModel) {
             Spacer(Modifier.height(16.dp))
             CircularProgressIndicator(color = Amber, modifier = Modifier.align(Alignment.CenterHorizontally))
         }
+
+        Spacer(Modifier.height(24.dp))
+        OutlinedButton(
+            onClick = onLogout,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = RedAlert),
+            border = BorderStroke(1.dp, RedAlert.copy(alpha = 0.4f)),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth().height(50.dp)
+        ) {
+            Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Logout", fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(8.dp))
     }
 }
 
