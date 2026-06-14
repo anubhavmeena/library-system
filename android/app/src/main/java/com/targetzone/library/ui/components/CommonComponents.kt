@@ -67,7 +67,7 @@ fun PrimaryButton(text: String, onClick: () -> Unit, enabled: Boolean = true, mo
 fun OutlineButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     OutlinedButton(
         onClick = onClick,
-        colors = OutlinedButtonDefaults.outlinedButtonColors(contentColor = Amber),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
         border = ButtonDefaults.outlinedButtonBorder.copy(brush = Brush.linearGradient(listOf(Amber, Amber))),
         shape = RoundedCornerShape(12.dp),
         modifier = modifier.height(50.dp)

@@ -9,7 +9,7 @@ interface ApiService {
 
     // Auth
     @POST("auth/send-otp")
-    suspend fun sendOtp(@Body req: SendOtpRequest): Response<ApiResponse<Unit>>
+    suspend fun sendOtp(@Body req: SendOtpRequest): Response<ApiResponse<Any?>>
 
     @POST("auth/verify-otp")
     suspend fun verifyOtp(@Body req: VerifyOtpRequest): Response<ApiResponse<OtpVerifyResponse>>
@@ -67,7 +67,7 @@ interface ApiService {
     ): Response<ApiResponse<List<Seat>>>
 
     @POST("seats/book")
-    suspend fun bookSeat(@Body req: BookSeatRequest): Response<ApiResponse<Unit>>
+    suspend fun bookSeat(@Body req: BookSeatRequest): Response<ApiResponse<Any?>>
 
     // Feedback
     @GET("feedback")
@@ -93,13 +93,13 @@ interface ApiService {
     suspend fun toggleStudentStatus(
         @Path("id") id: String,
         @Body req: ToggleStatusRequest
-    ): Response<ApiResponse<Unit>>
+    ): Response<ApiResponse<Any?>>
 
     @PATCH("admin/memberships/{id}/seat")
     suspend fun changeSeat(
         @Path("id") membershipId: String,
         @Body req: ChangeSeatRequest
-    ): Response<ApiResponse<Unit>>
+    ): Response<ApiResponse<Any?>>
 
     @GET("admin/memberships/expiring")
     suspend fun getExpiringMemberships(
@@ -107,13 +107,13 @@ interface ApiService {
     ): Response<ApiResponse<List<ReminderStudent>>>
 
     @POST("admin/reminders/send")
-    suspend fun sendReminders(@Body req: SendReminderRequest): Response<ApiResponse<String>>
+    suspend fun sendReminders(@Body req: SendReminderRequest): Response<ApiResponse<String?>>
 
     @GET("admin/feedback")
     suspend fun getAllFeedback(): Response<ApiResponse<List<FeedbackItem>>>
 
     @POST("admin/broadcast")
-    suspend fun sendBroadcast(@Body req: BroadcastRequest): Response<ApiResponse<String>>
+    suspend fun sendBroadcast(@Body req: BroadcastRequest): Response<ApiResponse<String?>>
 
     @POST("admin/memberships/create")
     suspend fun createMembership(@Body req: CreateMembershipRequest): Response<ApiResponse<Membership>>

@@ -154,14 +154,14 @@ private fun StudentCard(student: StudentSummary, onToggleStatus: () -> Unit, onC
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
                 onClick = onToggleStatus,
-                colors = OutlinedButtonDefaults.outlinedButtonColors(contentColor = if (student.isActive) RedAlert else Emerald),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = if (student.isActive) RedAlert else Emerald),
                 border = ButtonDefaults.outlinedButtonBorder,
                 modifier = Modifier.height(34.dp)
             ) { Text(if (student.isActive) "Deactivate" else "Activate", fontSize = 12.sp) }
             if (!student.membershipId.isNullOrBlank()) {
                 OutlinedButton(
                     onClick = onChangeSeat,
-                    colors = OutlinedButtonDefaults.outlinedButtonColors(contentColor = Amber),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
                     modifier = Modifier.height(34.dp)
                 ) { Text("Change Seat", fontSize = 12.sp) }
             }

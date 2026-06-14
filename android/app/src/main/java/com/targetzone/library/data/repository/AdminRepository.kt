@@ -31,7 +31,7 @@ class AdminRepository {
 
     suspend fun sendReminders(userIds: List<String>): Result<String> = runCatching {
         val res = api.sendReminders(SendReminderRequest(userIds = userIds))
-        res.body()?.data ?: "Reminders sent"
+        res.body()?.data ?: res.body()?.message ?: "Reminders sent"
     }
 
     suspend fun getAllFeedback(): Result<List<FeedbackItem>> = runCatching {
@@ -41,7 +41,7 @@ class AdminRepository {
 
     suspend fun sendBroadcast(message: String, targetGroup: String): Result<String> = runCatching {
         val res = api.sendBroadcast(BroadcastRequest(message = message, targetGroup = targetGroup))
-        res.body()?.data ?: "Broadcast sent"
+        res.body()?.data ?: res.body()?.message ?: "Broadcast sent"
     }
 
     suspend fun createMembership(req: CreateMembershipRequest): Result<Membership> = runCatching {
