@@ -89,6 +89,9 @@ interface ApiService {
         @Query("search") search: String? = null
     ): Response<ApiResponse<List<StudentSummary>>>
 
+    @GET("admin/students/{id}")
+    suspend fun getStudentDetail(@Path("id") id: String): Response<ApiResponse<StudentDetail>>
+
     @PATCH("admin/students/{id}/status")
     suspend fun toggleStudentStatus(
         @Path("id") id: String,

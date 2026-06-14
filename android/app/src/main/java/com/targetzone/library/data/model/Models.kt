@@ -121,6 +121,30 @@ data class StudentSummary(
     val planName: String? = null
 )
 
+data class StudentDetail(
+    val id: String = "",
+    val name: String = "",
+    val mobile: String = "",
+    val email: String? = null,
+    val address: String? = null,
+    val gender: String? = null,
+    val dateOfBirth: String? = null,
+    val photoUrl: String? = null,
+    val aadhaarUrl: String? = null,
+    val isActive: Boolean = true,
+    val joinedAt: String? = null,
+    val membershipId: String? = null,
+    val planName: String? = null,
+    val planType: String? = null,
+    val seatNumber: String? = null,
+    val shift: String? = null,
+    val membershipStart: String? = null,
+    val membershipEnd: String? = null,
+    val membershipStatus: String? = null,
+    val daysRemaining: Int = 0,
+    val paymentMode: String? = null
+)
+
 data class FeedbackItem(
     val id: String = "",
     val userId: String? = null,

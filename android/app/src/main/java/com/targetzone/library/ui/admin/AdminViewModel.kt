@@ -15,8 +15,9 @@ class AdminViewModel(
     private val membershipRepo: MembershipRepository = MembershipRepository()
 ) : ViewModel() {
 
-    val stats        = MutableStateFlow<AdminStats?>(null)
-    val students     = MutableStateFlow<List<StudentSummary>>(emptyList())
+    val stats           = MutableStateFlow<AdminStats?>(null)
+    val students        = MutableStateFlow<List<StudentSummary>>(emptyList())
+    val selectedStudent = MutableStateFlow<StudentDetail?>(null)
     val seats        = MutableStateFlow<List<Seat>>(emptyList())    // student-facing availability
     val adminSeats   = MutableStateFlow<List<Seat>>(emptyList())    // admin seat map with student details
     val expiring     = MutableStateFlow<List<ReminderStudent>>(emptyList())
@@ -35,6 +36,14 @@ class AdminViewModel(
         isLoading.value = false
     }
 
+    fun loadStudentDetail(studentId: String) = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.getStudentDetail(studentId)
+            .onSuccess { selectedStudent.value = it }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
     fun loadStudents(page: Int = 0, status: String? = null, membershipStatus: String? = null, search: String? = null) = viewModelScope.launch {
         isLoading.value = true
         adminRepo.getStudents(page, status, membershipStatus, search)
@@ -43,9 +52,9 @@ class AdminViewModel(
         isLoading.value = false
     }
 
-    fun toggleStudentStatus(id: String, currentActive: Boolean) = viewModelScope.launch {
+    fun toggleStudentStatus(id: String, currentActive: Boolean, onDone: (() -> Unit)? = null) = viewModelScope.launch {
         adminRepo.toggleStudentStatus(id, !currentActive)
-            .onSuccess { loadStudents() }
+            .onSuccess { if (onDone != null) onDone() else loadStudents() }
             .onFailure { error.value = it.message }
     }
 

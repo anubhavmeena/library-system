@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AirlineSeatReclineNormal
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CardMembership
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.EventSeat
@@ -141,7 +142,15 @@ fun AppNavigation(tokenManager: TokenManager) {
                 }
             }
             composable("admin/students")  {
-                AdminScaffold("Students", onLogout = logout) { AdminStudentsScreen(adminVm) }
+                AdminScaffold("Students", onLogout = logout) {
+                    AdminStudentsScreen(adminVm) { studentId -> navController.navigate("admin/students/$studentId") }
+                }
+            }
+            composable("admin/students/{studentId}") { back ->
+                val studentId = back.arguments?.getString("studentId") ?: ""
+                AdminScaffold("Student Details", onBack = { navController.popBackStack() }) {
+                    AdminStudentDetailScreen(adminVm, studentId) { navController.popBackStack() }
+                }
             }
             composable("admin/seats")     {
                 AdminScaffold("Seat Map", onLogout = logout) { AdminSeatsScreen(adminVm) }
@@ -163,19 +172,28 @@ fun AppNavigation(tokenManager: TokenManager) {
 }
 
 @Composable
-private fun AdminScaffold(title: String, onLogout: (() -> Unit)? = null, content: @Composable () -> Unit) {
+private fun AdminScaffold(title: String, onLogout: (() -> Unit)? = null, onBack: (() -> Unit)? = null, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier
                 .fillMaxWidth()
                 .background(NavyMid)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 4.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
         ) {
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                }
+            } else {
+                Spacer(Modifier.width(16.dp))
+            }
             Text(title, fontWeight = FontWeight.SemiBold, color = TextPrimary, fontSize = 16.sp)
             if (onLogout != null) {
                 TextButton(onClick = onLogout) { Text("Logout", color = RedAlert, fontSize = 13.sp) }
+            } else {
+                Spacer(Modifier.width(56.dp))
             }
         }
         Box(Modifier.weight(1f)) { content() }

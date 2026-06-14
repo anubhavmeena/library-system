@@ -20,7 +20,7 @@ import com.targetzone.library.ui.components.*
 import com.targetzone.library.ui.theme.*
 
 @Composable
-fun AdminStudentsScreen(vm: AdminViewModel) {
+fun AdminStudentsScreen(vm: AdminViewModel, onViewDetails: (String) -> Unit = {}) {
     val students  by vm.students.collectAsState()
     val seats     by vm.seats.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
@@ -82,7 +82,8 @@ fun AdminStudentsScreen(vm: AdminViewModel) {
                         onChangeSeat = {
                             changeSeatFor = student
                             student.membershipId?.let { mid -> vm.loadSeats(student.shift ?: "MORNING") }
-                        }
+                        },
+                        onViewDetails = { onViewDetails(student.id) }
                     )
                     Spacer(Modifier.height(8.dp))
                 }
@@ -126,7 +127,7 @@ fun AdminStudentsScreen(vm: AdminViewModel) {
 }
 
 @Composable
-private fun StudentCard(student: StudentSummary, onToggleStatus: () -> Unit, onChangeSeat: () -> Unit) {
+private fun StudentCard(student: StudentSummary, onToggleStatus: () -> Unit, onChangeSeat: () -> Unit, onViewDetails: () -> Unit = {}) {
     AppCard(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
@@ -165,6 +166,11 @@ private fun StudentCard(student: StudentSummary, onToggleStatus: () -> Unit, onC
                     modifier = Modifier.height(34.dp)
                 ) { Text("Change Seat", fontSize = 12.sp) }
             }
+            OutlinedButton(
+                onClick = onViewDetails,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
+                modifier = Modifier.height(34.dp)
+            ) { Text("View Details", fontSize = 12.sp) }
         }
     }
 }

@@ -51,6 +51,11 @@ class AdminRepository {
         }
     }
 
+    suspend fun getStudentDetail(studentId: String): Result<StudentDetail> = runCatching {
+        val res = api.getStudentDetail(studentId)
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to load student details")
+    }
+
     suspend fun getAllFeedback(): Result<List<FeedbackItem>> = runCatching {
         val res = api.getAllFeedback()
         res.body()?.data ?: emptyList()
