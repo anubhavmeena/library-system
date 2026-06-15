@@ -1,14 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.LibrarySystem" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@android:color/black</item>
-        <item name="android:statusBarColor">@android:color/black</item>
-    </style>
-
-    <style name="Theme.LibrarySystem.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#0D1B4B</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
-        <item name="windowSplashScreenIconBackgroundColor">#1A2A68</item>
-        <item name="postSplashScreenTheme">@style/Theme.LibrarySystem</item>
+        <item name="android:windowBackground">#0D1B4B</item>
+        <item name="android:statusBarColor">#0D1B4B</item>
     </style>
 </resources>
