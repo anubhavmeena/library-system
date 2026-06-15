@@ -28,6 +28,10 @@ import java.util.Map;
 @Slf4j
 public class OtpService {
 
+    // ── apitxt SMS ────────────────────────────────────────────────────────────
+    @Value("${apitxt.auth-key:}")
+    private String apitxtAuthKey;
+
     // ── Twilio SMS ────────────────────────────────────────────────────────────
     @Value("${twilio.account-sid:}")
     private String accountSid;
@@ -71,9 +75,15 @@ public class OtpService {
         httpClient = HttpClient.newHttpClient();
 
         if (!metaToken.isBlank() && !metaPhoneNumberId.isBlank()) {
-            log.info("Meta WhatsApp Cloud API configured — will be used as default OTP channel");
+            log.info("Meta WhatsApp Cloud API configured — will be used as primary OTP channel");
         } else {
-            log.warn("Meta WhatsApp not configured — will fall back to Twilio SMS");
+            log.warn("Meta WhatsApp not configured — will fall back to SMS");
+        }
+
+        if (!apitxtAuthKey.isBlank()) {
+            log.info("apitxt SMS configured — will be used as default SMS OTP channel");
+        } else {
+            log.warn("apitxt not configured — will fall back to Twilio SMS");
         }
 
         if (!accountSid.isBlank() && !authToken.isBlank()) {
@@ -94,6 +104,14 @@ public class OtpService {
                     log.warn("Meta WhatsApp failed for {}, falling back to Twilio SMS: {}", contact, e.getMessage());
                 }
             }
+            if (!apitxtAuthKey.isBlank()) {
+                try {
+                    sendApitxtSms(contact, otp);
+                    return;
+                } catch (Exception e) {
+                    log.warn("apitxt failed for {}, falling back to Twilio: {}", contact, e.getMessage());
+                }
+            }
             String smsBody = String.format(
                     "Library OTP: %s\nValid for 5 minutes. Do not share.", otp);
             sendSms(contact, smsBody, otp);
@@ -106,6 +124,7 @@ public class OtpService {
 
     public boolean isLiveConfigured() {
         return (!metaToken.isBlank() && !metaPhoneNumberId.isBlank())
+                || !apitxtAuthKey.isBlank()
                 || (!accountSid.isBlank() && !authToken.isBlank());
     }
 
@@ -138,6 +157,31 @@ public class OtpService {
             throw new RuntimeException("Meta API error " + resp.statusCode() + ": " + resp.body());
         }
         log.info("WhatsApp OTP sent to {} via Meta Cloud API", mobile);
+    }
+
+    private void sendApitxtSms(String mobile, String otp) throws Exception {
+        String digits = mobile.startsWith("+91") ? mobile.substring(3)
+                      : mobile.startsWith("+")   ? mobile.substring(1)
+                      : mobile;
+        String url = "https://apitxt.com/api/sendOTP"
+                + "?authkey=" + apitxtAuthKey
+                + "&mobile=91" + digits
+                + "&otp=" + otp;
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .GET()
+                .build();
+        HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+        if (resp.statusCode() >= 400) {
+            throw new RuntimeException("apitxt HTTP error " + resp.statusCode() + ": " + resp.body());
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = objectMapper.readValue(resp.body(), Map.class);
+        Object status = body.get("status");
+        if (!Integer.valueOf(200).equals(status) && !"200".equals(String.valueOf(status))) {
+            throw new RuntimeException("apitxt error: " + resp.body());
+        }
+        log.info("SMS OTP sent to {} via apitxt (request_id={})", mobile, body.get("request_id"));
     }
 
     private void sendSms(String mobile, String message, String otp) {

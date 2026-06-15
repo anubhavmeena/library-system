@@ -32,6 +32,9 @@ meta:
     template-name: ${META_WHATSAPP_TEMPLATE_NAME:library_otp}
     api-version: v19.0
 
+apitxt:
+  auth-key: ${APITXT_AUTH_KEY:}
+
 twilio:
   account-sid: ${TWILIO_ACCOUNT_SID:}
   auth-token: ${TWILIO_AUTH_TOKEN:}
