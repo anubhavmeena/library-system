@@ -89,7 +89,7 @@ services:
 
   # ─────────────────────────────────────────────────────────────────────
   # Auth Service  —  port 8081
-  # OTP generation (via Twilio SMS), OTP verification (Redis),
+  # OTP generation (apitxt SMS → Twilio fallback), OTP verification (Redis),
   # JWT issuance, user registration.
   # ─────────────────────────────────────────────────────────────────────
   auth-service:
@@ -107,6 +107,7 @@ services:
       REDIS_HOST:          redis
       REDIS_PORT:          6379
       JWT_SECRET:          ${JWT_SECRET:-library-jwt-secret-key-2024-change-in-production}
+      APITXT_AUTH_KEY:              ${APITXT_AUTH_KEY:-}
       META_WHATSAPP_TOKEN:          ${META_WHATSAPP_TOKEN:-}
       META_WHATSAPP_PHONE_NUMBER_ID: ${META_WHATSAPP_PHONE_NUMBER_ID:-}
       META_WHATSAPP_TEMPLATE_NAME:  ${META_WHATSAPP_TEMPLATE_NAME:-library_otp}
