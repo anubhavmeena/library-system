@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body { background: #0D1B4B; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family: -apple-system, sans-serif; color: #F0F4FF; }
+  .loader { text-align:center; }
+  .loader p { color: #8AA6F8; margin-top:16px; }
+  .spinner { width:40px; height:40px; border:3px solid rgba(245,158,11,0.3); border-top-color:#F59E0B; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="loader">
+  <div class="spinner"></div>
+  <p>Opening payment...</p>
+</div>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+  var options = {
+    key:        "{{KEY_ID}}",
+    amount:     {{AMOUNT_PAISE}},
+    currency:   "INR",
+    order_id:   "{{ORDER_ID}}",
+    name:       "TargetZone Library",
+    description:"Seat Booking",
+    theme:      { color: "#F59E0B" },
+    handler: function(response) {
+      window.webkit.messageHandlers.razorpayBridge.postMessage({
+        type:      "success",
+        paymentId: response.razorpay_payment_id,
+        orderId:   response.razorpay_order_id,
+        signature: response.razorpay_signature
+      });
+    },
+    modal: {
+      ondismiss: function() {
+        window.webkit.messageHandlers.razorpayBridge.postMessage({ type: "dismissed" });
+      }
+    }
+  };
+
+  document.addEventListener("DOMContentLoaded", function() {
+    var rzp = new Razorpay(options);
+    rzp.on("payment.failed", function(response) {
+      window.webkit.messageHandlers.razorpayBridge.postMessage({
+        type:  "failed",
+        error: response.error.description
+      });
+    });
+    rzp.open();
+  });
+</script>
+</body>
+</html>
