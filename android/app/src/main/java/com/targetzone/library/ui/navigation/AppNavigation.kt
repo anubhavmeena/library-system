@@ -129,7 +129,7 @@ fun AppNavigation(tokenManager: TokenManager) {
             }
 
             val logout: () -> Unit = {
-                scope.launch { authRepo.logout(); currentUser = null; navController.navigate("login") { popUpTo(0) { inclusive = true } } }
+                scope.launch { authRepo.logout(); authVm.resetOtpState(); currentUser = null; navController.navigate("login") { popUpTo(0) { inclusive = true } } }
             }
 
             // Student routes
