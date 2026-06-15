@@ -26,6 +26,7 @@ import androidx.navigation.compose.*
 import com.targetzone.library.data.TokenManager
 import com.targetzone.library.data.model.User
 import com.targetzone.library.data.repository.AuthRepository
+import com.targetzone.library.ui.SplashScreen
 import com.targetzone.library.ui.admin.*
 import com.targetzone.library.ui.auth.*
 import com.targetzone.library.ui.student.*
@@ -64,12 +65,6 @@ fun AppNavigation(tokenManager: TokenManager) {
     val studentVm = remember { StudentViewModel(tokenManager = tokenManager) }
     val adminVm = remember { AdminViewModel() }
 
-    val startDest = when {
-        currentUser?.role == "ADMIN"   -> "admin/dashboard"
-        currentUser?.role == "STUDENT" -> "dashboard"
-        else -> "login"
-    }
-
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route ?: ""
 
     val isStudentRoute = studentNavItems.any { currentRoute.startsWith(it.route) } || currentRoute in listOf("booking", "membership", "profile", "facilities", "feedback", "payment-success")
@@ -86,9 +81,20 @@ fun AppNavigation(tokenManager: TokenManager) {
     ) { padding ->
         NavHost(
             navController = navController,
-            startDestination = startDest,
+            startDestination = "splash",
             modifier = Modifier.padding(padding)
         ) {
+            composable("splash") {
+                SplashScreen {
+                    val dest = when {
+                        currentUser?.role == "ADMIN"   -> "admin/dashboard"
+                        currentUser?.role == "STUDENT" -> "dashboard"
+                        else -> "login"
+                    }
+                    navController.navigate(dest) { popUpTo("splash") { inclusive = true } }
+                }
+            }
+
             // Auth
             composable("login") {
                 LoginScreen(
