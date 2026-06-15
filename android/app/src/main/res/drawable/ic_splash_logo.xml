@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Left page -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M54,22 L14,29 L14,85 L54,78 Z"/>
+    <!-- Right page (lighter amber) -->
+    <path
+        android:fillColor="#FCD34D"
+        android:pathData="M54,22 L94,29 L94,85 L54,78 Z"/>
+    <!-- Spine -->
+    <path
+        android:fillColor="#D97706"
+        android:pathData="M51,22 L57,22 L57,78 L51,78 Z"/>
+    <!-- Left page lines -->
+    <path
+        android:fillColor="#B45309"
+        android:pathData="M22,42 L48,39 L48,41 L22,44 Z"/>
+    <path
+        android:fillColor="#B45309"
+        android:pathData="M22,52 L48,49 L48,51 L22,54 Z"/>
+    <path
+        android:fillColor="#B45309"
+        android:pathData="M22,62 L48,59 L48,61 L22,64 Z"/>
+    <!-- Right page lines -->
+    <path
+        android:fillColor="#92400E"
+        android:pathData="M60,39 L86,42 L86,44 L60,41 Z"/>
+    <path
+        android:fillColor="#92400E"
+        android:pathData="M60,49 L86,52 L86,54 L60,51 Z"/>
+    <path
+        android:fillColor="#92400E"
+        android:pathData="M60,59 L86,62 L86,64 L60,61 Z"/>
+</vector>

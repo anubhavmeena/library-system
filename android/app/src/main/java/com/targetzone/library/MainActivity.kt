@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import com.razorpay.Checkout
 import com.razorpay.PaymentData
@@ -20,6 +21,7 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     var onPaymentResult: ((success: Boolean, paymentId: String?, orderId: String?, signature: String?, error: String?) -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
