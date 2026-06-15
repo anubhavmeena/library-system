@@ -112,16 +112,14 @@ public class AuthService {
     // ── Login ─────────────────────────────────────────────────────────────────
 
     public AuthResponse login(LoginRequest request) {
-        String redisKey = "otp:" + request.getContact();
-        String storedOtp = redisTemplate.opsForValue().get(redisKey);
-
-        if (storedOtp == null || !storedOtp.equals(request.getOtp())) {
-            throw new RuntimeException("Invalid or expired OTP.");
+        String contact = redisTemplate.opsForValue().get("session:" + request.getSessionToken());
+        if (contact == null) {
+            throw new RuntimeException("Session expired. Please verify OTP again.");
         }
-        redisTemplate.delete(redisKey);
+        redisTemplate.delete("session:" + request.getSessionToken());
 
         User user = userRepository
-                .findByMobileOrEmail(request.getContact(), request.getContact())
+                .findByMobileOrEmail(contact, contact)
                 .orElseThrow(() -> new RuntimeException("User not found. Please register first."));
 
         return buildAuthResponse(generateJwt(user), user);
