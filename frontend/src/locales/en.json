@@ -19,12 +19,21 @@
     },
     "plans": {
       "title": "Simple Pricing",
-      "subtitle": "Flat monthly plans. No hidden fees.",
+      "subtitle": "Flexible plans for every commitment. No hidden fees.",
       "popular": "POPULAR",
+      "bestValue": "BEST VALUE",
       "perMonth": "/month",
+      "perSixMonths": "/6 months",
+      "perYear": "/year",
       "getStarted": "Get Started",
-      "halfDay": { "name": "Half Day", "f1": "One shift (Morning or Evening)", "f2": "Dedicated seat booking", "f3": "Wi-Fi access", "f4": "WhatsApp confirmation" },
-      "fullDay": { "name": "Full Day", "f1": "All-day access (6AM–10PM)", "f2": "Priority seat booking", "f3": "Wi-Fi + locker access", "f4": "WhatsApp + Email confirmation" }
+      "halfDaySection": "Half Day Plans",
+      "fullDaySection": "Full Day Plans",
+      "halfDay":        { "name": "Half Day",            "f1": "One shift (Morning or Evening)", "f2": "Dedicated seat booking", "f3": "Wi-Fi access", "f4": "WhatsApp confirmation" },
+      "halfDaySix":     { "name": "Half Day – 6 Months" },
+      "halfDayAnnual":  { "name": "Half Day – Annual" },
+      "fullDay":        { "name": "Full Day",            "f1": "All-day access (6AM–10PM)", "f2": "Priority seat booking", "f3": "Wi-Fi + locker access", "f4": "WhatsApp + Email confirmation" },
+      "fullDaySix":     { "name": "Full Day – 6 Months" },
+      "fullDayAnnual":  { "name": "Full Day – Annual" }
     },
     "footer": { "tagline": "Your dedicated space for learning and growth." }
   },

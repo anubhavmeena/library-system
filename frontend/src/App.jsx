@@ -1,7 +1,12 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 
-import LandingPage        from './pages/LandingPage'
+import LandingPage              from './pages/LandingPage'
+import TermsPage                from './pages/TermsPage'
+import PrivacyPolicyPage        from './pages/PrivacyPolicyPage'
+import RefundPolicyPage         from './pages/RefundPolicyPage'
+import CancellationPolicyPage   from './pages/CancellationPolicyPage'
+import AboutUsPage              from './pages/AboutUsPage'
 import LoginPage          from './pages/auth/LoginPage'
 import RegisterPage       from './pages/auth/RegisterPage'
 import AdminLoginPage     from './pages/admin/AdminLoginPage'
@@ -35,7 +40,12 @@ function ProtectedRoute({ children, role }) {
 export default function App() {
     return (
         <Routes>
-            <Route path="/"            element={<LandingPage />} />
+            <Route path="/"                    element={<LandingPage />} />
+            <Route path="/about"               element={<AboutUsPage />} />
+            <Route path="/terms"               element={<TermsPage />} />
+            <Route path="/privacy-policy"      element={<PrivacyPolicyPage />} />
+            <Route path="/refund-policy"       element={<RefundPolicyPage />} />
+            <Route path="/cancellation-policy" element={<CancellationPolicyPage />} />
             <Route path="/login"       element={<LoginPage />} />
             <Route path="/register"    element={<RegisterPage />} />
             <Route path="/admin/login" element={<AdminLoginPage />} />

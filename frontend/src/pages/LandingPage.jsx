@@ -15,17 +15,19 @@ export default function LandingPage() {
         desc:  t(`landing.features.${key}.desc`),
     }))
 
-    const plans = [
-        {
-            key: 'halfDay', price: '₹400', period: t('landing.plans.perMonth'),
-            color: 'from-primary-600 to-primary-700',
-            features: ['f1','f2','f3','f4'].map(f => t(`landing.plans.halfDay.${f}`)),
-        },
-        {
-            key: 'fullDay', price: '₹600', period: t('landing.plans.perMonth'),
-            color: 'from-amber-500 to-amber-600', popular: true,
-            features: ['f1','f2','f3','f4'].map(f => t(`landing.plans.fullDay.${f}`)),
-        },
+    const halfDayFeatures = ['f1','f2','f3','f4'].map(f => t(`landing.plans.halfDay.${f}`))
+    const fullDayFeatures = ['f1','f2','f3','f4'].map(f => t(`landing.plans.fullDay.${f}`))
+
+    const halfDayPlans = [
+        { key: 'halfDay',        price: '₹400',   period: t('landing.plans.perMonth'),      color: 'from-primary-600 to-primary-700', features: halfDayFeatures },
+        { key: 'halfDaySix',     price: '₹2,400', period: t('landing.plans.perSixMonths'),  color: 'from-primary-600 to-primary-700', badge: t('landing.plans.bestValue'), features: halfDayFeatures },
+        { key: 'halfDayAnnual',  price: '₹4,800', period: t('landing.plans.perYear'),       color: 'from-primary-600 to-primary-700', features: halfDayFeatures },
+    ]
+
+    const fullDayPlans = [
+        { key: 'fullDay',        price: '₹600',   period: t('landing.plans.perMonth'),      color: 'from-amber-500 to-amber-600', popular: true, features: fullDayFeatures },
+        { key: 'fullDaySix',     price: '₹3,600', period: t('landing.plans.perSixMonths'),  color: 'from-amber-500 to-amber-600', badge: t('landing.plans.bestValue'), features: fullDayFeatures },
+        { key: 'fullDayAnnual',  price: '₹7,200', period: t('landing.plans.perYear'),       color: 'from-amber-500 to-amber-600', features: fullDayFeatures },
     ]
 
     return (
@@ -102,45 +104,111 @@ export default function LandingPage() {
 
             {/* Plans */}
             <section id="plans" className="py-20 px-6 md:px-12 bg-primary-900/30">
-                <div className="max-w-3xl mx-auto">
+                <div className="max-w-5xl mx-auto">
                     <div className="text-center mb-14">
                         <h2 className="font-display text-4xl font-bold text-white mb-3">{t('landing.plans.title')}</h2>
                         <p className="text-primary-400">{t('landing.plans.subtitle')}</p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {plans.map((plan) => (
-                            <div key={plan.key} className={`card p-7 ${plan.popular ? 'border-amber-400/50 relative' : ''}`}>
-                                {plan.popular && (
-                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-amber-500 text-primary-900 text-xs font-bold rounded-full">{t('landing.plans.popular')}</div>
-                                )}
-                                <div className={`inline-flex px-3 py-1 rounded-lg bg-gradient-to-r ${plan.color} text-white text-sm font-semibold mb-4`}>{t(`landing.plans.${plan.key}.name`)}</div>
-                                <div className="flex items-end gap-1 mb-6">
-                                    <span className="font-display text-5xl font-bold text-white">{plan.price}</span>
-                                    <span className="text-primary-400 mb-2">{plan.period}</span>
+
+                    {/* Half Day Plans */}
+                    <div className="mb-14">
+                        <p className="text-amber-400 font-semibold text-center mb-6 uppercase tracking-widest text-xs">{t('landing.plans.halfDaySection')}</p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            {halfDayPlans.map((plan) => (
+                                <div key={plan.key} className={`card p-6 ${plan.badge ? 'border-primary-500/60 relative' : ''}`}>
+                                    {plan.badge && (
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-primary-600 text-white text-xs font-bold rounded-full">{plan.badge}</div>
+                                    )}
+                                    <div className={`inline-flex px-3 py-1 rounded-lg bg-gradient-to-r ${plan.color} text-white text-xs font-semibold mb-4`}>{t(`landing.plans.${plan.key}.name`)}</div>
+                                    <div className="flex items-end gap-1 mb-5">
+                                        <span className="font-display text-4xl font-bold text-white">{plan.price}</span>
+                                        <span className="text-primary-400 mb-1 text-sm">{plan.period}</span>
+                                    </div>
+                                    <ul className="space-y-2.5 mb-6">
+                                        {plan.features.map((f) => (
+                                            <li key={f} className="flex items-start gap-2.5 text-sm text-primary-300">
+                                                <CheckCircle2 size={15} className="text-amber-400 mt-0.5 shrink-0" />{f}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <Link to="/login" className="w-full block text-center py-2.5 rounded-xl font-semibold transition-all text-sm border border-primary-600/50 hover:border-primary-400 text-white">
+                                        {t('landing.plans.getStarted')}
+                                    </Link>
                                 </div>
-                                <ul className="space-y-3 mb-7">
-                                    {plan.features.map((f) => (
-                                        <li key={f} className="flex items-start gap-2.5 text-sm text-primary-300">
-                                            <CheckCircle2 size={16} className="text-amber-400 mt-0.5 shrink-0" />{f}
-                                        </li>
-                                    ))}
-                                </ul>
-                                <Link to="/login" className={`w-full block text-center py-3 rounded-xl font-semibold transition-all text-sm
-                  ${plan.popular ? 'bg-amber-500 hover:bg-amber-400 text-primary-900' : 'border border-primary-600/50 hover:border-primary-400 text-white'}`}>
-                                    {t('landing.plans.getStarted')}
-                                </Link>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Full Day Plans */}
+                    <div>
+                        <p className="text-amber-400 font-semibold text-center mb-6 uppercase tracking-widest text-xs">{t('landing.plans.fullDaySection')}</p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            {fullDayPlans.map((plan) => (
+                                <div key={plan.key} className={`card p-6 ${plan.popular ? 'border-amber-400/50 relative' : plan.badge ? 'border-amber-400/30 relative' : ''}`}>
+                                    {plan.popular && (
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-amber-500 text-primary-900 text-xs font-bold rounded-full">{t('landing.plans.popular')}</div>
+                                    )}
+                                    {plan.badge && (
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-amber-600 text-white text-xs font-bold rounded-full">{plan.badge}</div>
+                                    )}
+                                    <div className={`inline-flex px-3 py-1 rounded-lg bg-gradient-to-r ${plan.color} text-white text-xs font-semibold mb-4`}>{t(`landing.plans.${plan.key}.name`)}</div>
+                                    <div className="flex items-end gap-1 mb-5">
+                                        <span className="font-display text-4xl font-bold text-white">{plan.price}</span>
+                                        <span className="text-primary-400 mb-1 text-sm">{plan.period}</span>
+                                    </div>
+                                    <ul className="space-y-2.5 mb-6">
+                                        {plan.features.map((f) => (
+                                            <li key={f} className="flex items-start gap-2.5 text-sm text-primary-300">
+                                                <CheckCircle2 size={15} className="text-amber-400 mt-0.5 shrink-0" />{f}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <Link to="/login" className={`w-full block text-center py-2.5 rounded-xl font-semibold transition-all text-sm
+                                        ${plan.popular ? 'bg-amber-500 hover:bg-amber-400 text-primary-900' : 'border border-amber-600/50 hover:border-amber-400 text-white'}`}>
+                                        {t('landing.plans.getStarted')}
+                                    </Link>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <footer className="border-t border-primary-700/30 py-8 px-6 text-center text-primary-500 text-sm">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                    <BookOpen size={16} className="text-amber-400" />
-                    <span className="font-display text-white font-semibold">Target Zone Library</span>
+            <footer className="border-t border-primary-700/30 bg-primary-900/50 px-6 py-12">
+                <div className="max-w-5xl mx-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                        <div>
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center">
+                                    <BookOpen size={15} className="text-primary-900" />
+                                </div>
+                                <span className="font-display font-bold text-white">Target Zone Library</span>
+                            </div>
+                            <p className="text-primary-500 text-sm">{t('landing.footer.tagline')}</p>
+                        </div>
+
+                        <div>
+                            <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-3">Company</h4>
+                            <ul className="space-y-2">
+                                <li><Link to="/about" className="text-primary-400 hover:text-amber-400 text-sm transition-colors">About Us</Link></li>
+                            </ul>
+                        </div>
+
+                        <div>
+                            <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-3">Legal</h4>
+                            <ul className="space-y-2">
+                                <li><Link to="/terms" className="text-primary-400 hover:text-amber-400 text-sm transition-colors">Terms & Conditions</Link></li>
+                                <li><Link to="/privacy-policy" className="text-primary-400 hover:text-amber-400 text-sm transition-colors">Privacy Policy</Link></li>
+                                <li><Link to="/refund-policy" className="text-primary-400 hover:text-amber-400 text-sm transition-colors">Return & Refund Policy</Link></li>
+                                <li><Link to="/cancellation-policy" className="text-primary-400 hover:text-amber-400 text-sm transition-colors">Cancellation Policy</Link></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div className="border-t border-primary-700/30 pt-6 text-center">
+                        <p className="text-primary-500 text-xs">© 2025 TARGET ZONE. All rights reserved.</p>
+                    </div>
                 </div>
-                <p>{t('landing.footer.tagline')}</p>
             </footer>
         </div>
     )

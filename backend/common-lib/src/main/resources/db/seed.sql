@@ -40,6 +40,42 @@ VALUES
         30,
         'Full day access 6AM–10PM, 30 days validity',
         TRUE
+    ),
+    (
+        'b0000000-0000-0000-0000-000000000003',
+        'Half Day - 6 Months',
+        'HALF_DAY',
+        2400.00,
+        180,
+        'Morning or Evening shift access, 6 months validity',
+        TRUE
+    ),
+    (
+        'b0000000-0000-0000-0000-000000000004',
+        'Half Day - Annual',
+        'HALF_DAY',
+        4800.00,
+        365,
+        'Morning or Evening shift access, 12 months validity',
+        TRUE
+    ),
+    (
+        'b0000000-0000-0000-0000-000000000005',
+        'Full Day - 6 Months',
+        'FULL_DAY',
+        3600.00,
+        180,
+        'Full day access 6AM–10PM, 6 months validity',
+        TRUE
+    ),
+    (
+        'b0000000-0000-0000-0000-000000000006',
+        'Full Day - Annual',
+        'FULL_DAY',
+        7200.00,
+        365,
+        'Full day access 6AM–10PM, 12 months validity',
+        TRUE
     )
 ON CONFLICT (id) DO NOTHING;
 
