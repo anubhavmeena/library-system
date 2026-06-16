@@ -41,7 +41,7 @@ export default function RefundPolicyPage() {
 
                     <section>
                         <h2 className="text-amber-400 font-semibold text-base mb-2">5. Refund Mode</h2>
-                        <p>Any refunds approved under exceptional circumstances (as described in Sections 3 and 4 above) will be processed to the original payment method used at the time of purchase — either to the bank/UPI account via Razorpay, or in cash for cash transactions, within 7–10 business days.</p>
+                        <p>Any refunds approved under exceptional circumstances (as described in Sections 3 and 4 above) will be processed to the original payment method used at the time of purchase — either to the bank/UPI account, or in cash for cash transactions, within 7–10 business days.</p>
                     </section>
 
                     <section>
