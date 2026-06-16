@@ -22,7 +22,12 @@ class UserRepository {
     }
 
     suspend fun uploadPhoto(file: File): Result<String> = runCatching {
-        val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
+        val mimeType = when (file.extension.lowercase()) {
+            "png"  -> "image/png"
+            "webp" -> "image/webp"
+            else   -> "image/jpeg"
+        }
+        val requestFile = file.asRequestBody(mimeType.toMediaTypeOrNull())
         val part = MultipartBody.Part.createFormData("file", file.name, requestFile)
         val res = api.uploadPhoto(part)
         res.body()?.data?.get("photoUrl") ?: throw Exception("Upload failed")

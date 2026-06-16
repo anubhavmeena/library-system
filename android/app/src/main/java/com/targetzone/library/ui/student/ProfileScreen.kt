@@ -201,9 +201,11 @@ private fun InfoRowLocal(label: String, value: String) {
 }
 
 private fun uriToFile(context: android.content.Context, uri: Uri): File? = runCatching {
-    val inputStream = context.contentResolver.openInputStream(uri) ?: return null
-    val ext = context.contentResolver.getType(uri)?.substringAfter("/") ?: "jpg"
+    val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+    val ext = mimeType.substringAfter("/").substringBefore(";").trim()
     val file = File(context.cacheDir, "upload_${System.currentTimeMillis()}.$ext")
-    file.outputStream().use { inputStream.copyTo(it) }
+    context.contentResolver.openInputStream(uri)?.use { input ->
+        file.outputStream().use { output -> input.copyTo(output) }
+    } ?: return null
     file
 }.getOrNull()
