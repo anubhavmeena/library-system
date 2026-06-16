@@ -42,7 +42,25 @@ x-kafka-env: &kafka-env
   KAFKA_BOOTSTRAP_SERVERS: kafka:29092
 
 x-spring-env: &spring-env
-  SPRING_PROFILES_ACTIVE: prod 
+  SPRING_PROFILES_ACTIVE: prod
+
+x-jvm-heavy: &jvm-heavy
+  JAVA_TOOL_OPTIONS: >-
+    -Xms96m -Xmx256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+    -XX:MaxMetaspaceSize=96m -XX:ReservedCodeCacheSize=48m
+    -Xss256k -XX:+ExitOnOutOfMemoryError
+
+x-jvm-medium: &jvm-medium
+  JAVA_TOOL_OPTIONS: >-
+    -Xms64m -Xmx192m -XX:+UseSerialGC
+    -XX:MaxMetaspaceSize=96m -XX:ReservedCodeCacheSize=48m
+    -Xss256k -XX:+ExitOnOutOfMemoryError
+
+x-jvm-light: &jvm-light
+  JAVA_TOOL_OPTIONS: >-
+    -Xms48m -Xmx128m -XX:+UseSerialGC
+    -XX:MaxMetaspaceSize=96m -XX:ReservedCodeCacheSize=48m
+    -Xss256k -XX:+ExitOnOutOfMemoryError
 
 services:
 
@@ -60,10 +78,11 @@ services:
     container_name: library-api-gateway
     restart: unless-stopped
     <<: *default-logging
+    mem_limit: 512m
     ports:
       - "8080:8080"
     environment:
-      <<: *spring-env
+      <<: [*spring-env, *jvm-heavy]
       AUTH_SERVICE_URL:         http://auth-service:8081
       USER_SERVICE_URL:         http://user-service:8082
       MEMBERSHIP_SERVICE_URL:   http://membership-service:8083
@@ -100,10 +119,11 @@ services:
     container_name: library-auth-service
     restart: unless-stopped
     <<: *default-logging
+    mem_limit: 450m
     ports:
       - "8081:8081"
     environment:
-      <<: [*spring-env, *db-env]
+      <<: [*spring-env, *db-env, *jvm-medium]
       REDIS_HOST:          redis
       REDIS_PORT:          6379
       JWT_SECRET:          ${JWT_SECRET:-library-jwt-secret-key-2024-change-in-production}
@@ -136,10 +156,11 @@ services:
     container_name: library-user-service
     restart: unless-stopped
     <<: *default-logging
+    mem_limit: 450m
     ports:
       - "8082:8082"
     environment:
-      <<: [*spring-env, *db-env]
+      <<: [*spring-env, *db-env, *jvm-medium]
       UPLOAD_DIR: /app/uploads
     volumes:
       - uploads-data:/app/uploads
@@ -165,10 +186,11 @@ services:
     container_name: library-membership-service
     restart: unless-stopped
     <<: *default-logging
+    mem_limit: 512m
     ports:
       - "8083:8083"
     environment:
-      <<: [*spring-env, *db-env, *kafka-env]
+      <<: [*spring-env, *db-env, *kafka-env, *jvm-heavy]
       RAZORPAY_KEY_ID:     ${RAZORPAY_KEY_ID:-}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
       USER_SERVICE_URL:    http://user-service:8082
@@ -194,10 +216,11 @@ services:
     container_name: library-seat-service
     restart: unless-stopped
     <<: *default-logging
+    mem_limit: 450m
     ports:
       - "8084:8084"
     environment:
-      <<: [*spring-env, *db-env]
+      <<: [*spring-env, *db-env, *jvm-medium]
       REDIS_HOST: redis
       REDIS_PORT: 6379
     networks:
@@ -225,10 +248,11 @@ services:
     container_name: library-notification-service
     restart: unless-stopped
     <<: *default-logging
+    mem_limit: 384m
     ports:
       - "8085:8085"
     environment:
-      <<: [*spring-env, *db-env, *kafka-env]
+      <<: [*spring-env, *db-env, *kafka-env, *jvm-light]
       TWILIO_ACCOUNT_SID:   ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN:    ${TWILIO_AUTH_TOKEN:-}
       TWILIO_WHATSAPP_FROM: ${TWILIO_WHATSAPP_FROM:-whatsapp:+14155238886}
@@ -260,10 +284,11 @@ services:
     container_name: library-admin-service
     restart: unless-stopped
     <<: *default-logging
+    mem_limit: 384m
     ports:
       - "8086:8086"
     environment:
-      <<: [*spring-env, *db-env, *kafka-env]
+      <<: [*spring-env, *db-env, *kafka-env, *jvm-light]
     networks:
       - library-network
     healthcheck:
