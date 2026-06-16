@@ -29,6 +29,8 @@ volumes:
     name: library-redis-data
   kafka-data:
     name: library-kafka-data
+  zookeeper-data:
+    name: library-zookeeper-data
 
 services:
 
@@ -109,6 +111,8 @@ services:
       ZOOKEEPER_LOG4J_ROOT_LOGLEVEL: WARN
       ZOOKEEPER_4LW_COMMANDS_WHITELIST: "srvr,ruok"
       ZOOKEEPER_HEAP_OPTS: "-Xms64m -Xmx128m"
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
     networks:
       - library-network
     healthcheck:
