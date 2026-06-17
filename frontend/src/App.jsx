@@ -28,6 +28,7 @@ import AdminFeedbackPage  from './pages/admin/AdminFeedbackPage'
 import AdminCreateMembershipPage from './pages/admin/AdminCreateMembershipPage'
 import AdminBroadcastPage from './pages/admin/AdminBroadcastPage'
 import AdminExpensesPage  from './pages/admin/AdminExpensesPage'
+import AdminImportPage    from './pages/admin/AdminImportPage'
 
 import FeedbackPage       from './pages/student/FeedbackPage'
 
@@ -76,6 +77,7 @@ export default function App() {
                 <Route path="memberships/new" element={<AdminCreateMembershipPage />} />
                 <Route path="broadcast"       element={<AdminBroadcastPage />} />
                 <Route path="expenses"        element={<AdminExpensesPage />} />
+                <Route path="import"          element={<AdminImportPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

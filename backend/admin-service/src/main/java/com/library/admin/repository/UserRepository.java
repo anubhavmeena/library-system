@@ -60,4 +60,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Query("SELECT COUNT(u) FROM User u WHERE u.role = 'STUDENT'")
     long countAllStudents();
+
+    java.util.Optional<User> findByMobile(String mobile);
 }

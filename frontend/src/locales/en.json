@@ -162,7 +162,8 @@
         "feedback": "Feedback",
         "newMembership": "New Membership",
         "broadcast": "Broadcast",
-        "expenses": "Expenses"
+        "expenses": "Expenses",
+        "importStudents": "Import Students"
       },
       "logout": "Logout"
     }
@@ -755,6 +756,27 @@
       "created": "Membership created successfully",
       "createFailed": "Failed to create membership"
     }
+  },
+  "adminImport": {
+    "title": "Import Students",
+    "subtitle": "Bulk-seed students from a CSV or Excel file",
+    "format": "Expected columns: S.No, Name, Phone, Fees Paid, Date (dd-MM-yyyy), Seat",
+    "dropzone": "Drop your CSV or Excel file here, or click to browse",
+    "accepts": "Accepts .csv and .xlsx files",
+    "uploading": "Importing…",
+    "upload": "Import File",
+    "results": "Import Results",
+    "imported": "Imported",
+    "skipped": "Skipped",
+    "total": "Total rows",
+    "errorsTitle": "Row Errors",
+    "row": "Row",
+    "name": "Name",
+    "phone": "Phone",
+    "reason": "Reason",
+    "successAll": "All {{count}} rows imported successfully!",
+    "partialSuccess": "{{imported}} of {{total}} rows imported.",
+    "uploadFailed": "Import failed"
   },
   "adminExpenses": {
     "title": "Monthly Expenses",

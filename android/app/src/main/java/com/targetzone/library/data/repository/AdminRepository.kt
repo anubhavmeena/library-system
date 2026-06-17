@@ -76,6 +76,11 @@ class AdminRepository {
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to create membership")
     }
 
+    suspend fun importStudents(file: okhttp3.MultipartBody.Part): Result<ImportResult> = runCatching {
+        val res = api.importStudents(file)
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Import failed")
+    }
+
     suspend fun getExpenses(year: Int, month: Int): Result<MonthlyExpense> = runCatching {
         val res = api.getExpenses(year, month)
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to load expenses")

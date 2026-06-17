@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AirlineSeatReclineNormal
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CardMembership
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.EventSeat
 import androidx.compose.material.icons.filled.Feedback
@@ -50,6 +51,7 @@ private val adminNavItems = listOf(
     NavItem("admin/reminders",   Icons.Default.Notifications,"Alerts"),
     NavItem("admin/feedback",    Icons.Default.Feedback,     "Feedback"),
     NavItem("admin/expenses",    Icons.Default.Receipt,      "Expenses"),
+    NavItem("admin/import",      Icons.Default.CloudUpload,  "Import"),
 )
 
 @Composable
@@ -177,6 +179,9 @@ fun AppNavigation(tokenManager: TokenManager) {
             }
             composable("admin/expenses") {
                 AdminScaffold("Expenses", onLogout = logout) { AdminExpensesScreen(adminVm) }
+            }
+            composable("admin/import") {
+                AdminScaffold("Import Students", onLogout = logout) { AdminImportScreen(adminVm) }
             }
         }
     }

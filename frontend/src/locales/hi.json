@@ -162,7 +162,8 @@
         "feedback": "फीडबैक",
         "newMembership": "नई सदस्यता",
         "broadcast": "ब्रॉडकास्ट",
-        "expenses": "खर्च"
+        "expenses": "खर्च",
+        "importStudents": "छात्र आयात"
       },
       "logout": "लॉग आउट"
     }
@@ -738,6 +739,27 @@
       "created": "सदस्यता सफलतापूर्वक बनाई गई",
       "createFailed": "सदस्यता बनाने में विफल"
     }
+  },
+  "adminImport": {
+    "title": "छात्र आयात",
+    "subtitle": "CSV या Excel फ़ाइल से छात्रों को बल्क में जोड़ें",
+    "format": "आवश्यक कॉलम: क्र.सं., नाम, फ़ोन, शुल्क, दिनांक (dd-MM-yyyy), सीट",
+    "dropzone": "CSV या Excel फ़ाइल यहाँ छोड़ें, या ब्राउज़ करें",
+    "accepts": ".csv और .xlsx फ़ाइलें स्वीकार की जाती हैं",
+    "uploading": "आयात हो रहा है…",
+    "upload": "फ़ाइल आयात करें",
+    "results": "आयात परिणाम",
+    "imported": "आयात हुए",
+    "skipped": "छूटे",
+    "total": "कुल पंक्तियाँ",
+    "errorsTitle": "त्रुटियाँ",
+    "row": "पंक्ति",
+    "name": "नाम",
+    "phone": "फ़ोन",
+    "reason": "कारण",
+    "successAll": "सभी {{count}} पंक्तियाँ सफलतापूर्वक आयात हुईं!",
+    "partialSuccess": "{{total}} में से {{imported}} पंक्तियाँ आयात हुईं।",
+    "uploadFailed": "आयात विफल"
   },
   "adminExpenses": {
     "title": "मासिक खर्च",

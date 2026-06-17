@@ -133,6 +133,10 @@ interface ApiService {
     @POST("admin/memberships/create")
     suspend fun createMembership(@Body req: CreateMembershipRequest): Response<ApiResponse<Membership>>
 
+    @Multipart
+    @POST("admin/students/import")
+    suspend fun importStudents(@Part file: MultipartBody.Part): Response<ApiResponse<ImportResult>>
+
     @GET("admin/expenses")
     suspend fun getExpenses(
         @Query("year") year: Int,

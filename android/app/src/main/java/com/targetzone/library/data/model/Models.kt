@@ -200,6 +200,20 @@ data class MonthlyExpense(
     val totalExpense: Double = 0.0
 )
 
+data class ImportResult(
+    val totalRows: Int = 0,
+    val imported: Int = 0,
+    val skipped: Int = 0,
+    val errors: List<ImportRowError> = emptyList()
+)
+
+data class ImportRowError(
+    val row: Int = 0,
+    val name: String = "",
+    val phone: String = "",
+    val reason: String = ""
+)
+
 data class SaveExpenseRequest(
     val year: Int,
     val month: Int,

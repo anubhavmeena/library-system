@@ -25,6 +25,7 @@ class AdminViewModel(
     val plans        = MutableStateFlow<List<Plan>>(emptyList())
 
     val expense      = MutableStateFlow<MonthlyExpense?>(null)
+    val importResult = MutableStateFlow<ImportResult?>(null)
 
     val isLoading    = MutableStateFlow(false)
     val error        = MutableStateFlow<String?>(null)
@@ -126,6 +127,15 @@ class AdminViewModel(
         isLoading.value = true
         adminRepo.createMembership(req)
             .onSuccess { successMsg.value = "Membership created for seat ${it.seatNumber}"; onDone() }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
+    fun importStudents(file: okhttp3.MultipartBody.Part) = viewModelScope.launch {
+        isLoading.value = true
+        importResult.value = null
+        adminRepo.importStudents(file)
+            .onSuccess { importResult.value = it; successMsg.value = "Imported ${it.imported} of ${it.totalRows} rows" }
             .onFailure { error.value = it.message }
         isLoading.value = false
     }
