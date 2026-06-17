@@ -37,7 +37,9 @@ public class ImportService {
             DateTimeFormatter.ofPattern("dd/MM/yyyy"),
             DateTimeFormatter.ofPattern("d/M/yyyy"),
             DateTimeFormatter.ofPattern("yyyy-MM-dd"),
-            DateTimeFormatter.ofPattern("MM/dd/yyyy")
+            DateTimeFormatter.ofPattern("MM/dd/yyyy"),
+            DateTimeFormatter.ofPattern("dd/MM/yy"),
+            DateTimeFormatter.ofPattern("d/M/yy")
     );
 
     public ImportResultDto importStudents(MultipartFile file) throws Exception {
@@ -90,7 +92,7 @@ public class ImportService {
         String phone      = safeGet(cols, 2).replaceAll("[^0-9]", "");
         String feesRaw    = safeGet(cols, 3).replaceAll("[^0-9.]", "");
         String dateRaw    = safeGet(cols, 4);
-        String seatNumber = safeGet(cols, 5).toUpperCase().replaceAll("\\s+", "");
+        String seatNumber = safeGet(cols, 5).toUpperCase().replaceAll("[\\s-]", "");
 
         if (name.isBlank())  throw new IllegalArgumentException("Name is blank");
         if (phone.isBlank()) throw new IllegalArgumentException("Phone is blank");
