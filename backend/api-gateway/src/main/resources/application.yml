@@ -12,6 +12,8 @@ spring:
             allowedOrigins:
               - "http://localhost:3000"
               - "http://frontend:3000"
+              - "https://targetzone.co.in"       # add this
+              - "https://www.targetzone.co.in"   # add this
             allowedMethods:
               - GET
               - POST
