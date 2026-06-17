@@ -135,7 +135,9 @@ export default function AdminSeatsPage() {
                                                     title={seat.isOccupied ? `${seat.studentName} — ${shiftLabel(seat.shift)}` : `${seat.seatNumber} (${t('adminSeats.legend.available')})`}
                                                     className={`w-8 h-8 rounded-lg text-xs font-medium border transition-all
                           ${seat.isOccupied
-                                                        ? 'bg-red-500/30 border-red-500/50 text-red-300 hover:bg-red-500/50 cursor-pointer'
+                                                        ? seat.studentGender === 'Female'
+                                                            ? 'bg-fuchsia-500/30 border-fuchsia-500/50 text-fuchsia-300 hover:bg-fuchsia-500/50 cursor-pointer'
+                                                            : 'bg-red-500/30 border-red-500/50 text-red-300 hover:bg-red-500/50 cursor-pointer'
                                                         : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 cursor-default'}`}>
                                                 {seat.seatNumber.substring(1)}
                                             </button>
@@ -149,7 +151,9 @@ export default function AdminSeatsPage() {
                                                     title={seat.isOccupied ? `${seat.studentName} — ${shiftLabel(seat.shift)}` : `${seat.seatNumber} (${t('adminSeats.legend.available')})`}
                                                     className={`w-8 h-8 rounded-lg text-xs font-medium border transition-all
                           ${seat.isOccupied
-                                                        ? 'bg-red-500/30 border-red-500/50 text-red-300 hover:bg-red-500/50 cursor-pointer'
+                                                        ? seat.studentGender === 'Female'
+                                                            ? 'bg-fuchsia-500/30 border-fuchsia-500/50 text-fuchsia-300 hover:bg-fuchsia-500/50 cursor-pointer'
+                                                            : 'bg-red-500/30 border-red-500/50 text-red-300 hover:bg-red-500/50 cursor-pointer'
                                                         : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 cursor-default'}`}>
                                                 {seat.seatNumber.substring(1)}
                                             </button>
@@ -159,9 +163,10 @@ export default function AdminSeatsPage() {
                             )
                         })}
                     </div>
-                    <div className="flex gap-6 mt-6 text-xs text-primary-400">
+                    <div className="flex flex-wrap gap-6 mt-6 text-xs text-primary-400">
                         <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/10 border border-emerald-500/20" />{t('adminSeats.legend.available')}</div>
-                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-500/30 border border-red-500/50" />{t('adminSeats.legend.occupied')}</div>
+                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-500/30 border border-red-500/50" />Male occupied</div>
+                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-fuchsia-500/30 border border-fuchsia-500/50" />Female occupied</div>
                     </div>
                 </div>
             ) : null}
@@ -177,6 +182,7 @@ export default function AdminSeatsPage() {
                             {[
                                 { l: t('adminSeats.modal.student'), v: selected.studentName },
                                 { l: t('adminSeats.modal.mobile'),  v: selected.studentMobile || '—' },
+                                { l: 'Gender',                       v: selected.studentGender || '—' },
                                 { l: t('adminSeats.modal.shift'),   v: shiftLabel(selected.shift) },
                                 { l: t('adminSeats.modal.expires'), v: selected.membershipEnd },
                             ].map(({ l, v }) => (

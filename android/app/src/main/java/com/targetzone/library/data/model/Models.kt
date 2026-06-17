@@ -64,6 +64,7 @@ data class Seat(
     // populated only from /admin/seats/map
     val studentName: String? = null,
     val studentMobile: String? = null,
+    val studentGender: String? = null,
     val membershipEnd: String? = null
 )
 
@@ -82,6 +83,7 @@ data class SeatInfoItem(
     val isOccupied: Boolean = false,
     val studentName: String? = null,
     val studentMobile: String? = null,
+    val studentGender: String? = null,
     val shift: String? = null,
     val membershipEnd: String? = null
 )

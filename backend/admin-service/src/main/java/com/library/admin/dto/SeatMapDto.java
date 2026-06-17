@@ -21,6 +21,7 @@ public class SeatMapDto {
         private Boolean isOccupied;
         private String  studentName;    // null when seat is available
         private String  studentMobile;  // null when seat is available
+        private String  studentGender;  // null when seat is available
         private String  shift;          // the shift the seat is booked for
         private String  membershipEnd;  // yyyy-MM-dd
     }

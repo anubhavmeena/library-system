@@ -45,6 +45,7 @@ class AdminRepository {
                     isBooked = s.isOccupied,
                     studentName = s.studentName,
                     studentMobile = s.studentMobile,
+                    studentGender = s.studentGender,
                     membershipEnd = s.membershipEnd
                 )
             }

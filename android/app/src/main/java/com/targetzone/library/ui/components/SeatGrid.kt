@@ -61,7 +61,7 @@ fun SeatGrid(
                     for (i in 1..half) {
                         val seatNum = "$row$i"
                         val seat = seatMap[seatNum] ?: Seat(seatNumber = seatNum, row = row)
-                        SeatButton(seatNum, seat.isBooked, selectedSeatNumber == seatNum, bookedClickable = onBookedSeatClick != null) {
+                        SeatButton(seatNum, seat.isBooked, selectedSeatNumber == seatNum, seat.studentGender, bookedClickable = onBookedSeatClick != null) {
                             if (seat.isBooked) onBookedSeatClick?.invoke(seat) else onSeatClick(seat)
                         }
                     }
@@ -76,7 +76,7 @@ fun SeatGrid(
                     for (i in (half + 1)..total) {
                         val seatNum = "$row$i"
                         val seat = seatMap[seatNum] ?: Seat(seatNumber = seatNum, row = row)
-                        SeatButton(seatNum, seat.isBooked, selectedSeatNumber == seatNum, bookedClickable = onBookedSeatClick != null) {
+                        SeatButton(seatNum, seat.isBooked, selectedSeatNumber == seatNum, seat.studentGender, bookedClickable = onBookedSeatClick != null) {
                             if (seat.isBooked) onBookedSeatClick?.invoke(seat) else onSeatClick(seat)
                         }
                     }
@@ -88,17 +88,20 @@ fun SeatGrid(
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             LegendItem(CardBg, DividerColor, "Available")
             LegendItem(AmberFaint, Amber, "Selected")
-            LegendItem(RedFaint, RedAlert, "Booked")
+            LegendItem(RedFaint, RedAlert, "Male")
+            LegendItem(MagentaFaint, Magenta, "Female")
         }
     }
 }
 
 @Composable
-private fun SeatButton(label: String, booked: Boolean, selected: Boolean, bookedClickable: Boolean = false, onClick: () -> Unit) {
+private fun SeatButton(label: String, booked: Boolean, selected: Boolean, gender: String? = null, bookedClickable: Boolean = false, onClick: () -> Unit) {
+    val isFemale = booked && gender == "Female"
     val (bg, border, textColor) = when {
-        booked   -> Triple(RedFaint, RedAlert.copy(alpha = 0.3f), RedAlert.copy(alpha = 0.5f))
-        selected -> Triple(AmberFaint, Amber, Amber)
-        else     -> Triple(CardBg, DividerColor, TextSub)
+        booked && isFemale -> Triple(MagentaFaint, Magenta.copy(alpha = 0.3f), Magenta.copy(alpha = 0.7f))
+        booked             -> Triple(RedFaint, RedAlert.copy(alpha = 0.3f), RedAlert.copy(alpha = 0.5f))
+        selected           -> Triple(AmberFaint, Amber, Amber)
+        else               -> Triple(CardBg, DividerColor, TextSub)
     }
     Box(
         Modifier

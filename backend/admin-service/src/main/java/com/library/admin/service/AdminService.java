@@ -166,6 +166,7 @@ public class AdminService {
                             .isOccupied(true)
                             .studentName(student != null ? student.getName() : "Unknown")
                             .studentMobile(student != null ? student.getMobile() : null)
+                            .studentGender(student != null ? student.getGender() : null)
                             .shift(mem.getShift())
                             .membershipEnd(mem.getEndDate().toString())
                             .build());
