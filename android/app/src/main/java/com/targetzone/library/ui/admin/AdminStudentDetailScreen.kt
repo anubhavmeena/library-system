@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.targetzone.library.data.model.StudentDetail
+import com.targetzone.library.data.model.UpdateStudentRequest
 import com.targetzone.library.ui.components.*
 import com.targetzone.library.ui.theme.*
 
@@ -34,6 +35,7 @@ fun AdminStudentDetailScreen(
     val seats by vm.seats.collectAsState()
     var changeSeatOpen by remember { mutableStateOf(false) }
     var newSeat        by remember { mutableStateOf("") }
+    var editOpen       by remember { mutableStateOf(false) }
 
     LaunchedEffect(studentId) { vm.loadStudentDetail(studentId) }
 
@@ -146,6 +148,12 @@ fun AdminStudentDetailScreen(
                 modifier = Modifier.height(40.dp)
             ) { Text(if (s.isActive) "Deactivate" else "Activate", fontSize = 13.sp) }
 
+            OutlinedButton(
+                onClick = { editOpen = true },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
+                modifier = Modifier.height(40.dp)
+            ) { Text("Edit Profile", fontSize = 13.sp) }
+
             if (!s.membershipId.isNullOrBlank()) {
                 OutlinedButton(
                     onClick = {
@@ -159,6 +167,81 @@ fun AdminStudentDetailScreen(
         }
 
         Spacer(Modifier.height(8.dp))
+    }
+
+    // Edit profile dialog
+    if (editOpen) {
+        var eName by remember(s.name)        { mutableStateOf(s.name) }
+        var eEmail by remember(s.email)      { mutableStateOf(s.email ?: "") }
+        var eAddress by remember(s.address)  { mutableStateOf(s.address ?: "") }
+        var eGender by remember(s.gender)    { mutableStateOf(s.gender ?: "") }
+        var eDob by remember(s.dateOfBirth)  { mutableStateOf(s.dateOfBirth ?: "") }
+        val genderOptions = listOf("", "Male", "Female", "Other")
+        var genderExpanded by remember { mutableStateOf(false) }
+
+        Dialog(onDismissRequest = { editOpen = false }) {
+            Surface(shape = RoundedCornerShape(16.dp), color = NavyMid) {
+                Column(Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
+                    Text("Edit Profile", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                    Text(s.name, color = TextSub, fontSize = 12.sp)
+                    Spacer(Modifier.height(16.dp))
+
+                    OutlinedTextField(eName, { eName = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber, focusedLabelColor = Amber, cursorColor = Amber, unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary))
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(eEmail, { eEmail = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber, focusedLabelColor = Amber, cursorColor = Amber, unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary))
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(eAddress, { eAddress = it }, label = { Text("Address") }, modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber, focusedLabelColor = Amber, cursorColor = Amber, unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary))
+                    Spacer(Modifier.height(10.dp))
+
+                    // Gender dropdown
+                    ExposedDropdownMenuBox(expanded = genderExpanded, onExpandedChange = { genderExpanded = it }) {
+                        OutlinedTextField(
+                            value = eGender.ifBlank { "—" },
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Gender") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(genderExpanded) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber, focusedLabelColor = Amber, unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
+                        )
+                        ExposedDropdownMenu(expanded = genderExpanded, onDismissRequest = { genderExpanded = false }, containerColor = NavyMid) {
+                            genderOptions.forEach { opt ->
+                                DropdownMenuItem(
+                                    text = { Text(opt.ifBlank { "—" }, color = TextPrimary) },
+                                    onClick = { eGender = opt; genderExpanded = false }
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(eDob, { eDob = it }, label = { Text("Date of Birth (yyyy-MM-dd)") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber, focusedLabelColor = Amber, cursorColor = Amber, unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary))
+
+                    Spacer(Modifier.height(16.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { editOpen = false }) { Text("Cancel", color = TextSub) }
+                        Spacer(Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                val req = UpdateStudentRequest(
+                                    name        = eName.trim(),
+                                    email       = eEmail.trim().ifBlank { null },
+                                    address     = eAddress.trim().ifBlank { null },
+                                    gender      = eGender.trim().ifBlank { null },
+                                    dateOfBirth = eDob.trim().ifBlank { null }
+                                )
+                                vm.updateStudentProfile(s.id, req) { editOpen = false }
+                            },
+                            enabled = eName.isNotBlank(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = NavyDeep)
+                        ) { Text("Save") }
+                    }
+                }
+            }
+        }
     }
 
     // Change seat dialog

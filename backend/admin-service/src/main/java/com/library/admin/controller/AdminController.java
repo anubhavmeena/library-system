@@ -54,6 +54,13 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success("Status updated successfully"));
     }
 
+    @PatchMapping("/students/{userId}")
+    public ResponseEntity<ApiResponse<StudentDto>> updateStudent(
+            @PathVariable String userId,
+            @RequestBody UpdateStudentRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.updateStudent(userId, request)));
+    }
+
     // ── Seat Map ──────────────────────────────────────────────────────────────
     // Returns all 110 seats grouped by row (A/B/C/D), each with isOccupied,
     // studentName, studentMobile, shift, membershipEnd

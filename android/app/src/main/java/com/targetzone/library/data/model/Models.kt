@@ -214,6 +214,14 @@ data class ImportRowError(
     val reason: String = ""
 )
 
+data class UpdateStudentRequest(
+    val name: String,
+    val email: String?,
+    val address: String?,
+    val gender: String?,
+    val dateOfBirth: String?
+)
+
 data class SaveExpenseRequest(
     val year: Int,
     val month: Int,

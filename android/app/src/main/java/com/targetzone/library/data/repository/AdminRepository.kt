@@ -76,6 +76,11 @@ class AdminRepository {
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to create membership")
     }
 
+    suspend fun updateStudent(id: String, req: UpdateStudentRequest): Result<StudentDetail> = runCatching {
+        val res = api.updateStudent(id, req)
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Update failed")
+    }
+
     suspend fun importStudents(file: okhttp3.MultipartBody.Part): Result<ImportResult> = runCatching {
         val res = api.importStudents(file)
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Import failed")

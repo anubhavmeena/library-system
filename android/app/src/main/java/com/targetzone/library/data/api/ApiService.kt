@@ -92,6 +92,12 @@ interface ApiService {
     @GET("admin/students/{id}")
     suspend fun getStudentDetail(@Path("id") id: String): Response<ApiResponse<StudentDetail>>
 
+    @PATCH("admin/students/{id}")
+    suspend fun updateStudent(
+        @Path("id") id: String,
+        @Body req: UpdateStudentRequest
+    ): Response<ApiResponse<StudentDetail>>
+
     @PATCH("admin/students/{id}/status")
     suspend fun toggleStudentStatus(
         @Path("id") id: String,

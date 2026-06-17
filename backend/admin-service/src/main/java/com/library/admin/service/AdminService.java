@@ -328,6 +328,22 @@ public class AdminService {
         log.info("Student {} set to {}", userId, active ? "ACTIVE" : "INACTIVE");
     }
 
+    // ── Update Student Profile ────────────────────────────────────────────────
+
+    @Transactional
+    public StudentDto updateStudent(String userId, UpdateStudentRequest req) {
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + userId));
+        if (req.getName()  != null && !req.getName().isBlank()) user.setName(req.getName().trim());
+        if (req.getEmail() != null) user.setEmail(req.getEmail().isBlank() ? null : req.getEmail().trim());
+        user.setAddress(req.getAddress() != null && !req.getAddress().isBlank() ? req.getAddress().trim() : null);
+        user.setGender(req.getGender()   != null && !req.getGender().isBlank()  ? req.getGender().trim()   : null);
+        user.setDateOfBirth(req.getDateOfBirth() != null && !req.getDateOfBirth().isBlank()
+                ? LocalDate.parse(req.getDateOfBirth()) : null);
+        userRepository.save(user);
+        return getStudentDetails(userId);
+    }
+
     // ── Broadcast Notification ────────────────────────────────────────────────
 
     public int broadcastNotification(BroadcastRequest req) {

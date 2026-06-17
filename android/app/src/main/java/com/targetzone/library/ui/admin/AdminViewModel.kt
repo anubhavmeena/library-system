@@ -131,6 +131,14 @@ class AdminViewModel(
         isLoading.value = false
     }
 
+    fun updateStudentProfile(id: String, req: UpdateStudentRequest, onDone: () -> Unit) = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.updateStudent(id, req)
+            .onSuccess { selectedStudent.value = it; successMsg.value = "Profile updated"; onDone() }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
     fun importStudents(file: okhttp3.MultipartBody.Part) = viewModelScope.launch {
         isLoading.value = true
         importResult.value = null

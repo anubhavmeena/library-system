@@ -13,6 +13,9 @@ export default function AdminStudentsPage() {
     const [membershipFilter, setMembershipFilter] = useState('')
     const [search, setSearch]         = useState('')
     const [detail, setDetail]     = useState(null)
+    const [editMode, setEditMode] = useState(false)
+    const [editForm, setEditForm] = useState({})
+    const [saving, setSaving]     = useState(false)
 
     const [changeSeatFor, setChangeSeatFor]               = useState(null)
     const [changeSeatGrid, setChangeSeatGrid]             = useState(null)
@@ -217,7 +220,11 @@ export default function AdminStudentsPage() {
                                     </td>
                                     <td className="p-4">
                                         <div className="flex flex-wrap gap-2">
-                                            <button onClick={() => setDetail(s)}
+                                            <button onClick={() => {
+                                                setDetail(s)
+                                                setEditMode(false)
+                                                setEditForm({ name: s.name||'', email: s.email||'', address: s.address||'', gender: s.gender||'', dateOfBirth: s.dateOfBirth||'' })
+                                            }}
                                                     className="text-xs px-3 py-1.5 rounded-lg bg-primary-700/50 text-primary-300 hover:text-white border border-primary-700/40 transition-all">
                                                 {t('adminStudents.view')}
                                             </button>
@@ -338,42 +345,124 @@ export default function AdminStudentsPage() {
             )}
 
             {detail && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setDetail(null)}>
-                    <div className="card p-6 w-full max-w-md border-red-900/30" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => { setDetail(null); setEditMode(false) }}>
+                    <div className="card p-6 w-full max-w-md border-primary-700/30 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        {/* Header */}
                         <div className="flex items-center justify-between mb-5">
                             <h3 className="section-title">{t('adminStudents.modal.title')}</h3>
-                            <button onClick={() => setDetail(null)} className="text-primary-400 hover:text-white">✕</button>
-                        </div>
-                        <div className="flex items-center gap-4 mb-5 pb-5 border-b border-primary-700/30">
-                            {detail.photoUrl
-                                ? <img src={detail.photoUrl} alt={detail.name} className="w-14 h-14 rounded-full object-cover" />
-                                : <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-400 to-primary-600 flex items-center justify-center text-xl font-bold text-white">
-                                    {detail.name?.[0]?.toUpperCase()}
-                                </div>
-                            }
-                            <div>
-                                <p className="text-white font-bold text-lg">{detail.name}</p>
-                                <p className="text-primary-400 text-sm">{detail.mobile || detail.email}</p>
+                            <div className="flex items-center gap-2">
+                                {!editMode ? (
+                                    <button onClick={() => setEditMode(true)}
+                                        className="text-xs px-3 py-1 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 transition-all">
+                                        Edit
+                                    </button>
+                                ) : (
+                                    <>
+                                        <button onClick={() => { setEditMode(false); setEditForm({ name: detail.name||'', email: detail.email||'', address: detail.address||'', gender: detail.gender||'', dateOfBirth: detail.dateOfBirth||'' }) }}
+                                            className="text-xs px-3 py-1 rounded-lg bg-primary-700/50 text-primary-300 hover:text-white border border-primary-700/40 transition-all">
+                                            Cancel
+                                        </button>
+                                        <button
+                                            disabled={saving}
+                                            onClick={async () => {
+                                                setSaving(true)
+                                                try {
+                                                    const res = await api.patch(`/admin/students/${detail.id}`, editForm)
+                                                    const updated = res.data.data
+                                                    setDetail(updated)
+                                                    setEditForm({ name: updated.name||'', email: updated.email||'', address: updated.address||'', gender: updated.gender||'', dateOfBirth: updated.dateOfBirth||'' })
+                                                    setEditMode(false)
+                                                    fetchStudents()
+                                                    toast.success('Student profile updated')
+                                                } catch (e) {
+                                                    toast.error(e.response?.data?.message || 'Save failed')
+                                                } finally {
+                                                    setSaving(false)
+                                                }
+                                            }}
+                                            className="text-xs px-3 py-1 rounded-lg bg-amber-500 text-navy-deep font-semibold hover:bg-amber-400 disabled:opacity-50 transition-all">
+                                            {saving ? 'Saving…' : 'Save'}
+                                        </button>
+                                    </>
+                                )}
+                                <button onClick={() => { setDetail(null); setEditMode(false) }} className="text-primary-400 hover:text-white ml-1">✕</button>
                             </div>
                         </div>
+
+                        {/* Avatar + name */}
+                        <div className="flex items-center gap-4 mb-5 pb-5 border-b border-primary-700/30">
+                            {detail.photoUrl
+                                ? <img src={detail.photoUrl} alt={detail.name} className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
+                                : <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-400 to-primary-600 flex items-center justify-center text-xl font-bold text-white flex-shrink-0">
+                                    {(editMode ? editForm.name : detail.name)?.[0]?.toUpperCase()}
+                                </div>
+                            }
+                            <div className="min-w-0">
+                                {editMode
+                                    ? <input className="input text-sm py-1 w-full font-bold" value={editForm.name}
+                                        onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} placeholder="Name" />
+                                    : <p className="text-white font-bold text-lg truncate">{detail.name}</p>
+                                }
+                                <p className="text-primary-400 text-sm">{detail.mobile}</p>
+                            </div>
+                        </div>
+
+                        {/* Fields */}
                         <div className="space-y-2">
+                            {/* Mobile — always read-only */}
+                            <div className="flex justify-between py-1.5 border-b border-primary-700/20 text-sm">
+                                <span className="text-primary-400">{t('adminStudents.modal.mobile')}</span>
+                                <span className="text-white">{detail.mobile || '—'}</span>
+                            </div>
+
+                            {/* Editable fields */}
                             {[
-                                { l: t('adminStudents.modal.mobile'),   v: detail.mobile || '—' },
-                                { l: t('adminStudents.modal.email'),    v: detail.email || '—' },
-                                { l: t('adminStudents.modal.address'),  v: detail.address || '—' },
-                                { l: t('adminStudents.modal.gender'),   v: detail.gender || '—' },
-                                { l: t('adminStudents.modal.seat'),     v: detail.seatNumber || t('adminStudents.modal.noSeat') },
-                                { l: t('adminStudents.modal.plan'),     v: detail.planName || t('adminStudents.modal.noPlan') },
-                                { l: t('adminStudents.modal.expires'),  v: detail.membershipEnd || '—' },
-                                { l: t('adminStudents.modal.daysLeftLabel'), v: detail.daysRemaining ? t('adminStudents.modal.daysLeft', { count: detail.daysRemaining }) : '—' },
-                                { l: t('adminStudents.modal.payment'),  v: detail.paymentMode === 'CASH' ? `💵 ${t('adminStudents.cash')}` : detail.paymentMode === 'ONLINE' ? `💳 ${t('adminStudents.online')}` : '—' },
-                                { l: t('adminStudents.modal.joined'),   v: detail.joinedAt?.split('T')[0] || '—' },
+                                { key: 'email',       label: t('adminStudents.modal.email'),   type: 'text',  placeholder: 'Email' },
+                                { key: 'address',     label: t('adminStudents.modal.address'), type: 'text',  placeholder: 'Address' },
+                                { key: 'dateOfBirth', label: 'Date of Birth',                  type: 'date',  placeholder: '' },
+                            ].map(({ key, label, type, placeholder }) => (
+                                <div key={key} className="flex justify-between items-center py-1.5 border-b border-primary-700/20 text-sm gap-4">
+                                    <span className="text-primary-400 shrink-0">{label}</span>
+                                    {editMode
+                                        ? <input type={type} className="input text-sm py-0.5 text-right w-44"
+                                            value={editForm[key]} placeholder={placeholder}
+                                            onChange={e => setEditForm(f => ({ ...f, [key]: e.target.value }))} />
+                                        : <span className="text-white text-right max-w-[55%] truncate">{detail[key] || '—'}</span>
+                                    }
+                                </div>
+                            ))}
+
+                            {/* Gender — dropdown in edit mode */}
+                            <div className="flex justify-between items-center py-1.5 border-b border-primary-700/20 text-sm gap-4">
+                                <span className="text-primary-400 shrink-0">{t('adminStudents.modal.gender')}</span>
+                                {editMode
+                                    ? <select className="input text-sm py-0.5 w-44 text-right"
+                                        value={editForm.gender}
+                                        onChange={e => setEditForm(f => ({ ...f, gender: e.target.value }))}>
+                                        <option value="">—</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                    : <span className="text-white">{detail.gender || '—'}</span>
+                                }
+                            </div>
+
+                            {/* Read-only membership fields */}
+                            {[
+                                { l: t('adminStudents.modal.seat'),           v: detail.seatNumber || t('adminStudents.modal.noSeat') },
+                                { l: t('adminStudents.modal.plan'),           v: detail.planName || t('adminStudents.modal.noPlan') },
+                                { l: t('adminStudents.modal.expires'),        v: detail.membershipEnd || '—' },
+                                { l: t('adminStudents.modal.daysLeftLabel'),  v: detail.daysRemaining ? t('adminStudents.modal.daysLeft', { count: detail.daysRemaining }) : '—' },
+                                { l: t('adminStudents.modal.payment'),        v: detail.paymentMode === 'CASH' ? `💵 ${t('adminStudents.cash')}` : detail.paymentMode === 'ONLINE' ? `💳 ${t('adminStudents.online')}` : '—' },
+                                { l: t('adminStudents.modal.joined'),         v: detail.joinedAt?.split('T')[0] || '—' },
                             ].map(({ l, v }) => (
                                 <div key={l} className="flex justify-between py-1.5 border-b border-primary-700/20 last:border-0 text-sm">
                                     <span className="text-primary-400">{l}</span>
                                     <span className="text-white text-right max-w-[55%] truncate">{v}</span>
                                 </div>
                             ))}
+
                             <div className="flex justify-between py-1.5 text-sm">
                                 <span className="text-primary-400">{t('adminStudents.modal.aadhaar')}</span>
                                 {detail.aadhaarUrl ? (
