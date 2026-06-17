@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { BookOpen, Clock, Wifi, Coffee, Users, Star, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Helmet } from 'react-helmet-async'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 
 const FEATURE_ICONS = [Clock, Wifi, Coffee, Users]
@@ -32,6 +33,10 @@ export default function LandingPage() {
 
     return (
         <div className="min-h-screen bg-[#0d1b4b] overflow-x-hidden">
+            <Helmet>
+                <title>Target Zone Library Alwar — Study Seats in Malviya Nagar | Book Online</title>
+                <meta name="description" content="Reserve your dedicated study seat at Target Zone Library, Alwar. Morning, evening &amp; full-day plans. 110 seats, open 6 AM–11 PM. Book online instantly." />
+            </Helmet>
             {/* Nav */}
             <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-12 py-4 bg-primary-900/80 backdrop-blur-xl border-b border-primary-700/20">
                 <div className="flex items-center gap-3">

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { Provider } from 'react-redux'
 import { BrowserRouter } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
+import { HelmetProvider } from 'react-helmet-async'
 import App from './App'
 import { store } from './store'
 import './i18n'
@@ -10,6 +11,7 @@ import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
+        <HelmetProvider>
         <Provider store={store}>
             <BrowserRouter>
                 <App />
@@ -27,5 +29,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 />
             </BrowserRouter>
         </Provider>
+        </HelmetProvider>
     </React.StrictMode>
 )

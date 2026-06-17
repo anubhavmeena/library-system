@@ -1,9 +1,14 @@
 import { Link } from 'react-router-dom'
 import { BookOpen, MapPin, Phone, Clock, Users } from 'lucide-react'
+import { Helmet } from 'react-helmet-async'
 
 export default function AboutUsPage() {
     return (
         <div className="min-h-screen bg-[#0d1b4b] text-white">
+            <Helmet>
+                <title>About Us | Target Zone Library Alwar</title>
+                <meta name="description" content="Learn about Target Zone Library in Malviya Nagar, Alwar — our mission, facilities, and why students choose us for focused study." />
+            </Helmet>
             <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-12 py-4 bg-primary-900/80 backdrop-blur-xl border-b border-primary-700/20">
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/30">

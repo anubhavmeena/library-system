@@ -1,0 +1,12 @@
+{
+  "name": "Target Zone Library",
+  "short_name": "TZ Library",
+  "description": "Book your dedicated study seat at Target Zone Library, Alwar",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1b4b",
+  "theme_color": "#0d1b4b",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any" }
+  ]
+}
