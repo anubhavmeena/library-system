@@ -208,6 +208,18 @@ data class MonthlyExpense(
     val miscItems: List<MiscItem> = emptyList()
 )
 
+data class GalleryPhoto(
+    val id: String = "",
+    val url: String = "",
+    val caption: String? = null,
+    val uploadedAt: String = ""
+)
+
+data class StudentListResponse(
+    val students: List<StudentSummary> = emptyList(),
+    val total: Int = 0
+)
+
 data class ImportResult(
     val totalRows: Int = 0,
     val imported: Int = 0,

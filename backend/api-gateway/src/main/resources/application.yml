@@ -40,6 +40,15 @@ spring:
             - StripPrefix=0
             - name: AuthFilter
 
+        # Gallery Routes (auth-protected, role enforced in controller)
+        - id: gallery-service
+          uri: ${USER_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/gallery/**
+          filters:
+            - StripPrefix=0
+            - name: AuthFilter
+
         # Membership Service Routes (protected)
         - id: membership-service
           uri: ${MEMBERSHIP_SERVICE_URL:http://localhost:8083}

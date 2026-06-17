@@ -11,9 +11,10 @@ class AdminRepository {
         res.body()?.data ?: throw Exception("Failed to load stats")
     }
 
-    suspend fun getStudents(page: Int = 0, status: String? = null, membershipStatus: String? = null, search: String? = null): Result<List<StudentSummary>> = runCatching {
+    suspend fun getStudents(page: Int = 0, status: String? = null, membershipStatus: String? = null, search: String? = null): Result<Pair<List<StudentSummary>, Int>> = runCatching {
         val res = api.getStudents(page = page, status = status?.takeIf { it.isNotBlank() }, membershipStatus = membershipStatus?.takeIf { it.isNotBlank() }, search = search?.takeIf { it.isNotBlank() })
-        res.body()?.data ?: emptyList()
+        val data = res.body()?.data ?: StudentListResponse()
+        Pair(data.students, data.total)
     }
 
     suspend fun toggleStudentStatus(id: String, active: Boolean): Result<Unit> = runCatching {

@@ -7,6 +7,7 @@ const ROWS = ['A', 'B', 'C', 'D']
 
 export default function AdminStudentsPage() {
     const [students, setStudents] = useState([])
+    const [total, setTotal]       = useState(0)
     const [loading, setLoading]   = useState(true)
     const [page, setPage]             = useState(0)
     const [status, setStatus]         = useState('')
@@ -29,7 +30,8 @@ export default function AdminStudentsPage() {
         setLoading(true)
         try {
             const res = await api.get(`/admin/students?page=${page}&size=20${status ? `&status=${status}` : ''}${membershipFilter ? `&membershipStatus=${membershipFilter}` : ''}`)
-            setStudents(res.data.data || [])
+            setStudents(res.data.data.students || [])
+            setTotal(res.data.data.total || 0)
         } catch { toast.error(t('adminStudents.toasts.loadFailed')) }
         finally { setLoading(false) }
     }
@@ -118,7 +120,7 @@ export default function AdminStudentsPage() {
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h1 className="page-header">{t('adminStudents.title')}</h1>
-                    <p className="text-primary-400">{t('adminStudents.subtitle', { count: students.length })}</p>
+                    <p className="text-primary-400">{t('adminStudents.subtitle', { count: students.length, total })}</p>
                 </div>
                 <button onClick={fetchStudents} className="btn-ghost border border-primary-700/40 text-sm px-4 py-2 rounded-xl">↻ {t('adminStudents.refresh')}</button>
             </div>

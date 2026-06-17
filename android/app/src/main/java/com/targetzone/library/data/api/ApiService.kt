@@ -87,7 +87,7 @@ interface ApiService {
         @Query("status") status: String? = null,
         @Query("membershipStatus") membershipStatus: String? = null,
         @Query("search") search: String? = null
-    ): Response<ApiResponse<List<StudentSummary>>>
+    ): Response<ApiResponse<StudentListResponse>>
 
     @GET("admin/students/{id}")
     suspend fun getStudentDetail(@Path("id") id: String): Response<ApiResponse<StudentDetail>>
@@ -151,4 +151,18 @@ interface ApiService {
 
     @POST("admin/expenses")
     suspend fun saveExpenses(@Body req: SaveExpenseRequest): Response<ApiResponse<MonthlyExpense>>
+
+    // Gallery
+    @GET("gallery")
+    suspend fun getGallery(): Response<ApiResponse<List<GalleryPhoto>>>
+
+    @Multipart
+    @POST("gallery")
+    suspend fun uploadGalleryPhoto(
+        @Part file: MultipartBody.Part,
+        @Part("caption") caption: okhttp3.RequestBody? = null
+    ): Response<ApiResponse<GalleryPhoto>>
+
+    @DELETE("gallery/{id}")
+    suspend fun deleteGalleryPhoto(@Path("id") id: String): Response<ApiResponse<String?>>
 }

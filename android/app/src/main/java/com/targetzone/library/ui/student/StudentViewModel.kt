@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.targetzone.library.data.TokenManager
 import com.targetzone.library.data.api.BASE_URL
 import com.targetzone.library.data.model.*
+import com.targetzone.library.data.repository.GalleryRepository
 import com.targetzone.library.data.repository.MembershipRepository
 import com.targetzone.library.data.repository.SeatRepository
 import com.targetzone.library.data.repository.UserRepository
@@ -23,6 +24,7 @@ class StudentViewModel(
     private val membershipRepo: MembershipRepository = MembershipRepository(),
     private val seatRepo: SeatRepository = SeatRepository(),
     private val userRepo: UserRepository = UserRepository(),
+    private val galleryRepo: GalleryRepository = GalleryRepository(),
     private val tokenManager: TokenManager? = null
 ) : ViewModel() {
 
@@ -33,6 +35,7 @@ class StudentViewModel(
     val profile       = MutableStateFlow<User?>(null)
     val myFeedback    = MutableStateFlow<List<FeedbackItem>>(emptyList())
     val membershipHistory = MutableStateFlow<List<Membership>>(emptyList())
+    val galleryPhotos = MutableStateFlow<List<GalleryPhoto>>(emptyList())
 
     val isLoading     = MutableStateFlow(false)
     val error         = MutableStateFlow<String?>(null)
@@ -138,6 +141,12 @@ class StudentViewModel(
 
     fun loadMembershipHistory() = viewModelScope.launch {
         membershipRepo.getMembershipHistory().onSuccess { membershipHistory.value = it }
+    }
+
+    fun loadGallery() = viewModelScope.launch {
+        galleryRepo.getAll()
+            .onSuccess { galleryPhotos.value = it }
+            .onFailure { error.value = it.message }
     }
 
     fun resetBooking() { selectedSeat.value = null; bookingSuccess.value = false; error.value = null }

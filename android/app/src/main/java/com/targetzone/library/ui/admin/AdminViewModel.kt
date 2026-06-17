@@ -4,19 +4,24 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.targetzone.library.data.model.*
 import com.targetzone.library.data.repository.AdminRepository
+import com.targetzone.library.data.repository.GalleryRepository
 import com.targetzone.library.data.repository.MembershipRepository
 import com.targetzone.library.data.repository.SeatRepository
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 class AdminViewModel(
     private val adminRepo: AdminRepository = AdminRepository(),
     private val seatRepo: SeatRepository = SeatRepository(),
-    private val membershipRepo: MembershipRepository = MembershipRepository()
+    private val membershipRepo: MembershipRepository = MembershipRepository(),
+    private val galleryRepo: GalleryRepository = GalleryRepository()
 ) : ViewModel() {
 
     val stats           = MutableStateFlow<AdminStats?>(null)
     val students        = MutableStateFlow<List<StudentSummary>>(emptyList())
+    val totalStudents   = MutableStateFlow(0)
     val selectedStudent = MutableStateFlow<StudentDetail?>(null)
     val seats        = MutableStateFlow<List<Seat>>(emptyList())    // student-facing availability
     val adminSeats   = MutableStateFlow<List<Seat>>(emptyList())    // admin seat map with student details
@@ -26,6 +31,7 @@ class AdminViewModel(
 
     val expense      = MutableStateFlow<MonthlyExpense?>(null)
     val importResult = MutableStateFlow<ImportResult?>(null)
+    val galleryPhotos = MutableStateFlow<List<GalleryPhoto>>(emptyList())
 
     val isLoading    = MutableStateFlow(false)
     val error        = MutableStateFlow<String?>(null)
@@ -50,7 +56,7 @@ class AdminViewModel(
     fun loadStudents(page: Int = 0, status: String? = null, membershipStatus: String? = null, search: String? = null) = viewModelScope.launch {
         isLoading.value = true
         adminRepo.getStudents(page, status, membershipStatus, search)
-            .onSuccess { students.value = it }
+            .onSuccess { (list, total) -> students.value = list; totalStudents.value = total }
             .onFailure { error.value = it.message }
         isLoading.value = false
     }
@@ -165,4 +171,24 @@ class AdminViewModel(
     }
 
     fun clearMessages() { error.value = null; successMsg.value = null }
+
+    fun loadGallery() = viewModelScope.launch {
+        galleryRepo.getAll()
+            .onSuccess { galleryPhotos.value = it }
+            .onFailure { error.value = it.message }
+    }
+
+    fun uploadGalleryPhoto(file: MultipartBody.Part, caption: RequestBody?, onDone: () -> Unit) = viewModelScope.launch {
+        isLoading.value = true
+        galleryRepo.upload(file, caption)
+            .onSuccess { loadGallery(); successMsg.value = "Photo uploaded"; onDone() }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
+    fun deleteGalleryPhoto(id: String, onDone: () -> Unit) = viewModelScope.launch {
+        galleryRepo.delete(id)
+            .onSuccess { galleryPhotos.value = galleryPhotos.value.filter { it.id != id }; onDone() }
+            .onFailure { error.value = it.message }
+    }
 }

@@ -72,12 +72,12 @@ public class AdminService {
 
     // ── Students ──────────────────────────────────────────────────────────────
 
-    public List<StudentDto> getAllStudents(int page, int size, String status, String membershipStatus) {
-        List<User> users = userRepository
-                .findStudentsByStatus(status, membershipStatus, PageRequest.of(page, size))
-                .getContent();
+    public StudentListDto getAllStudents(int page, int size, String status, String membershipStatus) {
+        org.springframework.data.domain.Page<User> pageResult = userRepository
+                .findStudentsByStatus(status, membershipStatus, PageRequest.of(page, size));
+        List<User> users = pageResult.getContent();
 
-        return users.stream().map(user -> {
+        List<StudentDto> students = users.stream().map(user -> {
             Membership mem = membershipRepository
                     .findByUserIdAndStatus(user.getId(), Membership.Status.ACTIVE)
                     .orElse(null);
@@ -89,6 +89,7 @@ public class AdminService {
             }
             return dto;
         }).collect(Collectors.toList());
+        return new StudentListDto(students, pageResult.getTotalElements());
     }
 
     public StudentDto getStudentDetails(String userId) {

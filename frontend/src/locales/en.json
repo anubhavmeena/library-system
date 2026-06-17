@@ -140,7 +140,8 @@
         "booking": "Book a Seat",
         "facilities": "Facilities",
         "profile": "My Profile",
-        "feedback": "Feedback"
+        "feedback": "Feedback",
+        "gallery": "Gallery"
       },
       "logout": "Logout",
       "mobileTitle": "Target Zone Library"
@@ -163,7 +164,8 @@
         "newMembership": "New Membership",
         "broadcast": "Broadcast",
         "expenses": "Expenses",
-        "importStudents": "Import Students"
+        "importStudents": "Import Students",
+        "gallery": "Photo Gallery"
       },
       "logout": "Logout"
     }
@@ -462,7 +464,7 @@
   },
   "adminStudents": {
     "title": "Students",
-    "subtitle": "{{count}} students loaded",
+    "subtitle": "{{count}} students loaded of {{total}} students",
     "refresh": "Refresh",
     "searchPlaceholder": "🔍 Search name, mobile, email...",
     "filters": {
@@ -795,5 +797,25 @@
     "saved": "Expenses saved successfully",
     "loadFailed": "Failed to load expenses",
     "saveFailed": "Failed to save expenses"
+  },
+  "adminGallery": {
+    "title": "Photo Gallery",
+    "subtitle": "Manage library photos",
+    "uploadBtn": "Upload Photo",
+    "captionPlaceholder": "Caption (optional)",
+    "uploading": "Uploading…",
+    "uploadSuccess": "Photo uploaded",
+    "uploadFailed": "Upload failed",
+    "deleteConfirm": "Delete this photo?",
+    "deleteSuccess": "Photo deleted",
+    "deleteFailed": "Delete failed",
+    "loadFailed": "Failed to load gallery",
+    "empty": "No photos yet — upload the first one"
+  },
+  "studentGallery": {
+    "title": "Photo Gallery",
+    "subtitle": "Library moments",
+    "loadFailed": "Failed to load gallery",
+    "empty": "No photos have been added yet"
   }
 }

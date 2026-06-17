@@ -30,7 +30,7 @@ public class AdminController {
     // ── Students ──────────────────────────────────────────────────────────────
 
     @GetMapping("/students")
-    public ResponseEntity<ApiResponse<List<StudentDto>>> getAllStudents(
+    public ResponseEntity<ApiResponse<StudentListDto>> getAllStudents(
             @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false)    String status,            // ACTIVE | INACTIVE | null = all (account)

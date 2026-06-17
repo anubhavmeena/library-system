@@ -20,6 +20,7 @@ export default function StudentLayout() {
         { to: '/student/facilities',icon: '⌂', label: t('student.sidebar.nav.facilities') },
         { to: '/student/profile',   icon: '◉', label: t('student.sidebar.nav.profile') },
         { to: '/student/feedback',  icon: '◎', label: t('student.sidebar.nav.feedback') },
+        { to: '/student/gallery',   icon: '◼', label: t('student.sidebar.nav.gallery') },
     ]
 
     return (

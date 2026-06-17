@@ -140,7 +140,8 @@
         "booking": "सीट बुक करें",
         "facilities": "सुविधाएं",
         "profile": "मेरी प्रोफाइल",
-        "feedback": "फीडबैक"
+        "feedback": "फीडबैक",
+        "gallery": "गैलरी"
       },
       "logout": "लॉग आउट",
       "mobileTitle": "Target Zone Library"
@@ -163,7 +164,8 @@
         "newMembership": "नई सदस्यता",
         "broadcast": "ब्रॉडकास्ट",
         "expenses": "खर्च",
-        "importStudents": "छात्र आयात"
+        "importStudents": "छात्र आयात",
+        "gallery": "फोटो गैलरी"
       },
       "logout": "लॉग आउट"
     }
@@ -462,7 +464,7 @@
   },
   "adminStudents": {
     "title": "छात्र",
-    "subtitle": "{{count}} छात्र लोड हुए",
+    "subtitle": "{{total}} में से {{count}} छात्र लोड हुए",
     "refresh": "रिफ्रेश",
     "searchPlaceholder": "🔍 नाम, मोबाइल, ईमेल खोजें...",
     "filters": {
@@ -778,5 +780,25 @@
     "saved": "खर्च सफलतापूर्वक सहेजा गया",
     "loadFailed": "खर्च लोड करने में विफल",
     "saveFailed": "खर्च सहेजने में विफल"
+  },
+  "adminGallery": {
+    "title": "फोटो गैलरी",
+    "subtitle": "लाइब्रेरी की फोटो प्रबंधित करें",
+    "uploadBtn": "फोटो अपलोड करें",
+    "captionPlaceholder": "कैप्शन (वैकल्पिक)",
+    "uploading": "अपलोड हो रहा है…",
+    "uploadSuccess": "फोटो अपलोड हुई",
+    "uploadFailed": "अपलोड विफल",
+    "deleteConfirm": "यह फोटो हटाएं?",
+    "deleteSuccess": "फोटो हटाई गई",
+    "deleteFailed": "हटाने में विफल",
+    "loadFailed": "गैलरी लोड करने में विफल",
+    "empty": "अभी कोई फोटो नहीं — पहली फोटो अपलोड करें"
+  },
+  "studentGallery": {
+    "title": "फोटो गैलरी",
+    "subtitle": "लाइब्रेरी के पल",
+    "loadFailed": "गैलरी लोड करने में विफल",
+    "empty": "अभी कोई फोटो नहीं जोड़ी गई"
   }
 }

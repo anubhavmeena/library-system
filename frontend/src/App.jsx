@@ -30,8 +30,10 @@ import AdminCreateMembershipPage from './pages/admin/AdminCreateMembershipPage'
 import AdminBroadcastPage from './pages/admin/AdminBroadcastPage'
 import AdminExpensesPage  from './pages/admin/AdminExpensesPage'
 import AdminImportPage    from './pages/admin/AdminImportPage'
+import AdminGalleryPage   from './pages/admin/AdminGalleryPage'
 
 import FeedbackPage       from './pages/student/FeedbackPage'
+import StudentGalleryPage from './pages/student/StudentGalleryPage'
 
 function ProtectedRoute({ children, role }) {
     const { user, token } = useSelector(s => s.auth)
@@ -64,6 +66,7 @@ export default function App() {
                 <Route path="facilities"       element={<FacilitiesPage />} />
                 <Route path="payment-success"  element={<PaymentSuccessPage />} />
                 <Route path="feedback"         element={<FeedbackPage />} />
+                <Route path="gallery"          element={<StudentGalleryPage />} />
             </Route>
 
             <Route path="/admin" element={
@@ -79,6 +82,7 @@ export default function App() {
                 <Route path="broadcast"       element={<AdminBroadcastPage />} />
                 <Route path="expenses"        element={<AdminExpensesPage />} />
                 <Route path="import"          element={<AdminImportPage />} />
+                <Route path="gallery"         element={<AdminGalleryPage />} />
             </Route>
 
             <Route path="*" element={<NotFoundPage />} />

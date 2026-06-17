@@ -21,10 +21,11 @@ import com.targetzone.library.ui.theme.*
 
 @Composable
 fun AdminStudentsScreen(vm: AdminViewModel, onViewDetails: (String) -> Unit = {}) {
-    val students  by vm.students.collectAsState()
-    val seats     by vm.seats.collectAsState()
-    val isLoading by vm.isLoading.collectAsState()
-    val error     by vm.error.collectAsState()
+    val students      by vm.students.collectAsState()
+    val totalStudents by vm.totalStudents.collectAsState()
+    val seats         by vm.seats.collectAsState()
+    val isLoading     by vm.isLoading.collectAsState()
+    val error         by vm.error.collectAsState()
 
     var search     by remember { mutableStateOf("") }
     var statusFilter by remember { mutableStateOf("") }
@@ -41,6 +42,8 @@ fun AdminStudentsScreen(vm: AdminViewModel, onViewDetails: (String) -> Unit = {}
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(16.dp)) {
             Text("Students", style = MaterialTheme.typography.headlineMedium)
+            if (totalStudents > 0)
+                Text("${students.size} of $totalStudents students", color = TextSub, fontSize = 12.sp)
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = search, onValueChange = { search = it },

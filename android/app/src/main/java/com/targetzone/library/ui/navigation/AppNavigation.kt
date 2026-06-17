@@ -15,6 +15,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Photo
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,6 +44,7 @@ private val studentNavItems = listOf(
     NavItem("membership", Icons.Default.CardMembership, "Membership"),
     NavItem("booking",    Icons.Default.EventSeat,      "Book"),
     NavItem("profile",    Icons.Default.Person,         "Profile"),
+    NavItem("gallery",    Icons.Default.Photo,          "Gallery"),
 )
 
 private val adminNavItems = listOf(
@@ -51,7 +54,8 @@ private val adminNavItems = listOf(
     NavItem("admin/reminders",   Icons.Default.Notifications,"Alerts"),
     NavItem("admin/feedback",    Icons.Default.Feedback,     "Feedback"),
     NavItem("admin/expenses",    Icons.Default.Receipt,      "Expenses"),
-    NavItem("admin/import",      Icons.Default.CloudUpload,  "Import"),
+    NavItem("admin/import",      Icons.Default.CloudUpload,   "Import"),
+    NavItem("admin/gallery",     Icons.Default.PhotoLibrary, "Gallery"),
 )
 
 @Composable
@@ -143,6 +147,7 @@ fun AppNavigation(tokenManager: TokenManager) {
             composable("profile")         { ProfileScreen(studentVm, onLogout = logout) }
             composable("facilities")      { FacilitiesScreen() }
             composable("feedback")        { FeedbackScreen(studentVm) }
+            composable("gallery")         { StudentGalleryScreen(studentVm) }
             composable("payment-success") { PaymentSuccessScreen(studentVm) { navController.navigate("dashboard") { popUpTo("payment-success") { inclusive = true } } } }
 
             // Admin routes
@@ -182,6 +187,9 @@ fun AppNavigation(tokenManager: TokenManager) {
             }
             composable("admin/import") {
                 AdminScaffold("Import Students", onLogout = logout) { AdminImportScreen(adminVm) }
+            }
+            composable("admin/gallery") {
+                AdminScaffold("Photo Gallery", onLogout = logout) { AdminGalleryScreen(adminVm) }
             }
         }
     }
