@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import NotFoundPage from './pages/NotFoundPage'
 import { useSelector } from 'react-redux'
 
 import LandingPage              from './pages/LandingPage'
@@ -80,7 +81,7 @@ export default function App() {
                 <Route path="import"          element={<AdminImportPage />} />
             </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
         </Routes>
     )
 }
