@@ -132,4 +132,13 @@ interface ApiService {
 
     @POST("admin/memberships/create")
     suspend fun createMembership(@Body req: CreateMembershipRequest): Response<ApiResponse<Membership>>
+
+    @GET("admin/expenses")
+    suspend fun getExpenses(
+        @Query("year") year: Int,
+        @Query("month") month: Int
+    ): Response<ApiResponse<MonthlyExpense>>
+
+    @POST("admin/expenses")
+    suspend fun saveExpenses(@Body req: SaveExpenseRequest): Response<ApiResponse<MonthlyExpense>>
 }

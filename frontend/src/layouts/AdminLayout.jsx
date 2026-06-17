@@ -21,6 +21,7 @@ export default function AdminLayout() {
         { to: '/admin/feedback',         icon: '◎', label: t('admin.sidebar.nav.feedback') },
         { to: '/admin/memberships/new', icon: '⊕', label: t('admin.sidebar.nav.newMembership') },
         { to: '/admin/broadcast',       icon: '◷', label: t('admin.sidebar.nav.broadcast') },
+        { to: '/admin/expenses',        icon: '₹', label: t('admin.sidebar.nav.expenses') },
     ]
 
     return (

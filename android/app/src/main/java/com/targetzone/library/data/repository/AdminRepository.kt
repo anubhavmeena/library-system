@@ -75,4 +75,14 @@ class AdminRepository {
         val res = api.createMembership(req)
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to create membership")
     }
+
+    suspend fun getExpenses(year: Int, month: Int): Result<MonthlyExpense> = runCatching {
+        val res = api.getExpenses(year, month)
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to load expenses")
+    }
+
+    suspend fun saveExpenses(req: SaveExpenseRequest): Result<MonthlyExpense> = runCatching {
+        val res = api.saveExpenses(req)
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to save expenses")
+    }
 }

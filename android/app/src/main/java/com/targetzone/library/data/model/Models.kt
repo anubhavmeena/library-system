@@ -188,3 +188,24 @@ data class BroadcastRequest(val message: String, val targetGroup: String = "ALL"
 data class SubmitFeedbackRequest(val type: String, val subject: String, val description: String)
 data class UpdateFeedbackRequest(val status: String, val adminNotes: String?)
 data class CreateMembershipRequest(val userId: String, val planId: String, val seatNumber: String, val shift: String, val startDate: String)
+
+data class MonthlyExpense(
+    val year: Int = 0,
+    val month: Int = 0,
+    val waterTankerQty: Int = 0,
+    val waterTankerPrice: Double = 0.0,
+    val electricityBill: Double = 0.0,
+    val internetBill: Double = 0.0,
+    val miscellaneous: Double = 0.0,
+    val totalExpense: Double = 0.0
+)
+
+data class SaveExpenseRequest(
+    val year: Int,
+    val month: Int,
+    val waterTankerQty: Int,
+    val waterTankerPrice: Double,
+    val electricityBill: Double,
+    val internetBill: Double,
+    val miscellaneous: Double
+)

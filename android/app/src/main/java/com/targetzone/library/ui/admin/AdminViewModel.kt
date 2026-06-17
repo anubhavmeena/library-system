@@ -24,6 +24,8 @@ class AdminViewModel(
     val feedback     = MutableStateFlow<List<FeedbackItem>>(emptyList())
     val plans        = MutableStateFlow<List<Plan>>(emptyList())
 
+    val expense      = MutableStateFlow<MonthlyExpense?>(null)
+
     val isLoading    = MutableStateFlow(false)
     val error        = MutableStateFlow<String?>(null)
     val successMsg   = MutableStateFlow<String?>(null)
@@ -124,6 +126,22 @@ class AdminViewModel(
         isLoading.value = true
         adminRepo.createMembership(req)
             .onSuccess { successMsg.value = "Membership created for seat ${it.seatNumber}"; onDone() }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
+    fun loadExpenses(year: Int, month: Int) = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.getExpenses(year, month)
+            .onSuccess { expense.value = it }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
+    fun saveExpenses(req: SaveExpenseRequest, onDone: () -> Unit) = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.saveExpenses(req)
+            .onSuccess { expense.value = it; successMsg.value = "Expenses saved"; onDone() }
             .onFailure { error.value = it.message }
         isLoading.value = false
     }

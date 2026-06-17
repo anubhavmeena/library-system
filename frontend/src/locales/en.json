@@ -161,7 +161,8 @@
         "reminders": "Reminders",
         "feedback": "Feedback",
         "newMembership": "New Membership",
-        "broadcast": "Broadcast"
+        "broadcast": "Broadcast",
+        "expenses": "Expenses"
       },
       "logout": "Logout"
     }
@@ -754,5 +755,23 @@
       "created": "Membership created successfully",
       "createFailed": "Failed to create membership"
     }
+  },
+  "adminExpenses": {
+    "title": "Monthly Expenses",
+    "subtitle": "Track operating costs for the selected month",
+    "monthLabel": "Month",
+    "waterTankers": "Water Tankers",
+    "tankerQty": "Quantity (tankers)",
+    "tankerPrice": "Price per Tanker (₹)",
+    "electricityBill": "Electricity Bill (₹)",
+    "internetBill": "Internet Bill (₹)",
+    "miscellaneous": "Miscellaneous (₹)",
+    "totalExpense": "Total Expenses",
+    "waterSubtotal": "Water subtotal",
+    "save": "Save Expenses",
+    "saving": "Saving…",
+    "saved": "Expenses saved successfully",
+    "loadFailed": "Failed to load expenses",
+    "saveFailed": "Failed to save expenses"
   }
 }

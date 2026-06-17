@@ -27,6 +27,7 @@ import AdminRemindersPage from './pages/admin/AdminRemindersPage'
 import AdminFeedbackPage  from './pages/admin/AdminFeedbackPage'
 import AdminCreateMembershipPage from './pages/admin/AdminCreateMembershipPage'
 import AdminBroadcastPage from './pages/admin/AdminBroadcastPage'
+import AdminExpensesPage  from './pages/admin/AdminExpensesPage'
 
 import FeedbackPage       from './pages/student/FeedbackPage'
 
@@ -74,6 +75,7 @@ export default function App() {
                 <Route path="feedback"         element={<AdminFeedbackPage />} />
                 <Route path="memberships/new" element={<AdminCreateMembershipPage />} />
                 <Route path="broadcast"       element={<AdminBroadcastPage />} />
+                <Route path="expenses"        element={<AdminExpensesPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

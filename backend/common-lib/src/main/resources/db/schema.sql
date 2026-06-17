@@ -84,6 +84,21 @@ CREATE TABLE IF NOT EXISTS seat_bookings (
     UNIQUE (seat_id, shift, booking_date)
 );
 
+-- monthly_expenses (owned by admin-service)
+CREATE TABLE IF NOT EXISTS monthly_expenses (
+    id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    year               INTEGER       NOT NULL,
+    month              INTEGER       NOT NULL,
+    water_tanker_qty   INTEGER       NOT NULL DEFAULT 0,
+    water_tanker_price NUMERIC(10,2) NOT NULL DEFAULT 0,
+    electricity_bill   NUMERIC(10,2) NOT NULL DEFAULT 0,
+    internet_bill      NUMERIC(10,2) NOT NULL DEFAULT 0,
+    miscellaneous      NUMERIC(10,2) NOT NULL DEFAULT 0,
+    created_at         TIMESTAMP,
+    updated_at         TIMESTAMP,
+    UNIQUE (year, month)
+);
+
 -- notification_logs (owned by notification-service)
 CREATE TABLE IF NOT EXISTS notification_logs (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
