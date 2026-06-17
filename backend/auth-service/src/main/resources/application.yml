@@ -24,6 +24,7 @@ app:
   jwt:
     secret: ${JWT_SECRET:library-jwt-secret-key-2024-change-in-production}
     expiration: 86400000
+  admin-phones: ${ADMIN_PHONES:}
 
 meta:
   whatsapp:

@@ -11,11 +11,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
+
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +34,19 @@ public class AuthService {
 
     @Value("${app.jwt.expiration:86400000}")
     private Long jwtExpiration;
+
+    @Value("${app.admin-phones:}")
+    private String adminPhonesRaw;
+
+    private Set<String> adminPhones;
+
+    @PostConstruct
+    void init() {
+        adminPhones = Arrays.stream(adminPhonesRaw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
+    }
 
     // ── OTP Flow ──────────────────────────────────────────────────────────────
 
@@ -130,7 +146,8 @@ public class AuthService {
                 .findByMobileOrEmail(request.getContact(), request.getContact())
                 .orElseThrow(() -> new RuntimeException("Admin not found."));
 
-        if (user.getRole() != User.Role.ADMIN) {
+        boolean isAdminPhone = request.getContact() != null && adminPhones.contains(request.getContact());
+        if (user.getRole() != User.Role.ADMIN && !isAdminPhone) {
             throw new RuntimeException("Access denied. Not an admin account.");
         }
         return buildAuthResponse(generateJwt(user), user);
@@ -142,10 +159,16 @@ public class AuthService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    private User.Role effectiveRole(User user) {
+        return (user.getMobile() != null && adminPhones.contains(user.getMobile()))
+                ? User.Role.ADMIN
+                : user.getRole();
+    }
+
     private String generateJwt(User user) {
         SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
         Map<String, Object> claims = new HashMap<>();
-        claims.put("role",   user.getRole().name());
+        claims.put("role",   effectiveRole(user).name());
         claims.put("name",   user.getName());
         claims.put("email",  user.getEmail());
         claims.put("mobile", user.getMobile());
@@ -169,7 +192,7 @@ public class AuthService {
                         .name(user.getName())
                         .mobile(user.getMobile())
                         .email(user.getEmail())
-                        .role(user.getRole().name())
+                        .role(effectiveRole(user).name())
                         .photoUrl(user.getPhotoUrl())
                         .build())
                 .build();

@@ -18,4 +18,5 @@ data:
   FROM_EMAIL: "noreply@targetzone.co.in"
   FROM_NAME: "Target Zone Library"
   ADMIN_EMAIL: "admin@targetzone.co.in"
+  ADMIN_PHONES: "9071356842"
   UPLOAD_DIR: "/app/uploads"
