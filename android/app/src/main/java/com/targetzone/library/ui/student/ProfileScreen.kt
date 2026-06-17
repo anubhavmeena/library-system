@@ -87,7 +87,7 @@ fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
         Box(Modifier.align(Alignment.CenterHorizontally)) {
             if (!profile?.photoUrl.isNullOrBlank()) {
                 AsyncImage(
-                    model = profile!!.photoUrl,
+                    model = profile!!.photoUrl?.let { if (it.startsWith("http")) it else "https://targetzone.co.in$it" },
                     contentDescription = "Profile Photo",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.size(90.dp).clip(CircleShape).border(2.dp, Amber, CircleShape)
@@ -187,7 +187,7 @@ fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
             Spacer(Modifier.width(8.dp))
             Text("Logout", fontWeight = FontWeight.SemiBold)
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(32.dp))
     }
 }
 

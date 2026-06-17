@@ -30,7 +30,10 @@ fun MembershipScreen(vm: StudentViewModel, onBookNow: () -> Unit) {
         max(0L, ((java.text.SimpleDateFormat("yyyy-MM-dd").parse(it.endDate)?.time ?: 0L) - System.currentTimeMillis()) / 86400000L).toInt()
     }
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp)) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp)
+    ) {
         item {
             Text("Membership", style = MaterialTheme.typography.headlineMedium)
             Text("Your current plan & history", color = TextSub, fontSize = 13.sp)

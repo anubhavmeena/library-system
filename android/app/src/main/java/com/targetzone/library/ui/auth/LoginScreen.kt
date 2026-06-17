@@ -1,5 +1,6 @@
 package com.targetzone.library.ui.auth
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -9,11 +10,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.targetzone.library.R
 import com.targetzone.library.ui.components.AppTextField
 import com.targetzone.library.ui.components.PrimaryButton
 import com.targetzone.library.ui.theme.*
@@ -44,7 +47,11 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("📚", fontSize = 56.sp, textAlign = TextAlign.Center)
+        Image(
+            painter = painterResource(R.drawable.ic_splash_logo),
+            contentDescription = null,
+            modifier = Modifier.size(80.dp)
+        )
         Spacer(Modifier.height(16.dp))
         Text("Target Zone Library", style = MaterialTheme.typography.headlineMedium, color = Amber, textAlign = TextAlign.Center)
         Text("Student Login", style = MaterialTheme.typography.bodyMedium, color = TextSub, textAlign = TextAlign.Center)

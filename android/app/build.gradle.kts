@@ -51,5 +51,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.coil.compose)
     implementation(libs.razorpay.checkout)
+    implementation(libs.androidx.splashscreen)
     debugImplementation(libs.androidx.ui.tooling)
 }
