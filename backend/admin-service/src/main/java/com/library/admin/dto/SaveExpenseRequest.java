@@ -3,6 +3,7 @@ package com.library.admin.dto;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data @NoArgsConstructor @AllArgsConstructor
 public class SaveExpenseRequest {
@@ -12,5 +13,5 @@ public class SaveExpenseRequest {
     private BigDecimal waterTankerPrice;
     private BigDecimal electricityBill;
     private BigDecimal internetBill;
-    private BigDecimal miscellaneous;
+    private List<MiscItemDto> miscItems;
 }

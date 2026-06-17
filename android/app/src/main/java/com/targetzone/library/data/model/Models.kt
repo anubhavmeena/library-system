@@ -191,6 +191,11 @@ data class SubmitFeedbackRequest(val type: String, val subject: String, val desc
 data class UpdateFeedbackRequest(val status: String, val adminNotes: String?)
 data class CreateMembershipRequest(val userId: String, val planId: String, val seatNumber: String, val shift: String, val startDate: String)
 
+data class MiscItem(
+    val description: String = "",
+    val amount: Double = 0.0
+)
+
 data class MonthlyExpense(
     val year: Int = 0,
     val month: Int = 0,
@@ -198,8 +203,9 @@ data class MonthlyExpense(
     val waterTankerPrice: Double = 0.0,
     val electricityBill: Double = 0.0,
     val internetBill: Double = 0.0,
-    val miscellaneous: Double = 0.0,
-    val totalExpense: Double = 0.0
+    val miscellaneous: Double = 0.0,   // sum of miscItems, returned by backend
+    val totalExpense: Double = 0.0,
+    val miscItems: List<MiscItem> = emptyList()
 )
 
 data class ImportResult(
@@ -231,5 +237,5 @@ data class SaveExpenseRequest(
     val waterTankerPrice: Double,
     val electricityBill: Double,
     val internetBill: Double,
-    val miscellaneous: Double
+    val miscItems: List<MiscItem>
 )
