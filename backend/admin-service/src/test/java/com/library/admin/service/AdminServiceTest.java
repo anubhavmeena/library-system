@@ -150,10 +150,10 @@ class AdminServiceTest {
         when(membershipRepository.findByUserIdAndStatus(uid, Membership.Status.ACTIVE))
                 .thenReturn(Optional.of(mem));
 
-        List<StudentDto> result = adminService.getAllStudents(0, 20, null, null);
+        StudentListDto result = adminService.getAllStudents(0, 20, null, null);
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getMembershipId()).isEqualTo(mem.getId().toString());
+        assertThat(result.getStudents()).hasSize(1);
+        assertThat(result.getStudents().get(0).getMembershipId()).isEqualTo(mem.getId().toString());
     }
 
     @Test
@@ -164,10 +164,10 @@ class AdminServiceTest {
         when(membershipRepository.findByUserIdAndStatus(uid, Membership.Status.ACTIVE))
                 .thenReturn(Optional.empty());
 
-        List<StudentDto> result = adminService.getAllStudents(0, 20, null, null);
+        StudentListDto result = adminService.getAllStudents(0, 20, null, null);
 
-        assertThat(result.get(0).getMembershipId()).isNull();
-        assertThat(result.get(0).getDaysRemaining()).isZero();
+        assertThat(result.getStudents().get(0).getMembershipId()).isNull();
+        assertThat(result.getStudents().get(0).getDaysRemaining()).isZero();
     }
 
     @Test
@@ -185,9 +185,9 @@ class AdminServiceTest {
         when(userRepository.findStudentsByStatus(any(), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        List<StudentDto> result = adminService.getAllStudents(0, 20, null, null);
+        StudentListDto result = adminService.getAllStudents(0, 20, null, null);
 
-        assertThat(result).isEmpty();
+        assertThat(result.getStudents()).isEmpty();
     }
 
     // ================================================================

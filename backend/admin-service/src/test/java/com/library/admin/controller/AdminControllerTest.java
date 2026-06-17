@@ -59,19 +59,19 @@ class AdminControllerTest {
 
     @Test
     void getAllStudents_defaultParams_forwardsPageZeroSize20() throws Exception {
-        when(adminService.getAllStudents(eq(0), eq(20), isNull(), isNull())).thenReturn(List.of());
+        when(adminService.getAllStudents(eq(0), eq(20), isNull(), isNull())).thenReturn(new StudentListDto(List.of(), 0));
 
         mockMvc.perform(get("/api/admin/students"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data").isArray());
+                .andExpect(jsonPath("$.data.students").isArray());
 
         verify(adminService).getAllStudents(0, 20, null, null);
     }
 
     @Test
     void getAllStudents_customParams_forwarded() throws Exception {
-        when(adminService.getAllStudents(eq(2), eq(5), eq("ACTIVE"), isNull())).thenReturn(List.of());
+        when(adminService.getAllStudents(eq(2), eq(5), eq("ACTIVE"), isNull())).thenReturn(new StudentListDto(List.of(), 0));
 
         mockMvc.perform(get("/api/admin/students")
                         .param("page", "2")
@@ -90,11 +90,11 @@ class AdminControllerTest {
                 .isActive(true)
                 .build();
 
-        when(adminService.getAllStudents(anyInt(), anyInt(), any(), any())).thenReturn(List.of(student));
+        when(adminService.getAllStudents(anyInt(), anyInt(), any(), any())).thenReturn(new StudentListDto(List.of(student), 1));
 
         mockMvc.perform(get("/api/admin/students"))
-                .andExpect(jsonPath("$.data", hasSize(1)))
-                .andExpect(jsonPath("$.data[0].name").value("Alice"));
+                .andExpect(jsonPath("$.data.students", hasSize(1)))
+                .andExpect(jsonPath("$.data.students[0].name").value("Alice"));
     }
 
     // ── GET /api/admin/students/{userId} ────────────────────────────────────
