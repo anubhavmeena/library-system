@@ -5,9 +5,13 @@ import com.library.notification.repository.NotificationLogRepository;
 import com.sendgrid.*;
 import com.sendgrid.helpers.mail.Mail;
 import com.sendgrid.helpers.mail.objects.*;
+import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -23,6 +27,12 @@ public class EmailService {
 
     private final NotificationLogRepository logRepository;
 
+    @Autowired(required = false)
+    private JavaMailSender mailSender;
+
+    @Value("${spring.mail.host:}")
+    private String smtpHost;
+
     @Value("${sendgrid.api-key:}")
     private String sendgridApiKey;
 
@@ -32,30 +42,11 @@ public class EmailService {
     @Value("${notification.from-name:Target Zone Library}")
     private String fromName;
 
-    /**
-     * Send a plain-text email via SendGrid and persist a delivery log entry.
-     *
-     * @param to      Recipient email address
-     * @param subject Email subject line
-     * @param body    Plain-text message body
-     * @param userId  Student UUID for audit log — nullable (e.g. admin alerts)
-     * @param event   Event type label stored in notification_logs
-     *                e.g. BOOKING_CONFIRMED, RENEWAL_REMINDER, USER_REGISTERED
-     */
     public void sendText(String to, String subject, String body,
                          String userId, String event) {
         send(to, subject, body, null, userId, event);
     }
 
-    /**
-     * Send an HTML email via SendGrid and persist a delivery log entry.
-     *
-     * @param to       Recipient email address
-     * @param subject  Email subject line
-     * @param htmlBody HTML message body (inline CSS recommended for email clients)
-     * @param userId   Student UUID for audit log — nullable
-     * @param event    Event type label stored in notification_logs
-     */
     public void sendHtml(String to, String subject, String htmlBody,
                          String userId, String event) {
         send(to, subject, null, htmlBody, userId, event);
@@ -67,48 +58,77 @@ public class EmailService {
                       String textBody, String htmlBody,
                       String userId, String event) {
 
-        DeliveryStatus status = DeliveryStatus.SENT;
-        String errorMessage = null;
-        // Use whichever body type was supplied — for logging purposes
         String logBody = textBody != null ? textBody : htmlBody;
 
-        if (sendgridApiKey.isBlank()) {
-            // Dev mode — log to console, no actual send
+        // Dev mode: nothing configured → log to console only
+        if (smtpHost.isBlank() && sendgridApiKey.isBlank()) {
             log.info("[DEV] Email → {} | Subject: {} | Body:\n{}", to, subject, logBody);
-        } else {
+            saveLog(userId, to, logBody, event, DeliveryStatus.SENT, null);
+            return;
+        }
+
+        // 1. Try local SMTP (Postfix)
+        if (!smtpHost.isBlank() && mailSender != null) {
             try {
-                Email   from    = new Email(fromEmail, fromName);
-                Email   toEmail = new Email(to);
-                Content content = (htmlBody != null)
-                        ? new Content("text/html",  htmlBody)
-                        : new Content("text/plain", textBody);
-
-                Mail mail = new Mail(from, subject, toEmail, content);
-
-                SendGrid sg  = new SendGrid(sendgridApiKey);
-                Request  req = new Request();
-                req.setMethod(Method.POST);
-                req.setEndpoint("mail/send");
-                req.setBody(mail.build());
-
-                Response response = sg.api(req);
-
-                if (response.getStatusCode() >= 400) {
-                    // SendGrid returned an error HTTP status
-                    status       = DeliveryStatus.FAILED;
-                    errorMessage = "SendGrid HTTP "
-                            + response.getStatusCode() + ": " + response.getBody();
-                    log.error("Email send failed to {}: {}", to, errorMessage);
+                MimeMessage msg = mailSender.createMimeMessage();
+                MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
+                helper.setFrom(fromEmail, fromName);
+                helper.setTo(to);
+                helper.setSubject(subject);
+                if (htmlBody != null) {
+                    helper.setText(htmlBody, true);
                 } else {
-                    log.info("Email sent to {} | Subject: {}", to, subject);
+                    helper.setText(textBody != null ? textBody : "", false);
                 }
-
-            } catch (IOException e) {
-                status       = DeliveryStatus.FAILED;
-                errorMessage = e.getMessage();
-                log.error("Email send exception to {}: {}", to, e.getMessage());
-                // Do NOT rethrow — notification failure must not crash the Kafka consumer
+                mailSender.send(msg);
+                log.info("Email sent via SMTP to {} | Subject: {}", to, subject);
+                saveLog(userId, to, logBody, event, DeliveryStatus.SENT, null);
+                return;
+            } catch (Exception e) {
+                log.warn("SMTP send failed to {}, falling back to SendGrid: {}", to, e.getMessage());
             }
+        }
+
+        // 2. Fallback: SendGrid REST API
+        if (sendgridApiKey.isBlank()) {
+            log.info("[DEV] Email (no SendGrid key) → {} | Subject: {}", to, subject);
+            saveLog(userId, to, logBody, event, DeliveryStatus.SENT, null);
+            return;
+        }
+
+        DeliveryStatus status = DeliveryStatus.SENT;
+        String errorMessage = null;
+
+        try {
+            Email   from    = new Email(fromEmail, fromName);
+            Email   toEmail = new Email(to);
+            Content content = (htmlBody != null)
+                    ? new Content("text/html",  htmlBody)
+                    : new Content("text/plain", textBody);
+
+            Mail mail = new Mail(from, subject, toEmail, content);
+
+            SendGrid sg  = new SendGrid(sendgridApiKey);
+            Request  req = new Request();
+            req.setMethod(Method.POST);
+            req.setEndpoint("mail/send");
+            req.setBody(mail.build());
+
+            Response response = sg.api(req);
+
+            if (response.getStatusCode() >= 400) {
+                status       = DeliveryStatus.FAILED;
+                errorMessage = "SendGrid HTTP "
+                        + response.getStatusCode() + ": " + response.getBody();
+                log.error("Email send failed to {}: {}", to, errorMessage);
+            } else {
+                log.info("Email sent via SendGrid to {} | Subject: {}", to, subject);
+            }
+
+        } catch (IOException e) {
+            status       = DeliveryStatus.FAILED;
+            errorMessage = e.getMessage();
+            log.error("Email send exception to {}: {}", to, e.getMessage());
         }
 
         saveLog(userId, to, logBody, event, status, errorMessage);
@@ -116,18 +136,10 @@ public class EmailService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /**
-     * Persists every send attempt to notification_logs — both successes and failures.
-     * Message body is truncated to 1000 characters before saving to avoid
-     * bloating the DB with full HTML email bodies.
-     * Wrapped in try-catch so a DB write failure never prevents the attempt log
-     * from blocking any downstream logic.
-     */
     private void saveLog(String userId, String recipient, String message,
                          String event, DeliveryStatus status,
                          String errorMessage) {
         try {
-            // Truncate long bodies (e.g. HTML emails) before persisting
             String truncated = (message != null)
                     ? message.substring(0, Math.min(message.length(), 1000))
                     : "";
