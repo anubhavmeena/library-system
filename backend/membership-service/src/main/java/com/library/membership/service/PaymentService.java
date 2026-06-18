@@ -294,7 +294,7 @@ public class PaymentService {
                 log.info("Cashfree order created: {} (cf_order_id={}) for membership: {}",
                         resp.getOrderId(), resp.getCfOrderId(), membership.getId());
 
-                return new String[]{ resp.getCfOrderId(), resp.getPaymentSessionId() };
+                return new String[]{ resp.getOrderId(), resp.getPaymentSessionId() };
 
             } catch (RuntimeException e) {
                 throw e;
