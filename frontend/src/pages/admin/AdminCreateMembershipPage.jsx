@@ -65,7 +65,7 @@ export default function AdminCreateMembershipPage() {
 
     useEffect(() => {
         api.get('/admin/students?page=0&size=200')
-            .then(r => setStudents(r.data.data || []))
+            .then(r => setStudents(r.data.data?.students || []))
             .catch(() => toast.error(t('adminNewMembership.toasts.loadStudentsFailed')))
             .finally(() => setStudentsLoading(false))
     }, [])
