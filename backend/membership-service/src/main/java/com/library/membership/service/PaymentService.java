@@ -15,15 +15,19 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -35,14 +39,32 @@ public class PaymentService {
     private final PaymentRepository             paymentRepository;
     private final PlanRepository                planRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final RestTemplate                  restTemplate;
 
+    @Value("${app.payment-gateway:CASHFREE}")
+    private String activeGateway;
+
+    @Value("${app.user-service.base-url}")
+    private String userServiceBaseUrl;
+
+    // Razorpay
     @Value("${razorpay.key-id:}")
     private String razorpayKeyId;
 
     @Value("${razorpay.key-secret:}")
     private String razorpayKeySecret;
 
-    // ── Create Razorpay Order ─────────────────────────────────────────────────
+    // Cashfree
+    @Value("${cashfree.app-id:}")
+    private String cashfreeAppId;
+
+    @Value("${cashfree.secret-key:}")
+    private String cashfreeSecretKey;
+
+    @Value("${cashfree.env:sandbox}")
+    private String cashfreeEnv;
+
+    // ── Create Order ──────────────────────────────────────────────────────────
 
     @Transactional
     public CreateOrderResponse createOrder(String userId, CreateOrderRequest request) {
@@ -86,34 +108,17 @@ public class PaymentService {
 
         membership = membershipRepository.save(membership);
 
-        // 5. Create Razorpay order — or generate a dev mock if credentials absent
+        // 5. Create gateway order — or generate a dev mock if credentials absent
         String gatewayOrderId;
-        if (!razorpayKeyId.isBlank()) {
-            try {
-                RazorpayClient client = new RazorpayClient(razorpayKeyId, razorpayKeySecret);
+        String paymentSessionId = null;
 
-                JSONObject options = new JSONObject();
-                // Razorpay expects amount in paise (1 INR = 100 paise)
-                options.put("amount",
-                        plan.getPrice().multiply(BigDecimal.valueOf(100)).intValue());
-                options.put("currency", "INR");
-                options.put("receipt",
-                        "lib_" + membership.getId().toString().substring(0, 8));
-
-                Order order    = client.orders.create(options);
-                gatewayOrderId = order.get("id");
-
-                log.info("Razorpay order created: {} for membership: {}",
-                        gatewayOrderId, membership.getId());
-
-            } catch (Exception e) {
-                log.error("Razorpay order creation failed: {}", e.getMessage());
-                throw new RuntimeException("Payment gateway error. Please try again.");
-            }
+        if ("RAZORPAY".equals(activeGateway)) {
+            gatewayOrderId = createRazorpayOrder(plan, membership);
         } else {
-            // Dev mode: prefix dev_ so verifyAndActivateMembership skips HMAC check
-            gatewayOrderId = "dev_order_" + UUID.randomUUID().toString().substring(0, 8);
-            log.info("DEV MODE: Fake Razorpay order: {}", gatewayOrderId);
+            // CASHFREE (default)
+            String[] cashfreeResult = createCashfreeOrder(plan, membership, userId);
+            gatewayOrderId   = cashfreeResult[0];
+            paymentSessionId = cashfreeResult[1]; // null in dev mode
         }
 
         // 6. Persist payment record in PENDING state
@@ -121,18 +126,21 @@ public class PaymentService {
                 .membershipId(membership.getId())
                 .userId(UUID.fromString(userId))
                 .amount(plan.getPrice())
+                .paymentGateway(activeGateway)
                 .gatewayOrderId(gatewayOrderId)
                 .status(Payment.Status.PENDING)
                 .build();
         paymentRepository.save(payment);
 
-        // 7. Return order details to frontend so it can open Razorpay checkout
+        // 7. Return order details to frontend
         return CreateOrderResponse.builder()
                 .orderId(gatewayOrderId)
                 .membershipId(membership.getId().toString())
                 .amount(plan.getPrice())
                 .currency("INR")
-                .razorpayKeyId(razorpayKeyId)
+                .gateway(activeGateway)
+                .paymentSessionId(paymentSessionId)
+                .razorpayKeyId("RAZORPAY".equals(activeGateway) ? razorpayKeyId : null)
                 .build();
     }
 
@@ -142,15 +150,23 @@ public class PaymentService {
     public MembershipDto verifyAndActivateMembership(String userId,
                                                      PaymentVerifyRequest request) {
 
-        // 1. Skip HMAC verification in dev mode (dev_ prefix) or if not configured
-        if (!razorpayKeySecret.isBlank()
-                && request.getSignature() != null
-                && !request.getGatewayOrderId().startsWith("dev_")) {
-            verifySignature(
-                    request.getGatewayOrderId(),
-                    request.getGatewayPaymentId(),
-                    request.getSignature()
-            );
+        // 1. Gateway-specific verification (skipped in dev mode)
+        if ("RAZORPAY".equals(activeGateway)) {
+            if (!razorpayKeySecret.isBlank()
+                    && request.getSignature() != null
+                    && !request.getGatewayOrderId().startsWith("dev_")) {
+                verifyRazorpaySignature(
+                        request.getGatewayOrderId(),
+                        request.getGatewayPaymentId(),
+                        request.getSignature()
+                );
+            }
+        } else {
+            // CASHFREE: verify order status via API poll
+            if (!cashfreeSecretKey.isBlank()
+                    && !request.getGatewayOrderId().startsWith("dev_")) {
+                verifyCashfreeOrder(request.getGatewayOrderId());
+            }
         }
 
         // 2. Update payment → SUCCESS
@@ -170,11 +186,7 @@ public class PaymentService {
         membership.setStatus(Membership.Status.ACTIVE);
         membership = membershipRepository.save(membership);
 
-        // 4. Publish Kafka event → notification-service will send
-        //    WhatsApp + email to student and an alert email to admin.
-        //    Note: userName/userMobile/userEmail are left null here.
-        //    notification-service fetches them from user-service using userId
-        //    to avoid coupling membership-service to user-service.
+        // 4. Publish Kafka event → notification-service sends WhatsApp + email
         BookingConfirmedEvent event = BookingConfirmedEvent.builder()
                 .userId(userId)
                 .membershipId(membership.getId().toString())
@@ -195,11 +207,40 @@ public class PaymentService {
         return MembershipDto.fromEntity(membership);
     }
 
-    // ── HMAC-SHA256 Signature Verification ────────────────────────────────────
-    // Razorpay signs responses as: HMAC_SHA256(orderId + "|" + paymentId, keySecret)
-    // We verify this to confirm the payment callback is genuinely from Razorpay.
+    // ── Razorpay Helpers ──────────────────────────────────────────────────────
 
-    private void verifySignature(String orderId, String paymentId, String signature) {
+    private String createRazorpayOrder(Plan plan, Membership membership) {
+        if (!razorpayKeyId.isBlank()) {
+            try {
+                RazorpayClient client = new RazorpayClient(razorpayKeyId, razorpayKeySecret);
+
+                JSONObject options = new JSONObject();
+                options.put("amount",
+                        plan.getPrice().multiply(BigDecimal.valueOf(100)).intValue());
+                options.put("currency", "INR");
+                options.put("receipt",
+                        "lib_" + membership.getId().toString().substring(0, 8));
+
+                Order order = client.orders.create(options);
+                String orderId = order.get("id");
+
+                log.info("Razorpay order created: {} for membership: {}",
+                        orderId, membership.getId());
+                return orderId;
+
+            } catch (Exception e) {
+                log.error("Razorpay order creation failed: {}", e.getMessage());
+                throw new RuntimeException("Payment gateway error. Please try again.");
+            }
+        } else {
+            String orderId = "dev_order_" + UUID.randomUUID().toString().substring(0, 8);
+            log.info("DEV MODE: Fake Razorpay order: {}", orderId);
+            return orderId;
+        }
+    }
+
+    // Signature: HMAC_SHA256(orderId + "|" + paymentId, keySecret)
+    private void verifyRazorpaySignature(String orderId, String paymentId, String signature) {
         try {
             String payload = orderId + "|" + paymentId;
             Mac    mac     = Mac.getInstance("HmacSHA256");
@@ -217,5 +258,109 @@ public class PaymentService {
         } catch (Exception e) {
             throw new RuntimeException("Signature verification error: " + e.getMessage());
         }
+    }
+
+    // ── Cashfree Helpers ──────────────────────────────────────────────────────
+
+    // Returns [gatewayOrderId, paymentSessionId] — paymentSessionId is null in dev mode
+    private String[] createCashfreeOrder(Plan plan, Membership membership, String userId) {
+        if (!cashfreeAppId.isBlank()) {
+            try {
+                UserProfileDto user = fetchUserForCashfree(userId);
+
+                Map<String, Object> customerDetails = new HashMap<>();
+                customerDetails.put("customer_id",    userId);
+                customerDetails.put("customer_name",  user.getName()   != null && !user.getName().isBlank()   ? user.getName()   : "Library Student");
+                customerDetails.put("customer_phone", user.getMobile() != null && !user.getMobile().isBlank() ? user.getMobile() : "9999999999");
+                if (user.getEmail() != null && !user.getEmail().isBlank()) {
+                    customerDetails.put("customer_email", user.getEmail());
+                }
+
+                Map<String, Object> body = Map.of(
+                        "order_id",         "lib_" + membership.getId().toString().substring(0, 8),
+                        "order_amount",     plan.getPrice(),
+                        "order_currency",   "INR",
+                        "customer_details", customerDetails
+                );
+
+                CashfreeOrderResponse resp = restTemplate.postForObject(
+                        cashfreeBaseUrl() + "/pg/orders",
+                        new HttpEntity<>(body, cashfreeHeaders()),
+                        CashfreeOrderResponse.class
+                );
+
+                if (resp == null) throw new RuntimeException("Empty response from Cashfree");
+
+                log.info("Cashfree order created: {} (cf_order_id={}) for membership: {}",
+                        resp.getOrderId(), resp.getCfOrderId(), membership.getId());
+
+                return new String[]{ resp.getCfOrderId(), resp.getPaymentSessionId() };
+
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
+                log.error("Cashfree order creation failed: {}", e.getMessage());
+                throw new RuntimeException("Payment gateway error. Please try again.");
+            }
+        } else {
+            String orderId = "dev_order_" + UUID.randomUUID().toString().substring(0, 8);
+            log.info("DEV MODE: Fake Cashfree order: {}", orderId);
+            return new String[]{ orderId, null };
+        }
+    }
+
+    private void verifyCashfreeOrder(String orderId) {
+        try {
+            ResponseEntity<CashfreeOrderResponse> resp = restTemplate.exchange(
+                    cashfreeBaseUrl() + "/pg/orders/" + orderId,
+                    HttpMethod.GET,
+                    new HttpEntity<>(cashfreeHeaders()),
+                    CashfreeOrderResponse.class
+            );
+            CashfreeOrderResponse body = resp.getBody();
+            if (body == null || !"PAID".equals(body.getOrderStatus())) {
+                String status = body != null ? body.getOrderStatus() : "null";
+                throw new IllegalArgumentException(
+                        "Cashfree payment not completed (order_status: " + status + ")");
+            }
+            log.info("Cashfree order verified successfully: {}", orderId);
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Cashfree verification error: " + e.getMessage());
+        }
+    }
+
+    private HttpHeaders cashfreeHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("x-client-id", cashfreeAppId);
+        headers.set("x-client-secret", cashfreeSecretKey);
+        headers.set("x-api-version", "2023-08-01");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return headers;
+    }
+
+    private String cashfreeBaseUrl() {
+        return "production".equals(cashfreeEnv)
+                ? "https://api.cashfree.com"
+                : "https://sandbox.cashfree.com";
+    }
+
+    private UserProfileDto fetchUserForCashfree(String userId) {
+        try {
+            String url = userServiceBaseUrl + "/api/users/" + userId;
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-User-Id", userId);
+            headers.set("X-User-Role", "STUDENT");
+            ResponseEntity<UserApiResponse> resp = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), UserApiResponse.class);
+            if (resp.getBody() != null && resp.getBody().getData() != null) {
+                return resp.getBody().getData();
+            }
+        } catch (Exception e) {
+            log.warn("Could not fetch user details for Cashfree order (userId={}): {}",
+                    userId, e.getMessage());
+        }
+        return new UserProfileDto();
     }
 }

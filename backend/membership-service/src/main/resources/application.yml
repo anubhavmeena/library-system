@@ -34,6 +34,16 @@ razorpay:
   key-id: ${RAZORPAY_KEY_ID:}
   key-secret: ${RAZORPAY_KEY_SECRET:}
 
+cashfree:
+  app-id:     ${CASHFREE_APP_ID:}
+  secret-key: ${CASHFREE_SECRET_KEY:}
+  env:        ${CASHFREE_ENV:sandbox}
+
+app:
+  payment-gateway: ${PAYMENT_GATEWAY:CASHFREE}
+  user-service:
+    base-url: ${USER_SERVICE_URL:http://localhost:8082}
+
 management:
   endpoints:
     web:

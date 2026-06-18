@@ -151,9 +151,13 @@ export default function BookingPage() {
             }
 
             if (order.orderId?.startsWith('dev_')) {
+                // Dev mode — no gateway credentials configured, skip checkout
                 const verifyRes = await dispatch(verifyPayment({ gatewayOrderId: order.orderId, gatewayPaymentId: 'dev_pay_' + Date.now(), signature: 'dev_sig', membershipId: order.membershipId }))
                 if (verifyPayment.fulfilled.match(verifyRes)) await confirmBooking(verifyRes.payload)
+            } else if (order.gateway === 'CASHFREE') {
+                await handleCashfreePayment(order, confirmBooking)
             } else {
+                // RAZORPAY
                 const options = {
                     key: order.razorpayKeyId,
                     amount: order.amount * 100,
@@ -174,6 +178,28 @@ export default function BookingPage() {
         } catch (e) {
             toast.error(e.message || t('booking.toasts.paymentFailed'))
         } finally { setPaying(false) }
+    }
+
+    const handleCashfreePayment = async (order, confirmBooking) => {
+        const { load } = await import('@cashfreepayments/cashfree-js')
+        const cashfree = await load({
+            mode: import.meta.env.VITE_CASHFREE_ENV || 'sandbox',
+        })
+        const result = await cashfree.checkout({
+            paymentSessionId: order.paymentSessionId,
+            redirectTarget: '_modal',
+        })
+        if (result.error) throw new Error(result.error.message || t('booking.toasts.paymentFailed'))
+
+        // Backend verifies payment server-side via Cashfree GET /pg/orders/{id}
+        const verifyRes = await dispatch(verifyPayment({
+            gatewayOrderId:   order.orderId,
+            gatewayPaymentId: order.orderId,
+            signature:        null,
+            membershipId:     order.membershipId,
+        }))
+        if (verifyPayment.fulfilled.match(verifyRes)) await confirmBooking(verifyRes.payload)
+        else toast.error(t('booking.toasts.verifyFailed'))
     }
 
     const StepBar = () => (

@@ -5,11 +5,11 @@ import java.math.BigDecimal;
 
 @Data @Builder @NoArgsConstructor @AllArgsConstructor
 public class CreateOrderResponse {
-    private String     orderId;        // Razorpay order ID (e.g. "order_xxxxx")
-    // or "dev_order_xxx" in dev mode
-    private String     membershipId;   // Our internal membership UUID (PENDING state)
-    private BigDecimal amount;         // Plan price in INR (e.g. 400.00 or 600.00)
-    private String     currency;       // "INR"
-    private String     razorpayKeyId;  // Razorpay publishable key — sent to frontend
-    // so it can open the Razorpay checkout modal
+    private String     orderId;           // Gateway order ID or "dev_order_xxx" in dev mode
+    private String     membershipId;      // Our internal membership UUID (PENDING state)
+    private BigDecimal amount;            // Plan price in INR
+    private String     currency;          // "INR"
+    private String     gateway;           // "CASHFREE" | "RAZORPAY"
+    private String     paymentSessionId;  // Cashfree payment_session_id; null for Razorpay
+    private String     razorpayKeyId;     // Razorpay publishable key; null for Cashfree
 }
