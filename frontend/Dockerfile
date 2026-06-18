@@ -1,6 +1,8 @@
 # Stage 1: Build
 FROM node:20-alpine AS builder
 WORKDIR /app
+ARG VITE_CASHFREE_ENV=sandbox
+ENV VITE_CASHFREE_ENV=$VITE_CASHFREE_ENV
 COPY package.json .
 RUN npm install
 COPY . .

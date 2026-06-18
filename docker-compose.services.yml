@@ -195,6 +195,10 @@ services:
       RAZORPAY_KEY_ID:     ${RAZORPAY_KEY_ID:-}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
       USER_SERVICE_URL:    http://user-service:8082
+      PAYMENT_GATEWAY:     ${PAYMENT_GATEWAY:-CASHFREE}
+      CASHFREE_APP_ID:     ${CASHFREE_APP_ID:-}
+      CASHFREE_SECRET_KEY: ${CASHFREE_SECRET_KEY:-}
+      CASHFREE_ENV:        ${CASHFREE_ENV:-sandbox}
     networks:
       - library-network
     healthcheck:
@@ -312,6 +316,7 @@ services:
       args:
         VITE_API_BASE_URL:     ""        # empty = Nginx proxy handles /api routing
         VITE_RAZORPAY_KEY_ID:  ${RAZORPAY_KEY_ID:-}
+        VITE_CASHFREE_ENV:     ${CASHFREE_ENV:-sandbox}
     image: target-zone/frontend:latest
     container_name: library-frontend
     restart: unless-stopped

@@ -341,7 +341,7 @@ public class PaymentService {
     }
 
     private String cashfreeBaseUrl() {
-        return "production".equals(cashfreeEnv)
+        return "production".equals(cashfreeEnv.trim())
                 ? "https://api.cashfree.com"
                 : "https://sandbox.cashfree.com";
     }
