@@ -195,6 +195,7 @@ export default function BookingPage() {
         const result = await cashfree.checkout({
             paymentSessionId: order.paymentSessionId,
             redirectTarget: '_modal',
+            components: ['upi-qr', 'upi-collect', 'app', 'card', 'netbanking', 'paylater'],
         })
         if (result.error) throw new Error(result.error.message || t('booking.toasts.paymentFailed'))
 
