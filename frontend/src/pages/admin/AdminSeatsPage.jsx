@@ -119,13 +119,18 @@ export default function AdminSeatsPage() {
                 <div className="card p-8"><div className="shimmer w-full h-64 rounded-xl" /></div>
             ) : seatMap ? (
                 <div className="card p-6 overflow-x-auto">
-                    <div className="flex justify-center mb-6">
-                        <div className="px-8 py-2 rounded-lg bg-primary-700/40 border border-primary-600/30 text-primary-400 text-xs tracking-widest uppercase">
-                            {t('adminSeats.entrance')}
+                    <div className="min-w-[640px]">
+                    <div className="flex gap-2 mb-1">
+                        <div className="w-5 flex-shrink-0" />
+                        <div className="invisible pointer-events-none">
+                            <div className="flex gap-1">{L_TOP.map(n => <div key={n} className="w-8 h-0" />)}</div>
+                        </div>
+                        <div className="w-6 flex-shrink-0 flex justify-center">
+                            <span className="text-primary-400 text-[10px] tracking-widest uppercase">ENTRY</span>
                         </div>
                     </div>
-                    <div className="space-y-4 min-w-[640px]">
-                        {ROWS.map((row, rowIdx) => {
+                    <div className="space-y-4">
+                        {ROWS.map(row => {
                             const rowSeats = seatMap.seatsByRow?.[row] || []
                             const find = (sn) => rowSeats.find(s => s.seatNumber === sn)
                             const renderSeat = (n) => {
@@ -149,31 +154,33 @@ export default function AdminSeatsPage() {
                                 )
                             }
                             return (
-                                <div key={row}>
-                                    <div className="flex items-start gap-2">
-                                        <span className="text-primary-400 font-mono text-sm w-5 text-center pt-2">{row}</span>
-                                        <div>
-                                            <div className="flex gap-1">{L_TOP.map(renderSeat)}</div>
-                                            <div className="border-b border-primary-700/40 my-1" />
-                                            <div className="flex gap-1">{L_BOTTOM.map(renderSeat)}</div>
-                                        </div>
-                                        <div className="w-6 flex-shrink-0" />
-                                        <div>
-                                            <div className="flex gap-1">{R_TOP.map(renderSeat)}</div>
-                                            <div className="border-b border-primary-700/40 my-1" />
-                                            <div className="flex gap-1">{R_BOTTOM.map(renderSeat)}</div>
-                                        </div>
+                                <div key={row} className="flex gap-2">
+                                    <span className="text-primary-400 font-mono text-sm w-5 text-center self-start pt-2">{row}</span>
+                                    <div>
+                                        <div className="flex gap-1">{L_TOP.map(renderSeat)}</div>
+                                        <div className="border-b border-primary-700/40 my-1" />
+                                        <div className="flex gap-1">{L_BOTTOM.map(renderSeat)}</div>
                                     </div>
-                                    {rowIdx === 1 && (
-                                        <div className="flex items-center gap-2 mt-3">
-                                            <div className="h-px flex-1 bg-primary-800/40" />
-                                            <span className="text-primary-700 text-xs tracking-widest">WALKWAY</span>
-                                            <div className="h-px flex-1 bg-primary-800/40" />
-                                        </div>
-                                    )}
+                                    <div className="w-6 flex-shrink-0 relative">
+                                        <div className="absolute inset-y-0 left-1/2 w-px bg-primary-700/30 -translate-x-1/2" />
+                                    </div>
+                                    <div>
+                                        <div className="flex gap-1">{R_TOP.map(renderSeat)}</div>
+                                        <div className="border-b border-primary-700/40 my-1" />
+                                        <div className="flex gap-1">{R_BOTTOM.map(renderSeat)}</div>
+                                    </div>
                                 </div>
                             )
                         })}
+                    </div>
+                    <div className="flex gap-2 mt-3 text-[10px] tracking-widest uppercase text-primary-600">
+                        <div className="w-5 flex-shrink-0" />
+                        <div className="flex gap-1">
+                            <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40">EXIT</div>
+                            <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40">RO / PANTRY</div>
+                            <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40">WASHROOM</div>
+                        </div>
+                    </div>
                     </div>
                     <div className="flex flex-wrap gap-6 mt-6 text-xs text-primary-400">
                         <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/10 border border-emerald-500/20" />{t('adminSeats.legend.available')}</div>
