@@ -289,11 +289,11 @@ services:
     container_name: library-admin-service
     restart: unless-stopped
     <<: *default-logging
-    mem_limit: 384m
+    mem_limit: 512m
     ports:
       - "8086:8086"
     environment:
-      <<: [*spring-env, *db-env, *kafka-env, *jvm-light]
+      <<: [*spring-env, *db-env, *kafka-env, *jvm-heavy]
     networks:
       - library-network
     healthcheck:
@@ -301,7 +301,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 40s
+      start_period: 180s
 
   # ─────────────────────────────────────────────────────────────────────
   # Frontend  —  port 3000
