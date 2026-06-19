@@ -144,12 +144,12 @@ public class AdminService {
         Map<UUID, User> userMap = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
 
-        // Build row-ordered seat grid: A(28), B(28), C(28), D(26)
+        // Build row-ordered seat grid: A(28), B(28), C(28), D(28)
         Map<String, Integer> rowCounts = new LinkedHashMap<>();
         rowCounts.put("A", 28);
         rowCounts.put("B", 28);
         rowCounts.put("C", 28);
-        rowCounts.put("D", 26);
+        rowCounts.put("D", 28);
 
         Map<String, List<SeatMapDto.SeatInfoDto>> seatsByRow = new LinkedHashMap<>();
 

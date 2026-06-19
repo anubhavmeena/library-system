@@ -4,6 +4,11 @@ import api from '../../services/api'
 import toast from 'react-hot-toast'
 
 const ROWS = ['A', 'B', 'C', 'D']
+const INACTIVE_SEATS = new Set(['B8', 'B18', 'C18'])
+const L_TOP    = [13, 11, 9, 7, 5, 3, 1]
+const L_BOTTOM = [14, 12, 10, 8, 6, 4, 2]
+const R_TOP    = [15, 17, 19, 21, 23, 25, 27]
+const R_BOTTOM = [16, 18, 20, 22, 24, 26, 28]
 
 export default function AdminStudentsPage() {
     const [students, setStudents] = useState([])
@@ -316,21 +321,24 @@ export default function AdminStudentsPage() {
                                         {t('adminStudents.changeSeatModal.entrance')}
                                     </div>
                                 </div>
-                                <div className="space-y-2 min-w-[520px]">
-                                    {ROWS.map(row => {
-                                        const seats = changeSeatGrid.seatsByRow?.[row] || []
-                                        const half  = Math.ceil(seats.length / 2)
-                                        const left  = seats.slice(0, half)
-                                        const right = seats.slice(half)
-                                        const renderSeat = s => {
+                                <div className="space-y-3 min-w-[640px]">
+                                    {ROWS.map((row, rowIdx) => {
+                                        const rowSeats = changeSeatGrid.seatsByRow?.[row] || []
+                                        const find = (sn) => rowSeats.find(s => s.seatNumber === sn)
+                                        const renderSeat = (n) => {
+                                            const sn = `${row}${n}`
+                                            if (INACTIVE_SEATS.has(sn)) {
+                                                return <div key={sn} className="w-8 h-8 rounded-lg bg-primary-900/50 border border-primary-800/20" title="Blocked" />
+                                            }
+                                            const s = find(sn)
+                                            if (!s) return <div key={sn} className="w-8 h-8 rounded-lg bg-primary-900/40 border border-primary-800/20" />
                                             const isCurrent  = s.seatNumber === changeSeatFor.seatNumber
                                             const isSelected = newSeat === s.seatNumber
                                             return (
-                                                <button
-                                                    key={s.seatNumber}
+                                                <button key={sn}
                                                     disabled={s.isBooked && !isCurrent}
                                                     onClick={() => !isCurrent && setNewSeat(s.seatNumber)}
-                                                    title={isCurrent ? `${s.seatNumber} (current)` : s.isBooked ? `${s.seatNumber} (booked)` : s.seatNumber}
+                                                    title={isCurrent ? `${sn} (current)` : s.isBooked ? `${sn} (booked)` : sn}
                                                     className={`w-8 h-8 rounded-lg text-xs font-medium border transition-all
                                                         ${isCurrent
                                                             ? 'bg-indigo-500/30 border-indigo-400/60 text-indigo-300 cursor-default'
@@ -339,16 +347,33 @@ export default function AdminStudentsPage() {
                                                                 : s.isBooked
                                                                     ? 'bg-red-500/30 border-red-500/50 text-red-400 cursor-not-allowed opacity-60'
                                                                     : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 cursor-pointer'}`}>
-                                                    {s.seatNumber.substring(1)}
+                                                    {sn.substring(1)}
                                                 </button>
                                             )
                                         }
                                         return (
-                                            <div key={row} className="flex items-center gap-3">
-                                                <span className="text-primary-400 font-mono text-sm w-5 text-center">{row}</span>
-                                                <div className="flex gap-1">{left.map(renderSeat)}</div>
-                                                <div className="w-6" />
-                                                <div className="flex gap-1">{right.map(renderSeat)}</div>
+                                            <div key={row}>
+                                                <div className="flex items-start gap-2">
+                                                    <span className="text-primary-400 font-mono text-sm w-5 text-center pt-2">{row}</span>
+                                                    <div>
+                                                        <div className="flex gap-1">{L_TOP.map(renderSeat)}</div>
+                                                        <div className="border-b border-primary-700/40 my-1" />
+                                                        <div className="flex gap-1">{L_BOTTOM.map(renderSeat)}</div>
+                                                    </div>
+                                                    <div className="w-6 flex-shrink-0" />
+                                                    <div>
+                                                        <div className="flex gap-1">{R_TOP.map(renderSeat)}</div>
+                                                        <div className="border-b border-primary-700/40 my-1" />
+                                                        <div className="flex gap-1">{R_BOTTOM.map(renderSeat)}</div>
+                                                    </div>
+                                                </div>
+                                                {rowIdx === 1 && (
+                                                    <div className="flex items-center gap-2 mt-2">
+                                                        <div className="h-px flex-1 bg-primary-800/40" />
+                                                        <span className="text-primary-700 text-xs tracking-widest">WALKWAY</span>
+                                                        <div className="h-px flex-1 bg-primary-800/40" />
+                                                    </div>
+                                                )}
                                             </div>
                                         )
                                     })}

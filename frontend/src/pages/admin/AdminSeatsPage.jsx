@@ -33,6 +33,11 @@ const DATE_PICKER_POPPER_SX = {
 }
 
 const ROWS = ['A', 'B', 'C', 'D']
+const INACTIVE_SEATS = new Set(['B8', 'B18', 'C18'])
+const L_TOP    = [13, 11, 9, 7, 5, 3, 1]
+const L_BOTTOM = [14, 12, 10, 8, 6, 4, 2]
+const R_TOP    = [15, 17, 19, 21, 23, 25, 27]
+const R_BOTTOM = [16, 18, 20, 22, 24, 26, 28]
 
 export default function AdminSeatsPage() {
     const [seatMap, setSeatMap]   = useState(null)
@@ -119,46 +124,53 @@ export default function AdminSeatsPage() {
                             {t('adminSeats.entrance')}
                         </div>
                     </div>
-                    <div className="space-y-3 min-w-[580px]">
-                        {ROWS.map(row => {
-                            const seats = seatMap.seatsByRow?.[row] || []
-                            const half  = Math.ceil(seats.length / 2)
-                            const left  = seats.slice(0, half)
-                            const right = seats.slice(half)
+                    <div className="space-y-4 min-w-[640px]">
+                        {ROWS.map((row, rowIdx) => {
+                            const rowSeats = seatMap.seatsByRow?.[row] || []
+                            const find = (sn) => rowSeats.find(s => s.seatNumber === sn)
+                            const renderSeat = (n) => {
+                                const sn = `${row}${n}`
+                                if (INACTIVE_SEATS.has(sn)) {
+                                    return <div key={sn} className="w-8 h-8 rounded-lg bg-primary-900/50 border border-primary-800/20" title="Blocked" />
+                                }
+                                const seat = find(sn) ?? { seatNumber: sn, isOccupied: false }
+                                return (
+                                    <button key={sn}
+                                            onClick={() => setSelected(seat.isOccupied ? seat : null)}
+                                            title={seat.isOccupied ? `${seat.studentName} — ${shiftLabel(seat.shift)}` : `${sn} (${t('adminSeats.legend.available')})`}
+                                            className={`w-8 h-8 rounded-lg text-xs font-medium border transition-all
+                                                ${seat.isOccupied
+                                                    ? seat.studentGender === 'Female'
+                                                        ? 'bg-fuchsia-500/30 border-fuchsia-500/50 text-fuchsia-300 hover:bg-fuchsia-500/50 cursor-pointer'
+                                                        : 'bg-red-500/30 border-red-500/50 text-red-300 hover:bg-red-500/50 cursor-pointer'
+                                                    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 cursor-default'}`}>
+                                        {sn.substring(1)}
+                                    </button>
+                                )
+                            }
                             return (
-                                <div key={row} className="flex items-center gap-3">
-                                    <span className="text-primary-400 font-mono text-sm w-5 text-center">{row}</span>
-                                    <div className="flex gap-1">
-                                        {left.map(seat => (
-                                            <button key={seat.seatNumber}
-                                                    onClick={() => setSelected(seat.isOccupied ? seat : null)}
-                                                    title={seat.isOccupied ? `${seat.studentName} — ${shiftLabel(seat.shift)}` : `${seat.seatNumber} (${t('adminSeats.legend.available')})`}
-                                                    className={`w-8 h-8 rounded-lg text-xs font-medium border transition-all
-                          ${seat.isOccupied
-                                                        ? seat.studentGender === 'Female'
-                                                            ? 'bg-fuchsia-500/30 border-fuchsia-500/50 text-fuchsia-300 hover:bg-fuchsia-500/50 cursor-pointer'
-                                                            : 'bg-red-500/30 border-red-500/50 text-red-300 hover:bg-red-500/50 cursor-pointer'
-                                                        : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 cursor-default'}`}>
-                                                {seat.seatNumber.substring(1)}
-                                            </button>
-                                        ))}
+                                <div key={row}>
+                                    <div className="flex items-start gap-2">
+                                        <span className="text-primary-400 font-mono text-sm w-5 text-center pt-2">{row}</span>
+                                        <div>
+                                            <div className="flex gap-1">{L_TOP.map(renderSeat)}</div>
+                                            <div className="border-b border-primary-700/40 my-1" />
+                                            <div className="flex gap-1">{L_BOTTOM.map(renderSeat)}</div>
+                                        </div>
+                                        <div className="w-6 flex-shrink-0" />
+                                        <div>
+                                            <div className="flex gap-1">{R_TOP.map(renderSeat)}</div>
+                                            <div className="border-b border-primary-700/40 my-1" />
+                                            <div className="flex gap-1">{R_BOTTOM.map(renderSeat)}</div>
+                                        </div>
                                     </div>
-                                    <div className="w-6 flex-shrink-0 flex justify-center"><div className="w-px h-6 bg-primary-700/50" /></div>
-                                    <div className="flex gap-1">
-                                        {right.map(seat => (
-                                            <button key={seat.seatNumber}
-                                                    onClick={() => setSelected(seat.isOccupied ? seat : null)}
-                                                    title={seat.isOccupied ? `${seat.studentName} — ${shiftLabel(seat.shift)}` : `${seat.seatNumber} (${t('adminSeats.legend.available')})`}
-                                                    className={`w-8 h-8 rounded-lg text-xs font-medium border transition-all
-                          ${seat.isOccupied
-                                                        ? seat.studentGender === 'Female'
-                                                            ? 'bg-fuchsia-500/30 border-fuchsia-500/50 text-fuchsia-300 hover:bg-fuchsia-500/50 cursor-pointer'
-                                                            : 'bg-red-500/30 border-red-500/50 text-red-300 hover:bg-red-500/50 cursor-pointer'
-                                                        : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 cursor-default'}`}>
-                                                {seat.seatNumber.substring(1)}
-                                            </button>
-                                        ))}
-                                    </div>
+                                    {rowIdx === 1 && (
+                                        <div className="flex items-center gap-2 mt-3">
+                                            <div className="h-px flex-1 bg-primary-800/40" />
+                                            <span className="text-primary-700 text-xs tracking-widest">WALKWAY</span>
+                                            <div className="h-px flex-1 bg-primary-800/40" />
+                                        </div>
+                                    )}
                                 </div>
                             )
                         })}

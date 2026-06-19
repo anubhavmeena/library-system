@@ -24,7 +24,7 @@ export default function FacilitiesPage() {
         { row: 'A', count: 28 },
         { row: 'B', count: 28 },
         { row: 'C', count: 28 },
-        { row: 'D', count: 26 },
+        { row: 'D', count: 28 },
     ]
 
     return (

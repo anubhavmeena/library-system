@@ -6,15 +6,44 @@ import { useTranslation } from 'react-i18next'
 import { fetchSeatAvailability, selectSeat, bookSeat } from '../../store/slices/seatSlice'
 import { fetchMyMembership, fetchPlans, createPaymentOrder, verifyPayment } from '../../store/slices/membershipSlice'
 
+// Physical obstructions — not bookable seats
+const INACTIVE_SEATS = new Set(['B8', 'B18', 'C18'])
+// Display order within each section: left section reads right-to-left (13→1), right reads left-to-right (15→27)
+const L_TOP    = [13, 11, 9, 7, 5, 3, 1]
+const L_BOTTOM = [14, 12, 10, 8, 6, 4, 2]
+const R_TOP    = [15, 17, 19, 21, 23, 25, 27]
+const R_BOTTOM = [16, 18, 20, 22, 24, 26, 28]
+
 function SeatGrid({ seats, selectedSeat, onSelect, t }) {
     const findSeat = (seatNumber) => seats.find(s => s.seatNumber === seatNumber)
-    const rows = ['A', 'B', 'C', 'D']
-    const rowCounts = { A: 28, B: 28, C: 28, D: 26 }
 
     const getSeatStatus = (seatNumber) => {
+        if (INACTIVE_SEATS.has(seatNumber)) return 'inactive'
         const seat = seats.find(s => s.seatNumber === seatNumber)
         if (!seat) return 'available'
         return seat.isBooked ? 'booked' : 'available'
+    }
+
+    const renderSeat = (sn) => {
+        const status = getSeatStatus(sn)
+        const isSelected = selectedSeat?.seatNumber === sn
+        if (status === 'inactive') {
+            return <div key={sn} className="w-8 h-8 rounded-lg bg-primary-900/50 border border-primary-800/20" title="Blocked" />
+        }
+        return (
+            <button key={sn} disabled={status === 'booked'}
+                    onClick={() => status === 'available' && onSelect(findSeat(sn) ?? { seatNumber: sn, row: sn[0] })}
+                    title={`Seat ${sn}${status === 'booked' ? ' (Booked)' : ''}`}
+                    className={`w-8 h-8 rounded-lg text-xs font-medium transition-all duration-150 border
+                        ${status === 'booked'
+                            ? 'bg-red-500/20 border-red-500/30 text-red-500/50 cursor-not-allowed'
+                            : isSelected
+                                ? 'bg-amber-500 border-amber-400 text-primary-900 font-bold shadow-lg shadow-amber-500/30 seat-selected'
+                                : 'bg-primary-800/60 border-primary-700/40 text-primary-300 hover:bg-emerald-500/20 hover:border-emerald-500/40 hover:text-emerald-400 cursor-pointer'
+                        }`}>
+                {sn.substring(1)}
+            </button>
+        )
     }
 
     return (
@@ -24,62 +53,32 @@ function SeatGrid({ seats, selectedSeat, onSelect, t }) {
                     ← ENTRANCE / FRONT →
                 </div>
             </div>
-            <div className="space-y-3 min-w-[600px]">
-                {rows.map(row => {
-                    const total = rowCounts[row]
-                    const half = Math.ceil(total / 2)
-                    const leftSeats  = Array.from({ length: half },        (_, i) => `${row}${i + 1}`)
-                    const rightSeats = Array.from({ length: total - half }, (_, i) => `${row}${half + i + 1}`)
-
-                    return (
-                        <div key={row} className="flex items-center gap-3">
-                            <span className="text-primary-400 font-mono text-sm w-5 text-center">{row}</span>
-                            <div className="flex gap-1.5">
-                                {leftSeats.map(sn => {
-                                    const status = getSeatStatus(sn)
-                                    const isSelected = selectedSeat?.seatNumber === sn
-                                    return (
-                                        <button key={sn} disabled={status === 'booked'}
-                                                onClick={() => status === 'available' && onSelect(findSeat(sn) ?? { seatNumber: sn, row })}
-                                                title={`Seat ${sn}${status === 'booked' ? ' (Booked)' : ''}`}
-                                                className={`w-8 h-8 rounded-lg text-xs font-medium transition-all duration-150 border
-                        ${status === 'booked'
-                                                    ? 'bg-red-500/20 border-red-500/30 text-red-500/50 cursor-not-allowed'
-                                                    : isSelected
-                                                        ? 'bg-amber-500 border-amber-400 text-primary-900 font-bold shadow-lg shadow-amber-500/30 seat-selected'
-                                                        : 'bg-primary-800/60 border-primary-700/40 text-primary-300 hover:bg-emerald-500/20 hover:border-emerald-500/40 hover:text-emerald-400 cursor-pointer'
-                                                }`}>
-                                            {sn.substring(1)}
-                                        </button>
-                                    )
-                                })}
+            <div className="space-y-4 min-w-[640px]">
+                {['A', 'B', 'C', 'D'].map((row, rowIdx) => (
+                    <div key={row}>
+                        <div className="flex items-start gap-2">
+                            <span className="text-primary-400 font-mono text-sm w-5 text-center pt-2">{row}</span>
+                            <div>
+                                <div className="flex gap-1.5">{L_TOP.map(n => renderSeat(`${row}${n}`))}</div>
+                                <div className="border-b border-primary-700/40 my-1" />
+                                <div className="flex gap-1.5">{L_BOTTOM.map(n => renderSeat(`${row}${n}`))}</div>
                             </div>
-                            <div className="w-8 flex-shrink-0 flex items-center justify-center">
-                                <div className="w-px h-6 bg-primary-700/50" />
-                            </div>
-                            <div className="flex gap-1.5">
-                                {rightSeats.map(sn => {
-                                    const status = getSeatStatus(sn)
-                                    const isSelected = selectedSeat?.seatNumber === sn
-                                    return (
-                                        <button key={sn} disabled={status === 'booked'}
-                                                onClick={() => status === 'available' && onSelect(findSeat(sn) ?? { seatNumber: sn, row })}
-                                                title={`Seat ${sn}${status === 'booked' ? ' (Booked)' : ''}`}
-                                                className={`w-8 h-8 rounded-lg text-xs font-medium transition-all duration-150 border
-                        ${status === 'booked'
-                                                    ? 'bg-red-500/20 border-red-500/30 text-red-500/50 cursor-not-allowed'
-                                                    : isSelected
-                                                        ? 'bg-amber-500 border-amber-400 text-primary-900 font-bold shadow-lg shadow-amber-500/30 seat-selected'
-                                                        : 'bg-primary-800/60 border-primary-700/40 text-primary-300 hover:bg-emerald-500/20 hover:border-emerald-500/40 hover:text-emerald-400 cursor-pointer'
-                                                }`}>
-                                            {sn.substring(1)}
-                                        </button>
-                                    )
-                                })}
+                            <div className="w-8 flex-shrink-0" />
+                            <div>
+                                <div className="flex gap-1.5">{R_TOP.map(n => renderSeat(`${row}${n}`))}</div>
+                                <div className="border-b border-primary-700/40 my-1" />
+                                <div className="flex gap-1.5">{R_BOTTOM.map(n => renderSeat(`${row}${n}`))}</div>
                             </div>
                         </div>
-                    )
-                })}
+                        {rowIdx === 1 && (
+                            <div className="flex items-center gap-2 mt-3">
+                                <div className="h-px flex-1 bg-primary-800/40" />
+                                <span className="text-primary-700 text-xs tracking-widest">WALKWAY</span>
+                                <div className="h-px flex-1 bg-primary-800/40" />
+                            </div>
+                        )}
+                    </div>
+                ))}
             </div>
             <div className="flex items-center gap-6 mt-6 text-xs text-primary-400">
                 <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-primary-800/60 border border-primary-700/40" />{t('booking.seat.legendAvailable')}</div>

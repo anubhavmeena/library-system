@@ -22,8 +22,10 @@ public class SeatDataInitializer implements ApplicationRunner {
 
     private static final List<String> ROW_ORDER = List.of("A", "B", "C", "D");
     private static final Map<String, Integer> ROW_COUNTS = Map.of(
-            "A", 28, "B", 28, "C", 28, "D", 26
+            "A", 28, "B", 28, "C", 28, "D", 28
     );
+    // Physical obstructions (pillars) — seats exist in numbering but are not bookable
+    private static final List<String> BLOCKED_SEATS = List.of("B8", "B18", "C18");
 
     @Override
     @Transactional
@@ -37,16 +39,17 @@ public class SeatDataInitializer implements ApplicationRunner {
         for (String row : ROW_ORDER) {
             int count = ROW_COUNTS.get(row);
             for (int i = 1; i <= count; i++) {
+                String seatNumber = row + i;
                 seats.add(Seat.builder()
-                        .seatNumber(row + i)
+                        .seatNumber(seatNumber)
                         .rowLabel(row)
                         .seatIndex(i)
-                        .isActive(true)
+                        .isActive(!BLOCKED_SEATS.contains(seatNumber))
                         .build());
             }
         }
 
         seatRepository.saveAll(seats);
-        log.info("Seeded {} seats (A:28, B:28, C:28, D:26)", seats.size());
+        log.info("Seeded {} seats (A:28, B:28, C:28, D:28); blocked: {}", seats.size(), BLOCKED_SEATS);
     }
 }
