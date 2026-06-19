@@ -24,6 +24,9 @@ export default function AdminStudentsPage() {
     const [newSeat, setNewSeat]                           = useState(null)
     const [changeSeatSubmitting, setChangeSeatSubmitting] = useState(false)
 
+    const [deleteTarget, setDeleteTarget] = useState(null)
+    const [deleting, setDeleting]         = useState(false)
+
     const { t } = useTranslation()
 
     const fetchStudents = async () => {
@@ -47,6 +50,21 @@ export default function AdminStudentsPage() {
             toast.success(action)
             fetchStudents()
         } catch { toast.error(t('adminStudents.toasts.updateFailed')) }
+    }
+
+    const handleDeleteStudent = async () => {
+        if (!deleteTarget) return
+        setDeleting(true)
+        try {
+            await api.delete(`/admin/students/${deleteTarget.id}`)
+            toast.success(`${deleteTarget.name} deleted`)
+            setDeleteTarget(null)
+            fetchStudents()
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Delete failed')
+        } finally {
+            setDeleting(false)
+        }
     }
 
     const shiftLabel = (shift) => {
@@ -240,6 +258,10 @@ export default function AdminStudentsPage() {
                                                     className={`text-xs px-3 py-1.5 rounded-lg border transition-all
                             ${s.isActive ? 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'}`}>
                                                 {s.isActive ? t('adminStudents.disable') : t('adminStudents.enable')}
+                                            </button>
+                                            <button onClick={() => setDeleteTarget(s)}
+                                                    className="text-xs px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 border border-red-600/40 hover:bg-red-600/30 transition-all">
+                                                Delete
                                             </button>
                                         </div>
                                     </td>
@@ -476,6 +498,28 @@ export default function AdminStudentsPage() {
                                     <span className="text-primary-600 text-xs">{t('adminStudents.modal.aadhaarNone')}</span>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {deleteTarget && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div className="card p-6 max-w-sm w-full">
+                        <h3 className="text-lg font-semibold text-white mb-2">Delete Student</h3>
+                        <p className="text-sm text-gray-400 mb-6">
+                            Permanently delete <span className="text-white font-medium">{deleteTarget.name}</span> and all their memberships, payments, and seat bookings? This cannot be undone.
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => setDeleteTarget(null)} className="btn-outline text-sm px-4 py-2">
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDeleteStudent}
+                                disabled={deleting}
+                                className="text-sm px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 transition-colors">
+                                {deleting ? 'Deleting…' : 'Delete'}
+                            </button>
                         </div>
                     </div>
                 </div>

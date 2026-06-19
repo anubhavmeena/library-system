@@ -2,9 +2,11 @@ package com.library.admin.repository;
 
 import com.library.admin.entity.Feedback;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -25,4 +27,9 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     List<Feedback> findByTypeAndStatusWithUser(
             @Param("type")   Feedback.Type type,
             @Param("status") Feedback.Status status);
+
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM Feedback f WHERE f.userId = :userId")
+    void deleteByUserId(@Param("userId") UUID userId);
 }

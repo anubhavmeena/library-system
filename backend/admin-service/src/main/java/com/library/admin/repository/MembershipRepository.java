@@ -2,9 +2,11 @@ package com.library.admin.repository;
 
 import com.library.admin.entity.Membership;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -47,4 +49,9 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
 
     @Query("SELECT COUNT(m) FROM Membership m WHERE m.status = 'EXPIRED'")
     long countExpiredMemberships();
+
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM Membership m WHERE m.userId = :userId")
+    void deleteByUserId(@Param("userId") UUID userId);
 }

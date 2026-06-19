@@ -27,6 +27,8 @@ public class AdminService {
     private final UserRepository              userRepository;
     private final MembershipRepository        membershipRepository;
     private final PaymentRepository           paymentRepository;
+    private final SeatBookingRepository       seatBookingRepository;
+    private final FeedbackRepository          feedbackRepository;
     private final PlanRepository              planRepository;
     private final BroadcastMessageRepository  broadcastMessageRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
@@ -344,6 +346,21 @@ public class AdminService {
                 ? LocalDate.parse(req.getDateOfBirth()) : null);
         userRepository.save(user);
         return getStudentDetails(userId);
+    }
+
+    // ── Delete Student ────────────────────────────────────────────────────────
+
+    @Transactional
+    public void deleteStudent(String userId) {
+        UUID id = UUID.fromString(userId);
+        userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + userId));
+        feedbackRepository.deleteByUserId(id);    // has FK to users — must go first
+        seatBookingRepository.deleteByUserId(id);
+        paymentRepository.deleteByUserId(id);
+        membershipRepository.deleteByUserId(id);
+        userRepository.deleteById(id);
+        log.info("Student deleted: {}", userId);
     }
 
     // ── Broadcast Notification ────────────────────────────────────────────────

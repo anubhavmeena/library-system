@@ -61,6 +61,12 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(adminService.updateStudent(userId, request)));
     }
 
+    @DeleteMapping("/students/{userId}")
+    public ResponseEntity<ApiResponse<String>> deleteStudent(@PathVariable String userId) {
+        adminService.deleteStudent(userId);
+        return ResponseEntity.ok(ApiResponse.success("Student deleted successfully"));
+    }
+
     // ── Seat Map ──────────────────────────────────────────────────────────────
     // Returns all 110 seats grouped by row (A/B/C/D), each with isOccupied,
     // studentName, studentMobile, shift, membershipEnd
