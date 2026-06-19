@@ -27,6 +27,9 @@ export default function AdminStudentsPage() {
     const [deleteTarget, setDeleteTarget] = useState(null)
     const [deleting, setDeleting]         = useState(false)
 
+    const [studentPayments, setStudentPayments]               = useState([])
+    const [studentPaymentsLoading, setStudentPaymentsLoading] = useState(false)
+
     const { t } = useTranslation()
 
     const fetchStudents = async () => {
@@ -40,6 +43,15 @@ export default function AdminStudentsPage() {
     }
 
     useEffect(() => { fetchStudents() }, [page, status, membershipFilter])
+
+    useEffect(() => {
+        if (!detail) { setStudentPayments([]); return }
+        setStudentPaymentsLoading(true)
+        api.get(`/admin/students/${detail.id}/payments`)
+            .then(r => setStudentPayments(r.data.data || []))
+            .catch(() => setStudentPayments([]))
+            .finally(() => setStudentPaymentsLoading(false))
+    }, [detail])
 
     const handleToggleStatus = async (student) => {
         try {
@@ -498,6 +510,44 @@ export default function AdminStudentsPage() {
                                     <span className="text-primary-600 text-xs">{t('adminStudents.modal.aadhaarNone')}</span>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Payment History */}
+                        <div className="mt-5 pt-5 border-t border-primary-700/30">
+                            <h4 className="text-white font-semibold text-sm mb-3">Payment History</h4>
+                            {studentPaymentsLoading ? (
+                                <div className="shimmer h-16 rounded-xl" />
+                            ) : studentPayments.length === 0 ? (
+                                <p className="text-primary-500 text-xs text-center py-3">No payments found.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {studentPayments.map(p => {
+                                        const isCash = !p.paymentGateway || p.gatewayOrderId?.startsWith('dev_')
+                                        return (
+                                            <div key={p.id} className="rounded-lg bg-primary-800/40 border border-primary-700/30 px-3 py-2.5 text-xs">
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <span className="text-white font-semibold">₹{Number(p.amount).toLocaleString('en-IN')}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`px-2 py-0.5 rounded-full font-medium border ${isCash ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}>
+                                                            {isCash ? 'Cash' : 'Online'}
+                                                        </span>
+                                                        <span className={`px-2 py-0.5 rounded-full font-medium border ${
+                                                            p.status === 'SUCCESS'  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                                                            p.status === 'PENDING'  ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+                                                            'bg-red-500/20 text-red-400 border-red-500/30'
+                                                        }`}>{p.status}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-primary-400 space-y-0.5">
+                                                    <p>{p.paidAt ? new Date(p.paidAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</p>
+                                                    {p.gatewayOrderId  && <p className="font-mono">Order: {p.gatewayOrderId}</p>}
+                                                    {p.gatewayPaymentId && <p className="font-mono">Ref: {p.gatewayPaymentId}</p>}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

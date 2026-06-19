@@ -33,16 +33,19 @@ export default function MembershipPage() {
     const dispatch = useDispatch()
     const { t } = useTranslation()
     const { current: membership, plans } = useSelector(s => s.membership)
-    const [history, setHistory] = useState([])
-    const [loading, setLoading] = useState(true)
+    const [history, setHistory]                 = useState([])
+    const [payments, setPayments]               = useState([])
+    const [loading, setLoading]                 = useState(true)
+    const [paymentsLoading, setPaymentsLoading] = useState(true)
     const [downloadingCard, setDownloadingCard] = useState(false)
 
     useEffect(() => {
         dispatch(fetchMyMembership())
         dispatch(fetchPlans())
         api.get('/memberships/my/all').then(r => setHistory(r.data.data || [])).catch(() => {})
-        api.get('/payments/my').then(r => r.data.data || []).catch(() => {})
             .finally(() => setLoading(false))
+        api.get('/payments/my').then(r => setPayments(r.data.data || [])).catch(() => {})
+            .finally(() => setPaymentsLoading(false))
     }, [])
 
     const daysLeft = membership
@@ -179,6 +182,51 @@ export default function MembershipPage() {
                     </div>
                 </div>
             )}
+
+            <div className="mb-8">
+                <h2 className="section-title mb-4">Payment History</h2>
+                {paymentsLoading ? (
+                    <div className="shimmer h-32 rounded-2xl" />
+                ) : payments.length === 0 ? (
+                    <div className="card p-6 text-center text-primary-400 text-sm">No payments found.</div>
+                ) : (
+                    <div className="card overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-primary-700/30 text-primary-400 text-xs uppercase tracking-wide">
+                                    <th className="text-left px-4 py-3">Date</th>
+                                    <th className="text-left px-4 py-3">Amount</th>
+                                    <th className="text-left px-4 py-3">Mode</th>
+                                    <th className="text-left px-4 py-3">Order Ref</th>
+                                    <th className="text-left px-4 py-3">Payment Ref</th>
+                                    <th className="text-left px-4 py-3">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-primary-700/20">
+                                {payments.map(p => {
+                                    const isCash = !p.paymentGateway || p.gatewayOrderId?.startsWith('dev_')
+                                    return (
+                                        <tr key={p.id} className="hover:bg-primary-700/10 transition-colors">
+                                            <td className="px-4 py-3 text-primary-300">{p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                                            <td className="px-4 py-3 text-amber-400 font-semibold">₹{Number(p.amount).toLocaleString('en-IN')}</td>
+                                            <td className="px-4 py-3">
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${isCash ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}>
+                                                    {isCash ? 'Cash' : 'Online'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-primary-300 font-mono text-xs">{p.gatewayOrderId || '—'}</td>
+                                            <td className="px-4 py-3 text-primary-300 font-mono text-xs">{p.gatewayPaymentId || '—'}</td>
+                                            <td className="px-4 py-3">
+                                                <StatusBadge status={p.status} />
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
         </div>
     )
 }

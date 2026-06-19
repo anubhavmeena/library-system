@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
@@ -59,6 +60,12 @@ public class AdminController {
             @PathVariable String userId,
             @RequestBody UpdateStudentRequest request) {
         return ResponseEntity.ok(ApiResponse.success(adminService.updateStudent(userId, request)));
+    }
+
+    @GetMapping("/students/{userId}/payments")
+    public ResponseEntity<ApiResponse<List<PaymentHistoryDto>>> getStudentPayments(
+            @PathVariable String userId) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getStudentPayments(userId)));
     }
 
     @DeleteMapping("/students/{userId}")

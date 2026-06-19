@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,6 +17,8 @@ import java.util.UUID;
 public interface PaymentRepository extends JpaRepository<Payment, UUID> {
 
     Optional<Payment> findFirstByMembershipId(UUID membershipId);
+
+    List<Payment> findByUserIdOrderByCreatedAtDesc(UUID userId);
 
     @Modifying
     @Transactional

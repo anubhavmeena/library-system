@@ -348,6 +348,24 @@ public class AdminService {
         return getStudentDetails(userId);
     }
 
+    // ── Student Payment History ───────────────────────────────────────────────
+
+    public List<PaymentHistoryDto> getStudentPayments(String userId) {
+        return paymentRepository.findByUserIdOrderByCreatedAtDesc(UUID.fromString(userId))
+                .stream()
+                .map(p -> PaymentHistoryDto.builder()
+                        .id(p.getId())
+                        .membershipId(p.getMembershipId())
+                        .amount(p.getAmount())
+                        .paymentGateway(p.getPaymentGateway())
+                        .gatewayOrderId(p.getGatewayOrderId())
+                        .gatewayPaymentId(p.getGatewayPaymentId())
+                        .status(p.getStatus() != null ? p.getStatus().name() : null)
+                        .paidAt(p.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
     // ── Delete Student ────────────────────────────────────────────────────────
 
     @Transactional
