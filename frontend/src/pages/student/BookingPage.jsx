@@ -59,7 +59,7 @@ function SeatGrid({ seats, selectedSeat, onSelect, t }) {
                         <span className="text-primary-400 text-[10px] tracking-widest uppercase">ENTRY</span>
                     </div>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-7">
                     {['A', 'B', 'C', 'D'].map(row => (
                         <div key={row} className="flex gap-2">
                             <span className="text-primary-400 font-mono text-sm w-5 text-center self-start pt-2">{row}</span>

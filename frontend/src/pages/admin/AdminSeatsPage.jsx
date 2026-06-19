@@ -129,7 +129,7 @@ export default function AdminSeatsPage() {
                             <span className="text-primary-400 text-[10px] tracking-widest uppercase">ENTRY</span>
                         </div>
                     </div>
-                    <div className="space-y-4">
+                    <div className="space-y-7">
                         {ROWS.map(row => {
                             const rowSeats = seatMap.seatsByRow?.[row] || []
                             const find = (sn) => rowSeats.find(s => s.seatNumber === sn)
