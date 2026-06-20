@@ -34,8 +34,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
                          AND m.status = 'ACTIVE'
                          AND m.endDate >= CURRENT_DATE)))
           AND (:search IS NULL
-               OR LOWER(u.name)  LIKE LOWER(CONCAT('%', :search, '%'))
-               OR u.mobile       LIKE CONCAT('%', :search, '%'))
+               OR LOWER(u.name)  LIKE LOWER(CONCAT('%', CAST(:search AS String), '%'))
+               OR u.mobile       LIKE CONCAT('%', CAST(:search AS String), '%'))
         ORDER BY u.createdAt DESC
         """)
     Page<User> findStudentsByStatus(
