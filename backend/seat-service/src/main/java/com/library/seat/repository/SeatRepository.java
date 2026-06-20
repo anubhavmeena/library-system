@@ -17,6 +17,8 @@ public interface SeatRepository extends JpaRepository<Seat, UUID> {
 
     List<Seat> findByRowLabelAndIsActiveTrueOrderBySeatIndexAsc(String rowLabel);
 
+    List<Seat> findByIsActiveFalse();
+
     @Query("SELECT COUNT(s) FROM Seat s WHERE s.isActive = true")
     long countActiveSeats();
 }

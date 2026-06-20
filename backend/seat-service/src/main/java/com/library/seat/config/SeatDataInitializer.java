@@ -25,16 +25,18 @@ public class SeatDataInitializer implements ApplicationRunner {
             "A", 28, "B", 28, "C", 28, "D", 28
     );
     // Physical obstructions (pillars) — seats exist in numbering but are not bookable
-    private static final List<String> BLOCKED_SEATS = List.of("B8", "B18", "C18");
+    private static final List<String> BLOCKED_SEATS = List.of("B8", "B18");
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (seatRepository.count() > 0) {
-            log.info("Seats already seeded, skipping.");
-            return;
+        if (seatRepository.count() == 0) {
+            seedSeats();
         }
+        reconcileActiveStatus();
+    }
 
+    private void seedSeats() {
         List<Seat> seats = new ArrayList<>();
         for (String row : ROW_ORDER) {
             int count = ROW_COUNTS.get(row);
@@ -48,8 +50,18 @@ public class SeatDataInitializer implements ApplicationRunner {
                         .build());
             }
         }
-
         seatRepository.saveAll(seats);
         log.info("Seeded {} seats (A:28, B:28, C:28, D:28); blocked: {}", seats.size(), BLOCKED_SEATS);
+    }
+
+    private void reconcileActiveStatus() {
+        List<Seat> inactiveSeats = seatRepository.findByIsActiveFalse();
+        for (Seat seat : inactiveSeats) {
+            if (!BLOCKED_SEATS.contains(seat.getSeatNumber())) {
+                seat.setIsActive(true);
+                seatRepository.save(seat);
+                log.info("Activated previously blocked seat: {}", seat.getSeatNumber());
+            }
+        }
     }
 }
