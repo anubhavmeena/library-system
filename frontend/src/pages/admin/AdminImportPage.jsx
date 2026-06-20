@@ -11,6 +11,7 @@ export default function AdminImportPage() {
     const [dragging,  setDragging]  = useState(false)
     const [uploading, setUploading] = useState(false)
     const [result,    setResult]    = useState(null)
+    const [error,     setError]     = useState(null)
 
     const accept = '.csv,.xlsx,.xls'
 
@@ -18,6 +19,7 @@ export default function AdminImportPage() {
         if (!f) return
         setFile(f)
         setResult(null)
+        setError(null)
     }
 
     const onDrop = e => {
@@ -29,6 +31,7 @@ export default function AdminImportPage() {
     const onSubmit = async () => {
         if (!file) return
         setUploading(true)
+        setError(null)
         try {
             const fd = new FormData()
             fd.append('file', file)
@@ -43,7 +46,9 @@ export default function AdminImportPage() {
                 toast(t('adminImport.partialSuccess', { imported: data.imported, total: data.totalRows }))
             }
         } catch (e) {
-            toast.error(e.response?.data?.message || t('adminImport.uploadFailed'))
+            const msg = e.response?.data?.message || t('adminImport.uploadFailed')
+            setError(msg)
+            toast.error(msg)
         } finally {
             setUploading(false)
         }
@@ -107,6 +112,12 @@ export default function AdminImportPage() {
             >
                 {uploading ? t('adminImport.uploading') : t('adminImport.upload')}
             </button>
+
+            {error && (
+                <div className="card p-4 mb-6 border-red-500/30 bg-red-500/10">
+                    <p className="text-red-400 text-sm font-medium">Import failed: {error}</p>
+                </div>
+            )}
 
             {/* Results */}
             {result && (
