@@ -129,6 +129,12 @@ public class ImportService {
 
         String shift = plan.getPlanType() == Plan.PlanType.FULL_DAY ? "FULL_DAY" : "MORNING";
 
+        // If the CSV date is so far in the past that the membership would already be
+        // expired, start from today so the student appears active on the seat map.
+        if (startDate.plusDays(plan.getDurationDays()).isBefore(LocalDate.now())) {
+            startDate = LocalDate.now();
+        }
+
         CreateCashMembershipRequest req = new CreateCashMembershipRequest();
         req.setStudentId(user.getId().toString());
         req.setPlanId(plan.getId().toString());
