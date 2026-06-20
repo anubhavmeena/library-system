@@ -82,6 +82,7 @@ public class AdminService {
         List<StudentDto> students = users.stream().map(user -> {
             Membership mem = membershipRepository
                     .findByUserIdAndStatus(user.getId(), Membership.Status.ACTIVE)
+                    .filter(m -> !m.getEndDate().isBefore(LocalDate.now()))
                     .orElse(null);
             StudentDto dto = StudentDto.fromEntities(user, mem);
             if (mem != null) {
@@ -101,6 +102,7 @@ public class AdminService {
 
         Membership mem = membershipRepository
                 .findByUserIdAndStatus(user.getId(), Membership.Status.ACTIVE)
+                .filter(m -> !m.getEndDate().isBefore(LocalDate.now()))
                 .orElse(null);
 
         StudentDto dto = StudentDto.fromEntities(user, mem);
