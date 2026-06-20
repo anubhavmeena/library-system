@@ -33,7 +33,7 @@ const DATE_PICKER_POPPER_SX = {
 }
 
 const ROWS = ['A', 'B', 'C', 'D']
-const INACTIVE_SEATS = new Set(['B8', 'B18', 'C18'])
+const INACTIVE_SEATS = new Set(['B8', 'B18'])
 const L_TOP    = [13, 11, 9, 7, 5, 3, 1]
 const L_BOTTOM = [14, 12, 10, 8, 6, 4, 2]
 const R_TOP    = [15, 17, 19, 21, 23, 25, 27]

@@ -7,7 +7,7 @@ import { fetchSeatAvailability, selectSeat, bookSeat } from '../../store/slices/
 import { fetchMyMembership, fetchPlans, createPaymentOrder, verifyPayment } from '../../store/slices/membershipSlice'
 
 // Physical obstructions — not bookable seats
-const INACTIVE_SEATS = new Set(['B8', 'B18', 'C18'])
+const INACTIVE_SEATS = new Set(['B8', 'B18'])
 // Display order within each section: left section reads right-to-left (13→1), right reads left-to-right (15→27)
 const L_TOP    = [13, 11, 9, 7, 5, 3, 1]
 const L_BOTTOM = [14, 12, 10, 8, 6, 4, 2]
