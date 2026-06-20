@@ -9,7 +9,7 @@ import com.library.admin.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -32,6 +32,8 @@ public class ImportService {
     private final AdminMembershipService  membershipService;
 
     private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
+            DateTimeFormatter.ofPattern("MM-dd-yyyy"),
+            DateTimeFormatter.ofPattern("M-d-yyyy"),
             DateTimeFormatter.ofPattern("dd-MM-yyyy"),
             DateTimeFormatter.ofPattern("d-M-yyyy"),
             DateTimeFormatter.ofPattern("dd/MM/yyyy"),
@@ -162,7 +164,7 @@ public class ImportService {
 
     private List<String[]> parseExcel(MultipartFile file) throws Exception {
         List<String[]> rows = new ArrayList<>();
-        try (Workbook wb = new XSSFWorkbook(file.getInputStream())) {
+        try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
             Sheet sheet = wb.getSheetAt(0);
             DataFormatter formatter = new DataFormatter();
             for (Row row : sheet) {

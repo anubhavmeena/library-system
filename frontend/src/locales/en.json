@@ -762,7 +762,7 @@
   "adminImport": {
     "title": "Import Students",
     "subtitle": "Bulk-seed students from a CSV or Excel file",
-    "format": "Expected columns: S.No, Name, Phone, Fees Paid, Date (dd-MM-yyyy), Seat",
+    "format": "Expected columns: S.No, Name, Phone, Fees Paid, Date (MM-dd-yyyy), Seat",
     "dropzone": "Drop your CSV or Excel file here, or click to browse",
     "accepts": "Accepts .csv and .xlsx files",
     "uploading": "Importing…",

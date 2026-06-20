@@ -18,6 +18,7 @@ export default function AdminStudentsPage() {
     const [status, setStatus]         = useState('')
     const [membershipFilter, setMembershipFilter] = useState('')
     const [search, setSearch]         = useState('')
+    const [debouncedSearch, setDebouncedSearch] = useState('')
     const [detail, setDetail]     = useState(null)
     const [editMode, setEditMode] = useState(false)
     const [editForm, setEditForm] = useState({})
@@ -40,14 +41,22 @@ export default function AdminStudentsPage() {
     const fetchStudents = async () => {
         setLoading(true)
         try {
-            const res = await api.get(`/admin/students?page=${page}&size=20${status ? `&status=${status}` : ''}${membershipFilter ? `&membershipStatus=${membershipFilter}` : ''}`)
+            const res = await api.get(`/admin/students?page=${page}&size=20${status ? `&status=${status}` : ''}${membershipFilter ? `&membershipStatus=${membershipFilter}` : ''}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`)
             setStudents(res.data.data.students || [])
             setTotal(res.data.data.total || 0)
         } catch { toast.error(t('adminStudents.toasts.loadFailed')) }
         finally { setLoading(false) }
     }
 
-    useEffect(() => { fetchStudents() }, [page, status, membershipFilter])
+    useEffect(() => {
+        const t = setTimeout(() => {
+            setPage(0)
+            setDebouncedSearch(search)
+        }, 300)
+        return () => clearTimeout(t)
+    }, [search])
+
+    useEffect(() => { fetchStudents() }, [page, status, membershipFilter, debouncedSearch])
 
     useEffect(() => {
         if (!detail) { setStudentPayments([]); return }
@@ -123,11 +132,6 @@ export default function AdminStudentsPage() {
         }
     }
 
-    const filtered = students.filter(s =>
-        !search || s.name?.toLowerCase().includes(search.toLowerCase()) ||
-        s.mobile?.includes(search) || s.email?.toLowerCase().includes(search.toLowerCase())
-    )
-
     const filters = [
         { v: '',         l: t('adminStudents.filters.all') },
         { v: 'ACTIVE',   l: t('adminStudents.filters.active') },
@@ -189,7 +193,7 @@ export default function AdminStudentsPage() {
 
             {loading ? (
                 <div className="space-y-3">{[1,2,3,4,5].map(i => <div key={i} className="shimmer h-16 rounded-xl" />)}</div>
-            ) : filtered.length === 0 ? (
+            ) : students.length === 0 ? (
                 <div className="card p-12 text-center">
                     <p className="text-4xl mb-3">👥</p>
                     <p className="text-white font-semibold">{t('adminStudents.empty')}</p>
@@ -206,7 +210,7 @@ export default function AdminStudentsPage() {
                             </tr>
                             </thead>
                             <tbody className="divide-y divide-primary-700/20">
-                            {filtered.map(s => (
+                            {students.map(s => (
                                 <tr key={s.id} className="hover:bg-primary-800/30 transition-colors">
                                     <td className="p-4">
                                         <div className="flex items-center gap-3">

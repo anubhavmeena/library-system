@@ -74,9 +74,9 @@ public class AdminService {
 
     // ── Students ──────────────────────────────────────────────────────────────
 
-    public StudentListDto getAllStudents(int page, int size, String status, String membershipStatus) {
+    public StudentListDto getAllStudents(int page, int size, String status, String membershipStatus, String search) {
         org.springframework.data.domain.Page<User> pageResult = userRepository
-                .findStudentsByStatus(status, membershipStatus, PageRequest.of(page, size));
+                .findStudentsByStatus(status, membershipStatus, search, PageRequest.of(page, size));
         List<User> users = pageResult.getContent();
 
         List<StudentDto> students = users.stream().map(user -> {
