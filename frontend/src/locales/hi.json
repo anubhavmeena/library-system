@@ -761,7 +761,23 @@
     "reason": "कारण",
     "successAll": "सभी {{count}} पंक्तियाँ सफलतापूर्वक आयात हुईं!",
     "partialSuccess": "{{total}} में से {{imported}} पंक्तियाँ आयात हुईं।",
-    "uploadFailed": "आयात विफल"
+    "uploadFailed": "आयात विफल",
+    "manual": {
+      "title": "छात्र मैन्युअल जोड़ें",
+      "subtitle": "एक छात्र की जानकारी भरकर जोड़ें",
+      "name": "पूरा नाम",
+      "phone": "फ़ोन नंबर",
+      "fees": "जमा शुल्क (₹)",
+      "date": "प्रारंभ तिथि",
+      "seat": "सीट नंबर",
+      "submit": "छात्र जोड़ें",
+      "submitting": "जोड़ा जा रहा है…",
+      "success": "छात्र सफलतापूर्वक जोड़ा गया",
+      "namePlaceholder": "जैसे राहुल शर्मा",
+      "phonePlaceholder": "10 अंकों का मोबाइल नंबर",
+      "feesPlaceholder": "जैसे 1500",
+      "seatPlaceholder": "जैसे B14"
+    }
   },
   "adminExpenses": {
     "title": "मासिक खर्च",

@@ -2,6 +2,7 @@ package com.library.admin.controller;
 
 import com.library.admin.dto.*;
 import com.library.admin.service.AdminService;
+import com.library.admin.service.ImportService;
 import com.library.common.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +18,8 @@ import java.util.List;
 @CrossOrigin(origins = "*")
 public class AdminController {
 
-    private final AdminService adminService;
+    private final AdminService  adminService;
+    private final ImportService importService;
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
     // Returns: totalStudents, activeStudents, activeMemberships, expiringThisWeek,
@@ -73,6 +75,13 @@ public class AdminController {
     public ResponseEntity<ApiResponse<String>> deleteStudent(@PathVariable String userId) {
         adminService.deleteStudent(userId);
         return ResponseEntity.ok(ApiResponse.success("Student deleted successfully"));
+    }
+
+    @PostMapping("/students/import/single")
+    public ResponseEntity<ApiResponse<String>> importSingleStudent(
+            @Valid @RequestBody ManualStudentImportRequest req) {
+        importService.importSingleStudent(req);
+        return ResponseEntity.ok(ApiResponse.success("Student added successfully"));
     }
 
     // ── Seat Map ──────────────────────────────────────────────────────────────

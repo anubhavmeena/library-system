@@ -2,6 +2,7 @@ package com.library.admin.service;
 
 import com.library.admin.dto.CreateCashMembershipRequest;
 import com.library.admin.dto.ImportResultDto;
+import com.library.admin.dto.ManualStudentImportRequest;
 import com.library.admin.entity.Plan;
 import com.library.admin.entity.User;
 import com.library.admin.repository.PlanRepository;
@@ -45,6 +46,21 @@ public class ImportService {
             DateTimeFormatter.ofPattern("MM/dd/yy"),
             DateTimeFormatter.ofPattern("M/d/yy")
     );
+
+    public void importSingleStudent(ManualStudentImportRequest req) {
+        List<Plan> activePlans = planRepository.findAll().stream()
+                .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
+                .toList();
+        String[] cols = {
+            "1",
+            req.getName(),
+            req.getPhone(),
+            req.getFees() != null ? req.getFees() : "0",
+            req.getDate()  != null ? req.getDate()  : "",
+            req.getSeatNumber()
+        };
+        processRow(cols, activePlans, null);
+    }
 
     public ImportResultDto importStudents(MultipartFile file) throws Exception {
         String filename = Objects.requireNonNullElse(file.getOriginalFilename(), "").toLowerCase();

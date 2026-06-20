@@ -778,7 +778,23 @@
     "reason": "Reason",
     "successAll": "All {{count}} rows imported successfully!",
     "partialSuccess": "{{imported}} of {{total}} rows imported.",
-    "uploadFailed": "Import failed"
+    "uploadFailed": "Import failed",
+    "manual": {
+      "title": "Add Student Manually",
+      "subtitle": "Fill in the details to add a single student",
+      "name": "Full Name",
+      "phone": "Phone Number",
+      "fees": "Fees Paid (₹)",
+      "date": "Start Date",
+      "seat": "Seat Number",
+      "submit": "Add Student",
+      "submitting": "Adding…",
+      "success": "Student added successfully",
+      "namePlaceholder": "e.g. Rahul Sharma",
+      "phonePlaceholder": "10-digit mobile number",
+      "feesPlaceholder": "e.g. 1500",
+      "seatPlaceholder": "e.g. B14"
+    }
   },
   "adminExpenses": {
     "title": "Monthly Expenses",

@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
+const EMPTY_FORM = { name: '', phone: '', fees: '', date: '', seatNumber: '' }
+
 export default function AdminImportPage() {
     const { t } = useTranslation()
     const inputRef = useRef(null)
@@ -12,6 +14,10 @@ export default function AdminImportPage() {
     const [uploading, setUploading] = useState(false)
     const [result,    setResult]    = useState(null)
     const [error,     setError]     = useState(null)
+
+    const [form,        setForm]        = useState(EMPTY_FORM)
+    const [submitting,  setSubmitting]  = useState(false)
+    const [formError,   setFormError]   = useState(null)
 
     const accept = '.csv,.xlsx,.xls'
 
@@ -53,6 +59,31 @@ export default function AdminImportPage() {
             setUploading(false)
         }
     }
+
+    const onManualSubmit = async e => {
+        e.preventDefault()
+        setFormError(null)
+        setSubmitting(true)
+        try {
+            await api.post('/admin/students/import/single', {
+                name:       form.name.trim(),
+                phone:      form.phone.trim(),
+                fees:       form.fees.trim() || null,
+                date:       form.date || null,
+                seatNumber: form.seatNumber.trim().toUpperCase(),
+            })
+            toast.success(t('adminImport.manual.success'))
+            setForm(EMPTY_FORM)
+        } catch (err) {
+            const msg = err.response?.data?.message || 'Failed to add student'
+            setFormError(msg)
+            toast.error(msg)
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    const field = (key, value) => setForm(f => ({ ...f, [key]: value }))
 
     return (
         <div className="max-w-3xl mx-auto">
@@ -121,7 +152,7 @@ export default function AdminImportPage() {
 
             {/* Results */}
             {result && (
-                <div className="space-y-4">
+                <div className="space-y-4 mb-10">
                     <h2 className="section-title">{t('adminImport.results')}</h2>
 
                     <div className="grid grid-cols-3 gap-4">
@@ -175,6 +206,82 @@ export default function AdminImportPage() {
                     )}
                 </div>
             )}
+
+            {/* ── Manual entry form ──────────────────────────────────────────── */}
+            <div className="border-t border-primary-700/30 pt-8">
+                <div className="mb-5">
+                    <h2 className="section-title">{t('adminImport.manual.title')}</h2>
+                    <p className="text-primary-400 text-sm">{t('adminImport.manual.subtitle')}</p>
+                </div>
+
+                <form onSubmit={onManualSubmit} className="card p-6 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="label">{t('adminImport.manual.name')} *</label>
+                            <input
+                                className="input w-full"
+                                placeholder={t('adminImport.manual.namePlaceholder')}
+                                value={form.name}
+                                onChange={e => field('name', e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="label">{t('adminImport.manual.phone')} *</label>
+                            <input
+                                className="input w-full"
+                                placeholder={t('adminImport.manual.phonePlaceholder')}
+                                value={form.phone}
+                                onChange={e => field('phone', e.target.value.replace(/[^0-9]/g, ''))}
+                                maxLength={10}
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="label">{t('adminImport.manual.fees')}</label>
+                            <input
+                                className="input w-full"
+                                type="number"
+                                min="0"
+                                placeholder={t('adminImport.manual.feesPlaceholder')}
+                                value={form.fees}
+                                onChange={e => field('fees', e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label className="label">{t('adminImport.manual.date')}</label>
+                            <input
+                                className="input w-full"
+                                type="date"
+                                value={form.date}
+                                onChange={e => field('date', e.target.value)}
+                            />
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label className="label">{t('adminImport.manual.seat')} *</label>
+                            <input
+                                className="input w-full sm:w-48"
+                                placeholder={t('adminImport.manual.seatPlaceholder')}
+                                value={form.seatNumber}
+                                onChange={e => field('seatNumber', e.target.value.toUpperCase())}
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    {formError && (
+                        <p className="text-red-400 text-sm">{formError}</p>
+                    )}
+
+                    <button
+                        type="submit"
+                        disabled={submitting}
+                        className="btn-primary py-2 px-6 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        {submitting ? t('adminImport.manual.submitting') : t('adminImport.manual.submit')}
+                    </button>
+                </form>
+            </div>
         </div>
     )
 }
