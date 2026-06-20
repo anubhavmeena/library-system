@@ -61,6 +61,9 @@ public class ImportService {
                 .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
                 .toList();
 
+        String[] header = rows.isEmpty() ? new String[0] : rows.get(0);
+        DateTimeFormatter dateFormatter = extractDateFormatter(safeGet(header, 4));
+
         for (int i = 1; i < rows.size(); i++) {
             String[] cols = rows.get(i);
             int rowNum = i + 1;
@@ -73,7 +76,7 @@ public class ImportService {
             }
 
             try {
-                processRow(cols, activePlans);
+                processRow(cols, activePlans, dateFormatter);
                 imported++;
             } catch (Exception e) {
                 log.warn("Import row {}: {}", rowNum, e.getMessage());
@@ -91,7 +94,7 @@ public class ImportService {
                 .build();
     }
 
-    private void processRow(String[] cols, List<Plan> activePlans) {
+    private void processRow(String[] cols, List<Plan> activePlans, DateTimeFormatter dateFormatter) {
         String name       = safeGet(cols, 1);
         String phone      = safeGet(cols, 2).replaceAll("[^0-9]", "");
         String feesRaw    = safeGet(cols, 3).replaceAll("[^0-9.]", "");
@@ -105,7 +108,7 @@ public class ImportService {
         if (seatNumber.isBlank()) throw new IllegalArgumentException("Seat is blank");
 
         BigDecimal fees = feesRaw.isBlank() ? BigDecimal.ZERO : new BigDecimal(feesRaw);
-        LocalDate  startDate = parseDate(dateRaw);
+        LocalDate  startDate = parseDate(dateRaw, dateFormatter);
 
         // Find or create user
         User user = userRepository.findByMobile(phone).orElseGet(() -> {
@@ -191,8 +194,22 @@ public class ImportService {
         return rows;
     }
 
-    private LocalDate parseDate(String raw) {
+    private DateTimeFormatter extractDateFormatter(String headerCell) {
+        int open  = headerCell.indexOf('(');
+        int close = headerCell.lastIndexOf(')');
+        if (open >= 0 && close > open) {
+            try {
+                return DateTimeFormatter.ofPattern(headerCell.substring(open + 1, close).trim());
+            } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
+    private LocalDate parseDate(String raw, DateTimeFormatter explicit) {
         if (raw == null || raw.isBlank()) return LocalDate.now();
+        if (explicit != null) {
+            try { return LocalDate.parse(raw.trim(), explicit); } catch (DateTimeParseException ignored) {}
+        }
         for (DateTimeFormatter fmt : DATE_FORMATS) {
             try { return LocalDate.parse(raw.trim(), fmt); } catch (DateTimeParseException ignored) {}
         }
