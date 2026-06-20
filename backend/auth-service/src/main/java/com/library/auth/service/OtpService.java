@@ -52,8 +52,11 @@ public class OtpService {
     @Value("${meta.whatsapp.template-name:library_otp}")
     private String metaTemplateName;
 
-    @Value("${meta.whatsapp.api-version:v19.0}")
+    @Value("${meta.whatsapp.api-version:v21.0}")
     private String metaApiVersion;
+
+    @Value("${meta.whatsapp.language:en_US}")
+    private String metaLanguage;
 
     // ── SendGrid Email ────────────────────────────────────────────────────────
     @Value("${sendgrid.api-key:}")
@@ -136,7 +139,7 @@ public class OtpService {
                 "type", "template",
                 "template", Map.of(
                         "name", metaTemplateName,
-                        "language", Map.of("code", "en"),
+                        "language", Map.of("code", metaLanguage),
                         "components", List.of(
                                 Map.of("type", "body",
                                         "parameters", List.of(

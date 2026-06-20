@@ -31,7 +31,8 @@ meta:
     token: ${META_WHATSAPP_TOKEN:}
     phone-number-id: ${META_WHATSAPP_PHONE_NUMBER_ID:}
     template-name: ${META_WHATSAPP_TEMPLATE_NAME:library_otp}
-    api-version: v19.0
+    api-version: ${META_WHATSAPP_API_VERSION:v21.0}
+    language: ${META_WHATSAPP_LANGUAGE:en_US}
 
 apitxt:
   auth-key: ${APITXT_AUTH_KEY:}
