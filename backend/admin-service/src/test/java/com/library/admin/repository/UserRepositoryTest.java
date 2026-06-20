@@ -58,7 +58,7 @@ class UserRepositoryTest {
 
     @Test
     void findStudentsByStatus_nullStatus_returnsAllStudents() {
-        Page<User> page = userRepository.findStudentsByStatus(null, null, PageRequest.of(0, 10));
+        Page<User> page = userRepository.findStudentsByStatus(null, null, null, PageRequest.of(0, 10));
 
         assertThat(page.getContent())
                 .hasSize(2)
@@ -68,7 +68,7 @@ class UserRepositoryTest {
 
     @Test
     void findStudentsByStatus_active_returnsOnlyActiveStudents() {
-        Page<User> page = userRepository.findStudentsByStatus("ACTIVE", null, PageRequest.of(0, 10));
+        Page<User> page = userRepository.findStudentsByStatus("ACTIVE", null, null, PageRequest.of(0, 10));
 
         assertThat(page.getContent())
                 .hasSize(1)
@@ -78,7 +78,7 @@ class UserRepositoryTest {
 
     @Test
     void findStudentsByStatus_inactive_returnsOnlyInactiveStudents() {
-        Page<User> page = userRepository.findStudentsByStatus("INACTIVE", null, PageRequest.of(0, 10));
+        Page<User> page = userRepository.findStudentsByStatus("INACTIVE", null, null, PageRequest.of(0, 10));
 
         assertThat(page.getContent())
                 .hasSize(1)
@@ -88,7 +88,7 @@ class UserRepositoryTest {
 
     @Test
     void findStudentsByStatus_doesNotReturnAdminUsers() {
-        Page<User> page = userRepository.findStudentsByStatus(null, null, PageRequest.of(0, 10));
+        Page<User> page = userRepository.findStudentsByStatus(null, null, null, PageRequest.of(0, 10));
 
         assertThat(page.getContent())
                 .extracting(User::getName)
@@ -97,7 +97,7 @@ class UserRepositoryTest {
 
     @Test
     void findStudentsByStatus_pagination_respectsPageSize() {
-        Page<User> page = userRepository.findStudentsByStatus(null, null, PageRequest.of(0, 1));
+        Page<User> page = userRepository.findStudentsByStatus(null, null, null, PageRequest.of(0, 1));
 
         assertThat(page.getContent()).hasSize(1);
         assertThat(page.getTotalElements()).isEqualTo(2);
@@ -106,7 +106,7 @@ class UserRepositoryTest {
     @Test
     void findStudentsByStatus_emptyTable_returnsEmptyPage() {
         userRepository.deleteAll();
-        Page<User> page = userRepository.findStudentsByStatus(null, null, PageRequest.of(0, 10));
+        Page<User> page = userRepository.findStudentsByStatus(null, null, null, PageRequest.of(0, 10));
 
         assertThat(page.getContent()).isEmpty();
     }
