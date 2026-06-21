@@ -15,6 +15,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -34,6 +35,12 @@ public class WhatsAppService {
 
     @Value("${meta.whatsapp.api-version:v21.0}")
     private String metaApiVersion;
+
+    @Value("${meta.whatsapp.template-name:library_notification}")
+    private String metaTemplateName;
+
+    @Value("${meta.whatsapp.language:en_US}")
+    private String metaLanguage;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -63,8 +70,18 @@ public class WhatsAppService {
                 Map<String, Object> body = Map.of(
                         "messaging_product", "whatsapp",
                         "to", to,
-                        "type", "text",
-                        "text", Map.of("body", message)
+                        "type", "template",
+                        "template", Map.of(
+                                "name", metaTemplateName,
+                                "language", Map.of("code", metaLanguage),
+                                "components", List.of(
+                                        Map.of("type", "body",
+                                               "parameters", List.of(
+                                                       Map.of("type", "text", "text", message)
+                                               )
+                                        )
+                                )
+                        )
                 );
 
                 HttpRequest req = HttpRequest.newBuilder()
