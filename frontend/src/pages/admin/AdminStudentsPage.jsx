@@ -15,6 +15,9 @@ export default function AdminStudentsPage() {
     const [total, setTotal]       = useState(0)
     const [loading, setLoading]   = useState(true)
     const [page, setPage]             = useState(0)
+    const [pageSize, setPageSize]     = useState(20)
+    const [sortBy,  setSortBy]        = useState('createdAt')
+    const [sortDir, setSortDir]       = useState('desc')
     const [status, setStatus]         = useState('')
     const [membershipFilter, setMembershipFilter] = useState('')
     const [search, setSearch]         = useState('')
@@ -41,7 +44,7 @@ export default function AdminStudentsPage() {
     const fetchStudents = async () => {
         setLoading(true)
         try {
-            const res = await api.get(`/admin/students?page=${page}&size=20${status ? `&status=${status}` : ''}${membershipFilter ? `&membershipStatus=${membershipFilter}` : ''}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`)
+            const res = await api.get(`/admin/students?page=${page}&size=${pageSize}&sortBy=${sortBy}&sortDir=${sortDir}${status ? `&status=${status}` : ''}${membershipFilter ? `&membershipStatus=${membershipFilter}` : ''}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`)
             setStudents(res.data.data.students || [])
             setTotal(res.data.data.total || 0)
         } catch { toast.error(t('adminStudents.toasts.loadFailed')) }
@@ -56,7 +59,7 @@ export default function AdminStudentsPage() {
         return () => clearTimeout(t)
     }, [search])
 
-    useEffect(() => { fetchStudents() }, [page, status, membershipFilter, debouncedSearch])
+    useEffect(() => { fetchStudents() }, [page, status, membershipFilter, debouncedSearch, pageSize, sortBy, sortDir])
 
     useEffect(() => {
         if (!detail) { setStudentPayments([]); return }
@@ -132,6 +135,17 @@ export default function AdminStudentsPage() {
         }
     }
 
+    const handleSort = (col) => {
+        if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+        else { setSortBy(col); setSortDir('asc') }
+        setPage(0)
+    }
+
+    const sortIcon = (col) => {
+        if (sortBy !== col) return <span className="ml-1 text-primary-700">↕</span>
+        return <span className="ml-1 text-amber-400">{sortDir === 'asc' ? '↑' : '↓'}</span>
+    }
+
     const filters = [
         { v: '',         l: t('adminStudents.filters.all') },
         { v: 'ACTIVE',   l: t('adminStudents.filters.active') },
@@ -144,14 +158,14 @@ export default function AdminStudentsPage() {
         { v: 'INACTIVE', l: t('adminStudents.filters.membershipInactive') },
     ]
 
-    const headers = [
-        t('adminStudents.table.student'),
-        t('adminStudents.table.contact'),
-        t('adminStudents.table.seatShift'),
-        t('adminStudents.table.membership'),
-        t('adminStudents.table.payment'),
-        t('adminStudents.table.status'),
-        t('adminStudents.table.actions'),
+    const headerCols = [
+        { l: t('adminStudents.table.student'),    col: 'name' },
+        { l: t('adminStudents.table.contact'),    col: 'mobile' },
+        { l: t('adminStudents.table.seatShift'),  col: 'seatNumber' },
+        { l: t('adminStudents.table.membership'), col: 'endDate' },
+        { l: t('adminStudents.table.payment'),    col: 'paymentMode' },
+        { l: t('adminStudents.table.status'),     col: 'isActive' },
+        { l: t('adminStudents.table.actions'),    col: null },
     ]
 
     return (
@@ -204,8 +218,13 @@ export default function AdminStudentsPage() {
                         <table className="w-full text-sm">
                             <thead>
                             <tr className="border-b border-primary-700/40">
-                                {headers.map(h => (
-                                    <th key={h} className="p-4 text-left text-primary-400 font-medium">{h}</th>
+                                {headerCols.map(({ l, col }) => (
+                                    <th key={l}
+                                        onClick={col ? () => handleSort(col) : undefined}
+                                        className={`p-4 text-left text-primary-400 font-medium select-none
+                                            ${col ? 'cursor-pointer hover:text-white transition-colors' : ''}`}>
+                                        {l}{col && sortIcon(col)}
+                                    </th>
                                 ))}
                             </tr>
                             </thead>
@@ -292,11 +311,17 @@ export default function AdminStudentsPage() {
                         </table>
                     </div>
                     <div className="flex items-center justify-between p-4 border-t border-primary-700/30">
-                        <span className="text-primary-400 text-sm">{t('adminStudents.page', { page: page + 1 })}</span>
+                        <div className="flex items-center gap-3">
+                            <span className="text-primary-400 text-sm">{t('adminStudents.page', { page: page + 1 })}</span>
+                            <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0) }}
+                                    className="input text-sm py-1 w-24">
+                                {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n} / page</option>)}
+                            </select>
+                        </div>
                         <div className="flex gap-2">
                             <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
                                     className="btn-ghost disabled:opacity-40 text-sm px-3 py-1.5 border border-primary-700/40 rounded-lg">← {t('adminStudents.prev')}</button>
-                            <button onClick={() => setPage(p => p + 1)} disabled={students.length < 20}
+                            <button onClick={() => setPage(p => p + 1)} disabled={students.length < pageSize}
                                     className="btn-ghost disabled:opacity-40 text-sm px-3 py-1.5 border border-primary-700/40 rounded-lg">{t('adminStudents.next')} →</button>
                         </div>
                     </div>

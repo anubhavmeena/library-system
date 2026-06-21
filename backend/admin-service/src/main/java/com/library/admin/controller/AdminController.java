@@ -34,13 +34,15 @@ public class AdminController {
 
     @GetMapping("/students")
     public ResponseEntity<ApiResponse<StudentListDto>> getAllStudents(
-            @RequestParam(defaultValue = "0")  int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false)    String status,
-            @RequestParam(required = false)    String membershipStatus,
-            @RequestParam(required = false)    String search) {
+            @RequestParam(defaultValue = "0")           int page,
+            @RequestParam(defaultValue = "20")          int size,
+            @RequestParam(required = false)             String status,
+            @RequestParam(required = false)             String membershipStatus,
+            @RequestParam(required = false)             String search,
+            @RequestParam(defaultValue = "createdAt")   String sortBy,
+            @RequestParam(defaultValue = "desc")        String sortDir) {
         return ResponseEntity.ok(ApiResponse.success(
-                adminService.getAllStudents(page, size, status, membershipStatus, search)));
+                adminService.getAllStudents(page, size, status, membershipStatus, search, sortBy, sortDir)));
     }
 
     @GetMapping("/students/{userId}")

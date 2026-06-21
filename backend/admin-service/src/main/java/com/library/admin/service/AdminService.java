@@ -5,9 +5,10 @@ import com.library.admin.entity.*;
 import com.library.admin.event.BroadcastNotificationEvent;
 import com.library.admin.exception.ResourceNotFoundException;
 import com.library.admin.repository.*;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,19 @@ public class AdminService {
     private final PlanRepository              planRepository;
     private final BroadcastMessageRepository  broadcastMessageRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    private static final Map<String, String> SORT_COLUMNS = Map.of(
+        "name",        "u.name",
+        "mobile",      "u.mobile",
+        "seatNumber",  "m.seat_number",
+        "endDate",     "m.end_date",
+        "paymentMode", "p.payment_gateway",
+        "isActive",    "u.is_active",
+        "createdAt",   "u.created_at"
+    );
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
 
@@ -74,10 +88,44 @@ public class AdminService {
 
     // ── Students ──────────────────────────────────────────────────────────────
 
-    public StudentListDto getAllStudents(int page, int size, String status, String membershipStatus, String search) {
-        org.springframework.data.domain.Page<User> pageResult = userRepository
-                .findStudentsByStatus(status, membershipStatus, search, PageRequest.of(page, size));
-        List<User> users = pageResult.getContent();
+    public StudentListDto getAllStudents(int page, int size, String status, String membershipStatus,
+                                         String search, String sortBy, String sortDir) {
+        String safeSortCol = SORT_COLUMNS.getOrDefault(sortBy, "u.created_at");
+        String safeSortDir = "asc".equalsIgnoreCase(sortDir) ? "ASC" : "DESC";
+
+        String where = """
+                FROM users u
+                LEFT JOIN memberships m ON m.user_id = u.id
+                    AND m.status = 'ACTIVE' AND m.end_date >= CURRENT_DATE
+                LEFT JOIN payments p ON p.membership_id = m.id
+                WHERE u.role = 'STUDENT'
+                  AND (:status IS NULL
+                       OR (:status = 'ACTIVE'   AND u.is_active = true)
+                       OR (:status = 'INACTIVE' AND u.is_active = false))
+                  AND (:membershipStatus IS NULL
+                       OR (:membershipStatus = 'ACTIVE'   AND m.id IS NOT NULL)
+                       OR (:membershipStatus = 'INACTIVE' AND m.id IS NULL))
+                  AND (:search IS NULL
+                       OR LOWER(u.name)  LIKE LOWER(CONCAT('%', CAST(:search AS VARCHAR), '%'))
+                       OR u.mobile       LIKE CONCAT('%', CAST(:search AS VARCHAR), '%'))
+                """;
+
+        @SuppressWarnings("unchecked")
+        List<User> users = entityManager
+                .createNativeQuery("SELECT u.* " + where + " ORDER BY " + safeSortCol + " " + safeSortDir, User.class)
+                .setParameter("status", status)
+                .setParameter("membershipStatus", membershipStatus)
+                .setParameter("search", search)
+                .setFirstResult(page * size)
+                .setMaxResults(size)
+                .getResultList();
+
+        long total = ((Number) entityManager
+                .createNativeQuery("SELECT COUNT(DISTINCT u.id) " + where)
+                .setParameter("status", status)
+                .setParameter("membershipStatus", membershipStatus)
+                .setParameter("search", search)
+                .getSingleResult()).longValue();
 
         List<StudentDto> students = users.stream().map(user -> {
             Membership mem = membershipRepository
@@ -92,7 +140,7 @@ public class AdminService {
             }
             return dto;
         }).collect(Collectors.toList());
-        return new StudentListDto(students, pageResult.getTotalElements());
+        return new StudentListDto(students, total);
     }
 
     public StudentDto getStudentDetails(String userId) {
