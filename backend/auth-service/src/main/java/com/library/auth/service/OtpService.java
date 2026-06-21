@@ -145,6 +145,13 @@ public class OtpService {
                                         "parameters", List.of(
                                                 Map.of("type", "text", "text", otp)
                                         )
+                                ),
+                                Map.of("type", "button",
+                                        "sub_type", "url",
+                                        "index", "0",
+                                        "parameters", List.of(
+                                                Map.of("type", "text", "text", otp)
+                                        )
                                 )
                         )
                 )
