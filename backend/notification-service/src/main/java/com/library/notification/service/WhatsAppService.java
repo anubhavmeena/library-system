@@ -1,19 +1,22 @@
 package com.library.notification.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.library.notification.entity.NotificationLog;
+import com.library.notification.enums.Channel;
+import com.library.notification.enums.DeliveryStatus;
 import com.library.notification.repository.NotificationLogRepository;
-import com.twilio.rest.api.v2010.account.Message;
-import com.twilio.type.PhoneNumber;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.Map;
 import java.util.UUID;
-
-import com.library.notification.enums.Channel;
-import com.library.notification.enums.DeliveryStatus;
 
 @Service
 @RequiredArgsConstructor
@@ -21,94 +24,76 @@ import com.library.notification.enums.DeliveryStatus;
 public class WhatsAppService {
 
     private final NotificationLogRepository logRepository;
+    private final ObjectMapper objectMapper;
 
-    @Value("${twilio.account-sid:}")
-    private String accountSid;
+    @Value("${meta.whatsapp.token:}")
+    private String metaToken;
 
-    @Value("${twilio.auth-token:}")
-    private String authToken;
+    @Value("${meta.whatsapp.phone-number-id:}")
+    private String metaPhoneNumberId;
 
-    @Value("${twilio.whatsapp-from:whatsapp:+14155238886}")
-    private String whatsappFrom;
+    @Value("${meta.whatsapp.api-version:v21.0}")
+    private String metaApiVersion;
 
-    private boolean twilioEnabled = false;
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
-    /**
-     * Initialises the Twilio SDK on startup.
-     * If credentials are not configured (dev mode), messages are only logged
-     * to the console — no real WhatsApp messages are sent.
-     */
+    private boolean metaEnabled = false;
+
     @PostConstruct
     public void init() {
-        if (!accountSid.isBlank() && !authToken.isBlank()) {
-            com.twilio.Twilio.init(accountSid, authToken);
-            twilioEnabled = true;
-            log.info("Twilio WhatsApp initialized successfully");
+        if (!metaToken.isBlank() && !metaPhoneNumberId.isBlank()) {
+            metaEnabled = true;
+            log.info("Meta WhatsApp Cloud API configured — all WhatsApp notifications will use Meta");
         } else {
-            log.warn("Twilio not configured — WhatsApp messages will be logged only (dev mode)");
+            log.warn("Meta WhatsApp not configured — WhatsApp messages will be logged only (dev mode)");
         }
     }
 
-    /**
-     * Send a WhatsApp message via Twilio and persist a delivery log entry.
-     *
-     * @param mobile   Recipient mobile number — 10-digit Indian (auto-prefixed +91)
-     *                 or full E.164 format (e.g. +919876543210)
-     * @param message  WhatsApp message body (plain text, supports *bold* formatting)
-     * @param userId   Student UUID for audit log — nullable (e.g. admin alerts)
-     * @param event    Event type label stored in notification_logs
-     *                 e.g. BOOKING_CONFIRMED, RENEWAL_REMINDER, ADMIN_BOOKING_ALERT
-     */
     public void send(String mobile, String message, String userId, String event) {
-        String formatted                        = formatNumber(mobile);
-        DeliveryStatus status   = DeliveryStatus.SENT;
-        String errorMessage                     = null;
+        DeliveryStatus status = DeliveryStatus.SENT;
+        String errorMessage   = null;
 
-        if (!twilioEnabled) {
-            // Dev mode — log to console, no actual send
+        if (!metaEnabled) {
             log.info("[DEV] WhatsApp → {} | Event: {} | Message:\n{}", mobile, event, message);
         } else {
             try {
-                Message msg = Message.creator(
-                        new PhoneNumber("whatsapp:" + formatted),  // To
-                        new PhoneNumber(whatsappFrom),              // From (Twilio sandbox or approved number)
-                        message
-                ).create();
+                String to = mobile.replaceAll("[^0-9+]", "");
+                to = to.startsWith("+") ? to.substring(1) : "91" + to;
 
-                log.info("WhatsApp sent to {} | SID: {}", mobile, msg.getSid());
+                Map<String, Object> body = Map.of(
+                        "messaging_product", "whatsapp",
+                        "to", to,
+                        "type", "text",
+                        "text", Map.of("body", message)
+                );
+
+                HttpRequest req = HttpRequest.newBuilder()
+                        .uri(URI.create("https://graph.facebook.com/" + metaApiVersion + "/" + metaPhoneNumberId + "/messages"))
+                        .header("Authorization", "Bearer " + metaToken)
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+                        .build();
+
+                HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+
+                if (resp.statusCode() >= 400) {
+                    throw new RuntimeException("Meta API error " + resp.statusCode() + ": " + resp.body());
+                }
+
+                log.info("WhatsApp sent to {} via Meta Cloud API | Event: {}", mobile, event);
 
             } catch (Exception e) {
-                status      = DeliveryStatus.FAILED;
+                status       = DeliveryStatus.FAILED;
                 errorMessage = e.getMessage();
-                log.error("WhatsApp send failed to {}: {}", mobile, e.getMessage());
-                // Do NOT rethrow — notification failure must not crash the Kafka consumer
+                log.error("WhatsApp send failed to {} | Event: {}: {}", mobile, event, e.getMessage());
             }
         }
 
         saveLog(userId, mobile, message, event, status, errorMessage);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    /**
-     * Normalises a mobile number to E.164 format with Indian country code.
-     * Strips all non-numeric characters (spaces, dashes, parentheses).
-     * If the number already starts with + it is used as-is.
-     */
-    private String formatNumber(String mobile) {
-        if (mobile == null || mobile.isBlank()) return "";
-        mobile = mobile.replaceAll("[^0-9+]", "");
-        return mobile.startsWith("+") ? mobile : "+91" + mobile;
-    }
-
-    /**
-     * Persists every send attempt to notification_logs — both successes and failures.
-     * Wrapped in try-catch so a DB write failure never prevents the message from
-     * being delivered (or at least attempted).
-     */
     private void saveLog(String userId, String recipient, String message,
-                         String event, DeliveryStatus status,
-                         String errorMessage) {
+                         String event, DeliveryStatus status, String errorMessage) {
         try {
             NotificationLog entry = NotificationLog.builder()
                     .userId(userId != null ? UUID.fromString(userId) : null)

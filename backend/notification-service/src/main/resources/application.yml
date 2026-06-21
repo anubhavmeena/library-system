@@ -44,6 +44,12 @@ spring:
         spring.json.trusted.packages: "com.library.*"
         spring.json.use.type.headers: false
 
+meta:
+  whatsapp:
+    token:           ${META_WHATSAPP_TOKEN:}
+    phone-number-id: ${META_WHATSAPP_PHONE_NUMBER_ID:}
+    api-version:     ${META_WHATSAPP_API_VERSION:v21.0}
+
 twilio:
   account-sid:   ${TWILIO_ACCOUNT_SID:}
   auth-token:    ${TWILIO_AUTH_TOKEN:}
