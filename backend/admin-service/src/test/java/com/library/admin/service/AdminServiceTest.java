@@ -4,11 +4,12 @@ import com.library.admin.dto.*;
 import com.library.admin.entity.*;
 import com.library.admin.exception.ResourceNotFoundException;
 import com.library.admin.repository.*;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.*;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import java.math.BigDecimal;
@@ -28,8 +29,24 @@ class AdminServiceTest {
     @Mock PaymentRepository    paymentRepository;
     @Mock PlanRepository       planRepository;
     @Mock KafkaTemplate<String, Object> kafkaTemplate;
+    @Mock EntityManager        entityManager;
+    @Mock Query                dataQuery;
+    @Mock Query                countQuery;
 
     @InjectMocks AdminService adminService;
+
+    @SuppressWarnings("unchecked")
+    private void stubEntityManagerForStudents(List<User> users, long count) {
+        when(entityManager.createNativeQuery(anyString(), eq(User.class))).thenReturn(dataQuery);
+        when(dataQuery.setParameter(anyString(), any())).thenReturn(dataQuery);
+        when(dataQuery.setFirstResult(anyInt())).thenReturn(dataQuery);
+        when(dataQuery.setMaxResults(anyInt())).thenReturn(dataQuery);
+        when(dataQuery.getResultList()).thenReturn(users);
+
+        when(entityManager.createNativeQuery(anyString())).thenReturn(countQuery);
+        when(countQuery.setParameter(anyString(), any())).thenReturn(countQuery);
+        when(countQuery.getSingleResult()).thenReturn(count);
+    }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -145,12 +162,11 @@ class AdminServiceTest {
         User user = buildUser(uid);
         Membership mem = buildActiveMembership(uid, LocalDate.now().plusDays(10));
 
-        Page<User> page = new PageImpl<>(List.of(user));
-        when(userRepository.findStudentsByStatus(isNull(), isNull(), isNull(), any(Pageable.class))).thenReturn(page);
+        stubEntityManagerForStudents(List.of(user), 1L);
         when(membershipRepository.findByUserIdAndStatus(uid, Membership.Status.ACTIVE))
                 .thenReturn(Optional.of(mem));
 
-        StudentListDto result = adminService.getAllStudents(0, 20, null, null, null);
+        StudentListDto result = adminService.getAllStudents(0, 20, null, null, null, "createdAt", "desc");
 
         assertThat(result.getStudents()).hasSize(1);
         assertThat(result.getStudents().get(0).getMembershipId()).isEqualTo(mem.getId().toString());
@@ -159,33 +175,30 @@ class AdminServiceTest {
     @Test
     void getAllStudents_studentWithNoMembership_hasMembershipFieldsNull() {
         UUID uid = UUID.randomUUID();
-        Page<User> page = new PageImpl<>(List.of(buildUser(uid)));
-        when(userRepository.findStudentsByStatus(any(), any(), any(), any(Pageable.class))).thenReturn(page);
+        stubEntityManagerForStudents(List.of(buildUser(uid)), 1L);
         when(membershipRepository.findByUserIdAndStatus(uid, Membership.Status.ACTIVE))
                 .thenReturn(Optional.empty());
 
-        StudentListDto result = adminService.getAllStudents(0, 20, null, null, null);
+        StudentListDto result = adminService.getAllStudents(0, 20, null, null, null, "createdAt", "desc");
 
         assertThat(result.getStudents().get(0).getMembershipId()).isNull();
         assertThat(result.getStudents().get(0).getDaysRemaining()).isZero();
     }
 
     @Test
-    void getAllStudents_forwardsStatusParamToRepo() {
-        when(userRepository.findStudentsByStatus(eq("ACTIVE"), isNull(), isNull(), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of()));
+    void getAllStudents_forwardsStatusParamToQuery() {
+        stubEntityManagerForStudents(List.of(), 0L);
 
-        adminService.getAllStudents(0, 10, "ACTIVE", null, null);
+        adminService.getAllStudents(0, 10, "ACTIVE", null, null, "createdAt", "desc");
 
-        verify(userRepository).findStudentsByStatus(eq("ACTIVE"), isNull(), isNull(), any(Pageable.class));
+        verify(dataQuery).setParameter("status", "ACTIVE");
     }
 
     @Test
     void getAllStudents_emptyPage_returnsEmptyList() {
-        when(userRepository.findStudentsByStatus(any(), any(), any(), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of()));
+        stubEntityManagerForStudents(List.of(), 0L);
 
-        StudentListDto result = adminService.getAllStudents(0, 20, null, null, null);
+        StudentListDto result = adminService.getAllStudents(0, 20, null, null, null, "createdAt", "desc");
 
         assertThat(result.getStudents()).isEmpty();
     }
