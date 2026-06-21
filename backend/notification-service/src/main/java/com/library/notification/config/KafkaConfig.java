@@ -19,7 +19,7 @@ public class KafkaConfig {
         return new DefaultErrorHandler(
                 (record, ex) -> log.error(
                         "Skipping unprocessable record — topic={} partition={} offset={} cause={}",
-                        record.topic(), record.partition(), record.offset(), ex.getMessage()),
+                        record.topic(), record.partition(), record.offset(), ex.getMessage(), ex),
                 new FixedBackOff(0L, 0L)
         );
     }
