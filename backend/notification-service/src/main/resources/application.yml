@@ -49,7 +49,7 @@ meta:
     token:           ${META_WHATSAPP_TOKEN:}
     phone-number-id: ${META_WHATSAPP_PHONE_NUMBER_ID:}
     api-version:     ${META_WHATSAPP_API_VERSION:v21.0}
-    template-name:   ${META_WHATSAPP_TEMPLATE_NAME:library_notification}
+    template-name:   ${META_NOTIFICATION_TEMPLATE_NAME:library_notification}
     language:        ${META_WHATSAPP_LANGUAGE:en_US}
 
 twilio:
