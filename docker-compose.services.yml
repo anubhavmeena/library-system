@@ -47,19 +47,19 @@ x-spring-env: &spring-env
 x-jvm-heavy: &jvm-heavy
   JAVA_TOOL_OPTIONS: >-
     -Xms96m -Xmx256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200
-    -XX:MaxMetaspaceSize=96m -XX:ReservedCodeCacheSize=48m
+    -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=48m
     -Xss256k -XX:+ExitOnOutOfMemoryError
 
 x-jvm-medium: &jvm-medium
   JAVA_TOOL_OPTIONS: >-
     -Xms64m -Xmx192m -XX:+UseSerialGC
-    -XX:MaxMetaspaceSize=96m -XX:ReservedCodeCacheSize=48m
+    -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=48m
     -Xss256k -XX:+ExitOnOutOfMemoryError
 
 x-jvm-light: &jvm-light
   JAVA_TOOL_OPTIONS: >-
     -Xms48m -Xmx128m -XX:+UseSerialGC
-    -XX:MaxMetaspaceSize=96m -XX:ReservedCodeCacheSize=48m
+    -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=48m
     -Xss256k -XX:+ExitOnOutOfMemoryError
 
 services:
