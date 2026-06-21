@@ -99,13 +99,13 @@ public class AdminService {
                     AND m.status = 'ACTIVE' AND m.end_date >= CURRENT_DATE
                 LEFT JOIN payments p ON p.membership_id = m.id
                 WHERE u.role = 'STUDENT'
-                  AND (:status IS NULL
-                       OR (:status = 'ACTIVE'   AND u.is_active = true)
-                       OR (:status = 'INACTIVE' AND u.is_active = false))
-                  AND (:membershipStatus IS NULL
-                       OR (:membershipStatus = 'ACTIVE'   AND m.id IS NOT NULL)
-                       OR (:membershipStatus = 'INACTIVE' AND m.id IS NULL))
-                  AND (:search IS NULL
+                  AND (CAST(:status AS VARCHAR) IS NULL
+                       OR (CAST(:status AS VARCHAR) = 'ACTIVE'   AND u.is_active = true)
+                       OR (CAST(:status AS VARCHAR) = 'INACTIVE' AND u.is_active = false))
+                  AND (CAST(:membershipStatus AS VARCHAR) IS NULL
+                       OR (CAST(:membershipStatus AS VARCHAR) = 'ACTIVE'   AND m.id IS NOT NULL)
+                       OR (CAST(:membershipStatus AS VARCHAR) = 'INACTIVE' AND m.id IS NULL))
+                  AND (CAST(:search AS VARCHAR) IS NULL
                        OR LOWER(u.name)  LIKE LOWER(CONCAT('%', CAST(:search AS VARCHAR), '%'))
                        OR u.mobile       LIKE CONCAT('%', CAST(:search AS VARCHAR), '%'))
                 """;
