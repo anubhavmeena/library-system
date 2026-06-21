@@ -1,17 +1,28 @@
 package com.library.notification.config;
 
+import com.library.notification.dto.BroadcastNotificationEvent;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.util.backoff.FixedBackOff;
+
+import java.util.Map;
 
 @Slf4j
 @Configuration
 public class KafkaConfig {
+
+    @Value("${spring.kafka.bootstrap-servers}")
+    private String bootstrapServers;
 
     // Zero retries: log the poison-pill record and skip it immediately.
     // Deserialization failures are surfaced here via ErrorHandlingDeserializer.
@@ -51,10 +62,27 @@ public class KafkaConfig {
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, Object> broadcastKafkaListenerContainerFactory(
-            ConsumerFactory<String, Object> consumerFactory) {
+    public ConcurrentKafkaListenerContainerFactory<String, BroadcastNotificationEvent>
+            broadcastKafkaListenerContainerFactory() {
 
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
+        JsonDeserializer<BroadcastNotificationEvent> valueDeser =
+                new JsonDeserializer<>(BroadcastNotificationEvent.class);
+        valueDeser.addTrustedPackages("*");
+        valueDeser.ignoreTypeHeaders();
+
+        DefaultKafkaConsumerFactory<String, BroadcastNotificationEvent> consumerFactory =
+                new DefaultKafkaConsumerFactory<>(
+                        Map.of(
+                                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
+                                ConsumerConfig.GROUP_ID_CONFIG, "notification-broadcast-group",
+                                ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
+                                ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false
+                        ),
+                        new StringDeserializer(),
+                        valueDeser
+                );
+
+        ConcurrentKafkaListenerContainerFactory<String, BroadcastNotificationEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
         factory.setConcurrency(3);
