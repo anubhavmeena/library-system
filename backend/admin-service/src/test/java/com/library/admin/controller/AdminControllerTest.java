@@ -59,19 +59,19 @@ class AdminControllerTest {
 
     @Test
     void getAllStudents_defaultParams_forwardsPageZeroSize20() throws Exception {
-        when(adminService.getAllStudents(eq(0), eq(20), isNull(), isNull(), isNull())).thenReturn(new StudentListDto(List.of(), 0));
+        when(adminService.getAllStudents(eq(0), eq(20), isNull(), isNull(), isNull(), eq("createdAt"), eq("desc"))).thenReturn(new StudentListDto(List.of(), 0));
 
         mockMvc.perform(get("/api/admin/students"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.students").isArray());
 
-        verify(adminService).getAllStudents(0, 20, null, null, null);
+        verify(adminService).getAllStudents(0, 20, null, null, null, "createdAt", "desc");
     }
 
     @Test
     void getAllStudents_customParams_forwarded() throws Exception {
-        when(adminService.getAllStudents(eq(2), eq(5), eq("ACTIVE"), isNull(), isNull())).thenReturn(new StudentListDto(List.of(), 0));
+        when(adminService.getAllStudents(eq(2), eq(5), eq("ACTIVE"), isNull(), isNull(), eq("createdAt"), eq("desc"))).thenReturn(new StudentListDto(List.of(), 0));
 
         mockMvc.perform(get("/api/admin/students")
                         .param("page", "2")
@@ -79,7 +79,7 @@ class AdminControllerTest {
                         .param("status", "ACTIVE"))
                 .andExpect(status().isOk());
 
-        verify(adminService).getAllStudents(2, 5, "ACTIVE", null, null);
+        verify(adminService).getAllStudents(2, 5, "ACTIVE", null, null, "createdAt", "desc");
     }
 
     @Test
@@ -90,7 +90,7 @@ class AdminControllerTest {
                 .isActive(true)
                 .build();
 
-        when(adminService.getAllStudents(anyInt(), anyInt(), any(), any(), any())).thenReturn(new StudentListDto(List.of(student), 1));
+        when(adminService.getAllStudents(anyInt(), anyInt(), any(), any(), any(), any(), any())).thenReturn(new StudentListDto(List.of(student), 1));
 
         mockMvc.perform(get("/api/admin/students"))
                 .andExpect(jsonPath("$.data.students", hasSize(1)))
