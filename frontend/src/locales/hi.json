@@ -550,13 +550,22 @@
     "stats": { "total": "कुल सीटें", "occupied": "भरी हुई", "available": "उपलब्ध" },
     "occupancy": "अधिभोग",
     "entrance": "← प्रवेश / आगे →",
+    "expiryView": "समाप्ति दृश्य",
+    "defaultView": "सामान्य दृश्य",
     "legend": {
       "available": "उपलब्ध",
-      "occupied": "भरी हुई (विवरण के लिए क्लिक करें)"
+      "occupied": "भरी हुई (विवरण के लिए क्लिक करें)",
+      "expiry": {
+        "critical": "≤ 3 दिन",
+        "warning": "4–7 दिन",
+        "soon": "8–15 दिन",
+        "safe": "16+ दिन"
+      }
     },
     "modal": {
       "seat": "सीट {{seatNumber}}",
-      "student": "छात्र", "mobile": "मोबाइल", "shift": "शिफ्ट", "expires": "समाप्ति"
+      "student": "छात्र", "mobile": "मोबाइल", "shift": "शिफ्ट", "expires": "समाप्ति",
+      "daysLeft": "बचे दिन", "daysLeftValue": "{{days}} दिन"
     },
     "loadFailed": "सीट मैप लोड करने में विफल"
   },

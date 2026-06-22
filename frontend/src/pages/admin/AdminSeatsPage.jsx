@@ -39,12 +39,26 @@ const L_BOTTOM = [14, 12, 10, 8, 6, 4, 2]
 const R_TOP    = [15, 17, 19, 21, 23, 25, 27]
 const R_BOTTOM = [16, 18, 20, 22, 24, 26, 28]
 
+const daysToExpiry = (membershipEnd, today) => {
+    if (!membershipEnd) return null
+    const diff = Math.ceil((new Date(membershipEnd) - new Date(today)) / 86400000)
+    return Math.max(0, diff)
+}
+
+const expiryClasses = (days) => {
+    if (days <= 3)  return 'bg-red-500/60 border-red-400/80 text-red-100 hover:bg-red-500/80'
+    if (days <= 7)  return 'bg-orange-500/50 border-orange-400/70 text-orange-100 hover:bg-orange-500/70'
+    if (days <= 15) return 'bg-yellow-500/40 border-yellow-400/60 text-yellow-100 hover:bg-yellow-500/60'
+    return 'bg-emerald-500/30 border-emerald-400/50 text-emerald-100 hover:bg-emerald-500/50'
+}
+
 export default function AdminSeatsPage() {
-    const [seatMap, setSeatMap]   = useState(null)
-    const [loading, setLoading]   = useState(true)
-    const [shift, setShift]       = useState('FULL_DAY')
-    const [date, setDate]         = useState(new Date().toISOString().split('T')[0])
-    const [selected, setSelected] = useState(null)
+    const [seatMap, setSeatMap]     = useState(null)
+    const [loading, setLoading]     = useState(true)
+    const [shift, setShift]         = useState('FULL_DAY')
+    const [date, setDate]           = useState(new Date().toISOString().split('T')[0])
+    const [selected, setSelected]   = useState(null)
+    const [viewMode, setViewMode]   = useState('default') // 'default' | 'expiry'
     const { t } = useTranslation()
 
     const fetchMap = async () => {
@@ -90,6 +104,13 @@ export default function AdminSeatsPage() {
                     />
                 </LocalizationProvider>
                 <button onClick={fetchMap} className="px-4 py-2 rounded-xl text-sm bg-primary-700/50 text-primary-300 hover:text-white border border-primary-700/40 transition-all">↻ {t('adminSeats.refresh')}</button>
+                <button onClick={() => setViewMode(v => v === 'expiry' ? 'default' : 'expiry')}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all
+                            ${viewMode === 'expiry'
+                                ? 'bg-amber-500/20 border-amber-400/60 text-amber-400'
+                                : 'border-primary-700/40 text-primary-400 hover:text-white'}`}>
+                    📅 {viewMode === 'expiry' ? t('adminSeats.defaultView') : t('adminSeats.expiryView')}
+                </button>
             </div>
 
             <div className="grid grid-cols-3 gap-4 mb-6">
@@ -139,6 +160,19 @@ export default function AdminSeatsPage() {
                                     return <div key={sn} className="w-8 h-8 rounded-lg bg-primary-900/50 border border-primary-800/20" title="Blocked" />
                                 }
                                 const seat = find(sn) ?? { seatNumber: sn, isOccupied: false }
+
+                                if (viewMode === 'expiry' && seat.isOccupied) {
+                                    const days = daysToExpiry(seat.membershipEnd, date)
+                                    return (
+                                        <button key={sn}
+                                                onClick={() => setSelected(seat)}
+                                                title={`${sn} — ${seat.studentName} — ${days}d left`}
+                                                className={`w-8 h-8 rounded-lg text-xs font-bold border transition-all cursor-pointer ${expiryClasses(days)}`}>
+                                            {days}
+                                        </button>
+                                    )
+                                }
+
                                 return (
                                     <button key={sn}
                                             onClick={() => setSelected(seat.isOccupied ? seat : null)}
@@ -182,11 +216,22 @@ export default function AdminSeatsPage() {
                         </div>
                     </div>
                     </div>
-                    <div className="flex flex-wrap gap-6 mt-6 text-xs text-primary-400">
-                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/10 border border-emerald-500/20" />{t('adminSeats.legend.available')}</div>
-                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-500/30 border border-red-500/50" />Male occupied</div>
-                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-fuchsia-500/30 border border-fuchsia-500/50" />Female occupied</div>
-                    </div>
+
+                    {viewMode === 'expiry' ? (
+                        <div className="flex flex-wrap gap-6 mt-6 text-xs text-primary-400">
+                            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-500/60 border border-red-400/80" />{t('adminSeats.legend.expiry.critical')}</div>
+                            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-orange-500/50 border border-orange-400/70" />{t('adminSeats.legend.expiry.warning')}</div>
+                            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-yellow-500/40 border border-yellow-400/60" />{t('adminSeats.legend.expiry.soon')}</div>
+                            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/30 border border-emerald-400/50" />{t('adminSeats.legend.expiry.safe')}</div>
+                            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/10 border border-emerald-500/20" />{t('adminSeats.legend.available')}</div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-wrap gap-6 mt-6 text-xs text-primary-400">
+                            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/10 border border-emerald-500/20" />{t('adminSeats.legend.available')}</div>
+                            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-500/30 border border-red-500/50" />Male occupied</div>
+                            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-fuchsia-500/30 border border-fuchsia-500/50" />Female occupied</div>
+                        </div>
+                    )}
                 </div>
             ) : null}
 
@@ -204,6 +249,7 @@ export default function AdminSeatsPage() {
                                 { l: 'Gender',                       v: selected.studentGender || '—' },
                                 { l: t('adminSeats.modal.shift'),   v: shiftLabel(selected.shift) },
                                 { l: t('adminSeats.modal.expires'), v: selected.membershipEnd },
+                                { l: t('adminSeats.modal.daysLeft'), v: t('adminSeats.modal.daysLeftValue', { days: daysToExpiry(selected.membershipEnd, date) }) },
                             ].map(({ l, v }) => (
                                 <div key={l} className="flex justify-between py-2 border-b border-primary-700/30 last:border-0 text-sm">
                                     <span className="text-primary-400">{l}</span>

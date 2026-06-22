@@ -550,13 +550,22 @@
     "stats": { "total": "Total Seats", "occupied": "Occupied", "available": "Available" },
     "occupancy": "Occupancy",
     "entrance": "← ENTRANCE / FRONT →",
+    "expiryView": "Expiry View",
+    "defaultView": "Default View",
     "legend": {
       "available": "Available",
-      "occupied": "Occupied (click for details)"
+      "occupied": "Occupied (click for details)",
+      "expiry": {
+        "critical": "≤ 3 days",
+        "warning": "4–7 days",
+        "soon": "8–15 days",
+        "safe": "16+ days"
+      }
     },
     "modal": {
       "seat": "Seat {{seatNumber}}",
-      "student": "Student", "mobile": "Mobile", "shift": "Shift", "expires": "Expires"
+      "student": "Student", "mobile": "Mobile", "shift": "Shift", "expires": "Expires",
+      "daysLeft": "Days Left", "daysLeftValue": "{{days}} days"
     },
     "loadFailed": "Failed to load seat map"
   },
