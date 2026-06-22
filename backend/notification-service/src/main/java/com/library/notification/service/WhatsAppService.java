@@ -67,6 +67,9 @@ public class WhatsAppService {
                 String to = mobile.replaceAll("[^0-9+]", "");
                 to = to.startsWith("+") ? to.substring(1) : "91" + to;
 
+                // Meta template params reject newlines, tabs, or 5+ consecutive spaces
+                String param = message.replaceAll("[\n\r\t]", " ").replaceAll(" {5,}", "    ").trim();
+
                 Map<String, Object> body = Map.of(
                         "messaging_product", "whatsapp",
                         "to", to,
@@ -77,7 +80,7 @@ public class WhatsAppService {
                                 "components", List.of(
                                         Map.of("type", "body",
                                                "parameters", List.of(
-                                                       Map.of("type", "text", "text", message)
+                                                       Map.of("type", "text", "text", param)
                                                )
                                         )
                                 )
