@@ -7,7 +7,7 @@ import { sendOtp, verifyOtp, registerUser, resetAuthState } from '../../store/sl
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3'
-import { parseISO, format } from 'date-fns'
+import { parseISO, format, isValid } from 'date-fns'
 
 const DATE_PICKER_SX = {
     '& .MuiOutlinedInput-root': {
@@ -172,7 +172,8 @@ export default function RegisterPage() {
                                     <LocalizationProvider dateAdapter={AdapterDateFns}>
                                         <DatePicker
                                             value={form.dateOfBirth ? parseISO(form.dateOfBirth) : null}
-                                            onChange={(d) => setForm(f => ({ ...f, dateOfBirth: d ? format(d, 'yyyy-MM-dd') : '' }))}
+                                            onChange={(d) => setForm(f => ({ ...f, dateOfBirth: d && isValid(d) ? format(d, 'yyyy-MM-dd') : '' }))}
+                                            onError={() => {}}
                                             sx={{ width: '100%', ...DATE_PICKER_SX }}
                                             slotProps={{ textField: { size: 'small' }, popper: { sx: DATE_PICKER_POPPER_SX } }}
                                         />
