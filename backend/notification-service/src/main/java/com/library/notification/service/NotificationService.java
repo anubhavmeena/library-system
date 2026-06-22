@@ -8,6 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -21,6 +24,14 @@ public class NotificationService {
 
     @Value("${notification.admin-whatsapp:}")
     private String adminWhatsapp;
+
+    private List<String> adminWhatsappNumbers() {
+        if (!hasValue(adminWhatsapp)) return List.of();
+        return Arrays.stream(adminWhatsapp.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .toList();
+    }
 
     // ── Booking Confirmed ─────────────────────────────────────────────────────
     // Sends WhatsApp + email to student, and an alert to admin
@@ -61,8 +72,8 @@ public class NotificationService {
                 event.getAmountPaid()
         );
 
-        if (hasValue(adminWhatsapp)) {
-            whatsAppService.send(adminWhatsapp, adminMsg, null, "ADMIN_BOOKING_ALERT");
+        for (String number : adminWhatsappNumbers()) {
+            whatsAppService.send(number, adminMsg, null, "ADMIN_BOOKING_ALERT");
         }
 
         // Alert admin via email (always sent if adminEmail is configured)
@@ -115,8 +126,8 @@ public class NotificationService {
                 hasValue(event.getUserEmail())  ? event.getUserEmail()  : "—"
         );
 
-        if (hasValue(adminWhatsapp)) {
-            whatsAppService.send(adminWhatsapp, adminMsg, null, "ADMIN_REGISTRATION_ALERT");
+        for (String number : adminWhatsappNumbers()) {
+            whatsAppService.send(number, adminMsg, null, "ADMIN_REGISTRATION_ALERT");
         }
 
         emailService.sendText(
