@@ -144,6 +144,14 @@ public class ExpiryReminderScheduler {
             mem.setStatus(Membership.Status.EXPIRED);
             membershipRepository.save(mem);
 
+            // Activate any queued plan for this user
+            membershipRepository.findQueuedByUserId(mem.getUserId()).ifPresent(queued -> {
+                queued.setStatus(Membership.Status.ACTIVE);
+                membershipRepository.save(queued);
+                log.info("Activated queued plan for user {} — seat {} from {}",
+                        mem.getUserId(), queued.getSeatNumber(), queued.getStartDate());
+            });
+
             User user = userMap.get(mem.getUserId());
             String userName = user != null ? user.getName()   : "Unknown";
             String mobile   = user != null ? user.getMobile() : null;

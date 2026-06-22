@@ -33,5 +33,5 @@ public class Membership {
     @Column(name = "created_at", updatable = false) private LocalDateTime createdAt;
     @PrePersist protected void onCreate() { createdAt = LocalDateTime.now(); }
 
-    public enum Status { PENDING, ACTIVE, EXPIRED, CANCELLED }
+    public enum Status { PENDING, ACTIVE, QUEUED, EXPIRED, CANCELLED }
 }

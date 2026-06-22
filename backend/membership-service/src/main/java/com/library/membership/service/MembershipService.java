@@ -32,6 +32,13 @@ public class MembershipService {
                 .orElse(null);
     }
 
+    public MembershipDto getUserQueuedMembership(String userId) {
+        return membershipRepository
+                .findQueuedByUserId(UUID.fromString(userId))
+                .map(MembershipDto::fromEntity)
+                .orElse(null);
+    }
+
     /**
      * Returns full membership history for a student — all statuses
      * (PENDING, ACTIVE, EXPIRED, CANCELLED), newest first.

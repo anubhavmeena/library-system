@@ -53,6 +53,9 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
         """)
     List<Membership> findExpiredActive(@Param("today") LocalDate today);
 
+    @Query("SELECT m FROM Membership m WHERE m.userId = :userId AND m.status = 'QUEUED'")
+    Optional<Membership> findQueuedByUserId(@Param("userId") UUID userId);
+
     @Query("SELECT COUNT(m) FROM Membership m WHERE m.status = 'ACTIVE'")
     long countActiveMemberships();
 

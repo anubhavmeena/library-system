@@ -69,19 +69,32 @@ public class PaymentService {
     @Transactional
     public CreateOrderResponse createOrder(String userId, CreateOrderRequest request) {
 
-        // 1. Block if user already has an active, non-expired membership
-        membershipRepository.findActiveByUserId(UUID.fromString(userId))
-                .filter(m -> !m.getEndDate().isBefore(LocalDate.now()))
-                .ifPresent(m -> {
-                    throw new IllegalArgumentException(
-                            "You already have an active membership until " + m.getEndDate()
-                            + ". You can purchase a new plan after it expires.");
-                });
-
-        // 2. Resolve the plan
+        // 1. Resolve the plan
         Plan plan = planRepository.findById(UUID.fromString(request.getPlanId()))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Plan not found: " + request.getPlanId()));
+
+        // 2. Determine start date — queue on top of active membership if one exists
+        Optional<Membership> activeOpt = membershipRepository
+                .findActiveByUserId(UUID.fromString(userId))
+                .filter(m -> !m.getEndDate().isBefore(LocalDate.now()));
+
+        LocalDate startDate;
+        if (activeOpt.isPresent()) {
+            // Only one queued plan allowed at a time
+            membershipRepository.findQueuedByUserId(UUID.fromString(userId)).ifPresent(q -> {
+                throw new IllegalArgumentException(
+                        "You already have a plan queued starting " + q.getStartDate() + ".");
+            });
+            Membership active = activeOpt.get();
+            startDate = active.getEndDate().plusDays(1);
+            // Inherit seat and shift from current active membership
+            if (active.getSeatId()     != null) request.setSeatId(active.getSeatId().toString());
+            if (active.getSeatNumber() != null) request.setSeatNumber(active.getSeatNumber());
+            if (active.getShift()      != null) request.setShift(active.getShift());
+        } else {
+            startDate = LocalDate.now();
+        }
 
         // 3. Validate shift requirement for half-day plans
         if (plan.getPlanType() == Plan.PlanType.HALF_DAY) {
@@ -92,7 +105,7 @@ public class PaymentService {
             }
         }
 
-        // 4. Create membership in PENDING state (activated after payment)
+        // 4. Create membership in PENDING state (set to ACTIVE or QUEUED after payment)
         Membership membership = Membership.builder()
                 .userId(UUID.fromString(userId))
                 .plan(plan)
@@ -101,8 +114,8 @@ public class PaymentService {
                 .seatNumber(request.getSeatNumber())
                 .shift(plan.getPlanType() == Plan.PlanType.FULL_DAY
                         ? "FULL_DAY" : request.getShift())
-                .startDate(LocalDate.now())
-                .endDate(LocalDate.now().plusDays(plan.getDurationDays()))
+                .startDate(startDate)
+                .endDate(startDate.plusDays(plan.getDurationDays()))
                 .status(Membership.Status.PENDING)
                 .build();
 
@@ -178,12 +191,13 @@ public class PaymentService {
         payment.setStatus(Payment.Status.SUCCESS);
         paymentRepository.save(payment);
 
-        // 3. Activate the membership
+        // 3. Activate or queue the membership depending on its start date
         Membership membership = membershipRepository
                 .findById(payment.getMembershipId())
                 .orElseThrow(() -> new ResourceNotFoundException("Membership not found"));
 
-        membership.setStatus(Membership.Status.ACTIVE);
+        boolean isQueued = membership.getStartDate().isAfter(LocalDate.now());
+        membership.setStatus(isQueued ? Membership.Status.QUEUED : Membership.Status.ACTIVE);
         membership = membershipRepository.save(membership);
 
         // 4. Publish Kafka event → notification-service sends WhatsApp + email

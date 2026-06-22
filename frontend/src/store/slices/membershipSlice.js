@@ -6,6 +6,11 @@ export const fetchMyMembership = createAsyncThunk('membership/fetchMy', async (_
     catch (err) { return rejectWithValue(err.response?.data?.message) }
 })
 
+export const fetchQueuedMembership = createAsyncThunk('membership/fetchQueued', async (_, { rejectWithValue }) => {
+    try { const res = await api.get('/memberships/my/queued'); return res.data.data }
+    catch (err) { return rejectWithValue(err.response?.data?.message) }
+})
+
 export const fetchPlans = createAsyncThunk('membership/fetchPlans', async (_, { rejectWithValue }) => {
     try { const res = await api.get('/plans'); return res.data.data }
     catch (err) { return rejectWithValue(err.response?.data?.message) }
@@ -23,16 +28,20 @@ export const verifyPayment = createAsyncThunk('membership/verifyPayment', async 
 
 const membershipSlice = createSlice({
     name: 'membership',
-    initialState: { current: null, plans: [], isLoading: false, order: null, error: null },
+    initialState: { current: null, queued: null, plans: [], isLoading: false, order: null, error: null },
     reducers: {
         setOrder: (state, action) => { state.order = action.payload }
     },
     extraReducers: (builder) => {
         builder
-            .addCase(fetchMyMembership.fulfilled, (state, a) => { state.current = a.payload })
-            .addCase(fetchPlans.fulfilled,        (state, a) => { state.plans   = a.payload })
-            .addCase(createPaymentOrder.fulfilled,(state, a) => { state.order   = a.payload })
-            .addCase(verifyPayment.fulfilled,     (state, a) => { state.current = a.payload })
+            .addCase(fetchMyMembership.fulfilled,   (state, a) => { state.current = a.payload })
+            .addCase(fetchQueuedMembership.fulfilled,(state, a) => { state.queued  = a.payload })
+            .addCase(fetchPlans.fulfilled,          (state, a) => { state.plans   = a.payload })
+            .addCase(createPaymentOrder.fulfilled,  (state, a) => { state.order   = a.payload })
+            .addCase(verifyPayment.fulfilled,       (state, a) => {
+                if (a.payload?.status === 'QUEUED') { state.queued  = a.payload }
+                else                               { state.current = a.payload }
+            })
     }
 })
 

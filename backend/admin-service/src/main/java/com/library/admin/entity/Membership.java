@@ -43,5 +43,5 @@ public class Membership {
         if (createdAt == null) createdAt = LocalDateTime.now();
     }
 
-    public enum Status { PENDING, ACTIVE, EXPIRED, CANCELLED }
+    public enum Status { PENDING, ACTIVE, QUEUED, EXPIRED, CANCELLED }
 }

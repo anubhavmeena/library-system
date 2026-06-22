@@ -56,6 +56,12 @@ public class MembershipController {
 
     // ── Full membership history ────────────────────────────────────────────────
 
+    @GetMapping("/api/memberships/my/queued")
+    public ResponseEntity<ApiResponse<MembershipDto>> getMyQueuedMembership(
+            @RequestHeader("X-User-Id") String userId) {
+        return ResponseEntity.ok(ApiResponse.success(membershipService.getUserQueuedMembership(userId)));
+    }
+
     @GetMapping("/api/memberships/my/all")
     public ResponseEntity<ApiResponse<List<MembershipDto>>> getAllMyMemberships(
             @RequestHeader("X-User-Id") String userId) {

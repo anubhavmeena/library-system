@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { fetchMyMembership, fetchPlans } from '../../store/slices/membershipSlice'
+import toast from 'react-hot-toast'
+import { fetchMyMembership, fetchQueuedMembership, fetchPlans, createPaymentOrder, verifyPayment } from '../../store/slices/membershipSlice'
 import api from '../../services/api'
 
 function InfoRow({ label, value, highlight }) {
@@ -32,15 +33,19 @@ function StatusBadge({ status }) {
 export default function MembershipPage() {
     const dispatch = useDispatch()
     const { t } = useTranslation()
-    const { current: membership, plans } = useSelector(s => s.membership)
+    const { current: membership, queued: queuedMembership, plans } = useSelector(s => s.membership)
     const [history, setHistory]                 = useState([])
     const [payments, setPayments]               = useState([])
     const [loading, setLoading]                 = useState(true)
     const [paymentsLoading, setPaymentsLoading] = useState(true)
     const [downloadingCard, setDownloadingCard] = useState(false)
+    const [queueFlow, setQueueFlow]             = useState(null) // null | 'select' | 'paying'
+    const [selectedQueuePlan, setSelectedQueuePlan] = useState(null)
+    const [queuePaying, setQueuePaying]         = useState(false)
 
     useEffect(() => {
         dispatch(fetchMyMembership())
+        dispatch(fetchQueuedMembership())
         dispatch(fetchPlans())
         api.get('/memberships/my/all').then(r => setHistory(r.data.data || [])).catch(() => {})
             .finally(() => setLoading(false))
@@ -72,6 +77,86 @@ export default function MembershipPage() {
         } finally {
             setDownloadingCard(false)
         }
+    }
+
+    const handleQueuePayment = async () => {
+        if (!selectedQueuePlan) return
+        setQueuePaying(true)
+        try {
+            const orderRes = await dispatch(createPaymentOrder({ planId: selectedQueuePlan.id }))
+            if (!createPaymentOrder.fulfilled.match(orderRes)) throw new Error(orderRes.payload)
+            const order = orderRes.payload
+
+            const onSuccess = async () => {
+                toast.success('Plan queued! It will activate when your current plan expires.')
+                setQueueFlow(null)
+                setSelectedQueuePlan(null)
+                dispatch(fetchQueuedMembership())
+            }
+
+            if (order.orderId?.startsWith('dev_')) {
+                const verifyRes = await dispatch(verifyPayment({
+                    gatewayOrderId: order.orderId, gatewayPaymentId: 'dev_pay_' + Date.now(),
+                    signature: 'dev_sig', membershipId: order.membershipId,
+                }))
+                if (verifyPayment.fulfilled.match(verifyRes)) {
+                    const m = verifyRes.payload
+                    if (m.seatNumber) await api.post('/seats/book', {
+                        seatNumber: m.seatNumber, membershipId: m.id,
+                        shift: m.shift, startDate: m.startDate, endDate: m.endDate,
+                    }).catch(() => {})
+                    await onSuccess()
+                }
+            } else if (order.gateway === 'CASHFREE') {
+                const { load } = await import('@cashfreepayments/cashfree-js')
+                const cashfree = await load({ mode: import.meta.env.VITE_CASHFREE_ENV || 'sandbox' })
+                const result = await cashfree.checkout({
+                    paymentSessionId: order.paymentSessionId,
+                    redirectTarget: '_modal',
+                    components: ['upi-qr', 'upi-collect', 'app', 'card', 'netbanking', 'paylater'],
+                })
+                if (result.error) throw new Error(result.error.message || 'Payment failed')
+                const verifyRes = await dispatch(verifyPayment({
+                    gatewayOrderId: order.orderId, gatewayPaymentId: order.orderId,
+                    signature: null, membershipId: order.membershipId,
+                }))
+                if (verifyPayment.fulfilled.match(verifyRes)) {
+                    const m = verifyRes.payload
+                    if (m.seatNumber) await api.post('/seats/book', {
+                        seatNumber: m.seatNumber, membershipId: m.id,
+                        shift: m.shift, startDate: m.startDate, endDate: m.endDate,
+                    }).catch(() => {})
+                    await onSuccess()
+                } else toast.error('Payment verification failed')
+            } else {
+                const options = {
+                    key: order.razorpayKeyId, amount: order.amount * 100, currency: 'INR',
+                    name: 'Target Zone Library',
+                    description: `${selectedQueuePlan.name} — Queued Plan`,
+                    order_id: order.orderId,
+                    handler: async (response) => {
+                        const verifyRes = await dispatch(verifyPayment({
+                            gatewayOrderId: response.razorpay_order_id,
+                            gatewayPaymentId: response.razorpay_payment_id,
+                            signature: response.razorpay_signature,
+                            membershipId: order.membershipId,
+                        }))
+                        if (verifyPayment.fulfilled.match(verifyRes)) {
+                            const m = verifyRes.payload
+                            if (m.seatNumber) await api.post('/seats/book', {
+                                seatNumber: m.seatNumber, membershipId: m.id,
+                                shift: m.shift, startDate: m.startDate, endDate: m.endDate,
+                            }).catch(() => {})
+                            await onSuccess()
+                        } else toast.error('Payment verification failed')
+                    },
+                    theme: { color: '#f59e0b' },
+                }
+                new window.Razorpay(options).open()
+            }
+        } catch (e) {
+            toast.error(e.message || 'Payment failed')
+        } finally { setQueuePaying(false) }
     }
 
     return (
@@ -120,10 +205,12 @@ export default function MembershipPage() {
                             {downloadingCard ? 'Generating...' : 'Download ID Card'}
                         </button>
                     </div>
-                    {daysLeft <= 10 && (
+                    {!queuedMembership && (
                         <div className="mt-5 pt-5 border-t border-primary-700/30 flex items-center justify-between">
-                            <p className="text-primary-400 text-sm">{t('membership.readyToRenew')}</p>
-                            <Link to="/student/booking" className="btn-primary text-sm px-5 py-2.5">{t('membership.renewBtn')}</Link>
+                            <p className="text-primary-400 text-sm">Queue your next plan — it activates automatically when this one expires.</p>
+                            <button onClick={() => setQueueFlow('select')} className="btn-outline text-sm px-5 py-2.5">
+                                Queue Next Plan
+                            </button>
                         </div>
                     )}
                 </div>
@@ -133,6 +220,63 @@ export default function MembershipPage() {
                     <h2 className="section-title mb-2">{t('membership.noActive.title')}</h2>
                     <p className="text-primary-400 mb-5">{t('membership.noActive.desc')}</p>
                     <Link to="/student/booking" className="btn-primary inline-block">{t('membership.noActive.cta')}</Link>
+                </div>
+            )}
+
+            {/* Queued plan card */}
+            {queuedMembership && (
+                <div className="card p-6 mb-6 border-violet-500/20 bg-gradient-to-br from-violet-500/5 to-transparent">
+                    <div className="flex items-start justify-between mb-4">
+                        <div>
+                            <h2 className="section-title">Queued Plan</h2>
+                            <p className="text-primary-400 text-sm mt-1">{queuedMembership.planName}</p>
+                        </div>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border bg-violet-500/20 text-violet-400 border-violet-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-current" /> QUEUED
+                        </span>
+                    </div>
+                    <InfoRow label="Seat"       value={queuedMembership.seatNumber} highlight />
+                    <InfoRow label="Shift"      value={formatShift(queuedMembership.shift)} />
+                    <InfoRow label="Starts On"  value={queuedMembership.startDate} />
+                    <InfoRow label="Expires On" value={queuedMembership.endDate} />
+                    <p className="text-violet-400/70 text-xs mt-4">This plan will activate automatically when your current plan expires.</p>
+                </div>
+            )}
+
+            {/* Queue flow — plan selection */}
+            {queueFlow === 'select' && (
+                <div className="card p-6 mb-6 border-violet-500/20">
+                    <div className="flex items-center justify-between mb-5">
+                        <h2 className="section-title">Select Next Plan</h2>
+                        <button onClick={() => { setQueueFlow(null); setSelectedQueuePlan(null) }}
+                                className="text-primary-400 hover:text-white text-sm transition-colors">✕ Cancel</button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                        {plans.map(plan => (
+                            <button key={plan.id} onClick={() => setSelectedQueuePlan(plan)}
+                                    className={`text-left p-4 rounded-xl border transition-all ${selectedQueuePlan?.id === plan.id
+                                        ? 'border-violet-400/60 bg-violet-500/10'
+                                        : 'border-primary-700/40 hover:border-primary-600/60'}`}>
+                                <div className="flex justify-between items-start mb-1">
+                                    <p className="text-white font-semibold text-sm">{plan.name}</p>
+                                    <p className="text-amber-400 font-bold">₹{plan.price}</p>
+                                </div>
+                                <p className="text-primary-400 text-xs">{plan.description}</p>
+                            </button>
+                        ))}
+                    </div>
+                    {selectedQueuePlan && (
+                        <div className="flex items-center justify-between pt-4 border-t border-primary-700/30">
+                            <div>
+                                <p className="text-white text-sm font-medium">{selectedQueuePlan.name}</p>
+                                <p className="text-primary-400 text-xs">Seat and shift inherited from current plan</p>
+                            </div>
+                            <button onClick={handleQueuePayment} disabled={queuePaying}
+                                    className="btn-primary text-sm px-6 py-2.5">
+                                {queuePaying ? 'Processing...' : `Pay ₹${selectedQueuePlan.price}`}
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
