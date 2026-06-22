@@ -435,12 +435,14 @@ public class AdminService {
 
     public int broadcastNotification(BroadcastRequest req) {
         List<User> recipients = userRepository.findStudentsWithActiveMemberships();
-        for (User user : recipients) {
+        for (int i = 0; i < recipients.size(); i++) {
+            User user = recipients.get(i);
             BroadcastNotificationEvent event = BroadcastNotificationEvent.builder()
                     .userId(user.getId().toString())
                     .mobile(user.getMobile())
                     .userName(user.getName())
                     .message(req.getMessage())
+                    .isFirst(i == 0)
                     .build();
             try {
                 kafkaTemplate.send("broadcast-notification", user.getId().toString(), event);

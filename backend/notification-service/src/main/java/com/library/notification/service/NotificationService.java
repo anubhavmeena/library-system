@@ -201,6 +201,20 @@ public class NotificationService {
             );
         }
 
+        if (event.isFirst()) {
+            String echoMsg = String.format("📢 Broadcast sent!\n\nMessage: %s", event.getMessage());
+            for (String number : adminWhatsappNumbers()) {
+                whatsAppService.send(number, echoMsg, null, "ADMIN_BROADCAST_ECHO");
+            }
+            emailService.sendText(
+                    adminEmail,
+                    "Broadcast Sent — " + event.getMessage().substring(0, Math.min(50, event.getMessage().length())),
+                    echoMsg,
+                    null,
+                    "ADMIN_BROADCAST_ECHO"
+            );
+        }
+
         log.info("Broadcast sent to user: {}", event.getUserId());
     }
 

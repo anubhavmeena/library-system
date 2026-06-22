@@ -14,4 +14,5 @@ public class BroadcastNotificationEvent {
     private String mobile;
     private String userName;
     private String message;
+    private boolean isFirst;
 }
