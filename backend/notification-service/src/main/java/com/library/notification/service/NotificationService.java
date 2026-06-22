@@ -107,6 +107,26 @@ public class NotificationService {
             );
         }
 
+        // Alert admin
+        String adminMsg = String.format(
+                "🆕 New Student Registered!\n\nName   : %s\nMobile : %s\nEmail  : %s",
+                event.getUserName(),
+                hasValue(event.getUserMobile()) ? event.getUserMobile() : "—",
+                hasValue(event.getUserEmail())  ? event.getUserEmail()  : "—"
+        );
+
+        if (hasValue(adminWhatsapp)) {
+            whatsAppService.send(adminWhatsapp, adminMsg, null, "ADMIN_REGISTRATION_ALERT");
+        }
+
+        emailService.sendText(
+                adminEmail,
+                "New Registration — " + event.getUserName(),
+                adminMsg,
+                null,
+                "ADMIN_REGISTRATION_ALERT"
+        );
+
         log.info("Welcome notification sent for user: {}", event.getUserId());
     }
 
