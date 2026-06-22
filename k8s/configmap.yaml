@@ -15,6 +15,8 @@ data:
   SEAT_SERVICE_URL: "http://seat-service:8084"
   NOTIFICATION_SERVICE_URL: "http://notification-service:8085"
   ADMIN_SERVICE_URL: "http://admin-service:8086"
+  SMTP_HOST: "localhost"
+  SMTP_PORT: "25"
   FROM_EMAIL: "noreply@targetzone.co.in"
   FROM_NAME: "Target Zone Library"
   ADMIN_EMAIL: "admin@targetzone.co.in"

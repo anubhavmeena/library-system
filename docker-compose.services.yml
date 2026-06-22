@@ -258,8 +258,12 @@ services:
     mem_limit: 384m
     ports:
       - "8085:8085"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       <<: [*spring-env, *db-env, *kafka-env, *jvm-light]
+      SMTP_HOST: host.docker.internal
+      SMTP_PORT: "25"
       TWILIO_ACCOUNT_SID:            ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN:             ${TWILIO_AUTH_TOKEN:-}
       TWILIO_WHATSAPP_FROM:          ${TWILIO_WHATSAPP_FROM:-whatsapp:+14155238886}

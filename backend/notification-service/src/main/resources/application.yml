@@ -23,9 +23,11 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
   mail:
-    host: ${SMTP_HOST:}
+    host: ${SMTP_HOST:localhost}
     port: ${SMTP_PORT:25}
     properties:
+      mail.smtp.auth: false
+      mail.smtp.starttls.enable: false
       mail.smtp.connectiontimeout: 5000
       mail.smtp.timeout: 5000
       mail.smtp.writetimeout: 5000
