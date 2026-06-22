@@ -65,7 +65,8 @@
         "enter6Otp": "Enter the 6-digit OTP",
         "otpSent": "OTP sent!",
         "welcomeBack": "Welcome back!",
-        "failedOtp": "Failed to send OTP"
+        "failedOtp": "Failed to send OTP",
+        "notRegistered": "No account found. Please register first."
       }
     },
     "register": {

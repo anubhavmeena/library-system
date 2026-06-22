@@ -65,7 +65,8 @@
         "enter6Otp": "6 अंकों का OTP दर्ज करें",
         "otpSent": "OTP भेजा गया!",
         "welcomeBack": "वापस स्वागत है!",
-        "failedOtp": "OTP भेजने में विफल"
+        "failedOtp": "OTP भेजने में विफल",
+        "notRegistered": "खाता नहीं मिला। कृपया पहले रजिस्टर करें।"
       }
     },
     "register": {

@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useTranslation } from 'react-i18next'
-import { sendOtp, loginUser, resetAuthState } from '../../store/slices/authSlice'
+import { sendOtp, verifyOtp, loginUser, resetAuthState } from '../../store/slices/authSlice'
 
 export default function LoginPage() {
     const dispatch = useDispatch()
@@ -42,9 +42,17 @@ export default function LoginPage() {
 
     const handleLogin = async () => {
         if (otp.length !== 6) return toast.error(t('auth.login.toasts.enter6Otp'))
-        const res = await dispatch(loginUser({ contact: contact.trim(), otp }))
-        if (loginUser.fulfilled.match(res)) { toast.success(t('auth.login.toasts.welcomeBack')); navigate('/student/dashboard') }
-        else toast.error(res.payload || 'Login failed')
+        const verifyRes = await dispatch(verifyOtp({ contact: contact.trim(), otp }))
+        if (!verifyOtp.fulfilled.match(verifyRes)) {
+            return toast.error(verifyRes.payload || 'Invalid OTP')
+        }
+        if (verifyRes.payload.newUser) {
+            toast.error(t('auth.login.toasts.notRegistered') || 'No account found. Please register first.')
+            return navigate('/register')
+        }
+        const loginRes = await dispatch(loginUser({ sessionToken: verifyRes.payload.sessionToken }))
+        if (loginUser.fulfilled.match(loginRes)) { toast.success(t('auth.login.toasts.welcomeBack')); navigate('/student/dashboard') }
+        else toast.error(loginRes.payload || 'Login failed')
     }
 
     return (
