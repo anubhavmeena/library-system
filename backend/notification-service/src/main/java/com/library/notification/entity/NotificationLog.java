@@ -43,5 +43,6 @@ public class NotificationLog {
     @PrePersist
     void prePersist() {
         if (createdAt == null) createdAt = LocalDateTime.now();
+        if (sentAt   == null) sentAt    = LocalDateTime.now();
     }
 }
