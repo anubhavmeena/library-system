@@ -104,13 +104,19 @@ export default function AdminSeatsPage() {
                     />
                 </LocalizationProvider>
                 <button onClick={fetchMap} className="px-4 py-2 rounded-xl text-sm bg-primary-700/50 text-primary-300 hover:text-white border border-primary-700/40 transition-all">↻ {t('adminSeats.refresh')}</button>
-                <button onClick={() => setViewMode(v => v === 'expiry' ? 'default' : 'expiry')}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all
-                            ${viewMode === 'expiry'
-                                ? 'bg-amber-500/20 border-amber-400/60 text-amber-400'
-                                : 'border-primary-700/40 text-primary-400 hover:text-white'}`}>
-                    📅 {viewMode === 'expiry' ? t('adminSeats.defaultView') : t('adminSeats.expiryView')}
-                </button>
+                <div className="flex rounded-xl border border-primary-700/40 overflow-hidden text-sm font-medium">
+                    <button onClick={() => setViewMode('default')}
+                            className={`px-4 py-2 transition-all
+                                ${viewMode === 'default' ? 'bg-primary-700/60 text-white' : 'text-primary-400 hover:text-white'}`}>
+                        {t('adminSeats.defaultView')}
+                    </button>
+                    <div className="w-px bg-primary-700/40 self-stretch" />
+                    <button onClick={() => setViewMode('expiry')}
+                            className={`px-4 py-2 transition-all
+                                ${viewMode === 'expiry' ? 'bg-amber-500/20 text-amber-400' : 'text-primary-400 hover:text-white'}`}>
+                        📅 {t('adminSeats.expiryView')}
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-3 gap-4 mb-6">
@@ -183,7 +189,7 @@ export default function AdminSeatsPage() {
                                                         ? 'bg-fuchsia-500/30 border-fuchsia-500/50 text-fuchsia-300 hover:bg-fuchsia-500/50 cursor-pointer'
                                                         : 'bg-red-500/30 border-red-500/50 text-red-300 hover:bg-red-500/50 cursor-pointer'
                                                     : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 cursor-default'}`}>
-                                        {sn.substring(1)}
+                                        {viewMode === 'expiry' ? '' : sn.substring(1)}
                                     </button>
                                 )
                             }
