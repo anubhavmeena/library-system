@@ -214,11 +214,15 @@ class NotificationServiceTest {
     }
 
     @Test
-    void sendWelcomeNotification_noMobileNoEmail_noCalls() {
+    void sendWelcomeNotification_noMobileNoEmail_onlyAdminEmailSent() {
         notificationService.sendWelcomeNotification(bookingEvent(null, null));
 
+        // admin WA is blank in setup → no WhatsApp at all
         verifyNoInteractions(whatsAppService);
-        verifyNoInteractions(emailService);
+        // admin email always sent on registration; no student email (student has no email)
+        verify(emailService, times(1)).sendText(
+                eq("admin@test.com"), anyString(), anyString(), isNull(), anyString());
+        verifyNoMoreInteractions(emailService);
     }
 
     // ── sendRenewalReminder ───────────────────────────────────────────────────
@@ -229,7 +233,7 @@ class NotificationServiceTest {
 
         notificationService.sendRenewalReminder(reminderEvent(3));
 
-        verify(emailService).sendText(anyString(), subjectCaptor.capture(), anyString(), anyString(), anyString());
+        verify(emailService).sendText(anyString(), subjectCaptor.capture(), anyString(), anyString(), anyString(), anyString());
         assertThat(subjectCaptor.getValue()).contains("URGENT");
     }
 
@@ -239,7 +243,7 @@ class NotificationServiceTest {
 
         notificationService.sendRenewalReminder(reminderEvent(1));
 
-        verify(emailService).sendText(anyString(), subjectCaptor.capture(), anyString(), anyString(), anyString());
+        verify(emailService).sendText(anyString(), subjectCaptor.capture(), anyString(), anyString(), anyString(), anyString());
         assertThat(subjectCaptor.getValue()).contains("URGENT");
         // "1 day" not "1 days"
         assertThat(subjectCaptor.getValue()).endsWith("1 day");
@@ -251,7 +255,7 @@ class NotificationServiceTest {
 
         notificationService.sendRenewalReminder(reminderEvent(7));
 
-        verify(emailService).sendText(anyString(), subjectCaptor.capture(), anyString(), anyString(), anyString());
+        verify(emailService).sendText(anyString(), subjectCaptor.capture(), anyString(), anyString(), anyString(), anyString());
         assertThat(subjectCaptor.getValue()).contains("Reminder");
         assertThat(subjectCaptor.getValue()).contains("7 days");
     }
@@ -262,9 +266,19 @@ class NotificationServiceTest {
 
         notificationService.sendRenewalReminder(reminderEvent(4));
 
-        verify(emailService).sendText(anyString(), subjectCaptor.capture(), anyString(), anyString(), anyString());
+        verify(emailService).sendText(anyString(), subjectCaptor.capture(), anyString(), anyString(), anyString(), anyString());
         assertThat(subjectCaptor.getValue()).doesNotContain("URGENT");
         assertThat(subjectCaptor.getValue()).contains("Reminder");
+    }
+
+    @Test
+    void sendRenewalReminder_adminBccOnEmail() {
+        ArgumentCaptor<String> bccCaptor = ArgumentCaptor.forClass(String.class);
+
+        notificationService.sendRenewalReminder(reminderEvent(7));
+
+        verify(emailService).sendText(anyString(), anyString(), anyString(), bccCaptor.capture(), anyString(), anyString());
+        assertThat(bccCaptor.getValue()).isEqualTo("admin@test.com");
     }
 
     @Test
@@ -308,7 +322,7 @@ class NotificationServiceTest {
 
         notificationService.sendRenewalReminder(event);
 
-        verify(emailService, never()).sendText(anyString(), anyString(), anyString(), anyString(), anyString());
+        verify(emailService, never()).sendText(anyString(), anyString(), anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -316,6 +330,6 @@ class NotificationServiceTest {
         notificationService.sendRenewalReminder(reminderEvent(7));
 
         verify(whatsAppService).send(anyString(), anyString(), eq("user-r1"), eq("RENEWAL_REMINDER"));
-        verify(emailService).sendText(anyString(), anyString(), anyString(), eq("user-r1"), eq("RENEWAL_REMINDER"));
+        verify(emailService).sendText(anyString(), anyString(), anyString(), anyString(), eq("user-r1"), eq("RENEWAL_REMINDER"));
     }
 }

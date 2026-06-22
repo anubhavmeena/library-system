@@ -183,6 +183,7 @@ public class NotificationService {
         if (hasValue(event.getUserEmail())) {
             emailService.sendText(
                     event.getUserEmail(), emailSubject, whatsappMsg,
+                    adminEmail,
                     event.getUserId(), "RENEWAL_REMINDER"
             );
         }

@@ -44,25 +44,35 @@ public class EmailService {
 
     public void sendText(String to, String subject, String body,
                          String userId, String event) {
-        send(to, subject, body, null, userId, event);
+        send(to, subject, body, null, null, userId, event);
+    }
+
+    public void sendText(String to, String subject, String body, String bcc,
+                         String userId, String event) {
+        send(to, subject, body, null, bcc, userId, event);
     }
 
     public void sendHtml(String to, String subject, String htmlBody,
                          String userId, String event) {
-        send(to, subject, null, htmlBody, userId, event);
+        send(to, subject, null, htmlBody, null, userId, event);
+    }
+
+    public void sendHtml(String to, String subject, String htmlBody, String bcc,
+                         String userId, String event) {
+        send(to, subject, null, htmlBody, bcc, userId, event);
     }
 
     // ── Internal send ─────────────────────────────────────────────────────────
 
     private void send(String to, String subject,
-                      String textBody, String htmlBody,
+                      String textBody, String htmlBody, String bcc,
                       String userId, String event) {
 
         String logBody = textBody != null ? textBody : htmlBody;
 
         // Dev mode: nothing configured → log to console only
         if (smtpHost.isBlank() && sendgridApiKey.isBlank()) {
-            log.info("[DEV] Email → {} | Subject: {} | Body:\n{}", to, subject, logBody);
+            log.info("[DEV] Email → {} | Subject: {} | BCC: {} | Body:\n{}", to, subject, bcc, logBody);
             saveLog(userId, to, logBody, event, DeliveryStatus.SENT, null);
             return;
         }
@@ -75,6 +85,9 @@ public class EmailService {
                 helper.setFrom(fromEmail, fromName);
                 helper.setTo(to);
                 helper.setSubject(subject);
+                if (bcc != null && !bcc.isBlank()) {
+                    helper.addBcc(bcc);
+                }
                 if (htmlBody != null) {
                     helper.setText(htmlBody, true);
                 } else {
@@ -107,6 +120,9 @@ public class EmailService {
                     : new Content("text/plain", textBody);
 
             Mail mail = new Mail(from, subject, toEmail, content);
+            if (bcc != null && !bcc.isBlank()) {
+                mail.getPersonalization().get(0).addBcc(new Email(bcc));
+            }
 
             SendGrid sg  = new SendGrid(sendgridApiKey);
             Request  req = new Request();

@@ -34,7 +34,8 @@ class EmailServiceTest {
 
     @BeforeEach
     void setup() {
-        // Dev mode by default — no real SendGrid calls
+        // Dev mode by default — no real SMTP or SendGrid calls
+        ReflectionTestUtils.setField(emailService, "smtpHost", "");
         ReflectionTestUtils.setField(emailService, "sendgridApiKey", "");
         ReflectionTestUtils.setField(emailService, "fromEmail", "noreply@test.com");
         ReflectionTestUtils.setField(emailService, "fromName", "Test Library");
@@ -117,6 +118,18 @@ class EmailServiceTest {
         verify(logRepository).save(captor.capture());
         assertThat(captor.getValue().getChannel()).isEqualTo(Channel.EMAIL);
         assertThat(captor.getValue().getStatus()).isEqualTo(DeliveryStatus.SENT);
+    }
+
+    @Test
+    void sendText_withBcc_devMode_savesLogWithSentStatus() {
+        ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
+
+        emailService.sendText("user@test.com", "Subject", "Body", "bcc@test.com",
+                UUID.randomUUID().toString(), "RENEWAL_REMINDER");
+
+        verify(logRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(DeliveryStatus.SENT);
+        assertThat(captor.getValue().getRecipient()).isEqualTo("user@test.com");
     }
 
     @Test
