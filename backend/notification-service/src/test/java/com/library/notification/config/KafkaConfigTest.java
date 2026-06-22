@@ -1,36 +1,34 @@
 package com.library.notification.config;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
-import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@ExtendWith(MockitoExtension.class)
 class KafkaConfigTest {
-
-    @Mock
-    ConsumerFactory<String, Object> consumerFactory;
 
     private final KafkaConfig config = new KafkaConfig();
 
+    @BeforeEach
+    void setup() {
+        ReflectionTestUtils.setField(config, "bootstrapServers", "localhost:9092");
+    }
+
     @Test
     void bookingFactory_hasConcurrency3() {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
-                config.bookingKafkaListenerContainerFactory(consumerFactory);
+        ConcurrentKafkaListenerContainerFactory<?, ?> factory =
+                config.bookingKafkaListenerContainerFactory();
 
         assertThat(ReflectionTestUtils.getField(factory, "concurrency")).isEqualTo(3);
     }
 
     @Test
     void bookingFactory_hasBatchAckMode() {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
-                config.bookingKafkaListenerContainerFactory(consumerFactory);
+        ConcurrentKafkaListenerContainerFactory<?, ?> factory =
+                config.bookingKafkaListenerContainerFactory();
 
         assertThat(factory.getContainerProperties().getAckMode())
                 .isEqualTo(ContainerProperties.AckMode.BATCH);
@@ -38,16 +36,16 @@ class KafkaConfigTest {
 
     @Test
     void reminderFactory_hasConcurrency2() {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
-                config.reminderKafkaListenerContainerFactory(consumerFactory);
+        ConcurrentKafkaListenerContainerFactory<?, ?> factory =
+                config.reminderKafkaListenerContainerFactory();
 
         assertThat(ReflectionTestUtils.getField(factory, "concurrency")).isEqualTo(2);
     }
 
     @Test
     void reminderFactory_hasBatchAckMode() {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
-                config.reminderKafkaListenerContainerFactory(consumerFactory);
+        ConcurrentKafkaListenerContainerFactory<?, ?> factory =
+                config.reminderKafkaListenerContainerFactory();
 
         assertThat(factory.getContainerProperties().getAckMode())
                 .isEqualTo(ContainerProperties.AckMode.BATCH);
@@ -55,8 +53,8 @@ class KafkaConfigTest {
 
     @Test
     void twoFactories_areDistinctInstances() {
-        var booking = config.bookingKafkaListenerContainerFactory(consumerFactory);
-        var reminder = config.reminderKafkaListenerContainerFactory(consumerFactory);
+        var booking = config.bookingKafkaListenerContainerFactory();
+        var reminder = config.reminderKafkaListenerContainerFactory();
 
         assertThat(booking).isNotSameAs(reminder);
     }

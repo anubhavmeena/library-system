@@ -1,6 +1,8 @@
 package com.library.notification.config;
 
+import com.library.notification.dto.BookingConfirmedEvent;
 import com.library.notification.dto.BroadcastNotificationEvent;
+import com.library.notification.dto.RenewalReminderEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -8,7 +10,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
-import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DefaultErrorHandler;
@@ -36,10 +37,27 @@ public class KafkaConfig {
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, Object> bookingKafkaListenerContainerFactory(
-            ConsumerFactory<String, Object> consumerFactory) {
+    public ConcurrentKafkaListenerContainerFactory<String, BookingConfirmedEvent>
+            bookingKafkaListenerContainerFactory() {
 
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
+        JsonDeserializer<BookingConfirmedEvent> valueDeser =
+                new JsonDeserializer<>(BookingConfirmedEvent.class);
+        valueDeser.addTrustedPackages("com.library.*");
+        valueDeser.ignoreTypeHeaders();
+
+        DefaultKafkaConsumerFactory<String, BookingConfirmedEvent> consumerFactory =
+                new DefaultKafkaConsumerFactory<>(
+                        Map.of(
+                                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
+                                ConsumerConfig.GROUP_ID_CONFIG, "notification-booking-group",
+                                ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
+                                ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false
+                        ),
+                        new StringDeserializer(),
+                        valueDeser
+                );
+
+        ConcurrentKafkaListenerContainerFactory<String, BookingConfirmedEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
         factory.setConcurrency(3);
@@ -49,10 +67,27 @@ public class KafkaConfig {
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, Object> reminderKafkaListenerContainerFactory(
-            ConsumerFactory<String, Object> consumerFactory) {
+    public ConcurrentKafkaListenerContainerFactory<String, RenewalReminderEvent>
+            reminderKafkaListenerContainerFactory() {
 
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
+        JsonDeserializer<RenewalReminderEvent> valueDeser =
+                new JsonDeserializer<>(RenewalReminderEvent.class);
+        valueDeser.addTrustedPackages("com.library.*");
+        valueDeser.ignoreTypeHeaders();
+
+        DefaultKafkaConsumerFactory<String, RenewalReminderEvent> consumerFactory =
+                new DefaultKafkaConsumerFactory<>(
+                        Map.of(
+                                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
+                                ConsumerConfig.GROUP_ID_CONFIG, "notification-reminder-group",
+                                ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
+                                ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false
+                        ),
+                        new StringDeserializer(),
+                        valueDeser
+                );
+
+        ConcurrentKafkaListenerContainerFactory<String, RenewalReminderEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
         factory.setConcurrency(2);
