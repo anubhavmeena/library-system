@@ -146,6 +146,11 @@ public class NotificationService {
     // or manually via POST /api/admin/reminders/send
 
     public void sendRenewalReminder(RenewalReminderEvent event) {
+        if ("SEAT_EXPIRED".equals(event.getEventType())) {
+            sendSeatExpiredAlert(event);
+            return;
+        }
+
         // Escalate urgency label based on days remaining
         String urgency = event.getDaysRemaining() <= 3 ? "⚠️ URGENT" : "⏰ Reminder";
 
@@ -216,6 +221,33 @@ public class NotificationService {
         }
 
         log.info("Broadcast sent to user: {}", event.getUserId());
+    }
+
+    // ── Seat Expired Admin Alert ──────────────────────────────────────────────
+
+    private void sendSeatExpiredAlert(RenewalReminderEvent event) {
+        String msg = String.format(
+                "🪑 Seat Now Available!\n\nSeat   : %s\nStudent: %s\nExpired: %s\n\nThe seat is free for new booking.",
+                event.getSeatNumber() != null ? event.getSeatNumber() : "N/A",
+                event.getUserName(),
+                event.getExpiryDate()
+        );
+
+        for (String number : adminWhatsappNumbers()) {
+            whatsAppService.send(number, msg, null, "SEAT_EXPIRED");
+        }
+
+        emailService.sendText(
+                adminEmail,
+                "Seat " + (event.getSeatNumber() != null ? event.getSeatNumber() : "N/A")
+                        + " now free — " + event.getUserName() + "'s membership expired",
+                msg,
+                null,
+                "SEAT_EXPIRED"
+        );
+
+        log.info("Seat expired alert sent to admin for seat {} (user: {})",
+                event.getSeatNumber(), event.getUserName());
     }
 
     // ── Message Builders ──────────────────────────────────────────────────────

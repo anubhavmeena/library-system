@@ -44,6 +44,15 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
             @Param("to")   LocalDate to
     );
 
+    // Used by SeatExpiredScheduler — finds ACTIVE memberships whose endDate has passed
+    @Query("""
+        SELECT m FROM Membership m
+        WHERE m.status = 'ACTIVE'
+          AND m.endDate < :today
+        ORDER BY m.endDate ASC
+        """)
+    List<Membership> findExpiredActive(@Param("today") LocalDate today);
+
     @Query("SELECT COUNT(m) FROM Membership m WHERE m.status = 'ACTIVE'")
     long countActiveMemberships();
 

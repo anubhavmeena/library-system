@@ -116,4 +116,55 @@ public class ExpiryReminderScheduler {
 
         log.info("ExpiryReminderScheduler completed — {} reminders published to Kafka", sent);
     }
+
+    /**
+     * Runs every day at 10:00 AM (after the 9 AM reminder run).
+     * Finds memberships that are still ACTIVE but whose endDate has passed,
+     * marks them EXPIRED, and notifies admin that those seats are now free.
+     */
+    @Scheduled(cron = "0 0 10 * * *")
+    @Transactional
+    public void markExpiredAndNotifyAdmin() {
+        LocalDate today = LocalDate.now();
+        List<Membership> expired = membershipRepository.findExpiredActive(today);
+
+        if (expired.isEmpty()) {
+            log.info("SeatExpiredCheck: no newly expired memberships.");
+            return;
+        }
+
+        Set<UUID> userIds = expired.stream()
+                .map(Membership::getUserId)
+                .collect(Collectors.toSet());
+
+        Map<UUID, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        for (Membership mem : expired) {
+            mem.setStatus(Membership.Status.EXPIRED);
+            membershipRepository.save(mem);
+
+            User user = userMap.get(mem.getUserId());
+            String userName = user != null ? user.getName()   : "Unknown";
+            String mobile   = user != null ? user.getMobile() : null;
+            String email    = user != null ? user.getEmail()  : null;
+
+            RenewalReminderEvent event = RenewalReminderEvent.builder()
+                    .userId(mem.getUserId().toString())
+                    .membershipId(mem.getId().toString())
+                    .userName(userName)
+                    .userMobile(mobile)
+                    .userEmail(email)
+                    .seatNumber(mem.getSeatNumber())
+                    .expiryDate(mem.getEndDate().toString())
+                    .daysRemaining(0)
+                    .eventType("SEAT_EXPIRED")
+                    .build();
+
+            kafkaTemplate.send("renewal-reminder", mem.getUserId().toString(), event);
+            log.info("Seat {} marked expired for user '{}' — admin notified", mem.getSeatNumber(), userName);
+        }
+
+        log.info("SeatExpiredCheck: {} memberships marked EXPIRED", expired.size());
+    }
 }
