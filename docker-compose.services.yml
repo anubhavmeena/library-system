@@ -303,8 +303,17 @@ services:
     mem_limit: 512m
     ports:
       - "8086:8086"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       <<: [*spring-env, *db-env, *kafka-env, *jvm-heavy]
+      SMTP_HOST:        host.docker.internal
+      SMTP_PORT:        "25"
+      IMAP_HOST:        host.docker.internal
+      IMAP_PORT:        "143"
+      ADMIN_IMAP_USER:  ${ADMIN_IMAP_USER:-admin}
+      ADMIN_IMAP_PASS:  ${ADMIN_IMAP_PASS:-}
+      ADMIN_EMAIL:      ${ADMIN_EMAIL:-admin@targetzone.co.in}
     networks:
       - library-network
     healthcheck:
