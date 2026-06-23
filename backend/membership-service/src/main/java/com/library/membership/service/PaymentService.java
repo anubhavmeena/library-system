@@ -202,9 +202,13 @@ public class PaymentService {
         membership = membershipRepository.save(membership);
 
         // 4. Publish Kafka event → notification-service sends WhatsApp + email
+        UserProfileDto user = fetchUserProfile(userId);
         BookingConfirmedEvent event = BookingConfirmedEvent.builder()
                 .userId(userId)
                 .membershipId(membership.getId().toString())
+                .userName(user.getName())
+                .userMobile(user.getMobile())
+                .userEmail(user.getEmail())
                 .planName(membership.getPlan().getName())
                 .planType(membership.getPlan().getPlanType().name())
                 .seatNumber(membership.getSeatNumber())
@@ -281,7 +285,7 @@ public class PaymentService {
     private String[] createCashfreeOrder(Plan plan, Membership membership, String userId) {
         if (!cashfreeAppId.isBlank()) {
             try {
-                UserProfileDto user = fetchUserForCashfree(userId);
+                UserProfileDto user = fetchUserProfile(userId);
 
                 Map<String, Object> customerDetails = new HashMap<>();
                 customerDetails.put("customer_id",    userId);
@@ -361,7 +365,7 @@ public class PaymentService {
                 : "https://sandbox.cashfree.com";
     }
 
-    private UserProfileDto fetchUserForCashfree(String userId) {
+    private UserProfileDto fetchUserProfile(String userId) {
         try {
             String url = userServiceBaseUrl + "/api/users/" + userId;
             HttpHeaders headers = new HttpHeaders();

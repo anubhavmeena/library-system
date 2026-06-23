@@ -4,6 +4,8 @@ import com.library.membership.dto.CreateOrderRequest;
 import com.library.membership.dto.CreateOrderResponse;
 import com.library.membership.dto.MembershipDto;
 import com.library.membership.dto.PaymentVerifyRequest;
+import com.library.membership.dto.UserApiResponse;
+import com.library.membership.dto.UserProfileDto;
 import com.library.membership.entity.Membership;
 import com.library.membership.entity.Payment;
 import com.library.membership.entity.Plan;
@@ -23,8 +25,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.RestTemplate;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -47,6 +51,7 @@ class PaymentServiceTest {
     @Mock PaymentRepository    paymentRepository;
     @Mock PlanRepository       planRepository;
     @Mock KafkaTemplate<String, Object> kafkaTemplate;
+    @Mock RestTemplate restTemplate;
     @InjectMocks PaymentService paymentService;
 
     private final String userId = UUID.randomUUID().toString();
@@ -54,9 +59,14 @@ class PaymentServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Default: dev mode (blank keys)
-        ReflectionTestUtils.setField(paymentService, "razorpayKeyId", "");
-        ReflectionTestUtils.setField(paymentService, "razorpayKeySecret", "");
+        // Default: Cashfree dev mode (all credentials blank)
+        ReflectionTestUtils.setField(paymentService, "activeGateway",       "CASHFREE");
+        ReflectionTestUtils.setField(paymentService, "razorpayKeyId",       "");
+        ReflectionTestUtils.setField(paymentService, "razorpayKeySecret",   "");
+        ReflectionTestUtils.setField(paymentService, "cashfreeAppId",       "");
+        ReflectionTestUtils.setField(paymentService, "cashfreeSecretKey",   "");
+        ReflectionTestUtils.setField(paymentService, "cashfreeEnv",         "sandbox");
+        ReflectionTestUtils.setField(paymentService, "userServiceBaseUrl",  "http://localhost:8082");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -326,6 +336,7 @@ class PaymentServiceTest {
 
     @Test
     void createOrder_razorpayException_throwsRuntimeException() throws Exception {
+        ReflectionTestUtils.setField(paymentService, "activeGateway", "RAZORPAY");
         ReflectionTestUtils.setField(paymentService, "razorpayKeyId", "rzp_test_key");
         ReflectionTestUtils.setField(paymentService, "razorpayKeySecret", "rzp_test_secret");
 
@@ -354,6 +365,7 @@ class PaymentServiceTest {
 
     @Test
     void createOrder_razorpaySuccess_orderIdFromGateway() throws Exception {
+        ReflectionTestUtils.setField(paymentService, "activeGateway", "RAZORPAY");
         ReflectionTestUtils.setField(paymentService, "razorpayKeyId", "rzp_test_key");
         ReflectionTestUtils.setField(paymentService, "razorpayKeySecret", "rzp_test_secret");
 
@@ -411,6 +423,7 @@ class PaymentServiceTest {
 
     @Test
     void verify_devOrderPrefix_skipsHmacEvenWithSecretConfigured() {
+        ReflectionTestUtils.setField(paymentService, "activeGateway", "RAZORPAY");
         ReflectionTestUtils.setField(paymentService, "razorpayKeySecret", TEST_SECRET);
 
         String devOrderId = "dev_order_abc123";
@@ -436,6 +449,7 @@ class PaymentServiceTest {
 
     @Test
     void verify_nullSignature_skipsHmac() {
+        ReflectionTestUtils.setField(paymentService, "activeGateway", "RAZORPAY");
         ReflectionTestUtils.setField(paymentService, "razorpayKeySecret", TEST_SECRET);
 
         String orderId = "order_real123";
@@ -461,6 +475,7 @@ class PaymentServiceTest {
 
     @Test
     void verify_validHmacSignature_activates() throws Exception {
+        ReflectionTestUtils.setField(paymentService, "activeGateway", "RAZORPAY");
         ReflectionTestUtils.setField(paymentService, "razorpayKeySecret", TEST_SECRET);
 
         String orderId = "order_real456";
@@ -488,6 +503,7 @@ class PaymentServiceTest {
 
     @Test
     void verify_invalidHmacSignature_throwsIllegalArgument() {
+        ReflectionTestUtils.setField(paymentService, "activeGateway", "RAZORPAY");
         ReflectionTestUtils.setField(paymentService, "razorpayKeySecret", TEST_SECRET);
 
         PaymentVerifyRequest req = new PaymentVerifyRequest();
@@ -626,6 +642,15 @@ class PaymentServiceTest {
         when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
         when(membershipRepository.save(any())).thenReturn(membership);
 
+        UserProfileDto userProfile = new UserProfileDto();
+        userProfile.setName("Ravi Kumar");
+        userProfile.setMobile("9876543210");
+        userProfile.setEmail("ravi@example.com");
+        UserApiResponse userApiResponse = new UserApiResponse();
+        userApiResponse.setData(userProfile);
+        when(restTemplate.exchange(anyString(), any(), any(), eq(UserApiResponse.class)))
+                .thenReturn(ResponseEntity.ok(userApiResponse));
+
         PaymentVerifyRequest req = new PaymentVerifyRequest();
         req.setGatewayOrderId(orderId);
         req.setGatewayPaymentId("pay_fields");
@@ -638,6 +663,9 @@ class PaymentServiceTest {
         BookingConfirmedEvent event = cap.getValue();
         assertThat(event.getUserId()).isEqualTo(userId);
         assertThat(event.getMembershipId()).isEqualTo(memId.toString());
+        assertThat(event.getUserName()).isEqualTo("Ravi Kumar");
+        assertThat(event.getUserMobile()).isEqualTo("9876543210");
+        assertThat(event.getUserEmail()).isEqualTo("ravi@example.com");
         assertThat(event.getPlanName()).isEqualTo("Full Day Plan");
         assertThat(event.getPlanType()).isEqualTo("FULL_DAY");
         assertThat(event.getSeatNumber()).isEqualTo("B12");
@@ -670,5 +698,117 @@ class PaymentServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.getStatus()).isEqualTo("ACTIVE");
         assertThat(result.getId()).isEqualTo(memId.toString());
+    }
+
+    // ── createOrder — queued plan logic ──────────────────────────────────────
+
+    @Test
+    void createOrder_noActiveMembership_startDateIsToday() {
+        Plan plan = buildFullDayPlan();
+        when(planRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
+        when(membershipRepository.findActiveByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
+        when(membershipRepository.save(any())).thenReturn(buildSavedMembership(UUID.randomUUID(), plan));
+
+        CreateOrderRequest req = new CreateOrderRequest();
+        req.setPlanId(plan.getId().toString());
+        paymentService.createOrder(userId, req);
+
+        ArgumentCaptor<Membership> cap = ArgumentCaptor.forClass(Membership.class);
+        verify(membershipRepository).save(cap.capture());
+        assertThat(cap.getValue().getStartDate()).isEqualTo(LocalDate.now());
+    }
+
+    @Test
+    void createOrder_activeMembershipExists_startDateIsActivePlusOne() {
+        // Use a HALF_DAY plan so the active membership's shift ("MORNING") is inherited
+        Plan plan = buildHalfDayPlan();
+        UUID activeSeatId = UUID.randomUUID();
+        Membership active = Membership.builder()
+                .id(UUID.randomUUID())
+                .userId(UUID.fromString(userId))
+                .plan(plan)
+                .seatId(activeSeatId)
+                .seatNumber("C5")
+                .shift("MORNING")
+                .startDate(LocalDate.now().minusDays(10))
+                .endDate(LocalDate.now().plusDays(10))
+                .status(Membership.Status.ACTIVE)
+                .build();
+
+        when(planRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
+        when(membershipRepository.findActiveByUserId(UUID.fromString(userId))).thenReturn(Optional.of(active));
+        when(membershipRepository.findQueuedByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
+        when(membershipRepository.save(any())).thenReturn(buildSavedMembership(UUID.randomUUID(), plan));
+
+        CreateOrderRequest req = new CreateOrderRequest();
+        req.setPlanId(plan.getId().toString());
+        // No shift set — should be inherited from the active membership
+        paymentService.createOrder(userId, req);
+
+        ArgumentCaptor<Membership> cap = ArgumentCaptor.forClass(Membership.class);
+        verify(membershipRepository).save(cap.capture());
+        assertThat(cap.getValue().getStartDate()).isEqualTo(LocalDate.now().plusDays(11));
+        assertThat(cap.getValue().getSeatId()).isEqualTo(activeSeatId);
+        assertThat(cap.getValue().getSeatNumber()).isEqualTo("C5");
+        assertThat(cap.getValue().getShift()).isEqualTo("MORNING");
+    }
+
+    @Test
+    void createOrder_activeMembership_alreadyQueued_throwsIllegalArgument() {
+        Plan plan = buildFullDayPlan();
+        Membership active = Membership.builder()
+                .id(UUID.randomUUID())
+                .userId(UUID.fromString(userId))
+                .plan(plan)
+                .endDate(LocalDate.now().plusDays(10))
+                .status(Membership.Status.ACTIVE)
+                .build();
+        Membership queued = Membership.builder()
+                .id(UUID.randomUUID())
+                .userId(UUID.fromString(userId))
+                .plan(plan)
+                .startDate(LocalDate.now().plusDays(11))
+                .status(Membership.Status.QUEUED)
+                .build();
+
+        when(planRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
+        when(membershipRepository.findActiveByUserId(UUID.fromString(userId))).thenReturn(Optional.of(active));
+        when(membershipRepository.findQueuedByUserId(UUID.fromString(userId))).thenReturn(Optional.of(queued));
+
+        CreateOrderRequest req = new CreateOrderRequest();
+        req.setPlanId(plan.getId().toString());
+
+        assertThatThrownBy(() -> paymentService.createOrder(userId, req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("already have a plan queued");
+    }
+
+    // ── verifyAndActivateMembership — QUEUED status when startDate is future ──
+
+    @Test
+    void verify_startDateFuture_setsQueuedStatus() {
+        String orderId = "dev_order_queue1";
+        UUID memId = UUID.randomUUID();
+
+        Payment payment = buildSavedPayment(memId);
+        payment.setGatewayOrderId(orderId);
+        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
+
+        Plan plan = buildFullDayPlan();
+        Membership membership = buildSavedMembership(memId, plan);
+        membership.setStartDate(LocalDate.now().plusDays(1));
+        membership.setStatus(Membership.Status.PENDING);
+        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.save(any())).thenReturn(membership);
+
+        PaymentVerifyRequest req = new PaymentVerifyRequest();
+        req.setGatewayOrderId(orderId);
+        req.setGatewayPaymentId("pay_queue");
+
+        paymentService.verifyAndActivateMembership(userId, req);
+
+        ArgumentCaptor<Membership> cap = ArgumentCaptor.forClass(Membership.class);
+        verify(membershipRepository).save(cap.capture());
+        assertThat(cap.getValue().getStatus()).isEqualTo(Membership.Status.QUEUED);
     }
 }
