@@ -29,6 +29,7 @@ spring:
   mail:
     host: ${SMTP_HOST:localhost}
     port: ${SMTP_PORT:25}
+    test-connection: false
     properties:
       mail.smtp.auth: false
       mail.smtp.starttls.enable: false
