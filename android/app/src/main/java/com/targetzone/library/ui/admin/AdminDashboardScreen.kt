@@ -97,8 +97,24 @@ fun AdminDashboardScreen(vm: AdminViewModel, onNavigate: (String) -> Unit) {
         }
 
         Spacer(Modifier.height(16.dp))
+        SectionHeader("Visitors")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatCard("Today",  stats?.visitorsToday?.toString()  ?: "—", accent = Emerald, modifier = Modifier.weight(1f))
+            StatCard("Total",  stats?.totalVisitors?.toString()  ?: "—", accent = BlueSoft, modifier = Modifier.weight(1f))
+        }
+
+        Spacer(Modifier.height(16.dp))
         SectionHeader("Quick Links")
-        val links = listOf("students" to "👥  Manage Students", "seats" to "⊞  Seat Map", "reminders" to "🔔  Send Reminders", "broadcast" to "📢  Broadcast", "feedback" to "💬  View Feedback", "memberships/new" to "➕  Create Membership")
+        val links = listOf(
+            "students"       to "👥  Manage Students",
+            "seats"          to "⊞  Seat Map",
+            "reminders"      to "🔔  Reminders",
+            "broadcast"      to "📢  Broadcast",
+            "feedback"       to "💬  View Feedback",
+            "revenue"        to "📊  Revenue & Reports",
+            "inbox"          to "📬  Inbox",
+            "memberships/new" to "➕  Create Membership"
+        )
         links.forEach { (route, label) ->
             AppCard(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {

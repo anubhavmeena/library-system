@@ -18,7 +18,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.targetzone.library.data.model.ManualImportRequest
 import com.targetzone.library.ui.components.AppCard
+import com.targetzone.library.ui.components.AppTextField
 import com.targetzone.library.ui.components.PrimaryButton
 import com.targetzone.library.ui.theme.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -32,6 +34,13 @@ fun AdminImportScreen(vm: AdminViewModel) {
     val result      by vm.importResult.collectAsState()
     val success     by vm.successMsg.collectAsState()
     val error       by vm.error.collectAsState()
+
+    // Manual single import state
+    var manualName   by remember { mutableStateOf("") }
+    var manualPhone  by remember { mutableStateOf("") }
+    var manualSeat   by remember { mutableStateOf("") }
+    var manualFees   by remember { mutableStateOf("") }
+    var manualDate   by remember { mutableStateOf("") }
 
     var selectedUri  by remember { mutableStateOf<Uri?>(null) }
     var selectedName by remember { mutableStateOf("") }
@@ -69,8 +78,48 @@ fun AdminImportScreen(vm: AdminViewModel) {
             .padding(16.dp)
     ) {
         Text("Import Students", style = MaterialTheme.typography.headlineMedium)
-        Text("Bulk-seed students from a CSV or Excel file", color = TextSub, fontSize = 13.sp)
+        Text("Add a single student manually or import from file", color = TextSub, fontSize = 13.sp)
         Spacer(Modifier.height(16.dp))
+
+        // ── Manual single import ──────────────────────────────────────────────
+        AppCard(Modifier.fillMaxWidth()) {
+            Text("Add Single Student", fontWeight = FontWeight.SemiBold, color = TextPrimary)
+            Spacer(Modifier.height(4.dp))
+            Text("Register a student without going through the app.", color = TextMuted, fontSize = 11.sp)
+            Spacer(Modifier.height(12.dp))
+            AppTextField(value = manualName, onValueChange = { manualName = it }, label = "Full Name *")
+            Spacer(Modifier.height(6.dp))
+            AppTextField(value = manualPhone, onValueChange = { manualPhone = it }, label = "Phone Number *")
+            Spacer(Modifier.height(6.dp))
+            AppTextField(value = manualSeat, onValueChange = { manualSeat = it }, label = "Seat Number *  (e.g. A1)")
+            Spacer(Modifier.height(6.dp))
+            AppTextField(value = manualFees, onValueChange = { manualFees = it }, label = "Fees (optional — matches nearest plan)")
+            Spacer(Modifier.height(6.dp))
+            AppTextField(value = manualDate, onValueChange = { manualDate = it }, label = "Start Date (optional — YYYY-MM-DD)")
+            Spacer(Modifier.height(12.dp))
+            PrimaryButton(
+                text = if (isLoading) "Registering…" else "Register Student",
+                enabled = manualName.isNotBlank() && manualPhone.isNotBlank() && manualSeat.isNotBlank() && !isLoading,
+                onClick = {
+                    vm.importSingleStudent(
+                        ManualImportRequest(
+                            name       = manualName.trim(),
+                            phone      = manualPhone.trim(),
+                            fees       = manualFees.trim().ifBlank { null },
+                            date       = manualDate.trim().ifBlank { null },
+                            seatNumber = manualSeat.trim().uppercase()
+                        )
+                    ) { manualName = ""; manualPhone = ""; manualSeat = ""; manualFees = ""; manualDate = "" }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Spacer(Modifier.height(20.dp))
+        HorizontalDivider(color = DividerColor)
+        Spacer(Modifier.height(16.dp))
+        Text("Bulk Import from File", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+        Spacer(Modifier.height(12.dp))
 
         // Format hint
         AppCard(Modifier.fillMaxWidth()) {

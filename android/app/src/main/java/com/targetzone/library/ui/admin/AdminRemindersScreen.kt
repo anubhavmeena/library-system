@@ -11,6 +11,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.targetzone.library.data.model.ReminderStudent
+import com.targetzone.library.data.model.StudentDetail
 import com.targetzone.library.ui.components.AppCard
 import com.targetzone.library.ui.components.PrimaryButton
 import com.targetzone.library.ui.components.SectionHeader
@@ -18,20 +19,45 @@ import com.targetzone.library.ui.theme.*
 
 @Composable
 fun AdminRemindersScreen(vm: AdminViewModel) {
+    var tab by remember { mutableIntStateOf(0) }
+
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
+            Text("Reminders", style = MaterialTheme.typography.headlineMedium)
+            Text("Expiring memberships & pending fees", color = TextSub, fontSize = 13.sp)
+            Spacer(Modifier.height(12.dp))
+            TabRow(
+                selectedTabIndex = tab,
+                containerColor = NavyMid,
+                contentColor = Amber,
+                indicator = { tabPositions ->
+                    TabRowDefaults.SecondaryIndicator(Modifier.tabIndicatorOffset(tabPositions[tab]), color = Amber)
+                }
+            ) {
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Expiring", fontSize = 13.sp) })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Pending Fees", fontSize = 13.sp) })
+            }
+        }
+
+        when (tab) {
+            0 -> ExpiringTab(vm)
+            1 -> PendingFeesTab(vm)
+        }
+    }
+}
+
+@Composable
+private fun ExpiringTab(vm: AdminViewModel) {
     val expiring  by vm.expiring.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
     val success   by vm.successMsg.collectAsState()
     var withinDays by remember { mutableIntStateOf(7) }
-    val selected  = remember { mutableStateListOf<String>() }
+    val selected   = remember { mutableStateListOf<String>() }
 
     LaunchedEffect(withinDays) { vm.loadExpiring(withinDays) }
 
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(16.dp)) {
-            Text("Reminders", style = MaterialTheme.typography.headlineMedium)
-            Text("Students with expiring memberships", color = TextSub, fontSize = 13.sp)
-            Spacer(Modifier.height(12.dp))
-
             success?.let {
                 Card(colors = CardDefaults.cardColors(containerColor = EmeraldFaint)) {
                     Text(it, color = Emerald, modifier = Modifier.padding(12.dp), fontSize = 13.sp)
@@ -39,7 +65,6 @@ fun AdminRemindersScreen(vm: AdminViewModel) {
                 Spacer(Modifier.height(8.dp))
                 LaunchedEffect(success) { kotlinx.coroutines.delay(3000); vm.clearMessages() }
             }
-
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(3, 5, 7).forEach { days ->
                     FilterChip(
@@ -51,7 +76,6 @@ fun AdminRemindersScreen(vm: AdminViewModel) {
                 }
             }
             Spacer(Modifier.height(12.dp))
-
             PrimaryButton(
                 text = when {
                     isLoading -> "Sending…"
@@ -59,7 +83,7 @@ fun AdminRemindersScreen(vm: AdminViewModel) {
                     else -> "Send to All (${expiring.size})"
                 },
                 enabled = expiring.isNotEmpty() && !isLoading,
-                onClick = { vm.sendReminders(if (selected.isNotEmpty()) selected.toList() else emptyList()); selected.clear(); },
+                onClick = { vm.sendReminders(if (selected.isNotEmpty()) selected.toList() else emptyList()); selected.clear() },
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -83,7 +107,6 @@ fun AdminRemindersScreen(vm: AdminViewModel) {
                             if (selected.size == expiring.size) selected.clear()
                             else { selected.clear(); selected.addAll(expiring.map { it.id }) }
                         }) { Text(if (selected.size == expiring.size) "Deselect All" else "Select All", color = Amber, fontSize = 12.sp) }
-
                     }
                 }
                 items(expiring) { student ->
@@ -94,6 +117,73 @@ fun AdminRemindersScreen(vm: AdminViewModel) {
                     Spacer(Modifier.height(8.dp))
                 }
                 item { Spacer(Modifier.height(16.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingFeesTab(vm: AdminViewModel) {
+    val students  by vm.pendingFeeStudents.collectAsState()
+    val isLoading by vm.isLoading.collectAsState()
+    val success   by vm.successMsg.collectAsState()
+
+    LaunchedEffect(Unit) { vm.loadPendingFeeStudents() }
+
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.padding(16.dp)) {
+            success?.let {
+                Card(colors = CardDefaults.cardColors(containerColor = EmeraldFaint)) {
+                    Text(it, color = Emerald, modifier = Modifier.padding(12.dp), fontSize = 13.sp)
+                }
+                Spacer(Modifier.height(8.dp))
+                LaunchedEffect(success) { kotlinx.coroutines.delay(3000); vm.clearMessages() }
+            }
+            PrimaryButton(
+                text = if (isLoading) "Sending…" else "Send Reminders to All (${students.size})",
+                enabled = students.isNotEmpty() && !isLoading,
+                onClick = { vm.sendPendingFeeReminders() },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        if (isLoading && students.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Amber) }
+        } else if (students.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("✅", fontSize = 48.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text("No pending fee students", color = TextSub)
+                }
+            }
+        } else {
+            LazyColumn(Modifier.padding(horizontal = 16.dp)) {
+                items(students) { s -> PendingFeeCard(s) { vm.clearPendingFees(s.id) {} }; Spacer(Modifier.height(8.dp)) }
+                item { Spacer(Modifier.height(16.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingFeeCard(s: StudentDetail, onClear: () -> Unit) {
+    AppCard(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(s.name, fontWeight = FontWeight.SemiBold, color = TextPrimary, fontSize = 14.sp)
+                Text(s.mobile, color = TextSub, fontSize = 12.sp)
+                if (!s.seatNumber.isNullOrBlank()) Text("Seat ${s.seatNumber} · ${s.shift}", color = TextMuted, fontSize = 11.sp)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("₹${s.pendingAmount?.toInt() ?: 0}", color = RedAlert, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("pending", color = RedAlert.copy(alpha = 0.7f), fontSize = 10.sp)
+                Spacer(Modifier.height(6.dp))
+                OutlinedButton(
+                    onClick = onClear,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Emerald),
+                    modifier = Modifier.height(32.dp)
+                ) { Text("Clear", fontSize = 11.sp) }
             }
         }
     }
@@ -123,4 +213,3 @@ private fun ReminderCard(student: ReminderStudent, isSelected: Boolean, onToggle
         }
     }
 }
-

@@ -9,7 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.targetzone.library.data.model.CreateMembershipRequest
+import com.targetzone.library.data.model.CreateCashMembershipRequest
 import com.targetzone.library.ui.components.*
 import com.targetzone.library.ui.theme.*
 import java.text.SimpleDateFormat
@@ -24,11 +24,13 @@ fun AdminCreateMembershipScreen(vm: AdminViewModel, onBack: () -> Unit) {
     val success   by vm.successMsg.collectAsState()
     val error     by vm.error.collectAsState()
 
-    var userId      by remember { mutableStateOf("") }
+    var userId        by remember { mutableStateOf("") }
     var selectedPlanId by remember { mutableStateOf("") }
-    var shift       by remember { mutableStateOf("MORNING") }
-    var selectedSeat by remember { mutableStateOf("") }
-    var startDate   by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())) }
+    var shift         by remember { mutableStateOf("MORNING") }
+    var selectedSeat  by remember { mutableStateOf("") }
+    var startDate     by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())) }
+    var paidAmount    by remember { mutableStateOf("") }
+    var pendingAmount by remember { mutableStateOf("") }
 
     val selectedPlan = plans.find { it.id == selectedPlanId }
 
@@ -119,19 +121,31 @@ fun AdminCreateMembershipScreen(vm: AdminViewModel, onBack: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             AppTextField(value = startDate, onValueChange = { startDate = it }, label = "YYYY-MM-DD")
         }
+        Spacer(Modifier.height(12.dp))
+        AppCard(Modifier.fillMaxWidth()) {
+            Text("Payment (optional)", fontWeight = FontWeight.SemiBold, color = TextPrimary)
+            Spacer(Modifier.height(4.dp))
+            Text("Leave blank to use plan price. Enter partial amount if split payment.", color = TextMuted, fontSize = 11.sp)
+            Spacer(Modifier.height(8.dp))
+            AppTextField(value = paidAmount, onValueChange = { paidAmount = it }, label = "Amount Paid (₹)")
+            Spacer(Modifier.height(6.dp))
+            AppTextField(value = pendingAmount, onValueChange = { pendingAmount = it }, label = "Pending Amount (₹)")
+        }
         Spacer(Modifier.height(20.dp))
 
         PrimaryButton(
             text = if (isLoading) "Creating…" else "Create Membership",
             enabled = userId.isNotBlank() && selectedPlanId.isNotBlank() && selectedSeat.isNotBlank() && startDate.isNotBlank() && !isLoading,
             onClick = {
-                vm.createMembership(
-                    CreateMembershipRequest(
-                        userId = userId.trim(),
-                        planId = selectedPlanId,
-                        seatNumber = selectedSeat,
-                        shift = if (selectedPlan?.planType == "FULL_DAY") "FULL_DAY" else shift,
-                        startDate = startDate
+                vm.createCashMembership(
+                    CreateCashMembershipRequest(
+                        studentId    = userId.trim(),
+                        planId       = selectedPlanId,
+                        seatNumber   = selectedSeat,
+                        shift        = if (selectedPlan?.planType == "FULL_DAY") "FULL_DAY" else shift,
+                        startDate    = startDate,
+                        paidAmount   = paidAmount.toDoubleOrNull(),
+                        pendingAmount = pendingAmount.toDoubleOrNull()
                     )
                 ) {}
             },

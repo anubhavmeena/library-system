@@ -191,6 +191,12 @@ fun AppNavigation(tokenManager: TokenManager) {
             composable("admin/gallery") {
                 AdminScaffold("Photo Gallery", onLogout = logout) { AdminGalleryScreen(adminVm) }
             }
+            composable("admin/revenue") {
+                AdminScaffold("Revenue & Reports", onLogout = logout) { AdminRevenueScreen(adminVm) }
+            }
+            composable("admin/inbox") {
+                AdminScaffold("Inbox", onLogout = logout) { AdminInboxScreen(adminVm) }
+            }
         }
     }
 }

@@ -1,7 +1,10 @@
 package com.targetzone.library.ui.admin
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -150,8 +153,17 @@ private fun StudentCard(student: StudentSummary, onToggleStatus: () -> Unit, onC
                     Text("Expires ${student.endDate}", color = TextMuted, fontSize = 11.sp)
                 }
             }
-            Column(horizontalAlignment = Alignment.End) {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 student.membershipStatus?.let { StatusChip(it) }
+                if ((student.pendingAmount ?: 0.0) > 0.0) {
+                    Box(
+                        Modifier
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(50))
+                            .background(RedFaint)
+                            .border(1.dp, RedAlert.copy(alpha = 0.3f), androidx.compose.foundation.shape.RoundedCornerShape(50))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) { Text("₹${student.pendingAmount!!.toInt()} due", color = RedAlert, fontSize = 10.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) }
+                }
             }
         }
         Spacer(Modifier.height(8.dp))

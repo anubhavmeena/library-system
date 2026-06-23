@@ -105,7 +105,9 @@ data class AdminStats(
     val availableSeats: Int = 0,
     val revenueToday: Double = 0.0,
     val revenueThisMonth: Double = 0.0,
-    val paymentsThisMonth: Int = 0
+    val paymentsThisMonth: Int = 0,
+    val totalVisitors: Int = 0,
+    val visitorsToday: Int = 0
 )
 
 data class StudentSummary(
@@ -120,7 +122,8 @@ data class StudentSummary(
     val shift: String? = null,
     val membershipStart: String? = null,
     val endDate: String? = null,
-    val planName: String? = null
+    val planName: String? = null,
+    val pendingAmount: Double? = null
 )
 
 data class StudentDetail(
@@ -144,7 +147,8 @@ data class StudentDetail(
     val membershipEnd: String? = null,
     val membershipStatus: String? = null,
     val daysRemaining: Int = 0,
-    val paymentMode: String? = null
+    val paymentMode: String? = null,
+    val pendingAmount: Double? = null
 )
 
 data class FeedbackItem(
@@ -250,4 +254,88 @@ data class SaveExpenseRequest(
     val electricityBill: Double,
     val internetBill: Double,
     val miscItems: List<MiscItem>
+)
+
+data class CreateCashMembershipRequest(
+    val studentId: String,
+    val planId: String,
+    val seatNumber: String,
+    val shift: String,
+    val startDate: String,
+    val paidAmount: Double? = null,
+    val pendingAmount: Double? = null
+)
+
+data class ManualImportRequest(
+    val name: String,
+    val phone: String,
+    val fees: String? = null,
+    val date: String? = null,
+    val seatNumber: String
+)
+
+data class ReplyRequest(val body: String)
+
+data class StudentPayment(
+    val id: String = "",
+    val membershipId: String? = null,
+    val amount: Double = 0.0,
+    val paymentGateway: String? = null,
+    val gatewayOrderId: String? = null,
+    val gatewayPaymentId: String? = null,
+    val status: String = "",
+    val createdAt: String? = null
+)
+
+data class BroadcastHistory(
+    val id: String = "",
+    val message: String = "",
+    val targetGroup: String = "",
+    val recipientCount: Int = 0,
+    val sentAt: String? = null
+)
+
+data class DailyRevenue(
+    val date: String = "",
+    val revenue: Double = 0.0,
+    val transactionCount: Int = 0,
+    val fullDayCount: Int = 0,
+    val halfDayCount: Int = 0
+)
+
+data class DailyPayment(
+    val id: String = "",
+    val studentName: String? = null,
+    val planName: String? = null,
+    val amount: Double = 0.0,
+    val paymentGateway: String? = null,
+    val status: String = "",
+    val createdAt: String? = null
+)
+
+data class RevenueReport(
+    val from: String = "",
+    val to: String = "",
+    val totalRevenue: Double = 0.0,
+    val totalTransactions: Int = 0,
+    val fullDayCount: Int = 0,
+    val halfDayCount: Int = 0,
+    val dailyBreakdown: List<DailyRevenue> = emptyList()
+)
+
+data class InboxSummary(
+    val messageNumber: Int = 0,
+    val from: String = "",
+    val subject: String = "",
+    val date: String = "",
+    val isRead: Boolean = false
+)
+
+data class InboxMessage(
+    val messageNumber: Int = 0,
+    val from: String = "",
+    val subject: String = "",
+    val date: String = "",
+    val isRead: Boolean = false,
+    val body: String = ""
 )

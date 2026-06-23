@@ -33,6 +33,23 @@ class AdminViewModel(
     val importResult = MutableStateFlow<ImportResult?>(null)
     val galleryPhotos = MutableStateFlow<List<GalleryPhoto>>(emptyList())
 
+    // Pending fees
+    val pendingFeeStudents = MutableStateFlow<List<StudentDetail>>(emptyList())
+
+    // Broadcast history
+    val broadcastHistory = MutableStateFlow<List<BroadcastHistory>>(emptyList())
+
+    // Revenue reports
+    val revenueReport   = MutableStateFlow<RevenueReport?>(null)
+    val dailyPayments   = MutableStateFlow<List<DailyPayment>>(emptyList())
+
+    // Student payment history (admin view)
+    val studentPayments = MutableStateFlow<List<StudentPayment>>(emptyList())
+
+    // Inbox
+    val inboxMessages      = MutableStateFlow<List<InboxSummary>>(emptyList())
+    val selectedInboxMsg   = MutableStateFlow<InboxMessage?>(null)
+
     val isLoading    = MutableStateFlow(false)
     val error        = MutableStateFlow<String?>(null)
     val successMsg   = MutableStateFlow<String?>(null)
@@ -129,10 +146,98 @@ class AdminViewModel(
         membershipRepo.getPlans().onSuccess { plans.value = it }
     }
 
-    fun createMembership(req: CreateMembershipRequest, onDone: () -> Unit) = viewModelScope.launch {
+    fun createCashMembership(req: CreateCashMembershipRequest, onDone: () -> Unit) = viewModelScope.launch {
         isLoading.value = true
-        adminRepo.createMembership(req)
+        adminRepo.createCashMembership(req)
             .onSuccess { successMsg.value = "Membership created for seat ${it.seatNumber}"; onDone() }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
+    fun loadPendingFeeStudents() = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.getStudentsWithPendingFees()
+            .onSuccess { pendingFeeStudents.value = it }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
+    fun clearPendingFees(id: String, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.clearPendingFees(id)
+            .onSuccess {
+                pendingFeeStudents.value = pendingFeeStudents.value.filter { s -> s.id != id }
+                successMsg.value = "Fees cleared"
+                onDone()
+            }
+            .onFailure { error.value = it.message }
+    }
+
+    fun sendPendingFeeReminders() = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.sendPendingFeeReminders()
+            .onSuccess { successMsg.value = it }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
+    fun loadBroadcastHistory() = viewModelScope.launch {
+        adminRepo.getBroadcastHistory()
+            .onSuccess { broadcastHistory.value = it }
+            .onFailure { /* non-critical */ }
+    }
+
+    fun loadRevenueReport(from: String, to: String) = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.getRevenueReport(from, to)
+            .onSuccess { revenueReport.value = it }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
+    fun loadDailyPayments(date: String) = viewModelScope.launch {
+        adminRepo.getDailyPayments(date)
+            .onSuccess { dailyPayments.value = it }
+            .onFailure { error.value = it.message }
+    }
+
+    fun loadStudentPayments(userId: String) = viewModelScope.launch {
+        adminRepo.getStudentPayments(userId)
+            .onSuccess { studentPayments.value = it }
+            .onFailure { /* non-critical */ }
+    }
+
+    fun loadInbox() = viewModelScope.launch {
+        adminRepo.getInbox()
+            .onSuccess { inboxMessages.value = it }
+            .onFailure { error.value = it.message }
+    }
+
+    fun loadInboxMessage(messageNumber: Int) = viewModelScope.launch {
+        adminRepo.getInboxMessage(messageNumber)
+            .onSuccess { selectedInboxMsg.value = it }
+            .onFailure { error.value = it.message }
+    }
+
+    fun replyToMessage(messageNumber: Int, body: String, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.replyToMessage(messageNumber, body)
+            .onSuccess { successMsg.value = "Reply sent"; onDone() }
+            .onFailure { error.value = it.message }
+    }
+
+    fun deleteInboxMessage(messageNumber: Int, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.deleteInboxMessage(messageNumber)
+            .onSuccess {
+                inboxMessages.value = inboxMessages.value.filter { it.messageNumber != messageNumber }
+                selectedInboxMsg.value = null
+                onDone()
+            }
+            .onFailure { error.value = it.message }
+    }
+
+    fun importSingleStudent(req: ManualImportRequest, onDone: () -> Unit) = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.importSingleStudent(req)
+            .onSuccess { successMsg.value = "${req.name} registered successfully"; onDone() }
             .onFailure { error.value = it.message }
         isLoading.value = false
     }

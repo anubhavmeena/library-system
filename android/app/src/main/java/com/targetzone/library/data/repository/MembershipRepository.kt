@@ -40,4 +40,14 @@ class MembershipRepository {
         val res = api.getMyFeedback()
         res.body()?.data ?: emptyList()
     }
+
+    suspend fun getQueuedMembership(): Result<Membership?> = runCatching {
+        val res = api.getQueuedMembership()
+        res.body()?.data
+    }
+
+    suspend fun getMyPayments(): Result<List<StudentPayment>> = runCatching {
+        val res = api.getPaymentHistory()
+        res.body()?.data ?: emptyList()
+    }
 }

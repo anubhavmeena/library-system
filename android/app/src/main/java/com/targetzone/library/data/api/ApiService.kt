@@ -45,6 +45,9 @@ interface ApiService {
     @GET("memberships/my/all")
     suspend fun getMembershipHistory(): Response<ApiResponse<List<Membership>>>
 
+    @GET("memberships/my/queued")
+    suspend fun getQueuedMembership(): Response<ApiResponse<Membership>>
+
     // Plans
     @GET("plans")
     suspend fun getPlans(): Response<ApiResponse<List<Plan>>>
@@ -57,7 +60,7 @@ interface ApiService {
     suspend fun verifyPayment(@Body req: VerifyPaymentRequest): Response<ApiResponse<Membership>>
 
     @GET("payments/my")
-    suspend fun getPaymentHistory(): Response<ApiResponse<List<Map<String, Any>>>>
+    suspend fun getPaymentHistory(): Response<ApiResponse<List<StudentPayment>>>
 
     // Seats
     @GET("seats/availability")
@@ -91,6 +94,9 @@ interface ApiService {
 
     @GET("admin/students/{id}")
     suspend fun getStudentDetail(@Path("id") id: String): Response<ApiResponse<StudentDetail>>
+
+    @GET("admin/students/{id}/payments")
+    suspend fun getAdminStudentPayments(@Path("id") id: String): Response<ApiResponse<List<StudentPayment>>>
 
     @PATCH("admin/students/{id}")
     suspend fun updateStudent(
@@ -136,12 +142,53 @@ interface ApiService {
     @POST("admin/broadcast")
     suspend fun sendBroadcast(@Body req: BroadcastRequest): Response<ApiResponse<String?>>
 
-    @POST("admin/memberships/create")
-    suspend fun createMembership(@Body req: CreateMembershipRequest): Response<ApiResponse<Membership>>
+    @POST("admin/memberships/cash")
+    suspend fun createCashMembership(@Body req: CreateCashMembershipRequest): Response<ApiResponse<Membership>>
 
     @Multipart
     @POST("admin/students/import")
     suspend fun importStudents(@Part file: MultipartBody.Part): Response<ApiResponse<ImportResult>>
+
+    @POST("admin/students/import/single")
+    suspend fun importSingleStudent(@Body req: ManualImportRequest): Response<ApiResponse<Any?>>
+
+    @GET("admin/students/pending-fees")
+    suspend fun getStudentsWithPendingFees(): Response<ApiResponse<List<StudentDetail>>>
+
+    @POST("admin/students/{id}/clear-fees")
+    suspend fun clearPendingFees(@Path("id") id: String): Response<ApiResponse<StudentDetail>>
+
+    @POST("admin/reminders/pending-fees")
+    suspend fun sendPendingFeeReminders(): Response<ApiResponse<String?>>
+
+    @GET("admin/broadcast/history")
+    suspend fun getBroadcastHistory(): Response<ApiResponse<List<BroadcastHistory>>>
+
+    @GET("admin/reports/revenue")
+    suspend fun getRevenueReport(
+        @Query("from") from: String,
+        @Query("to") to: String
+    ): Response<ApiResponse<RevenueReport>>
+
+    @GET("admin/reports/payments")
+    suspend fun getDailyPayments(
+        @Query("date") date: String
+    ): Response<ApiResponse<List<DailyPayment>>>
+
+    @GET("admin/inbox")
+    suspend fun getInbox(): Response<ApiResponse<List<InboxSummary>>>
+
+    @GET("admin/inbox/{messageNumber}")
+    suspend fun getInboxMessage(@Path("messageNumber") messageNumber: Int): Response<ApiResponse<InboxMessage>>
+
+    @POST("admin/inbox/{messageNumber}/reply")
+    suspend fun replyToMessage(
+        @Path("messageNumber") messageNumber: Int,
+        @Body req: ReplyRequest
+    ): Response<ApiResponse<Any?>>
+
+    @DELETE("admin/inbox/{messageNumber}")
+    suspend fun deleteInboxMessage(@Path("messageNumber") messageNumber: Int): Response<ApiResponse<Any?>>
 
     @GET("admin/expenses")
     suspend fun getExpenses(

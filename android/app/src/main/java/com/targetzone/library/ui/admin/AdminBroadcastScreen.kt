@@ -12,18 +12,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.targetzone.library.ui.components.AppCard
 import com.targetzone.library.ui.components.PrimaryButton
+import com.targetzone.library.ui.components.SectionHeader
 import com.targetzone.library.ui.theme.*
 
 @Composable
 fun AdminBroadcastScreen(vm: AdminViewModel) {
-    val isLoading by vm.isLoading.collectAsState()
-    val success   by vm.successMsg.collectAsState()
-    val error     by vm.error.collectAsState()
-    var message   by remember { mutableStateOf("") }
-    var target    by remember { mutableStateOf("ALL") }
+    val isLoading       by vm.isLoading.collectAsState()
+    val success         by vm.successMsg.collectAsState()
+    val error           by vm.error.collectAsState()
+    val broadcastHistory by vm.broadcastHistory.collectAsState()
+    var message         by remember { mutableStateOf("") }
+    var target          by remember { mutableStateOf("ALL") }
 
+    LaunchedEffect(Unit) { vm.loadBroadcastHistory() }
     LaunchedEffect(success) {
-        if (success != null) { kotlinx.coroutines.delay(3000); vm.clearMessages() }
+        if (success != null) { kotlinx.coroutines.delay(3000); vm.clearMessages(); vm.loadBroadcastHistory() }
     }
 
     Column(
@@ -94,5 +97,25 @@ fun AdminBroadcastScreen(vm: AdminViewModel) {
             onClick = { vm.sendBroadcast(message, target) { message = "" } },
             modifier = Modifier.fillMaxWidth()
         )
+
+        if (broadcastHistory.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            SectionHeader("Broadcast History")
+            Spacer(Modifier.height(8.dp))
+            broadcastHistory.forEach { h ->
+                AppCard(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                        Column(Modifier.weight(1f)) {
+                            Text(h.message, color = TextPrimary, fontSize = 13.sp, maxLines = 2)
+                            Spacer(Modifier.height(4.dp))
+                            Text("${h.targetGroup} · ${h.recipientCount} recipients", color = TextMuted, fontSize = 11.sp)
+                        }
+                        if (!h.sentAt.isNullOrBlank()) {
+                            Text(h.sentAt.take(10), color = TextMuted, fontSize = 10.sp)
+                        }
+                    }
+                }
+            }
+        }
     }
 }

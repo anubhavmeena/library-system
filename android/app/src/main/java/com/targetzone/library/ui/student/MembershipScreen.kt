@@ -20,11 +20,13 @@ import kotlin.math.max
 
 @Composable
 fun MembershipScreen(vm: StudentViewModel, onBookNow: () -> Unit) {
-    val membership by vm.membership.collectAsState()
-    val history    by vm.membershipHistory.collectAsState()
-    val context    = LocalContext.current
+    val membership        by vm.membership.collectAsState()
+    val queuedMembership  by vm.queuedMembership.collectAsState()
+    val myPayments        by vm.myPayments.collectAsState()
+    val history           by vm.membershipHistory.collectAsState()
+    val context           = LocalContext.current
 
-    LaunchedEffect(Unit) { vm.loadDashboard(); vm.loadMembershipHistory() }
+    LaunchedEffect(Unit) { vm.loadDashboard(); vm.loadMembershipHistory(); vm.loadMyPayments() }
 
     val daysLeft = membership?.let {
         max(0L, ((java.text.SimpleDateFormat("yyyy-MM-dd").parse(it.endDate)?.time ?: 0L) - System.currentTimeMillis()) / 86400000L).toInt()
@@ -105,6 +107,42 @@ fun MembershipScreen(vm: StudentViewModel, onBookNow: () -> Unit) {
                     }
                 }
                 Spacer(Modifier.height(16.dp))
+            }
+        }
+
+        queuedMembership?.let { q ->
+            item {
+                SectionHeader("Upcoming Plan")
+                AppCard(Modifier.fillMaxWidth()) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text(q.planName, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                            Text("Starts ${q.startDate}", color = TextSub, fontSize = 12.sp)
+                        }
+                        StatusChip("PENDING")
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    InfoRow("Seat", q.seatNumber)
+                    InfoRow("Shift", q.shift)
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+
+        if (myPayments.isNotEmpty()) {
+            item { SectionHeader("Payment History") }
+            items(myPayments) { p ->
+                AppCard(Modifier.fillMaxWidth()) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("₹${p.amount.toInt()}", fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                            if (!p.paymentGateway.isNullOrBlank()) Text(p.paymentGateway, color = TextMuted, fontSize = 11.sp)
+                            if (!p.createdAt.isNullOrBlank()) Text(p.createdAt.take(10), color = TextMuted, fontSize = 11.sp)
+                        }
+                        StatusChip(p.status)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
             }
         }
 

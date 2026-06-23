@@ -137,6 +137,50 @@ fun AdminStudentDetailScreen(
             }
         }
 
+        // ── Pending Fees ──────────────────────────────────────────────────────
+        if ((s.pendingAmount ?: 0.0) > 0.0) {
+            Spacer(Modifier.height(12.dp))
+            SectionHeader("Pending Fees")
+            Card(
+                colors = CardDefaults.cardColors(containerColor = RedFaint),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("Outstanding Amount", color = RedAlert, fontSize = 12.sp)
+                            Text("₹${s.pendingAmount!!.toInt()}", color = RedAlert, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                        }
+                        Button(
+                            onClick = { vm.clearPendingFees(s.id) { vm.loadStudentDetail(studentId) } },
+                            colors = ButtonDefaults.buttonColors(containerColor = RedAlert, contentColor = androidx.compose.ui.graphics.Color.White)
+                        ) { Text("Mark Cleared", fontSize = 13.sp) }
+                    }
+                }
+            }
+        }
+
+        // ── Payment History ───────────────────────────────────────────────────
+        val studentPayments by vm.studentPayments.collectAsState()
+        LaunchedEffect(studentId) { vm.loadStudentPayments(s.id) }
+        if (studentPayments.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            SectionHeader("Payment History")
+            studentPayments.forEach { p ->
+                AppCard(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("₹${p.amount.toInt()}", fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                            if (p.paymentGateway != null) Text(p.paymentGateway, color = TextMuted, fontSize = 11.sp)
+                            if (p.createdAt != null) Text(p.createdAt.take(10), color = TextMuted, fontSize = 11.sp)
+                        }
+                        StatusChip(p.status)
+                    }
+                }
+            }
+        }
+
         Spacer(Modifier.height(16.dp))
 
         // ── Actions ───────────────────────────────────────────────────────────

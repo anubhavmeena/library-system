@@ -73,9 +73,62 @@ class AdminRepository {
         res.body()?.data ?: res.body()?.message ?: "Broadcast sent"
     }
 
-    suspend fun createMembership(req: CreateMembershipRequest): Result<Membership> = runCatching {
-        val res = api.createMembership(req)
+    suspend fun createCashMembership(req: CreateCashMembershipRequest): Result<Membership> = runCatching {
+        val res = api.createCashMembership(req)
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to create membership")
+    }
+
+    suspend fun getStudentsWithPendingFees(): Result<List<StudentDetail>> = runCatching {
+        val res = api.getStudentsWithPendingFees()
+        res.body()?.data ?: emptyList()
+    }
+
+    suspend fun clearPendingFees(id: String): Result<StudentDetail> = runCatching {
+        val res = api.clearPendingFees(id)
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to clear fees")
+    }
+
+    suspend fun sendPendingFeeReminders(): Result<String> = runCatching {
+        val res = api.sendPendingFeeReminders()
+        res.body()?.data ?: res.body()?.message ?: "Reminders sent"
+    }
+
+    suspend fun getBroadcastHistory(): Result<List<BroadcastHistory>> = runCatching {
+        val res = api.getBroadcastHistory()
+        res.body()?.data ?: emptyList()
+    }
+
+    suspend fun getRevenueReport(from: String, to: String): Result<RevenueReport> = runCatching {
+        val res = api.getRevenueReport(from, to)
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to load report")
+    }
+
+    suspend fun getDailyPayments(date: String): Result<List<DailyPayment>> = runCatching {
+        val res = api.getDailyPayments(date)
+        res.body()?.data ?: emptyList()
+    }
+
+    suspend fun getInbox(): Result<List<InboxSummary>> = runCatching {
+        val res = api.getInbox()
+        res.body()?.data ?: emptyList()
+    }
+
+    suspend fun getInboxMessage(messageNumber: Int): Result<InboxMessage> = runCatching {
+        val res = api.getInboxMessage(messageNumber)
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Message not found")
+    }
+
+    suspend fun replyToMessage(messageNumber: Int, body: String): Result<Unit> = runCatching {
+        api.replyToMessage(messageNumber, ReplyRequest(body))
+    }
+
+    suspend fun deleteInboxMessage(messageNumber: Int): Result<Unit> = runCatching {
+        api.deleteInboxMessage(messageNumber)
+    }
+
+    suspend fun importSingleStudent(req: ManualImportRequest): Result<Unit> = runCatching {
+        val res = api.importSingleStudent(req)
+        if (res.body()?.success == false) throw Exception(res.body()?.message ?: "Import failed")
     }
 
     suspend fun updateStudent(id: String, req: UpdateStudentRequest): Result<StudentDetail> = runCatching {
@@ -96,5 +149,10 @@ class AdminRepository {
     suspend fun saveExpenses(req: SaveExpenseRequest): Result<MonthlyExpense> = runCatching {
         val res = api.saveExpenses(req)
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to save expenses")
+    }
+
+    suspend fun getStudentPayments(userId: String): Result<List<StudentPayment>> = runCatching {
+        val res = api.getAdminStudentPayments(userId)
+        res.body()?.data ?: emptyList()
     }
 }

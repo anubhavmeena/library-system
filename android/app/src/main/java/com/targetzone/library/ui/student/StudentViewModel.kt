@@ -28,14 +28,16 @@ class StudentViewModel(
     private val tokenManager: TokenManager? = null
 ) : ViewModel() {
 
-    val membership    = MutableStateFlow<Membership?>(null)
-    val plans         = MutableStateFlow<List<Plan>>(emptyList())
-    val seats         = MutableStateFlow<List<Seat>>(emptyList())
-    val selectedSeat  = MutableStateFlow<Seat?>(null)
-    val profile       = MutableStateFlow<User?>(null)
-    val myFeedback    = MutableStateFlow<List<FeedbackItem>>(emptyList())
+    val membership        = MutableStateFlow<Membership?>(null)
+    val queuedMembership  = MutableStateFlow<Membership?>(null)
+    val myPayments        = MutableStateFlow<List<StudentPayment>>(emptyList())
+    val plans             = MutableStateFlow<List<Plan>>(emptyList())
+    val seats             = MutableStateFlow<List<Seat>>(emptyList())
+    val selectedSeat      = MutableStateFlow<Seat?>(null)
+    val profile           = MutableStateFlow<User?>(null)
+    val myFeedback        = MutableStateFlow<List<FeedbackItem>>(emptyList())
     val membershipHistory = MutableStateFlow<List<Membership>>(emptyList())
-    val galleryPhotos = MutableStateFlow<List<GalleryPhoto>>(emptyList())
+    val galleryPhotos     = MutableStateFlow<List<GalleryPhoto>>(emptyList())
 
     val isLoading     = MutableStateFlow(false)
     val error         = MutableStateFlow<String?>(null)
@@ -47,8 +49,12 @@ class StudentViewModel(
     val bookingSuccess = MutableStateFlow(false)
 
     fun loadDashboard() = viewModelScope.launch {
-        membershipRepo.getMyMembership()
-            .onSuccess { membership.value = it }
+        membershipRepo.getMyMembership().onSuccess { membership.value = it }
+        membershipRepo.getQueuedMembership().onSuccess { queuedMembership.value = it }
+    }
+
+    fun loadMyPayments() = viewModelScope.launch {
+        membershipRepo.getMyPayments().onSuccess { myPayments.value = it }
     }
 
     fun loadPlans() = viewModelScope.launch {
