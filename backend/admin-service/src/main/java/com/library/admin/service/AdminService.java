@@ -32,6 +32,7 @@ public class AdminService {
     private final FeedbackRepository          feedbackRepository;
     private final PlanRepository              planRepository;
     private final BroadcastMessageRepository  broadcastMessageRepository;
+    private final VisitorEventRepository       visitorEventRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @PersistenceContext
@@ -71,6 +72,9 @@ public class AdminService {
         long paymentsMonth        = paymentRepository
                 .countSuccessfulPayments(monthStart, LocalDateTime.now());
 
+        long totalVisitors  = visitorEventRepository.count();
+        long visitorsToday  = visitorEventRepository.countByCreatedAtAfter(todayStart);
+
         return DashboardDto.builder()
                 .totalStudents(totalStudents)
                 .activeStudents(activeStudents)
@@ -83,6 +87,8 @@ public class AdminService {
                 .revenueToday(revenueToday   != null ? revenueToday  : BigDecimal.ZERO)
                 .revenueThisMonth(revenueMonth != null ? revenueMonth : BigDecimal.ZERO)
                 .paymentsThisMonth(paymentsMonth)
+                .totalVisitors(totalVisitors)
+                .visitorsToday(visitorsToday)
                 .build();
     }
 

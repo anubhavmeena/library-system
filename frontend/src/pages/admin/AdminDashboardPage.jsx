@@ -91,6 +91,12 @@ export default function AdminDashboardPage() {
                     sub={t('adminDashboard.stats.transactions', { count: fmt(stats?.paymentsThisMonth) })} />
             </div>
 
+            <p className="text-primary-500 text-xs uppercase tracking-widest mb-3">{t('adminDashboard.visitors')}</p>
+            <div className="grid grid-cols-2 gap-4 mb-8">
+                <StatCard icon="👁️" label={t('adminDashboard.stats.totalVisitors')} value={fmt(stats?.totalVisitors)} color="blue" />
+                <StatCard icon="📅" label={t('adminDashboard.stats.visitorsToday')} value={fmt(stats?.visitorsToday)} color="emerald" />
+            </div>
+
             <div className="card p-6 mb-6">
                 <div className="flex justify-between mb-3">
                     <span className="text-white font-semibold">{t('adminDashboard.occupancy.title')}</span>

@@ -1,6 +1,8 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import NotFoundPage from './pages/NotFoundPage'
 import { useSelector } from 'react-redux'
+import api from './services/api'
 
 import LandingPage              from './pages/LandingPage'
 import TermsPage                from './pages/TermsPage'
@@ -35,6 +37,19 @@ import AdminGalleryPage   from './pages/admin/AdminGalleryPage'
 import FeedbackPage       from './pages/student/FeedbackPage'
 import StudentGalleryPage from './pages/student/StudentGalleryPage'
 
+const PUBLIC_PATHS = new Set(['/', '/about', '/login', '/register', '/terms',
+    '/privacy-policy', '/refund-policy', '/cancellation-policy'])
+
+function VisitorTracker() {
+    const location = useLocation()
+    useEffect(() => {
+        if (PUBLIC_PATHS.has(location.pathname)) {
+            api.post('/visitor/track', { page: location.pathname }).catch(() => {})
+        }
+    }, [location.pathname])
+    return null
+}
+
 function ProtectedRoute({ children, role }) {
     const { user, token } = useSelector(s => s.auth)
     if (!token || !user) return <Navigate to="/login" replace />
@@ -44,6 +59,8 @@ function ProtectedRoute({ children, role }) {
 
 export default function App() {
     return (
+        <>
+        <VisitorTracker />
         <Routes>
             <Route path="/"                    element={<LandingPage />} />
             <Route path="/about"               element={<AboutUsPage />} />
@@ -87,5 +104,6 @@ export default function App() {
 
             <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        </>
     )
 }

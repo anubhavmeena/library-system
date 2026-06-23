@@ -24,4 +24,8 @@ public class DashboardDto {
     private BigDecimal revenueToday;
     private BigDecimal revenueThisMonth;
     private long       paymentsThisMonth;
+
+    // ── Visitors ───────────────────────────────────────────────────────────
+    private long totalVisitors;
+    private long visitorsToday;
 }

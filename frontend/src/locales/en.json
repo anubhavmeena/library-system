@@ -448,8 +448,11 @@
       "available": "Available",
       "revenueToday": "Revenue Today",
       "revenueMonth": "Revenue This Month",
-      "transactions": "{{count}} transactions"
+      "transactions": "{{count}} transactions",
+      "totalVisitors": "Total Visitors",
+      "visitorsToday": "Visitors Today"
     },
+    "visitors": "Visitors",
     "occupancy": {
       "title": "Seat Occupancy",
       "occupied": "{{count}} occupied",

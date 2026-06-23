@@ -448,8 +448,11 @@
       "available": "उपलब्ध",
       "revenueToday": "आज का राजस्व",
       "revenueMonth": "इस माह का राजस्व",
-      "transactions": "{{count}} लेन-देन"
+      "transactions": "{{count}} लेन-देन",
+      "totalVisitors": "कुल आगंतुक",
+      "visitorsToday": "आज के आगंतुक"
     },
+    "visitors": "आगंतुक",
     "occupancy": {
       "title": "सीट अधिभोग",
       "occupied": "{{count}} भरी हुई",

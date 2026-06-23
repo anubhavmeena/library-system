@@ -69,6 +69,14 @@ spring:
             - StripPrefix=0
             - name: AuthFilter
 
+        # Visitor Tracking (public — no auth required)
+        - id: visitor-service
+          uri: ${ADMIN_SERVICE_URL:http://localhost:8086}
+          predicates:
+            - Path=/api/visitor/**
+          filters:
+            - StripPrefix=0
+
         # Admin Service Routes (admin only)
         - id: admin-service
           uri: ${ADMIN_SERVICE_URL:http://localhost:8086}
