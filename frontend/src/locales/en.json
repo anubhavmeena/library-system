@@ -464,6 +464,15 @@
       "sendReminders":  { "label": "Send Reminders",   "desc": "Alert expiring members" },
       "revenueReport":  { "label": "Revenue Report",   "desc": "Track payments & earnings" }
     },
+    "revenueModal": {
+      "title": "Day-wise Revenue — This Month",
+      "date": "Date",
+      "amount": "Amount",
+      "transactions": "Transactions",
+      "total": "Total",
+      "noData": "No transactions this month yet",
+      "loadFailed": "Failed to load revenue breakdown"
+    },
     "loadFailed": "Failed to load dashboard"
   },
   "adminStudents": {
