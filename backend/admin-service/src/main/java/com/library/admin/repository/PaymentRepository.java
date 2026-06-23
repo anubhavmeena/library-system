@@ -67,10 +67,10 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     // Students with outstanding cash balance
     List<Payment> findByPendingAmountGreaterThan(java.math.BigDecimal amount);
 
-    // Zero out pending balance for a user (clear pending fees action)
-    @Modifying
+    // Fold pending balance into paid amount and zero it out (clear pending fees action)
+    @Modifying(clearAutomatically = true)
     @Transactional
-    @Query("UPDATE Payment p SET p.pendingAmount = 0 WHERE p.userId = :userId AND p.pendingAmount > 0")
+    @Query("UPDATE Payment p SET p.amount = p.amount + p.pendingAmount, p.pendingAmount = 0 WHERE p.userId = :userId AND p.pendingAmount > 0")
     void clearPendingAmountByUserId(@Param("userId") UUID userId);
 
     // All successful payments within a single day — used for student drill-down

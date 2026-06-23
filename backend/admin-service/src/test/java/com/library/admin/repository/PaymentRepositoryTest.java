@@ -36,6 +36,18 @@ class PaymentRepositoryTest {
                 .build());
     }
 
+    private Payment saveWithPending(UUID userId, BigDecimal amount, BigDecimal pendingAmount, LocalDateTime createdAt) {
+        return paymentRepository.save(Payment.builder()
+                .id(UUID.randomUUID())
+                .membershipId(UUID.randomUUID())
+                .userId(userId)
+                .amount(amount)
+                .pendingAmount(pendingAmount)
+                .status(Payment.Status.SUCCESS)
+                .createdAt(createdAt)
+                .build());
+    }
+
     // ── sumRevenueForPeriod ──────────────────────────────────────────────────
 
     @Test
@@ -143,5 +155,33 @@ class PaymentRepositoryTest {
                 BASE.minusHours(1), BASE.plusHours(1));
 
         assertThat(count).isEqualTo(1L);
+    }
+
+    // ── clearPendingAmountByUserId ───────────────────────────────────────────
+
+    @Test
+    void clearPendingAmount_foldsIntoAmountAndZerosPending() {
+        UUID uid = UUID.randomUUID();
+        saveWithPending(uid, new BigDecimal("1500.00"), new BigDecimal("500.00"), BASE);
+
+        paymentRepository.clearPendingAmountByUserId(uid);
+
+        Payment updated = paymentRepository.findByUserIdOrderByCreatedAtDesc(uid).get(0);
+        assertThat(updated.getAmount()).isEqualByComparingTo("2000.00");
+        assertThat(updated.getPendingAmount()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void clearPendingAmount_clearedAmountAppearsInRevenueSums() {
+        UUID uid = UUID.randomUUID();
+        saveWithPending(uid, new BigDecimal("1000.00"), new BigDecimal("300.00"), BASE);
+
+        BigDecimal before = paymentRepository.sumRevenueForPeriod(BASE.minusHours(1), BASE.plusHours(1));
+        assertThat(before).isEqualByComparingTo("1000.00");
+
+        paymentRepository.clearPendingAmountByUserId(uid);
+
+        BigDecimal after = paymentRepository.sumRevenueForPeriod(BASE.minusHours(1), BASE.plusHours(1));
+        assertThat(after).isEqualByComparingTo("1300.00");
     }
 }
