@@ -855,6 +855,8 @@
     "mode": "Mode",
     "referenceId": "Reference ID",
     "noPayments": "No payments on this day",
+    "export": "Export Excel",
+    "total": "Total",
     "loadFailed": "Failed to load revenue data",
     "paymentLoadFailed": "Failed to load payment details",
     "legend": {

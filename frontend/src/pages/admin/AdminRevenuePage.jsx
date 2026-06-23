@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import * as XLSX from 'xlsx'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
@@ -40,6 +41,20 @@ export default function AdminRevenuePage() {
 
     const currency = (n) => `₹${Number(n ?? 0).toLocaleString('en-IN')}`
     const fmt      = (n) => (n ?? 0).toLocaleString('en-IN')
+
+    const exportToExcel = () => {
+        const monthName = MONTHS[month - 1]
+        const rows = [
+            [t('adminRevenue.date'), t('adminRevenue.amount'), t('adminRevenue.transactions')],
+            ...(report?.dailyBreakdown ?? []).map(r => [r.date, Number(r.amount), Number(r.count)]),
+            [],
+            [t('adminRevenue.total'), Number(report?.totalRevenue ?? 0), Number(report?.totalTransactions ?? 0)],
+        ]
+        const ws = XLSX.utils.aoa_to_sheet(rows)
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, `${monthName} ${year}`)
+        XLSX.writeFile(wb, `revenue-${monthName}-${year}.xlsx`)
+    }
 
     const lastDay = new Date(year, month, 0).getDate()
 
@@ -139,6 +154,13 @@ export default function AdminRevenuePage() {
                         className="btn-ghost border border-primary-700/40 text-sm px-4 py-2 rounded-xl"
                     >
                         ↻ {t('adminRevenue.refresh')}
+                    </button>
+                    <button
+                        onClick={exportToExcel}
+                        disabled={!report?.dailyBreakdown?.length}
+                        className="btn-ghost border border-primary-700/40 text-sm px-4 py-2 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        ↓ {t('adminRevenue.export')}
                     </button>
                 </div>
             </div>
