@@ -338,6 +338,31 @@ public class AdminService {
 
     // ── Revenue Report ────────────────────────────────────────────────────────
 
+    public List<DailyPaymentDto> getPaymentsByDate(String dateStr) {
+        LocalDate date = LocalDate.parse(dateStr);
+        List<Payment> payments = paymentRepository.findSuccessfulPaymentsForDay(
+                date.atStartOfDay(), date.atTime(23, 59, 59));
+
+        Set<UUID> userIds = payments.stream().map(Payment::getUserId).collect(Collectors.toSet());
+        Map<UUID, User> usersById = userRepository.findAllById(userIds)
+                .stream().collect(Collectors.toMap(User::getId, u -> u));
+
+        return payments.stream().map(p -> {
+            User user = usersById.get(p.getUserId());
+            String ref = (p.getGatewayPaymentId() != null && !p.getGatewayPaymentId().isBlank())
+                    ? p.getGatewayPaymentId()
+                    : p.getGatewayOrderId();
+            return DailyPaymentDto.builder()
+                    .studentName(user != null ? user.getName() : "—")
+                    .studentMobile(user != null ? user.getMobile() : "—")
+                    .amount(p.getAmount())
+                    .paymentGateway(p.getPaymentGateway())
+                    .referenceId(ref)
+                    .paidAt(p.getCreatedAt().toString())
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
     public RevenueReportDto getRevenueReport(String fromStr, String toStr) {
         LocalDateTime from = LocalDate.parse(fromStr).atStartOfDay();
         LocalDateTime to   = LocalDate.parse(toStr).atTime(23, 59, 59);

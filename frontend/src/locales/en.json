@@ -165,6 +165,7 @@
         "newMembership": "New Membership",
         "broadcast": "Broadcast",
         "expenses": "Expenses",
+        "revenue": "Revenue",
         "importStudents": "Import Students",
         "gallery": "Photo Gallery"
       },
@@ -835,6 +836,31 @@
     "saved": "Expenses saved successfully",
     "loadFailed": "Failed to load expenses",
     "saveFailed": "Failed to save expenses"
+  },
+  "adminRevenue": {
+    "title": "Revenue Report",
+    "subtitle": "Monthly revenue overview",
+    "refresh": "Refresh",
+    "totalRevenue": "Total Revenue",
+    "totalTransactions": "Total Transactions",
+    "revenueMap": "Revenue Map",
+    "dayBreakdown": "Day-wise Breakdown",
+    "noData": "No transactions in this period",
+    "date": "Date",
+    "amount": "Amount",
+    "transactions": "Transactions",
+    "paymentsOn": "Payments on {{date}}",
+    "student": "Student",
+    "mobile": "Mobile",
+    "mode": "Mode",
+    "referenceId": "Reference ID",
+    "noPayments": "No payments on this day",
+    "loadFailed": "Failed to load revenue data",
+    "paymentLoadFailed": "Failed to load payment details",
+    "legend": {
+      "low": "Low",
+      "high": "High"
+    }
   },
   "adminGallery": {
     "title": "Photo Gallery",

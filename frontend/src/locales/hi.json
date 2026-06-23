@@ -165,6 +165,7 @@
         "newMembership": "नई सदस्यता",
         "broadcast": "ब्रॉडकास्ट",
         "expenses": "खर्च",
+        "revenue": "राजस्व",
         "importStudents": "छात्र आयात",
         "gallery": "फोटो गैलरी"
       },
@@ -818,6 +819,31 @@
     "saved": "खर्च सफलतापूर्वक सहेजा गया",
     "loadFailed": "खर्च लोड करने में विफल",
     "saveFailed": "खर्च सहेजने में विफल"
+  },
+  "adminRevenue": {
+    "title": "राजस्व रिपोर्ट",
+    "subtitle": "मासिक राजस्व अवलोकन",
+    "refresh": "ताज़ा करें",
+    "totalRevenue": "कुल राजस्व",
+    "totalTransactions": "कुल लेन-देन",
+    "revenueMap": "राजस्व मानचित्र",
+    "dayBreakdown": "दिन-वार विवरण",
+    "noData": "इस अवधि में कोई लेन-देन नहीं",
+    "date": "दिनांक",
+    "amount": "राशि",
+    "transactions": "लेन-देन",
+    "paymentsOn": "{{date}} के भुगतान",
+    "student": "छात्र",
+    "mobile": "मोबाइल",
+    "mode": "माध्यम",
+    "referenceId": "संदर्भ आईडी",
+    "noPayments": "इस दिन कोई भुगतान नहीं",
+    "loadFailed": "राजस्व डेटा लोड करने में विफल",
+    "paymentLoadFailed": "भुगतान विवरण लोड करने में विफल",
+    "legend": {
+      "low": "कम",
+      "high": "अधिक"
+    }
   },
   "adminGallery": {
     "title": "फोटो गैलरी",

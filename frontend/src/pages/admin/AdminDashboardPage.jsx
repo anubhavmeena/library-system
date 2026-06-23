@@ -28,58 +28,10 @@ function StatCard({ icon, label, value, sub, color = 'amber', to, onClick }) {
     return content
 }
 
-function RevenueBreakdownModal({ data, onClose, t, currency, fmt }) {
-    const rows = data?.dailyBreakdown ?? []
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <div className="relative bg-primary-900 border border-primary-700/50 rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl"
-                 onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between px-6 py-4 border-b border-primary-700/40">
-                    <h2 className="text-white font-semibold">{t('adminDashboard.revenueModal.title')}</h2>
-                    <button onClick={onClose} className="text-primary-400 hover:text-white transition-colors text-xl leading-none">✕</button>
-                </div>
-
-                <div className="overflow-y-auto flex-1">
-                    {rows.length === 0 ? (
-                        <p className="text-primary-500 text-sm text-center py-10">{t('adminDashboard.revenueModal.noData')}</p>
-                    ) : (
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="text-primary-500 text-xs uppercase tracking-wider border-b border-primary-700/40">
-                                    <th className="text-left px-6 py-3">{t('adminDashboard.revenueModal.date')}</th>
-                                    <th className="text-right px-6 py-3">{t('adminDashboard.revenueModal.amount')}</th>
-                                    <th className="text-right px-6 py-3">{t('adminDashboard.revenueModal.transactions')}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {rows.map(row => (
-                                    <tr key={row.date} className="border-b border-primary-800/60 hover:bg-primary-800/30 transition-colors">
-                                        <td className="px-6 py-3 text-primary-300 font-mono">{row.date}</td>
-                                        <td className="px-6 py-3 text-amber-400 font-semibold text-right">{currency(row.amount)}</td>
-                                        <td className="px-6 py-3 text-primary-400 text-right">{fmt(row.count)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-
-                {rows.length > 0 && (
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-primary-700/40 bg-primary-800/30 rounded-b-2xl">
-                        <span className="text-primary-400 text-sm font-semibold">{t('adminDashboard.revenueModal.total')}</span>
-                        <span className="text-amber-400 font-bold text-lg">{currency(data?.totalRevenue)}</span>
-                    </div>
-                )}
-            </div>
-        </div>
-    )
-}
 
 export default function AdminDashboardPage() {
-    const [stats, setStats]         = useState(null)
-    const [loading, setLoading]     = useState(true)
-    const [breakdown, setBreakdown] = useState(null)
+    const [stats, setStats]     = useState(null)
+    const [loading, setLoading] = useState(true)
     const { t } = useTranslation()
 
     const fetchStats = async () => {
@@ -94,17 +46,6 @@ export default function AdminDashboardPage() {
     const fmt      = (n) => (n ?? 0).toLocaleString('en-IN')
     const currency = (n) => `₹${Number(n ?? 0).toLocaleString('en-IN')}`
 
-    const openRevenueBreakdown = async () => {
-        const today = new Date()
-        const from  = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
-        const to    = today.toISOString().slice(0, 10)
-        try {
-            const res = await api.get(`/admin/reports/revenue?from=${from}&to=${to}`)
-            setBreakdown(res.data.data)
-        } catch {
-            toast.error(t('adminDashboard.revenueModal.loadFailed'))
-        }
-    }
 
     if (loading) return (
         <div>
@@ -124,16 +65,6 @@ export default function AdminDashboardPage() {
 
     return (
         <div>
-            {breakdown && (
-                <RevenueBreakdownModal
-                    data={breakdown}
-                    onClose={() => setBreakdown(null)}
-                    t={t}
-                    currency={currency}
-                    fmt={fmt}
-                />
-            )}
-
             <div className="flex items-center justify-between mb-8">
                 <div>
                     <h1 className="page-header">{t('adminDashboard.title')}</h1>
@@ -162,7 +93,7 @@ export default function AdminDashboardPage() {
                 <StatCard icon="💰" label={t('adminDashboard.stats.revenueToday')}  value={currency(stats?.revenueToday)}     color="emerald" />
                 <StatCard icon="📈" label={t('adminDashboard.stats.revenueMonth')}  value={currency(stats?.revenueThisMonth)} color="amber"
                     sub={t('adminDashboard.stats.transactions', { count: fmt(stats?.paymentsThisMonth) })}
-                    onClick={openRevenueBreakdown} />
+                    to="/admin/revenue" />
             </div>
 
             <p className="text-primary-500 text-xs uppercase tracking-widest mb-3">{t('adminDashboard.visitors')}</p>

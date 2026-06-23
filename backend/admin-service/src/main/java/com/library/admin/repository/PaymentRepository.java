@@ -48,4 +48,17 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
             @Param("from") LocalDateTime from,
             @Param("to")   LocalDateTime to
     );
+
+    // All successful payments within a single day — used for student drill-down
+    @Query("""
+        SELECT p FROM Payment p
+        WHERE p.status = 'SUCCESS'
+          AND p.createdAt >= :from
+          AND p.createdAt <= :to
+        ORDER BY p.createdAt DESC
+        """)
+    List<Payment> findSuccessfulPaymentsForDay(
+            @Param("from") LocalDateTime from,
+            @Param("to")   LocalDateTime to
+    );
 }

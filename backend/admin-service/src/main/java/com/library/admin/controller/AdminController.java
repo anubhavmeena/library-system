@@ -147,4 +147,11 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(
                 adminService.getRevenueReport(from, to)));
     }
+
+    @GetMapping("/reports/payments/daily")
+    public ResponseEntity<ApiResponse<List<DailyPaymentDto>>> getDailyPayments(
+            @RequestParam String date) {  // yyyy-MM-dd
+        return ResponseEntity.ok(ApiResponse.success(
+                adminService.getPaymentsByDate(date)));
+    }
 }
