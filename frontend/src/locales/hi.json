@@ -1,6 +1,6 @@
 {
   "language": { "en": "EN", "hi": "हिं", "switchTo": "भाषा बदलें" },
-  "nav": { "admin": "एडमिन", "getStarted": "शुरू करें →" },
+  "nav": { "admin": "एडमिन", "getStarted": "लॉगिन" },
   "landing": {
     "badge": "आपका प्रीमियम अध्ययन गंतव्य",
     "heroTitle": "स्मार्ट तरीके से पढ़ें,",

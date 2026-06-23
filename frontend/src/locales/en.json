@@ -1,6 +1,6 @@
 {
   "language": { "en": "EN", "hi": "हिं", "switchTo": "Switch language" },
-  "nav": { "admin": "Admin", "getStarted": "Get Started →" },
+  "nav": { "admin": "Admin", "getStarted": "Login" },
   "landing": {
     "badge": "Your Premier Study Destination",
     "heroTitle": "Study Smarter,",
