@@ -22,7 +22,7 @@ public class Payment {
     @Column(name = "user_id",       nullable = false) private UUID       userId;
     @Column(nullable = false, precision = 10, scale = 2) private BigDecimal amount;
     @Column(name = "pending_amount", precision = 10, scale = 2)
-    private BigDecimal pendingAmount = java.math.BigDecimal.ZERO;
+    private BigDecimal pendingAmount = BigDecimal.ZERO;
     @Column(name = "payment_gateway")    private String paymentGateway;
     @Column(name = "gateway_order_id")   private String gatewayOrderId;
     @Column(name = "gateway_payment_id") private String gatewayPaymentId;

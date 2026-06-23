@@ -24,14 +24,15 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AdminServiceTest {
 
-    @Mock UserRepository       userRepository;
-    @Mock MembershipRepository membershipRepository;
-    @Mock PaymentRepository    paymentRepository;
-    @Mock PlanRepository       planRepository;
+    @Mock UserRepository           userRepository;
+    @Mock MembershipRepository     membershipRepository;
+    @Mock PaymentRepository        paymentRepository;
+    @Mock PlanRepository           planRepository;
+    @Mock VisitorEventRepository   visitorEventRepository;
     @Mock KafkaTemplate<String, Object> kafkaTemplate;
-    @Mock EntityManager        entityManager;
-    @Mock Query                dataQuery;
-    @Mock Query                countQuery;
+    @Mock EntityManager            entityManager;
+    @Mock Query                    dataQuery;
+    @Mock Query                    countQuery;
 
     @InjectMocks AdminService adminService;
 

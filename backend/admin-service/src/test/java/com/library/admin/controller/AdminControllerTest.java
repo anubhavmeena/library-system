@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.library.admin.dto.*;
 import com.library.admin.exception.ResourceNotFoundException;
 import com.library.admin.service.AdminService;
+import com.library.admin.service.ImportService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -28,6 +29,7 @@ class AdminControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @MockBean  AdminService adminService;
+    @MockBean  ImportService importService;
 
     // ── GET /api/admin/dashboard ─────────────────────────────────────────────
 

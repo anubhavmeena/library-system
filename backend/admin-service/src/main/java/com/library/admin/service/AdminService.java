@@ -6,7 +6,6 @@ import com.library.admin.event.BroadcastNotificationEvent;
 import com.library.admin.exception.ResourceNotFoundException;
 import com.library.admin.repository.*;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -34,9 +33,7 @@ public class AdminService {
     private final BroadcastMessageRepository  broadcastMessageRepository;
     private final VisitorEventRepository       visitorEventRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
-
-    @PersistenceContext
-    private EntityManager entityManager;
+    private final EntityManager entityManager;
 
     private static final Map<String, String> SORT_COLUMNS = Map.of(
         "name",          "u.name",
@@ -208,7 +205,7 @@ public class AdminService {
         rowCounts.put("A", 28);
         rowCounts.put("B", 28);
         rowCounts.put("C", 28);
-        rowCounts.put("D", 28);
+        rowCounts.put("D", 26);
 
         Map<String, List<SeatMapDto.SeatInfoDto>> seatsByRow = new LinkedHashMap<>();
 

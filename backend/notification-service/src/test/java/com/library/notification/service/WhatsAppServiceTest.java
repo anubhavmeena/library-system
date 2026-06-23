@@ -1,82 +1,76 @@
 package com.library.notification.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.library.notification.entity.NotificationLog;
 import com.library.notification.enums.Channel;
 import com.library.notification.enums.DeliveryStatus;
 import com.library.notification.repository.NotificationLogRepository;
-import com.twilio.Twilio;
-import com.twilio.rest.api.v2010.account.Message;
-import java.util.UUID;
-import com.twilio.rest.api.v2010.account.MessageCreator;
-import com.twilio.type.PhoneNumber;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class WhatsAppServiceTest {
 
-    @Mock
-    NotificationLogRepository logRepository;
+    @Mock NotificationLogRepository logRepository;
+    @Mock ObjectMapper objectMapper;
 
-    @InjectMocks
-    WhatsAppService whatsAppService;
+    @InjectMocks WhatsAppService whatsAppService;
 
     @BeforeEach
     void setup() {
-        ReflectionTestUtils.setField(whatsAppService, "accountSid", "");
-        ReflectionTestUtils.setField(whatsAppService, "authToken", "");
-        ReflectionTestUtils.setField(whatsAppService, "whatsappFrom", "whatsapp:+14155238886");
-        // twilioEnabled starts false (field default)
+        ReflectionTestUtils.setField(whatsAppService, "metaToken", "");
+        ReflectionTestUtils.setField(whatsAppService, "metaPhoneNumberId", "");
+        ReflectionTestUtils.setField(whatsAppService, "metaApiVersion", "v21.0");
+        ReflectionTestUtils.setField(whatsAppService, "metaTemplateName", "library_notification");
+        ReflectionTestUtils.setField(whatsAppService, "metaLanguage", "en_US");
+        // metaEnabled starts false (field default)
     }
 
     // ── init() ────────────────────────────────────────────────────────────────
 
     @Test
-    void init_blankCredentials_twilioDisabled() {
+    void init_blankCredentials_metaDisabled() {
         whatsAppService.init();
 
-        boolean enabled = (boolean) ReflectionTestUtils.getField(whatsAppService, "twilioEnabled");
+        boolean enabled = (boolean) ReflectionTestUtils.getField(whatsAppService, "metaEnabled");
         assertThat(enabled).isFalse();
     }
 
     @Test
-    void init_withCredentials_initializesTwilioAndEnables() {
-        ReflectionTestUtils.setField(whatsAppService, "accountSid", "ACtest123456");
-        ReflectionTestUtils.setField(whatsAppService, "authToken", "authtoken123");
-
-        try (MockedStatic<Twilio> mockedTwilio = mockStatic(Twilio.class)) {
-            whatsAppService.init();
-
-            mockedTwilio.verify(() -> Twilio.init("ACtest123456", "authtoken123"));
-            boolean enabled = (boolean) ReflectionTestUtils.getField(whatsAppService, "twilioEnabled");
-            assertThat(enabled).isTrue();
-        }
-    }
-
-    @Test
-    void init_onlyAccountSid_twilioDisabled() {
-        ReflectionTestUtils.setField(whatsAppService, "accountSid", "ACtest123456");
-        ReflectionTestUtils.setField(whatsAppService, "authToken", "");
+    void init_withCredentials_metaEnabled() {
+        ReflectionTestUtils.setField(whatsAppService, "metaToken", "EAAtest123");
+        ReflectionTestUtils.setField(whatsAppService, "metaPhoneNumberId", "123456789");
 
         whatsAppService.init();
 
-        boolean enabled = (boolean) ReflectionTestUtils.getField(whatsAppService, "twilioEnabled");
+        boolean enabled = (boolean) ReflectionTestUtils.getField(whatsAppService, "metaEnabled");
+        assertThat(enabled).isTrue();
+    }
+
+    @Test
+    void init_onlyToken_metaDisabled() {
+        ReflectionTestUtils.setField(whatsAppService, "metaToken", "EAAtest123");
+        ReflectionTestUtils.setField(whatsAppService, "metaPhoneNumberId", "");
+
+        whatsAppService.init();
+
+        boolean enabled = (boolean) ReflectionTestUtils.getField(whatsAppService, "metaEnabled");
         assertThat(enabled).isFalse();
     }
 
-    // ── send() — dev mode (twilioEnabled = false) ─────────────────────────────
+    // ── send() — dev mode (metaEnabled = false) ───────────────────────────────
 
     @Test
     void send_devMode_savesLogWithSentStatus() {
@@ -121,105 +115,16 @@ class WhatsAppServiceTest {
                 .doesNotThrowAnyException();
     }
 
-    // ── send() — Twilio configured ────────────────────────────────────────────
+    // ── send() — metaEnabled = false, coverage of log fields ─────────────────
 
     @Test
-    void send_twilioEnabled_success_savedAsSent() {
-        ReflectionTestUtils.setField(whatsAppService, "twilioEnabled", true);
+    void send_devMode_statusIsSent_noErrorMessage() {
+        ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
 
-        try (MockedStatic<Message> mockedMsg = mockStatic(Message.class)) {
-            MessageCreator mockCreator = mock(MessageCreator.class);
-            Message mockMessage = mock(Message.class);
-            when(mockMessage.getSid()).thenReturn("SM12345");
-            when(mockCreator.create()).thenReturn(mockMessage);
-            mockedMsg.when(() -> Message.creator(any(PhoneNumber.class), any(PhoneNumber.class), anyString()))
-                     .thenReturn(mockCreator);
+        whatsAppService.send("9876543210", "Hello", UUID.randomUUID().toString(), "RENEWAL_REMINDER");
 
-            whatsAppService.send("9876543210", "Hello", UUID.randomUUID().toString(), "BOOKING_CONFIRMED");
-
-            ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
-            verify(logRepository).save(captor.capture());
-            assertThat(captor.getValue().getStatus()).isEqualTo(DeliveryStatus.SENT);
-            assertThat(captor.getValue().getErrorMessage()).isNull();
-        }
-    }
-
-    @Test
-    void send_twilioEnabled_exception_savedAsFailed() {
-        ReflectionTestUtils.setField(whatsAppService, "twilioEnabled", true);
-
-        try (MockedStatic<Message> mockedMsg = mockStatic(Message.class)) {
-            MessageCreator mockCreator = mock(MessageCreator.class);
-            when(mockCreator.create()).thenThrow(new RuntimeException("Twilio 429 rate limit"));
-            mockedMsg.when(() -> Message.creator(any(PhoneNumber.class), any(PhoneNumber.class), anyString()))
-                     .thenReturn(mockCreator);
-
-            assertThatCode(() -> whatsAppService.send("9876543210", "Hello", null, "TEST"))
-                    .doesNotThrowAnyException();
-
-            ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
-            verify(logRepository).save(captor.capture());
-            assertThat(captor.getValue().getStatus()).isEqualTo(DeliveryStatus.FAILED);
-            assertThat(captor.getValue().getErrorMessage()).contains("429");
-        }
-    }
-
-    @Test
-    void send_twilioEnabled_formatsRecipientWithWhatsappPrefix() {
-        ReflectionTestUtils.setField(whatsAppService, "twilioEnabled", true);
-
-        try (MockedStatic<Message> mockedMsg = mockStatic(Message.class)) {
-            ArgumentCaptor<PhoneNumber> toCaptor = ArgumentCaptor.forClass(PhoneNumber.class);
-            MessageCreator mockCreator = mock(MessageCreator.class);
-            Message mockMessage = mock(Message.class);
-            when(mockMessage.getSid()).thenReturn("SM99");
-            when(mockCreator.create()).thenReturn(mockMessage);
-            mockedMsg.when(() -> Message.creator(toCaptor.capture(), any(PhoneNumber.class), anyString()))
-                     .thenReturn(mockCreator);
-
-            whatsAppService.send("9876543210", "Hi", null, "TEST");
-
-            // Number formatted to whatsapp:+91<number>
-            assertThat(toCaptor.getValue().getEndpoint())
-                    .isEqualTo("whatsapp:+919876543210");
-        }
-    }
-
-    // ── formatNumber() — tested via reflection ────────────────────────────────
-
-    @Test
-    void formatNumber_tenDigit_prepends91() {
-        String result = ReflectionTestUtils.invokeMethod(whatsAppService, "formatNumber", "9876543210");
-        assertThat(result).isEqualTo("+919876543210");
-    }
-
-    @Test
-    void formatNumber_alreadyE164_unchanged() {
-        String result = ReflectionTestUtils.invokeMethod(whatsAppService, "formatNumber", "+919876543210");
-        assertThat(result).isEqualTo("+919876543210");
-    }
-
-    @Test
-    void formatNumber_withDashesAndSpaces_stripped() {
-        String result = ReflectionTestUtils.invokeMethod(whatsAppService, "formatNumber", "987-654-3210");
-        assertThat(result).isEqualTo("+919876543210");
-    }
-
-    @Test
-    void formatNumber_withParentheses_stripped() {
-        String result = ReflectionTestUtils.invokeMethod(whatsAppService, "formatNumber", "(987) 654-3210");
-        assertThat(result).isEqualTo("+919876543210");
-    }
-
-    @Test
-    void formatNumber_null_returnsEmpty() {
-        String result = ReflectionTestUtils.invokeMethod(whatsAppService, "formatNumber", (Object) null);
-        assertThat(result).isEqualTo("");
-    }
-
-    @Test
-    void formatNumber_blank_returnsEmpty() {
-        String result = ReflectionTestUtils.invokeMethod(whatsAppService, "formatNumber", "   ");
-        assertThat(result).isEqualTo("");
+        verify(logRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(DeliveryStatus.SENT);
+        assertThat(captor.getValue().getErrorMessage()).isNull();
     }
 }

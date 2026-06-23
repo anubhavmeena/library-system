@@ -13,6 +13,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -101,7 +102,7 @@ public class AdminMembershipService {
         // 9. Save Payment (SUCCESS, CASH)
         BigDecimal planPrice     = plan.getPrice();
         BigDecimal paidAmount    = (req.getPaidAmount()    != null) ? req.getPaidAmount()    : planPrice;
-        BigDecimal pendingAmount = (req.getPendingAmount() != null) ? req.getPendingAmount() : java.math.BigDecimal.ZERO;
+        BigDecimal pendingAmount = (req.getPendingAmount() != null) ? req.getPendingAmount() : BigDecimal.ZERO;
 
         String cashOrderId = "cash_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         Payment payment = Payment.builder()
