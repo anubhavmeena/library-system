@@ -16,6 +16,14 @@ struct MembershipView: View {
                             noMembershipCard
                         }
 
+                        if let q = vm.queuedMembership {
+                            queuedMembershipCard(q)
+                        }
+
+                        if !vm.myPayments.isEmpty {
+                            paymentHistorySection
+                        }
+
                         if !vm.membershipHistory.isEmpty {
                             historySection
                         }
@@ -38,6 +46,7 @@ struct MembershipView: View {
         .onAppear {
             vm.loadDashboard()
             vm.loadMembershipHistory()
+            vm.loadMyPayments()
         }
     }
 
@@ -52,7 +61,6 @@ struct MembershipView: View {
                     StatusChip(status: m.status)
                 }
 
-                // Progress bar
                 if let progress = membershipProgress(m) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Plan Progress")
@@ -78,7 +86,28 @@ struct MembershipView: View {
                 InfoRow(label: "Shift",       value: m.shift.capitalized)
                 InfoRow(label: "Start Date",  value: m.startDate)
                 InfoRow(label: "End Date",    value: m.endDate)
-                InfoRow(label: "Amount Paid", value: "₹\(String(format: "%.0f", m.amountPaid))")
+                InfoRow(label: "Amount Paid", value: "₹\(String(format: "%.0f", m.displayAmount))")
+            }
+        }
+    }
+
+    private func queuedMembershipCard(_ m: Membership) -> some View {
+        AppCard(accentColor: .blueSoft) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label("Queued Plan", systemImage: "clock.badge.checkmark")
+                        .font(.headlineSmall)
+                        .foregroundColor(.blueSoft)
+                    Spacer()
+                    StatusChip(status: "QUEUED")
+                }
+                Divider().background(Color.dividerColor)
+                InfoRow(label: "Plan",   value: m.planName)
+                InfoRow(label: "Type",   value: m.planType.replacingOccurrences(of: "_", with: " "))
+                InfoRow(label: "Seat",   value: m.seatNumber.isEmpty ? "—" : m.seatNumber)
+                InfoRow(label: "Shift",  value: m.shift.capitalized)
+                if !m.startDate.isEmpty { InfoRow(label: "Starts", value: m.startDate) }
+                if !m.endDate.isEmpty   { InfoRow(label: "Ends",   value: m.endDate) }
             }
         }
     }
@@ -124,9 +153,40 @@ struct MembershipView: View {
                         Text("\(m.startDate) → \(m.endDate)")
                             .font(.bodySmall)
                             .foregroundColor(.textSub)
-                        Text("₹\(String(format: "%.0f", m.amountPaid)) · \(m.shift.capitalized) · Seat \(m.seatNumber)")
+                        Text("₹\(String(format: "%.0f", m.displayAmount)) · \(m.shift.capitalized) · Seat \(m.seatNumber)")
                             .font(.bodySmall)
                             .foregroundColor(.textMuted)
+                    }
+                }
+            }
+        }
+    }
+
+    private var paymentHistorySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Payment History").font(.headlineSmall).foregroundColor(.textPrimary)
+            ForEach(vm.myPayments) { p in
+                AppCard {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Text("₹\(String(format: "%.0f", p.amount))")
+                                    .font(.labelLarge).foregroundColor(.textPrimary)
+                                if let gw = p.paymentGateway {
+                                    Text("·").foregroundColor(.textMuted)
+                                    Text(gw).font(.labelSmall).foregroundColor(.textMuted)
+                                }
+                            }
+                            if let date = p.createdAt {
+                                Text(date.prefix(10).description)
+                                    .font(.bodySmall).foregroundColor(.textSub)
+                            }
+                            if let ref = p.gatewayOrderId {
+                                Text(ref).font(.labelSmall).foregroundColor(.textMuted).lineLimit(1)
+                            }
+                        }
+                        Spacer()
+                        StatusChip(status: p.status)
                     }
                 }
             }

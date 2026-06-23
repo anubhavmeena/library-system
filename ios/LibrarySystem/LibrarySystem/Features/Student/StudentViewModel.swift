@@ -5,6 +5,7 @@ import Combine
 final class StudentViewModel: ObservableObject {
     // Dashboard
     @Published var membership: Membership?
+    @Published var queuedMembership: Membership?
     @Published var membershipHistory: [Membership] = []
 
     // Plans & Booking
@@ -22,6 +23,12 @@ final class StudentViewModel: ObservableObject {
 
     // Feedback
     @Published var myFeedback: [FeedbackItem] = []
+
+    // Payment history
+    @Published var myPayments: [StudentPayment] = []
+
+    // Gallery
+    @Published var galleryPhotos: [GalleryPhoto] = []
 
     // UI State
     @Published var isLoading = false
@@ -41,6 +48,7 @@ final class StudentViewModel: ObservableObject {
         Task {
             do { membership = try await membershipRepo.getMyMembership() }
             catch { /* no active membership is a normal 404 */ }
+            queuedMembership = await membershipRepo.getQueuedMembership()
             isLoading = false
         }
     }
@@ -174,6 +182,20 @@ final class StudentViewModel: ObservableObject {
         Task {
             do { membershipHistory = try await membershipRepo.getMembershipHistory() }
             catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func loadMyPayments() {
+        Task {
+            do { myPayments = try await membershipRepo.getMyPayments() }
+            catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func loadGallery() {
+        Task {
+            do { galleryPhotos = try await GalleryRepository.shared.getAll() }
+            catch { /* gallery failure is non-critical */ }
         }
     }
 

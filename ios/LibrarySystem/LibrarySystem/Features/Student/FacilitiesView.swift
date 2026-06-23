@@ -82,14 +82,18 @@ struct FacilitiesView: View {
             Text("Rules & Guidelines").font(.headlineSmall).foregroundColor(.textPrimary)
             AppCard {
                 VStack(alignment: .leading, spacing: 8) {
-                    ruleItem("Maintain silence in the study hall")
-                    ruleItem("Mobile phones on silent mode")
-                    ruleItem("No food or beverages at seats")
-                    ruleItem("Keep the premises clean")
-                    ruleItem("Show ID card on entry")
-                    ruleItem("Seats are non-transferable")
+                    ruleItem("Maintain complete silence in the study hall at all times")
+                    ruleItem("Mobile phones must be kept on silent mode")
+                    ruleItem("Food and beverages are not allowed at study seats")
+                    ruleItem("Keep your seat and surroundings clean")
+                    ruleItem("No marking or writing in library books")
+                    ruleItem("Report any technical issues to the front desk")
+                    ruleItem("Membership card must be shown at entry")
+                    ruleItem("Guests are not permitted inside the study hall")
                 }
             }
+            Text("⚠\u{FE0F} Violation of rules may result in membership cancellation without refund.")
+                .font(.bodySmall).foregroundColor(.redAlert).padding(.top, 4)
         }
     }
 

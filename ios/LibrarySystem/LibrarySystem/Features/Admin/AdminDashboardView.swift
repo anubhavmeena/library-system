@@ -34,6 +34,9 @@ struct AdminDashboardView: View {
 
                         // Revenue
                         revenueSection
+
+                        // Visitor stats
+                        visitorsSection
                     }
                     .padding(.bottom, 24)
                 }
@@ -106,6 +109,21 @@ struct AdminDashboardView: View {
                          accent: .amber)
                 StatCard(label: "Payments This Month",
                          value: "\(vm.stats.paymentsThisMonth)",
+                         accent: .blueSoft)
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
+    private var visitorsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Visitors").font(.headlineSmall).foregroundColor(.textPrimary).padding(.horizontal, 16)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                StatCard(label: "Today's Visitors",
+                         value: "\(vm.stats.visitorsToday)",
+                         accent: .emerald)
+                StatCard(label: "Total Visitors",
+                         value: "\(vm.stats.totalVisitors)",
                          accent: .blueSoft)
             }
             .padding(.horizontal, 16)

@@ -146,6 +146,8 @@ struct AdminStudentsView: View {
                                     StatusChip(status: status)
                                 }
                             }
+                        } else if s.membershipStatus == "EXPIRED" {
+                            StatusChip(status: "EXPIRED")
                         }
                     }
                 }

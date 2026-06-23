@@ -43,9 +43,10 @@ extension Endpoint {
     }
 
     // MARK: - Membership
-    static let getMyMembership = Endpoint(path: "memberships/my")
+    static let getMyMembership    = Endpoint(path: "memberships/my")
     static let getMembershipHistory = Endpoint(path: "memberships/my/all")
-    static let getPlans = Endpoint(path: "plans")
+    static let getQueuedMembership  = Endpoint(path: "memberships/my/queued")
+    static let getPlans             = Endpoint(path: "plans")
 
     // MARK: - Payments
     static func createOrder(_ req: CreateOrderRequest) -> Endpoint {
@@ -71,7 +72,7 @@ extension Endpoint {
         Endpoint(path: "users/feedback", method: .POST, body: encode(req))
     }
 
-    // MARK: - Admin
+    // MARK: - Admin: Dashboard & Students
     static let getAdminStats = Endpoint(path: "admin/dashboard")
     static func getStudents(page: Int = 0, size: Int = 20, status: String? = nil,
                             membershipStatus: String? = nil, search: String? = nil) -> Endpoint {
@@ -85,9 +86,18 @@ extension Endpoint {
     static func getStudentDetail(id: String) -> Endpoint {
         Endpoint(path: "admin/students/\(id)")
     }
+    static func getStudentPayments(userId: String) -> Endpoint {
+        Endpoint(path: "admin/students/\(userId)/payments")
+    }
     static func toggleStudentStatus(id: String, req: ToggleStatusRequest) -> Endpoint {
         Endpoint(path: "admin/students/\(id)/status", method: .PATCH, body: encode(req))
     }
+    static let getStudentsWithPendingFees = Endpoint(path: "admin/students/pending-fees")
+    static func clearPendingFees(userId: String) -> Endpoint {
+        Endpoint(path: "admin/students/\(userId)/clear-pending-fees", method: .PATCH)
+    }
+
+    // MARK: - Admin: Memberships & Seats
     static func changeSeat(membershipId: String, req: ChangeSeatRequest) -> Endpoint {
         Endpoint(path: "admin/memberships/\(membershipId)/seat", method: .PATCH, body: encode(req))
     }
@@ -95,24 +105,82 @@ extension Endpoint {
         Endpoint(path: "admin/memberships/expiring",
                  queryItems: [URLQueryItem(name: "withinDays", value: "\(withinDays)")])
     }
-    static func sendReminders(_ req: SendReminderRequest) -> Endpoint {
-        Endpoint(path: "admin/reminders/send", method: .POST, body: encode(req))
+    static func createCashMembership(_ req: CreateCashMembershipRequest) -> Endpoint {
+        Endpoint(path: "admin/memberships/cash", method: .POST, body: encode(req))
     }
     static func getAdminSeatMap(shift: String, date: String? = nil) -> Endpoint {
         var items = [URLQueryItem(name: "shift", value: shift)]
         if let date { items.append(URLQueryItem(name: "date", value: date)) }
         return Endpoint(path: "admin/seats/map", queryItems: items)
     }
-    static let getAllFeedback = Endpoint(path: "admin/feedback")
-    static func updateFeedback(id: String, req: UpdateFeedbackRequest) -> Endpoint {
-        Endpoint(path: "admin/feedback/\(id)", method: .PATCH, body: encode(req))
+
+    // MARK: - Admin: Reminders & Broadcast
+    static func sendReminders(_ req: SendReminderRequest) -> Endpoint {
+        Endpoint(path: "admin/reminders/send", method: .POST, body: encode(req))
+    }
+    static func sendPendingFeeReminders(_ req: SendReminderRequest) -> Endpoint {
+        Endpoint(path: "admin/reminders/pending-fees", method: .POST, body: encode(req))
     }
     static func sendBroadcast(_ req: BroadcastRequest) -> Endpoint {
         Endpoint(path: "admin/broadcast", method: .POST, body: encode(req))
     }
-    static func createMembership(_ req: CreateMembershipRequest) -> Endpoint {
-        Endpoint(path: "admin/memberships/create", method: .POST, body: encode(req))
+    static let getBroadcastHistory = Endpoint(path: "admin/broadcast/history")
+
+    // MARK: - Admin: Feedback
+    static let getAllFeedback = Endpoint(path: "admin/feedback")
+    static func updateFeedback(id: String, req: UpdateFeedbackRequest) -> Endpoint {
+        Endpoint(path: "admin/feedback/\(id)", method: .PATCH, body: encode(req))
     }
+
+    // MARK: - Admin: Revenue Reports
+    static func getRevenueReport(from: String, to: String) -> Endpoint {
+        Endpoint(path: "admin/reports/revenue",
+                 queryItems: [URLQueryItem(name: "from", value: from),
+                               URLQueryItem(name: "to",   value: to)])
+    }
+    static func getDailyPayments(date: String) -> Endpoint {
+        Endpoint(path: "admin/reports/payments/daily",
+                 queryItems: [URLQueryItem(name: "date", value: date)])
+    }
+
+    // MARK: - Admin: Expenses
+    static func getExpenses(year: Int? = nil, month: Int? = nil) -> Endpoint {
+        var items: [URLQueryItem] = []
+        if let y = year  { items.append(URLQueryItem(name: "year",  value: "\(y)")) }
+        if let m = month { items.append(URLQueryItem(name: "month", value: "\(m)")) }
+        return Endpoint(path: "admin/expenses", queryItems: items)
+    }
+    static func saveExpenses(_ req: SaveExpenseRequest) -> Endpoint {
+        Endpoint(path: "admin/expenses", method: .POST, body: encode(req))
+    }
+
+    // MARK: - Admin: Inbox
+    static let getInbox = Endpoint(path: "admin/inbox")
+    static func getInboxMessage(_ number: Int) -> Endpoint {
+        Endpoint(path: "admin/inbox/\(number)")
+    }
+    static func replyToMessage(_ number: Int, req: ReplyRequest) -> Endpoint {
+        Endpoint(path: "admin/inbox/\(number)/reply", method: .POST, body: encode(req))
+    }
+    static func deleteInboxMessage(_ number: Int) -> Endpoint {
+        Endpoint(path: "admin/inbox/\(number)", method: .DELETE)
+    }
+
+    // MARK: - Student payments
+    static let getMyPayments = Endpoint(path: "payments/my")
+
+    // MARK: - Gallery
+    static let getGallery = Endpoint(path: "gallery")
+    static func deleteGalleryPhoto(id: String) -> Endpoint {
+        Endpoint(path: "gallery/\(id)", method: .DELETE)
+    }
+
+    // MARK: - Admin: Import
+    static func importSingleStudent(_ req: ManualImportRequest) -> Endpoint {
+        Endpoint(path: "admin/students/import/single", method: .POST, body: encode(req))
+    }
+
+    // MARK: - ID Card
     static let downloadIdCard = Endpoint(path: "memberships/my/id-card")
 
     // MARK: - Helper

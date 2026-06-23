@@ -5,9 +5,9 @@ struct AdminStudentDetailView: View {
     let studentId: String
 
     @State private var showChangeSeat   = false
-    @State private var newSeat          = ""
     @State private var seatMapSeats:    [Seat] = []
     @State private var selectedNewSeat: String?
+    @State private var showPayments     = false
 
     private let baseURL = "https://targetzone.co.in"
 
@@ -22,7 +22,13 @@ struct AdminStudentDetailView: View {
                         VStack(spacing: 16) {
                             profileHeader(s)
                             membershipSection(s)
+                            if s.pendingAmount ?? 0 > 0 {
+                                pendingFeesSection(s)
+                            }
                             actionsSection(s)
+                            if showPayments {
+                                paymentHistorySection
+                            }
                         }
                         .padding(16)
                     }
@@ -45,7 +51,6 @@ struct AdminStudentDetailView: View {
     private func profileHeader(_ s: StudentDetail) -> some View {
         AppCard(accentColor: .amber) {
             VStack(spacing: 12) {
-                // Avatar
                 if let urlStr = s.photoUrl, let url = URL(string: baseURL + urlStr) {
                     AsyncImage(url: url) { img in img.resizable().scaledToFill() }
                     placeholder: { Color.navyLight }
@@ -95,9 +100,37 @@ struct AdminStudentDetailView: View {
         }
     }
 
+    private func pendingFeesSection(_ s: StudentDetail) -> some View {
+        AppCard(accentColor: .redAlert) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label("Pending Fees", systemImage: "exclamationmark.circle.fill")
+                        .font(.headlineSmall).foregroundColor(.redAlert)
+                    Spacer()
+                    Text("₹\(String(format: "%.0f", s.pendingAmount ?? 0))")
+                        .font(.headlineMedium).foregroundColor(.redAlert)
+                }
+                Text("Outstanding balance on cash membership")
+                    .font(.bodySmall).foregroundColor(.textSub)
+                Button {
+                    vm.clearPendingFees(userId: s.id)
+                } label: {
+                    HStack {
+                        Image(systemName: "checkmark.circle")
+                        Text("Mark as Cleared")
+                    }
+                    .font(.labelMedium).foregroundColor(.emerald)
+                    .frame(maxWidth: .infinity).padding(10)
+                    .background(Color.emeraldFaint)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.emerald.opacity(0.4)))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+            }
+        }
+    }
+
     private func actionsSection(_ s: StudentDetail) -> some View {
         VStack(spacing: 10) {
-            // Toggle status
             Button {
                 vm.toggleStudentStatus(id: s.id, active: !s.isActive)
             } label: {
@@ -113,9 +146,23 @@ struct AdminStudentDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
 
-            // Change seat (only if membership exists)
             if s.membershipId != nil {
                 OutlineButton("Change Seat") { showChangeSeat = true }
+            }
+
+            Button {
+                showPayments.toggle()
+                if showPayments { vm.loadStudentPayments(userId: s.id) }
+            } label: {
+                HStack {
+                    Image(systemName: "creditcard")
+                    Text(showPayments ? "Hide Payments" : "View Payments")
+                }
+                .font(.labelLarge).foregroundColor(.blueSoft)
+                .frame(maxWidth: .infinity).padding(14)
+                .background(Color.blueFaint)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.blueSoft.opacity(0.4)))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
 
             if let err = vm.error { ErrorBanner(message: err) }
@@ -125,6 +172,40 @@ struct AdminStudentDetailView: View {
                 }
                 .padding(12).background(Color.emeraldFaint)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+        }
+    }
+
+    private var paymentHistorySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Payment History").font(.headlineSmall).foregroundColor(.textPrimary)
+            if vm.studentPayments.isEmpty {
+                Text("No payments found").font(.bodySmall).foregroundColor(.textMuted)
+                    .frame(maxWidth: .infinity).padding(.vertical, 8)
+            } else {
+                ForEach(vm.studentPayments) { p in
+                    AppCard {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("₹\(String(format: "%.0f", p.amount))")
+                                    .font(.labelLarge).foregroundColor(.textPrimary)
+                                Spacer()
+                                StatusChip(status: p.status)
+                            }
+                            if let gw = p.paymentGateway {
+                                Text(gw).font(.labelSmall).foregroundColor(.textMuted)
+                            }
+                            if let ref = p.gatewayOrderId {
+                                Text("Ref: \(ref)").font(.bodySmall).foregroundColor(.textMuted)
+                                    .lineLimit(1)
+                            }
+                            if let paidAt = p.paidAt {
+                                Text(paidAt.prefix(16).description)
+                                    .font(.bodySmall).foregroundColor(.textSub)
+                            }
+                        }
+                    }
+                }
             }
         }
     }

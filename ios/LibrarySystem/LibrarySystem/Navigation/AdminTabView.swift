@@ -36,16 +36,32 @@ struct AdminTabView: View {
                 Color.navyDeep.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 12) {
-                        NavigationLink {
-                            AdminBroadcastView(vm: vm)
-                        } label: {
+                        NavigationLink { AdminBroadcastView(vm: vm) } label: {
                             moreActionRow(icon: "megaphone.fill", label: "Broadcast Message")
                         }
 
-                        NavigationLink {
-                            AdminFeedbackView(vm: vm)
-                        } label: {
+                        NavigationLink { AdminFeedbackView(vm: vm) } label: {
                             moreActionRow(icon: "text.bubble.fill", label: "Feedback & Complaints")
+                        }
+
+                        NavigationLink { AdminRevenueView(vm: vm) } label: {
+                            moreActionRow(icon: "chart.line.uptrend.xyaxis", label: "Revenue & Reports")
+                        }
+
+                        NavigationLink { AdminExpensesView(vm: vm) } label: {
+                            moreActionRow(icon: "list.bullet.rectangle", label: "Monthly Expenses")
+                        }
+
+                        NavigationLink { AdminInboxView(vm: vm) } label: {
+                            moreActionRow(icon: "tray.full.fill", label: "Inbox")
+                        }
+
+                        NavigationLink { AdminGalleryView() } label: {
+                            moreActionRow(icon: "photo.fill.on.rectangle.fill", label: "Photo Gallery")
+                        }
+
+                        NavigationLink { AdminImportView() } label: {
+                            moreActionRow(icon: "person.badge.plus", label: "Import Student")
                         }
 
                         Button { showCreateMembership = true } label: {

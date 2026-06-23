@@ -13,6 +13,10 @@ struct MembershipRepository {
         try await api.request(.getMembershipHistory, token: token)
     }
 
+    func getQueuedMembership() async -> Membership? {
+        try? await api.request(.getQueuedMembership, token: token)
+    }
+
     func getPlans() async throws -> [Plan] {
         try await api.request(.getPlans)
     }
@@ -37,6 +41,10 @@ struct MembershipRepository {
 
     func getMyFeedback() async throws -> [FeedbackItem] {
         try await api.request(.getMyFeedback, token: token)
+    }
+
+    func getMyPayments() async throws -> [StudentPayment] {
+        try await api.request(.getMyPayments, token: token)
     }
 
     func downloadIdCard() async throws -> Data {

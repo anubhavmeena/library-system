@@ -86,10 +86,40 @@ struct UpdateFeedbackRequest: Codable {
     let adminNotes: String?
 }
 
-struct CreateMembershipRequest: Codable {
-    let userId: String
+// Maps to backend CreateCashMembershipRequest
+struct CreateCashMembershipRequest: Codable {
+    let studentId: String
     let planId: String
     let seatNumber: String
     let shift: String
     let startDate: String
+    let paidAmount: Double?
+    let pendingAmount: Double?
+}
+
+struct SaveExpenseRequest: Codable {
+    let year: Int
+    let month: Int
+    let waterTankerQty: Int
+    let waterTankerPrice: Double
+    let electricityBill: Double
+    let internetBill: Double
+    let miscItems: [MiscItemRequest]
+}
+
+struct MiscItemRequest: Codable {
+    let description: String
+    let amount: Double
+}
+
+struct ReplyRequest: Codable {
+    let body: String
+}
+
+struct ManualImportRequest: Codable {
+    let name: String
+    let phone: String
+    let fees: String?
+    let date: String?
+    let seatNumber: String
 }

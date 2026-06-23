@@ -13,55 +13,9 @@ struct AdminBroadcastView: View {
                 Color.navyDeep.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 16) {
-                        // Warning card
-                        HStack(spacing: 10) {
-                            Image(systemName: "megaphone.fill").foregroundColor(.amber)
-                            Text("This message will be sent via WhatsApp to selected students.")
-                                .font(.bodySmall).foregroundColor(.textSub)
-                        }
-                        .padding(12)
-                        .background(Color.amberFaint)
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.amber.opacity(0.4)))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                        // Target group
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Send To").font(.labelMedium).foregroundColor(.textSub)
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach([("ALL","All Students"),("ACTIVE","Active Only"),("EXPIRING","Expiring Soon")], id: \.0) { g in
-                                        let selected = targetGroup == g.0
-                                        Button { targetGroup = g.0 } label: {
-                                            Text(g.1)
-                                                .font(.labelSmall)
-                                                .foregroundColor(selected ? .navyDeep : .textSub)
-                                                .padding(.horizontal, 12).padding(.vertical, 6)
-                                                .background(selected ? Color.amber : Color.cardBg)
-                                                .clipShape(Capsule())
-                                                .overlay(Capsule().stroke(selected ? Color.amber : Color.cardBorder))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Message input
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text("Message").font(.labelMedium).foregroundColor(.textSub)
-                                Spacer()
-                                Text("\(message.count)/\(maxChars)")
-                                    .font(.caption)
-                                    .foregroundColor(message.count > maxChars * 9 / 10 ? .redAlert : .textMuted)
-                            }
-                            TextEditor(text: $message)
-                                .font(.bodyMedium).foregroundColor(.textPrimary)
-                                .scrollContentBackground(.hidden).background(Color.cardBg)
-                                .frame(minHeight: 160).padding(10)
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cardBorder))
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .onChange(of: message) { if $0.count > maxChars { message = String($0.prefix(maxChars)) } }
-                        }
+                        warningCard
+                        targetGroupSection
+                        messageSection
 
                         if let err = vm.error { ErrorBanner(message: err) }
                         if let msg = vm.successMsg {
@@ -74,6 +28,10 @@ struct AdminBroadcastView: View {
                             vm.sendBroadcast(message: message, targetGroup: targetGroup)
                             message = ""
                         }
+
+                        if !vm.broadcastHistory.isEmpty {
+                            historySection
+                        }
                     }
                     .padding(16)
                 }
@@ -83,6 +41,82 @@ struct AdminBroadcastView: View {
             .toolbarBackground(Color.navyMid, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
+        }
+        .onAppear { vm.loadBroadcastHistory() }
+    }
+
+    private var warningCard: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "megaphone.fill").foregroundColor(.amber)
+            Text("This message will be sent via WhatsApp to selected students.")
+                .font(.bodySmall).foregroundColor(.textSub)
+        }
+        .padding(12)
+        .background(Color.amberFaint)
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.amber.opacity(0.4)))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var targetGroupSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Send To").font(.labelMedium).foregroundColor(.textSub)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach([("ALL","All Students"),("ACTIVE","Active Only"),("EXPIRING","Expiring Soon")], id: \.0) { g in
+                        let selected = targetGroup == g.0
+                        Button { targetGroup = g.0 } label: {
+                            Text(g.1)
+                                .font(.labelSmall)
+                                .foregroundColor(selected ? .navyDeep : .textSub)
+                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                .background(selected ? Color.amber : Color.cardBg)
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(selected ? Color.amber : Color.cardBorder))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var messageSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Message").font(.labelMedium).foregroundColor(.textSub)
+                Spacer()
+                Text("\(message.count)/\(maxChars)")
+                    .font(.caption)
+                    .foregroundColor(message.count > maxChars * 9 / 10 ? .redAlert : .textMuted)
+            }
+            TextEditor(text: $message)
+                .font(.bodyMedium).foregroundColor(.textPrimary)
+                .scrollContentBackground(.hidden).background(Color.cardBg)
+                .frame(minHeight: 160).padding(10)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cardBorder))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .onChange(of: message) { if $0.count > maxChars { message = String($0.prefix(maxChars)) } }
+        }
+    }
+
+    private var historySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Recent Broadcasts").font(.headlineSmall).foregroundColor(.textPrimary)
+            ForEach(vm.broadcastHistory) { item in
+                AppCard {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Label("\(item.recipientCount) recipients", systemImage: "person.2.fill")
+                                .font(.labelSmall).foregroundColor(.emerald)
+                            Spacer()
+                            Text(item.sentAt.prefix(10).description)
+                                .font(.bodySmall).foregroundColor(.textMuted)
+                        }
+                        Text(item.message)
+                            .font(.bodySmall).foregroundColor(.textSub)
+                            .lineLimit(3)
+                    }
+                }
+            }
         }
     }
 }
