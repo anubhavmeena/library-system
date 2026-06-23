@@ -3,6 +3,7 @@ package com.library.admin.service;
 import com.library.admin.dto.InboxMessageDto;
 import com.library.admin.dto.InboxSummaryDto;
 import jakarta.mail.*;
+import jakarta.mail.FetchProfile;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,8 +46,14 @@ public class MailboxService {
     public List<InboxSummaryDto> listMessages() {
         try (Store store = openStore()) {
             Folder inbox = store.getFolder("INBOX");
-            inbox.open(Folder.READ_WRITE);
+            inbox.open(Folder.READ_ONLY);
             Message[] messages = inbox.getMessages();
+            // Batch-fetch FLAGS + ENVELOPE in a single IMAP command so we always
+            // get the server's current flag state rather than a stale cached value.
+            FetchProfile fp = new FetchProfile();
+            fp.add(FetchProfile.Item.FLAGS);
+            fp.add(FetchProfile.Item.ENVELOPE);
+            inbox.fetch(messages, fp);
             List<InboxSummaryDto> result = new ArrayList<>();
             for (int i = messages.length - 1; i >= 0; i--) {
                 Message msg = messages[i];
