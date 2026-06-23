@@ -463,7 +463,7 @@
       "manageStudents": { "label": "Manage Students", "desc": "View and manage all students" },
       "seatMap":        { "label": "Seat Map",         "desc": "Live seat occupancy view" },
       "sendReminders":  { "label": "Send Reminders",   "desc": "Alert expiring members" },
-      "revenueReport":  { "label": "Revenue Report",   "desc": "Track payments & earnings" }
+      "revenueReport":  { "label": "Revenue Report",   "desc": "Day-wise revenue breakdown" }
     },
     "revenueModal": {
       "title": "Day-wise Revenue — This Month",

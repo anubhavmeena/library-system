@@ -121,8 +121,15 @@ export default function AdminRevenuePage() {
         return cell > today
     }
 
-    const yearOptions = []
-    for (let y = today.getFullYear() - 3; y <= today.getFullYear(); y++) yearOptions.push(y)
+    const isCurrentMonth  = year === today.getFullYear() && month === today.getMonth() + 1
+    const goToPrevMonth   = () => {
+        if (month === 1) { setYear(y => y - 1); setMonth(12) }
+        else setMonth(m => m - 1)
+    }
+    const goToNextMonth   = () => {
+        if (month === 12) { setYear(y => y + 1); setMonth(1) }
+        else setMonth(m => m + 1)
+    }
 
     return (
         <div>
@@ -133,22 +140,12 @@ export default function AdminRevenuePage() {
                     <p className="text-primary-400">{t('adminRevenue.subtitle')}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <select
-                        value={month}
-                        onChange={e => setMonth(Number(e.target.value))}
-                        className="input text-sm py-2 px-3"
-                    >
-                        {MONTHS.map((name, i) => (
-                            <option key={i+1} value={i+1}>{name}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={year}
-                        onChange={e => setYear(Number(e.target.value))}
-                        className="input text-sm py-2 px-3"
-                    >
-                        {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
+                    <div className="flex items-center gap-1">
+                        <button onClick={goToPrevMonth} className="btn-ghost border border-primary-700/40 px-3 py-2 rounded-xl text-sm">←</button>
+                        <span className="text-white font-semibold px-3 w-36 text-center">{MONTHS[month - 1]} {year}</span>
+                        <button onClick={goToNextMonth} disabled={isCurrentMonth}
+                            className="btn-ghost border border-primary-700/40 px-3 py-2 rounded-xl text-sm disabled:opacity-40 disabled:cursor-not-allowed">→</button>
+                    </div>
                     <button
                         onClick={() => fetchReport(year, month)}
                         className="btn-ghost border border-primary-700/40 text-sm px-4 py-2 rounded-xl"

@@ -60,7 +60,7 @@ export default function AdminDashboardPage() {
         { to: '/admin/students',  icon: '👥', key: 'manageStudents' },
         { to: '/admin/seats',     icon: '⊞',  key: 'seatMap' },
         { to: '/admin/reminders', icon: '🔔', key: 'sendReminders' },
-        { to: '/admin/reminders', icon: '📊', key: 'revenueReport' },
+        { to: '/admin/revenue',   icon: '📊', key: 'revenueReport' },
     ]
 
     return (
