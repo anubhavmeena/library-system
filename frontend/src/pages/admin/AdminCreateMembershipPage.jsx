@@ -32,7 +32,12 @@ const DATE_PICKER_POPPER_SX = {
     '& .MuiPickersYear-yearButton.Mui-selected': { backgroundColor: '#f59e0b', color: '#1a2a68' },
 }
 
-const ROWS = ['A', 'B', 'C', 'D']
+const ROWS          = ['A', 'B', 'C', 'D']
+const INACTIVE_SEATS = new Set(['B8', 'B18'])
+const L_TOP    = [13, 11, 9, 7, 5, 3, 1]
+const L_BOTTOM = [14, 12, 10, 8, 6, 4, 2]
+const R_TOP    = [15, 17, 19, 21, 23, 25, 27]
+const R_BOTTOM = [16, 18, 20, 22, 24, 26, 28]
 const TODAY = new Date().toISOString().split('T')[0]
 
 export default function AdminCreateMembershipPage() {
@@ -318,46 +323,76 @@ export default function AdminCreateMembershipPage() {
                             <div className="shimmer h-64 rounded-xl" />
                         ) : seatData ? (
                             <div className="overflow-x-auto">
-                                <div className="flex justify-center mb-4">
-                                    <div className="px-8 py-2 rounded-lg bg-primary-700/40 border border-primary-600/30 text-primary-400 text-xs tracking-widest uppercase">
-                                        {t('adminNewMembership.step3.entrance')}
+                                <div className="min-w-[640px]">
+                                    <div className="flex gap-2 mb-1">
+                                        <div className="w-5 flex-shrink-0" />
+                                        <div className="invisible pointer-events-none flex gap-1">
+                                            {L_TOP.map(n => <div key={n} className="w-8 h-0" />)}
+                                        </div>
+                                        <div className="w-6 flex-shrink-0 flex justify-center">
+                                            <span className="text-primary-400 text-[10px] tracking-widest uppercase">ENTRY</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-7">
+                                        {ROWS.map(row => {
+                                            const rowSeats = seatData.seatsByRow?.[row] || []
+                                            const find = sn => rowSeats.find(s => s.seatNumber === sn)
+                                            const renderSeat = n => {
+                                                const sn = `${row}${n}`
+                                                if (INACTIVE_SEATS.has(sn)) {
+                                                    return <div key={sn} className="w-8 h-8 rounded-lg bg-primary-900/50 border border-primary-800/20" title="Blocked" />
+                                                }
+                                                const s = find(sn)
+                                                if (!s) return <div key={sn} className="w-8 h-8 rounded-lg bg-primary-900/40 border border-primary-800/20" />
+                                                const isSelected = selectedSeat?.seatNumber === s.seatNumber
+                                                return (
+                                                    <button key={sn}
+                                                        disabled={s.isBooked}
+                                                        onClick={() => setSelectedSeat(s)}
+                                                        title={s.isBooked ? `${sn} (${t('adminNewMembership.step3.booked')})` : sn}
+                                                        className={`w-8 h-8 rounded-lg text-xs font-medium border transition-all
+                                                            ${isSelected
+                                                                ? 'seat-selected bg-amber-400/30 border-amber-400/70 text-amber-300'
+                                                                : s.isBooked
+                                                                    ? 'bg-red-500/30 border-red-500/50 text-red-400 cursor-not-allowed opacity-60'
+                                                                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 cursor-pointer'}`}>
+                                                        {sn.substring(1)}
+                                                    </button>
+                                                )
+                                            }
+                                            return (
+                                                <div key={row} className="flex gap-2">
+                                                    <span className="text-primary-400 font-mono text-sm w-5 text-center self-start pt-2">{row}</span>
+                                                    <div>
+                                                        <div className="flex gap-1">{L_TOP.map(renderSeat)}</div>
+                                                        <div className="border-b border-primary-700/40 my-1" />
+                                                        <div className="flex gap-1">{L_BOTTOM.map(renderSeat)}</div>
+                                                    </div>
+                                                    <div className="w-6 flex-shrink-0 relative">
+                                                        <div className="absolute inset-y-0 left-1/2 w-px bg-primary-700/30 -translate-x-1/2" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex gap-1">{R_TOP.map(renderSeat)}</div>
+                                                        <div className="border-b border-primary-700/40 my-1" />
+                                                        <div className="flex gap-1">{R_BOTTOM.map(renderSeat)}</div>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                    <div className="flex gap-2 mt-3 text-[10px] tracking-widest uppercase text-primary-600">
+                                        <div className="w-5 flex-shrink-0" />
+                                        <div className="flex gap-1">
+                                            <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40">EXIT</div>
+                                            <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40">RO / PANTRY</div>
+                                            <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40">WASHROOM</div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="space-y-3 min-w-[560px]">
-                                    {ROWS.map(row => {
-                                        const seats = seatData.seatsByRow?.[row] || []
-                                        const half  = Math.ceil(seats.length / 2)
-                                        const left  = seats.slice(0, half)
-                                        const right = seats.slice(half)
-                                        const renderSeat = s => (
-                                            <button
-                                                key={s.seatNumber}
-                                                disabled={s.isBooked}
-                                                onClick={() => setSelectedSeat(s)}
-                                                title={s.isBooked ? `${s.seatNumber} (${t('adminNewMembership.step3.booked')})` : s.seatNumber}
-                                                className={`w-8 h-8 rounded-lg text-xs font-medium border transition-all
-                                                    ${selectedSeat?.seatNumber === s.seatNumber
-                                                        ? 'seat-selected bg-amber-400/30 border-amber-400/70 text-amber-300'
-                                                        : s.isBooked
-                                                            ? 'bg-red-500/30 border-red-500/50 text-red-400 cursor-not-allowed opacity-60'
-                                                            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 cursor-pointer'}`}>
-                                                {s.seatNumber.substring(1)}
-                                            </button>
-                                        )
-                                        return (
-                                            <div key={row} className="flex items-center gap-3">
-                                                <span className="text-primary-400 font-mono text-sm w-5 text-center">{row}</span>
-                                                <div className="flex gap-1">{left.map(renderSeat)}</div>
-                                                <div className="w-6 flex-shrink-0 flex justify-center"><div className="w-px h-6 bg-primary-700/50" /></div>
-                                                <div className="flex gap-1">{right.map(renderSeat)}</div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
                                 <div className="flex gap-6 mt-4 text-xs text-primary-400">
-                                    <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/10 border border-emerald-500/30" />{t('adminNewMembership.step3.available')}</div>
-                                    <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-500/30 border border-red-500/50" />{t('adminNewMembership.step3.booked')}</div>
-                                    <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-amber-400/30 border border-amber-400/70" />{t('adminNewMembership.step3.selected')}</div>
+                                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-emerald-500/10 border border-emerald-500/30" />{t('adminNewMembership.step3.available')}</div>
+                                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-red-500/30 border border-red-500/50" />{t('adminNewMembership.step3.booked')}</div>
+                                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-amber-400/30 border border-amber-400/70" />{t('adminNewMembership.step3.selected')}</div>
                                 </div>
                                 {selectedSeat && (
                                     <p className="mt-3 text-sm text-amber-400 font-medium">
