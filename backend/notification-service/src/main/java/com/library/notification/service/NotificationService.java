@@ -150,6 +150,10 @@ public class NotificationService {
             sendSeatExpiredAlert(event);
             return;
         }
+        if ("PENDING_FEE_REMINDER".equals(event.getEventType())) {
+            sendPendingFeeReminder(event);
+            return;
+        }
 
         // Escalate urgency label based on days remaining
         String urgency = event.getDaysRemaining() <= 3 ? "⚠️ URGENT" : "⏰ Reminder";
@@ -190,6 +194,37 @@ public class NotificationService {
 
         log.info("Renewal reminder sent for user: {} ({} days left)",
                 event.getUserId(), event.getDaysRemaining());
+    }
+
+    // ── Pending Fee Reminder ──────────────────────────────────────────────────
+
+    private void sendPendingFeeReminder(RenewalReminderEvent event) {
+        String amount = event.getPendingAmount() != null
+                ? "₹" + event.getPendingAmount().stripTrailingZeros().toPlainString()
+                : "an outstanding amount";
+
+        String msg = String.format(
+                "💰 Pending Fee Reminder\n\n"                                         +
+                        "Hi %s,\n\n"                                                         +
+                        "You have a pending library fee of *%s*.\n\n"                        +
+                        "Please visit the library or contact us to clear your dues.\n\n"     +
+                        "📚 Target Zone Library Team",
+                event.getUserName(), amount
+        );
+
+        if (hasValue(event.getUserMobile())) {
+            whatsAppService.send(event.getUserMobile(), msg, event.getUserId(), "PENDING_FEE_REMINDER");
+        }
+        if (hasValue(event.getUserEmail())) {
+            emailService.sendText(
+                    event.getUserEmail(),
+                    "Pending Fee Reminder — " + amount,
+                    msg,
+                    adminEmail,
+                    event.getUserId(), "PENDING_FEE_REMINDER"
+            );
+        }
+        log.info("Pending fee reminder sent for user: {} ({})", event.getUserId(), amount);
     }
 
     // ── Broadcast (admin → all active members) ────────────────────────────────

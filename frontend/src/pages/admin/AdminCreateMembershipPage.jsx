@@ -65,6 +65,8 @@ export default function AdminCreateMembershipPage() {
     const [selectedSeat, setSelectedSeat] = useState(null)
 
     // step 4
+    const [paidAmount,    setPaidAmount]    = useState('')
+    const [pendingAmount, setPendingAmount] = useState('0')
     const [cashConfirmed, setCashConfirmed] = useState(false)
     const [submitting, setSubmitting]       = useState(false)
 
@@ -81,6 +83,10 @@ export default function AdminCreateMembershipPage() {
             .catch(() => toast.error(t('adminNewMembership.toasts.loadPlansFailed')))
             .finally(() => setPlansLoading(false))
     }, [])
+
+    useEffect(() => {
+        if (selectedPlan) { setPaidAmount(String(selectedPlan.price)); setPendingAmount('0') }
+    }, [selectedPlan])
 
     useEffect(() => {
         if (step !== 3 || !selectedPlan) return
@@ -114,11 +120,13 @@ export default function AdminCreateMembershipPage() {
         setSubmitting(true)
         try {
             await api.post('/admin/memberships/cash', {
-                studentId:  selectedStudent.id,
-                planId:     selectedPlan.id,
-                shift:      resolvedShift,
-                seatNumber: selectedSeat.seatNumber,
+                studentId:     selectedStudent.id,
+                planId:        selectedPlan.id,
+                shift:         resolvedShift,
+                seatNumber:    selectedSeat.seatNumber,
                 startDate,
+                paidAmount:    parseFloat(paidAmount)    || selectedPlan.price,
+                pendingAmount: parseFloat(pendingAmount) || 0,
             })
             toast.success(t('adminNewMembership.toasts.created'))
             navigate('/admin/students')
@@ -437,6 +445,38 @@ export default function AdminCreateMembershipPage() {
                                     <span className="text-white font-medium">{v}</span>
                                 </div>
                             ))}
+
+                            {/* Paid / Pending amount — editable */}
+                            <div className="flex justify-between items-center py-2 border-b border-primary-700/20 text-sm gap-4">
+                                <span className="text-primary-400 shrink-0">Paid Amount</span>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-primary-400">₹</span>
+                                    <input
+                                        type="number" min="0" step="1"
+                                        className="input text-sm py-0.5 w-28 text-right"
+                                        value={paidAmount}
+                                        onChange={e => {
+                                            setPaidAmount(e.target.value)
+                                            const paid    = parseFloat(e.target.value) || 0
+                                            const pending = Math.max(0, (selectedPlan?.price || 0) - paid)
+                                            setPendingAmount(String(pending))
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center py-2 border-b border-primary-700/20 text-sm gap-4">
+                                <span className="text-primary-400 shrink-0">Pending Amount</span>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-primary-400">₹</span>
+                                    <input
+                                        type="number" min="0" step="1"
+                                        className={`input text-sm py-0.5 w-28 text-right ${parseFloat(pendingAmount) > 0 ? 'text-red-400' : ''}`}
+                                        value={pendingAmount}
+                                        onChange={e => setPendingAmount(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
                             <div className="flex justify-between py-2 text-sm">
                                 <span className="text-primary-400">{t('adminNewMembership.summary.payment')}</span>
                                 <span className="px-3 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-medium">

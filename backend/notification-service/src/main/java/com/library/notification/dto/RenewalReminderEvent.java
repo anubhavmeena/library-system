@@ -10,4 +10,5 @@ public class RenewalReminderEvent {
     private String expiryDate;
     private int    daysRemaining;
     private String eventType;
+    private java.math.BigDecimal pendingAmount;
 }

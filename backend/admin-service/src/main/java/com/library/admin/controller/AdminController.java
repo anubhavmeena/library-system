@@ -79,6 +79,17 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success("Student deleted successfully"));
     }
 
+    @GetMapping("/students/pending-fees")
+    public ResponseEntity<ApiResponse<List<StudentDto>>> getStudentsWithPendingFees() {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getStudentsWithPendingFees()));
+    }
+
+    @PatchMapping("/students/{userId}/clear-pending-fees")
+    public ResponseEntity<ApiResponse<String>> clearPendingFees(@PathVariable String userId) {
+        adminService.clearPendingFees(userId);
+        return ResponseEntity.ok(ApiResponse.success("Pending fees cleared"));
+    }
+
     @PostMapping("/students/import/single")
     public ResponseEntity<ApiResponse<String>> importSingleStudent(
             @Valid @RequestBody ManualStudentImportRequest req) {
@@ -118,6 +129,14 @@ public class AdminController {
         int count = adminService.sendBulkReminders(request.getUserIds());
         return ResponseEntity.ok(ApiResponse.success(
                 "Reminders queued for " + count + " students"));
+    }
+
+    @PostMapping("/reminders/pending-fees")
+    public ResponseEntity<ApiResponse<String>> sendPendingFeeReminders(
+            @RequestBody SendReminderRequest request) {
+        int count = adminService.sendPendingFeeReminders(request.getUserIds());
+        return ResponseEntity.ok(ApiResponse.success(
+                "Pending fee reminders queued for " + count + " students"));
     }
 
     // ── Broadcast Notification ────────────────────────────────────────────────

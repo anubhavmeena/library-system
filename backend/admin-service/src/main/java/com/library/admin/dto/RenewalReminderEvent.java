@@ -12,5 +12,6 @@ public class RenewalReminderEvent {
     private String seatNumber;
     private String expiryDate;     // yyyy-MM-dd
     private int    daysRemaining;
-    private String eventType;      // RENEWAL_REMINDER
+    private String eventType;      // RENEWAL_REMINDER | PENDING_FEE_REMINDER
+    private java.math.BigDecimal pendingAmount; // non-null for PENDING_FEE_REMINDER
 }

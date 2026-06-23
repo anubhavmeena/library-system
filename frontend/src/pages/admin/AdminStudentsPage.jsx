@@ -37,6 +37,7 @@ export default function AdminStudentsPage() {
     const [deleting, setDeleting]         = useState(false)
 
     const [openDropdown, setOpenDropdown] = useState(null)
+    const [clearingFees, setClearingFees] = useState(null)
 
     const [studentPayments, setStudentPayments]               = useState([])
     const [studentPaymentsLoading, setStudentPaymentsLoading] = useState(false)
@@ -102,6 +103,16 @@ export default function AdminStudentsPage() {
         } finally {
             setDeleting(false)
         }
+    }
+
+    const handleClearPendingFees = async (student) => {
+        setClearingFees(student.id)
+        try {
+            await api.patch(`/admin/students/${student.id}/clear-pending-fees`)
+            toast.success(`Pending fees cleared for ${student.name}`)
+            fetchStudents()
+        } catch { toast.error('Failed to clear pending fees') }
+        finally { setClearingFees(null) }
     }
 
     const shiftLabel = (shift) => {
@@ -172,6 +183,7 @@ export default function AdminStudentsPage() {
         { l: t('adminStudents.table.seatShift'),  col: 'seatNumber' },
         { l: t('adminStudents.table.membership'), col: 'endDate' },
         { l: t('adminStudents.table.payment'),    col: 'paymentMode' },
+        { l: 'Pending',                           col: 'pendingAmount' },
         { l: t('adminStudents.table.status'),     col: 'isActive' },
         { l: t('adminStudents.table.actions'),    col: null },
     ]
@@ -281,6 +293,13 @@ export default function AdminStudentsPage() {
                                         )}
                                     </td>
                                     <td className="p-4">
+                                        {s.pendingAmount > 0 ? (
+                                            <span className="text-red-400 font-semibold text-sm">₹{s.pendingAmount}</span>
+                                        ) : (
+                                            <span className="text-primary-600 text-xs">—</span>
+                                        )}
+                                    </td>
+                                    <td className="p-4">
                                         <span className={`badge border text-xs px-2 py-1 rounded-full
                         ${s.isActive ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
                                             {s.isActive ? t('adminStudents.active') : t('adminStudents.inactive')}
@@ -316,6 +335,14 @@ export default function AdminStudentsPage() {
                                                             className={`w-full text-left text-xs px-3 py-2.5 transition-colors border-b border-primary-700/40 hover:bg-primary-700/60 ${s.isActive ? 'text-red-400' : 'text-emerald-400'}`}>
                                                             {s.isActive ? t('adminStudents.disable') : t('adminStudents.enable')}
                                                         </button>
+                                                        {s.pendingAmount > 0 && (
+                                                            <button
+                                                                disabled={clearingFees === s.id}
+                                                                onClick={() => { handleClearPendingFees(s); setOpenDropdown(null) }}
+                                                                className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40 disabled:opacity-50">
+                                                                {clearingFees === s.id ? 'Clearing…' : 'Clear Pending Fees'}
+                                                            </button>
+                                                        )}
                                                         <button
                                                             onClick={() => { setDeleteTarget(s); setOpenDropdown(null) }}
                                                             className="w-full text-left text-xs px-3 py-2.5 text-red-400 hover:bg-primary-700/60 transition-colors">

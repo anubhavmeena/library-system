@@ -99,11 +99,16 @@ public class AdminMembershipService {
         membership = membershipRepository.save(membership);
 
         // 9. Save Payment (SUCCESS, CASH)
+        BigDecimal planPrice     = plan.getPrice();
+        BigDecimal paidAmount    = (req.getPaidAmount()    != null) ? req.getPaidAmount()    : planPrice;
+        BigDecimal pendingAmount = (req.getPendingAmount() != null) ? req.getPendingAmount() : java.math.BigDecimal.ZERO;
+
         String cashOrderId = "cash_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         Payment payment = Payment.builder()
                 .membershipId(membership.getId())
                 .userId(student.getId())
-                .amount(plan.getPrice())
+                .amount(paidAmount)
+                .pendingAmount(pendingAmount)
                 .paymentGateway("CASH")
                 .gatewayOrderId(cashOrderId)
                 .status(Payment.Status.SUCCESS)

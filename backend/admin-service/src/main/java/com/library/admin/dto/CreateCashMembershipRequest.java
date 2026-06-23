@@ -2,6 +2,7 @@ package com.library.admin.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import java.math.BigDecimal;
 
 @Data
 public class CreateCashMembershipRequest {
@@ -18,4 +19,7 @@ public class CreateCashMembershipRequest {
     private String seatNumber;   // e.g. "B14"
 
     private String startDate;    // yyyy-MM-dd; defaults to today if null/blank
+
+    private BigDecimal paidAmount;    // null → defaults to plan price
+    private BigDecimal pendingAmount; // null → defaults to 0
 }

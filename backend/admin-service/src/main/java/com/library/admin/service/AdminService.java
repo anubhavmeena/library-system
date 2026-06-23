@@ -39,13 +39,14 @@ public class AdminService {
     private EntityManager entityManager;
 
     private static final Map<String, String> SORT_COLUMNS = Map.of(
-        "name",        "u.name",
-        "mobile",      "u.mobile",
-        "seatNumber",  "m.seat_number",
-        "endDate",     "m.end_date",
-        "paymentMode", "p.payment_gateway",
-        "isActive",    "u.is_active",
-        "createdAt",   "u.created_at"
+        "name",          "u.name",
+        "mobile",        "u.mobile",
+        "seatNumber",    "m.seat_number",
+        "endDate",       "m.end_date",
+        "paymentMode",   "p.payment_gateway",
+        "isActive",      "u.is_active",
+        "createdAt",     "u.created_at",
+        "pendingAmount", "p.pending_amount"
     );
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
@@ -140,9 +141,10 @@ public class AdminService {
                     .orElse(null);
             StudentDto dto = StudentDto.fromEntities(user, mem);
             if (mem != null) {
-                dto.setPaymentMode(paymentRepository.findFirstByMembershipId(mem.getId())
-                        .map(p -> "CASH".equalsIgnoreCase(p.getPaymentGateway()) ? "CASH" : "ONLINE")
-                        .orElse(null));
+                paymentRepository.findFirstByMembershipId(mem.getId()).ifPresent(p -> {
+                    dto.setPaymentMode("CASH".equalsIgnoreCase(p.getPaymentGateway()) ? "CASH" : "ONLINE");
+                    dto.setPendingAmount(p.getPendingAmount() != null ? p.getPendingAmount() : BigDecimal.ZERO);
+                });
             }
             return dto;
         }).collect(Collectors.toList());
@@ -161,9 +163,10 @@ public class AdminService {
 
         StudentDto dto = StudentDto.fromEntities(user, mem);
         if (mem != null) {
-            dto.setPaymentMode(paymentRepository.findFirstByMembershipId(mem.getId())
-                    .map(p -> "CASH".equalsIgnoreCase(p.getPaymentGateway()) ? "CASH" : "ONLINE")
-                    .orElse(null));
+            paymentRepository.findFirstByMembershipId(mem.getId()).ifPresent(p -> {
+                dto.setPaymentMode("CASH".equalsIgnoreCase(p.getPaymentGateway()) ? "CASH" : "ONLINE");
+                dto.setPendingAmount(p.getPendingAmount() != null ? p.getPendingAmount() : BigDecimal.ZERO);
+            });
         }
         return dto;
     }
@@ -333,6 +336,76 @@ public class AdminService {
         }
 
         log.info("sendBulkReminders: {} reminders published to Kafka", sent);
+        return sent;
+    }
+
+    // ── Pending Fees ──────────────────────────────────────────────────────────
+
+    public List<StudentDto> getStudentsWithPendingFees() {
+        List<Payment> pending = paymentRepository.findByPendingAmountGreaterThan(BigDecimal.ZERO);
+        Set<UUID> membershipIds = pending.stream().map(Payment::getMembershipId).collect(Collectors.toSet());
+        if (membershipIds.isEmpty()) return List.of();
+
+        List<Membership> memberships = membershipRepository.findAllById(membershipIds).stream()
+                .filter(m -> m.getStatus() == Membership.Status.ACTIVE)
+                .collect(Collectors.toList());
+
+        Map<UUID, Payment> payByMem = pending.stream()
+                .collect(Collectors.toMap(Payment::getMembershipId, p -> p, (a, b) -> a));
+
+        Set<UUID> userIds = memberships.stream().map(Membership::getUserId).collect(Collectors.toSet());
+        Map<UUID, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        return memberships.stream()
+                .filter(m -> userMap.containsKey(m.getUserId()))
+                .map(m -> {
+                    StudentDto dto = StudentDto.fromEntities(userMap.get(m.getUserId()), m);
+                    Payment pay = payByMem.get(m.getId());
+                    if (pay != null) {
+                        dto.setPaymentMode("CASH".equalsIgnoreCase(pay.getPaymentGateway()) ? "CASH" : "ONLINE");
+                        dto.setPendingAmount(pay.getPendingAmount());
+                    }
+                    return dto;
+                })
+                .sorted(Comparator.comparing(StudentDto::getPendingAmount,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void clearPendingFees(String userId) {
+        paymentRepository.clearPendingAmountByUserId(UUID.fromString(userId));
+        log.info("Pending fees cleared for user {}", userId);
+    }
+
+    @Transactional
+    public int sendPendingFeeReminders(List<String> userIds) {
+        List<StudentDto> targets = userIds == null || userIds.isEmpty()
+                ? getStudentsWithPendingFees()
+                : userIds.stream()
+                        .map(id -> {
+                            try { return getStudentDetails(id); } catch (Exception e) { return null; }
+                        })
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+
+        int sent = 0;
+        for (StudentDto s : targets) {
+            if (s.getPendingAmount() == null || s.getPendingAmount().compareTo(BigDecimal.ZERO) <= 0) continue;
+            RenewalReminderEvent event = RenewalReminderEvent.builder()
+                    .userId(s.getId())
+                    .userName(s.getName())
+                    .userMobile(s.getMobile())
+                    .userEmail(s.getEmail())
+                    .seatNumber(s.getSeatNumber())
+                    .pendingAmount(s.getPendingAmount())
+                    .eventType("PENDING_FEE_REMINDER")
+                    .build();
+            kafkaTemplate.send("renewal-reminder", s.getId(), event);
+            sent++;
+            log.info("Pending fee reminder queued for user '{}' (₹{})", s.getName(), s.getPendingAmount());
+        }
         return sent;
     }
 

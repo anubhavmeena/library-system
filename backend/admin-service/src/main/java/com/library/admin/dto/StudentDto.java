@@ -3,6 +3,7 @@ package com.library.admin.dto;
 import com.library.admin.entity.Membership;
 import com.library.admin.entity.User;
 import lombok.*;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 
@@ -32,7 +33,8 @@ public class StudentDto {
     private String membershipEnd;
     private String membershipStatus;  // ACTIVE | EXPIRED | PENDING | CANCELLED
     private int    daysRemaining;
-    private String paymentMode;       // CASH | ONLINE | null
+    private String     paymentMode;    // CASH | ONLINE | null
+    private BigDecimal pendingAmount; // outstanding cash balance, 0 if fully paid
 
     public static StudentDto fromEntities(User user, Membership membership) {
         StudentDtoBuilder b = StudentDto.builder()
