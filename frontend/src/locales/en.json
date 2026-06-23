@@ -167,7 +167,8 @@
         "expenses": "Expenses",
         "revenue": "Revenue",
         "importStudents": "Import Students",
-        "gallery": "Photo Gallery"
+        "gallery": "Photo Gallery",
+        "inbox": "Inbox"
       },
       "logout": "Logout"
     }
@@ -884,5 +885,23 @@
     "subtitle": "Library moments",
     "loadFailed": "Failed to load gallery",
     "empty": "No photos have been added yet"
+  },
+  "adminMailbox": {
+    "title": "Inbox",
+    "subtitle": "admin@targetzone.co.in",
+    "refresh": "Refresh",
+    "empty": "No messages",
+    "from": "From",
+    "subject": "Subject",
+    "date": "Date",
+    "delete": "Delete",
+    "reply": "Reply",
+    "sendReply": "Send Reply",
+    "cancel": "Cancel",
+    "replyPlaceholder": "Write your reply…",
+    "replySent": "Reply sent",
+    "loadFailed": "Failed to load mailbox",
+    "deleteFailed": "Failed to delete message",
+    "replyFailed": "Failed to send reply"
   }
 }

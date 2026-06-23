@@ -1,17 +1,25 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { logout } from '../store/slices/authSlice'
 import LanguageSwitcher from '../components/LanguageSwitcher'
+import api from '../services/api'
 
 export default function AdminLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false)
+    const [inboxUnread, setInboxUnread] = useState(0)
     const { user } = useSelector(s => s.auth)
     const dispatch = useDispatch()
     const navigate = useNavigate()
     const { t } = useTranslation()
     const handleLogout = () => { dispatch(logout()); navigate('/admin/login') }
+
+    useEffect(() => {
+        api.get('/admin/inbox')
+            .then(res => setInboxUnread((res.data.data ?? []).filter(m => !m.isRead).length))
+            .catch(() => {})
+    }, [])
 
     const navItems = [
         { to: '/admin/dashboard', icon: '▦', label: t('admin.sidebar.nav.dashboard') },
@@ -25,6 +33,7 @@ export default function AdminLayout() {
         { to: '/admin/revenue',         icon: '◑', label: t('admin.sidebar.nav.revenue') },
         { to: '/admin/import',          icon: '⬆', label: t('admin.sidebar.nav.importStudents') },
         { to: '/admin/gallery',         icon: '◼', label: t('admin.sidebar.nav.gallery') },
+        { to: '/admin/inbox',           icon: '✉', label: t('admin.sidebar.nav.inbox'), badge: inboxUnread },
     ]
 
     return (
@@ -46,10 +55,16 @@ export default function AdminLayout() {
                     </div>
                 </div>
                 <nav className="flex-1 px-3 py-4 space-y-1">
-                    {navItems.map(({ to, icon, label }) => (
+                    {navItems.map(({ to, icon, label, badge }) => (
                         <NavLink key={to} to={to} onClick={() => setSidebarOpen(false)}
                                  className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-primary-300 hover:text-white hover:bg-primary-800/60'}`}>
-                            <span className="text-base">{icon}</span>{label}
+                            <span className="text-base">{icon}</span>
+                            <span className="flex-1">{label}</span>
+                            {badge > 0 && (
+                                <span className="bg-amber-500 text-primary-900 text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center leading-tight">
+                                    {badge}
+                                </span>
+                            )}
                         </NavLink>
                     ))}
                 </nav>

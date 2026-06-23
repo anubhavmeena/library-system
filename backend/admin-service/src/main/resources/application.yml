@@ -25,6 +25,25 @@ spring:
       properties:
         spring.json.add.type.headers: false
 
+spring:
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:25}
+    properties:
+      mail.smtp.auth: false
+      mail.smtp.starttls.enable: false
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+
+admin:
+  inbox:
+    imap-host:  ${IMAP_HOST:localhost}
+    imap-port:  ${IMAP_PORT:143}
+    username:   ${ADMIN_IMAP_USER:admin}
+    password:   ${ADMIN_IMAP_PASS:}
+    use-ssl:    ${IMAP_SSL:false}
+    from-email: ${ADMIN_EMAIL:admin@targetzone.co.in}
+
 app:
   reminder:
     days-before: 7

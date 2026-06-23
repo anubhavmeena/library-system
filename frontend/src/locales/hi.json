@@ -167,7 +167,8 @@
         "expenses": "खर्च",
         "revenue": "राजस्व",
         "importStudents": "छात्र आयात",
-        "gallery": "फोटो गैलरी"
+        "gallery": "फोटो गैलरी",
+        "inbox": "इनबॉक्स"
       },
       "logout": "लॉग आउट"
     }
@@ -867,5 +868,23 @@
     "subtitle": "लाइब्रेरी के पल",
     "loadFailed": "गैलरी लोड करने में विफल",
     "empty": "अभी कोई फोटो नहीं जोड़ी गई"
+  },
+  "adminMailbox": {
+    "title": "इनबॉक्स",
+    "subtitle": "admin@targetzone.co.in",
+    "refresh": "रिफ्रेश",
+    "empty": "कोई संदेश नहीं",
+    "from": "से",
+    "subject": "विषय",
+    "date": "दिनांक",
+    "delete": "हटाएं",
+    "reply": "उत्तर दें",
+    "sendReply": "उत्तर भेजें",
+    "cancel": "रद्द करें",
+    "replyPlaceholder": "अपना उत्तर लिखें…",
+    "replySent": "उत्तर भेजा गया",
+    "loadFailed": "इनबॉक्स लोड नहीं हो सका",
+    "deleteFailed": "संदेश हटाने में विफल",
+    "replyFailed": "उत्तर भेजने में विफल"
   }
 }
