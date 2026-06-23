@@ -36,6 +36,8 @@ export default function AdminStudentsPage() {
     const [deleteTarget, setDeleteTarget] = useState(null)
     const [deleting, setDeleting]         = useState(false)
 
+    const [openDropdown, setOpenDropdown] = useState(null)
+
     const [studentPayments, setStudentPayments]               = useState([])
     const [studentPaymentsLoading, setStudentPaymentsLoading] = useState(false)
 
@@ -60,6 +62,12 @@ export default function AdminStudentsPage() {
     }, [search])
 
     useEffect(() => { fetchStudents() }, [page, status, membershipFilter, debouncedSearch, pageSize, sortBy, sortDir])
+
+    useEffect(() => {
+        const close = () => setOpenDropdown(null)
+        document.addEventListener('click', close)
+        return () => document.removeEventListener('click', close)
+    }, [])
 
     useEffect(() => {
         if (!detail) { setStudentPayments([]); return }
@@ -279,7 +287,7 @@ export default function AdminStudentsPage() {
                                         </span>
                                     </td>
                                     <td className="p-4">
-                                        <div className="flex flex-wrap gap-2">
+                                        <div className="flex items-center gap-2">
                                             <button onClick={() => {
                                                 setDetail(s)
                                                 setEditMode(false)
@@ -288,21 +296,34 @@ export default function AdminStudentsPage() {
                                                     className="text-xs px-3 py-1.5 rounded-lg bg-primary-700/50 text-primary-300 hover:text-white border border-primary-700/40 transition-all">
                                                 {t('adminStudents.view')}
                                             </button>
-                                            {s.membershipId && (
-                                                <button onClick={() => openChangeSeat(s)}
-                                                        className="text-xs px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 transition-all">
-                                                    {t('adminStudents.changeSeat')}
+                                            <div className="relative" onClick={e => e.stopPropagation()}>
+                                                <button
+                                                    onClick={() => setOpenDropdown(openDropdown === s.id ? null : s.id)}
+                                                    className="text-xs px-3 py-1.5 rounded-lg bg-primary-700/50 text-primary-300 hover:text-white border border-primary-700/40 transition-all flex items-center gap-1">
+                                                    Actions <span className="text-[10px]">▾</span>
                                                 </button>
-                                            )}
-                                            <button onClick={() => handleToggleStatus(s)}
-                                                    className={`text-xs px-3 py-1.5 rounded-lg border transition-all
-                            ${s.isActive ? 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'}`}>
-                                                {s.isActive ? t('adminStudents.disable') : t('adminStudents.enable')}
-                                            </button>
-                                            <button onClick={() => setDeleteTarget(s)}
-                                                    className="text-xs px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 border border-red-600/40 hover:bg-red-600/30 transition-all">
-                                                Delete
-                                            </button>
+                                                {openDropdown === s.id && (
+                                                    <div className="absolute right-0 mt-1 w-36 bg-primary-800 border border-primary-700/60 rounded-xl shadow-xl z-20 overflow-hidden">
+                                                        {s.membershipId && (
+                                                            <button
+                                                                onClick={() => { openChangeSeat(s); setOpenDropdown(null) }}
+                                                                className="w-full text-left text-xs px-3 py-2.5 text-indigo-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40">
+                                                                {t('adminStudents.changeSeat')}
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => { handleToggleStatus(s); setOpenDropdown(null) }}
+                                                            className={`w-full text-left text-xs px-3 py-2.5 transition-colors border-b border-primary-700/40 hover:bg-primary-700/60 ${s.isActive ? 'text-red-400' : 'text-emerald-400'}`}>
+                                                            {s.isActive ? t('adminStudents.disable') : t('adminStudents.enable')}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { setDeleteTarget(s); setOpenDropdown(null) }}
+                                                            className="w-full text-left text-xs px-3 py-2.5 text-red-400 hover:bg-primary-700/60 transition-colors">
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>
