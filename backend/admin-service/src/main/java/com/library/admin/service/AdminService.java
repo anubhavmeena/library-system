@@ -338,6 +338,17 @@ public class AdminService {
 
     // ── Revenue Report ────────────────────────────────────────────────────────
 
+    public List<PaymentAmountBreakdownDto> getPaymentAmountBreakdown(String fromStr, String toStr) {
+        LocalDateTime from = LocalDate.parse(fromStr).atStartOfDay();
+        LocalDateTime to   = LocalDate.parse(toStr).atTime(23, 59, 59);
+        return paymentRepository.countByAmountForPeriod(from, to).stream()
+                .map(row -> PaymentAmountBreakdownDto.builder()
+                        .amount((BigDecimal) row[0])
+                        .count(((Number) row[1]).longValue())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
     public List<DailyPaymentDto> getPaymentsByDate(String dateStr) {
         LocalDate date = LocalDate.parse(dateStr);
         List<Payment> payments = paymentRepository.findSuccessfulPaymentsForDay(

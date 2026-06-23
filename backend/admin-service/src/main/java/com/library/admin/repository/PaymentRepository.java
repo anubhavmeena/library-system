@@ -49,6 +49,21 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
             @Param("to")   LocalDateTime to
     );
 
+    // Successful payments grouped by amount for a period — used for pie chart breakdown
+    @Query("""
+        SELECT p.amount, COUNT(p)
+        FROM Payment p
+        WHERE p.status = 'SUCCESS'
+          AND p.createdAt >= :from
+          AND p.createdAt <= :to
+        GROUP BY p.amount
+        ORDER BY COUNT(p) DESC
+        """)
+    List<Object[]> countByAmountForPeriod(
+            @Param("from") LocalDateTime from,
+            @Param("to")   LocalDateTime to
+    );
+
     // All successful payments within a single day — used for student drill-down
     @Query("""
         SELECT p FROM Payment p

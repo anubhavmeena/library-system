@@ -857,6 +857,7 @@
     "noPayments": "No payments on this day",
     "export": "Export Excel",
     "total": "Total",
+    "paymentBreakdown": "Payment Distribution by Amount",
     "loadFailed": "Failed to load revenue data",
     "paymentLoadFailed": "Failed to load payment details",
     "legend": {

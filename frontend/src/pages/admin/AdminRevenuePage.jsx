@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as XLSX from 'xlsx'
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+
+const PIE_COLORS = ['#f59e0b','#10b981','#3b82f6','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316']
 
 const MONTHS = [
     'January','February','March','April','May','June',
@@ -38,6 +41,7 @@ export default function AdminRevenuePage() {
     const [selectedDay, setSelectedDay] = useState(null)
     const [dayPayments, setDayPayments] = useState({})
     const [dayLoading, setDayLoading]   = useState(false)
+    const [breakdown, setBreakdown]     = useState([])
 
     const currency = (n) => `₹${Number(n ?? 0).toLocaleString('en-IN')}`
     const fmt      = (n) => (n ?? 0).toLocaleString('en-IN')
@@ -64,8 +68,12 @@ export default function AdminRevenuePage() {
         const from = `${y}-${String(m).padStart(2, '0')}-01`
         const to   = `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`
         try {
-            const res = await api.get(`/admin/reports/revenue?from=${from}&to=${to}`)
+            const [res, res2] = await Promise.all([
+                api.get(`/admin/reports/revenue?from=${from}&to=${to}`),
+                api.get(`/admin/reports/payments/breakdown?from=${from}&to=${to}`),
+            ])
             setReport(res.data.data)
+            setBreakdown(res2.data.data ?? [])
         } catch {
             toast.error(t('adminRevenue.loadFailed'))
         } finally {
@@ -298,6 +306,46 @@ export default function AdminRevenuePage() {
                             })}
                         </tbody>
                     </table>
+                )}
+            </div>
+
+            {/* Payment Distribution Pie Chart */}
+            <p className="text-primary-500 text-xs uppercase tracking-widest mb-3">{t('adminRevenue.paymentBreakdown')}</p>
+            <div className="card p-6 mb-8">
+                {breakdown.length === 0 ? (
+                    <p className="text-primary-500 text-sm text-center py-8">{t('adminRevenue.noData')}</p>
+                ) : (
+                    <ResponsiveContainer width="100%" height={320}>
+                        <PieChart>
+                            <Pie
+                                data={breakdown}
+                                dataKey="count"
+                                nameKey="amount"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={110}
+                                label={({ amount, count }) =>
+                                    `₹${Number(amount).toLocaleString('en-IN')} (${count})`
+                                }
+                                labelLine={true}
+                            >
+                                {breakdown.map((_, i) => (
+                                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                                ))}
+                            </Pie>
+                            <Tooltip
+                                formatter={(value) => [`${value} students`]}
+                                labelFormatter={(label) => `₹${Number(label).toLocaleString('en-IN')}`}
+                                contentStyle={{ background: '#0d1b4b', border: '1px solid #1e3a5f', borderRadius: 12 }}
+                                labelStyle={{ color: '#94a3b8' }}
+                                itemStyle={{ color: '#f8fafc' }}
+                            />
+                            <Legend
+                                formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`}
+                                wrapperStyle={{ color: '#94a3b8', fontSize: 12 }}
+                            />
+                        </PieChart>
+                    </ResponsiveContainer>
                 )}
             </div>
         </div>
