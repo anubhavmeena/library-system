@@ -115,7 +115,7 @@ public class AuthService {
         if (request.getEmail() != null && !request.getEmail().isBlank()) {
             user.setEmail(request.getEmail());
         }
-        if (request.getDateOfBirth() != null) {
+        if (request.getDateOfBirth() != null && !request.getDateOfBirth().isBlank()) {
             user.setDateOfBirth(LocalDate.parse(request.getDateOfBirth()));
         }
 

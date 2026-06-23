@@ -58,7 +58,9 @@ export default function ProfilePage() {
     const handleSave = async () => {
         setSaving(true)
         try {
-            const r = await api.patch('/users/me', form)
+            const payload = { ...form }
+            if (!payload.dateOfBirth) delete payload.dateOfBirth
+            const r = await api.patch('/users/me', payload)
             setProfile(r.data.data)
             setEditing(false)
             toast.success(t('profile.toasts.profileUpdated'))
