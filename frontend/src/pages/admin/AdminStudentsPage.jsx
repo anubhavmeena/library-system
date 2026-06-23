@@ -281,7 +281,9 @@ export default function AdminStudentsPage() {
                                                     {t('adminStudents.daysLeft', { count: s.daysRemaining })}
                                                 </p>
                                             </>
-                                        ) : <span className="text-primary-600 text-xs">{t('adminStudents.noPlan')}</span>}
+                                        ) : s.membershipStatus === 'EXPIRED'
+                                            ? <span className="text-red-400 text-xs font-semibold">{t('adminStudents.expired')}</span>
+                                            : <span className="text-primary-600 text-xs">{t('adminStudents.noPlan')}</span>}
                                     </td>
                                     <td className="p-4">
                                         {s.paymentMode === 'CASH' ? (

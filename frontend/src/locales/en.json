@@ -507,6 +507,7 @@
     "expires": "Expires",
     "daysLeft": "{{count}}d left",
     "noPlan": "No plan",
+    "expired": "Expired",
     "active": "Enabled",
     "inactive": "Disabled",
     "cash": "Cash",

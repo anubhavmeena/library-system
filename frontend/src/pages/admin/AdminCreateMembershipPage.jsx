@@ -208,8 +208,14 @@ export default function AdminCreateMembershipPage() {
                                     <span className={`text-xs px-2 py-1 rounded-full border flex-shrink-0
                                         ${s.membershipEnd
                                             ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                                            : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}>
-                                        {s.membershipEnd ? t('adminNewMembership.hasMembership') : t('adminNewMembership.noPlan')}
+                                            : s.membershipStatus === 'EXPIRED'
+                                                ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                                                : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}>
+                                        {s.membershipEnd
+                                            ? t('adminNewMembership.hasMembership')
+                                            : s.membershipStatus === 'EXPIRED'
+                                                ? t('adminStudents.expired')
+                                                : t('adminNewMembership.noPlan')}
                                     </span>
                                 </button>
                             ))}

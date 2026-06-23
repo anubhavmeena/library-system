@@ -142,6 +142,8 @@ public class AdminService {
                     dto.setPaymentMode("CASH".equalsIgnoreCase(p.getPaymentGateway()) ? "CASH" : "ONLINE");
                     dto.setPendingAmount(p.getPendingAmount() != null ? p.getPendingAmount() : BigDecimal.ZERO);
                 });
+            } else if (membershipRepository.existsByUserId(user.getId())) {
+                dto.setMembershipStatus("EXPIRED");
             }
             return dto;
         }).collect(Collectors.toList());
@@ -164,6 +166,8 @@ public class AdminService {
                 dto.setPaymentMode("CASH".equalsIgnoreCase(p.getPaymentGateway()) ? "CASH" : "ONLINE");
                 dto.setPendingAmount(p.getPendingAmount() != null ? p.getPendingAmount() : BigDecimal.ZERO);
             });
+        } else if (membershipRepository.existsByUserId(user.getId())) {
+            dto.setMembershipStatus("EXPIRED");
         }
         return dto;
     }

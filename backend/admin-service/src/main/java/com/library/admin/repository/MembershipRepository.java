@@ -62,6 +62,8 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     @Query("SELECT COUNT(m) FROM Membership m WHERE m.status = 'EXPIRED'")
     long countExpiredMemberships();
 
+    boolean existsByUserId(UUID userId);
+
     @Modifying
     @Transactional
     @Query("DELETE FROM Membership m WHERE m.userId = :userId")

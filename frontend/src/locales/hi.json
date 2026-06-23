@@ -507,6 +507,7 @@
     "expires": "समाप्ति",
     "daysLeft": "{{count}}दि बचे",
     "noPlan": "कोई प्लान नहीं",
+    "expired": "समाप्त",
     "active": "सक्षम",
     "inactive": "अक्षम",
     "cash": "नकद",
