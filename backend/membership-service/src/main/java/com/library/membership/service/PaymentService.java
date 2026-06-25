@@ -354,7 +354,7 @@ public class PaymentService {
         HttpHeaders headers = new HttpHeaders();
         headers.set("x-client-id", cashfreeAppId);
         headers.set("x-client-secret", cashfreeSecretKey);
-        headers.set("x-api-version", "2023-08-01");
+        headers.set("x-api-version", "2025-01-01");
         headers.setContentType(MediaType.APPLICATION_JSON);
         return headers;
     }

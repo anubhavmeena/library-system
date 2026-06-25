@@ -16,7 +16,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cashfree.pg.api.CFPaymentGatewayService
+import com.cashfree.pg.core.api.CFSession
+import com.cashfree.pg.core.api.webcheckout.CFWebCheckoutPayment
+import com.cashfree.pg.core.api.webcheckout.CFWebCheckoutTheme
 import com.razorpay.Checkout
+import com.targetzone.library.BuildConfig
 import com.targetzone.library.MainActivity
 import com.targetzone.library.data.model.Plan
 import com.targetzone.library.data.model.PaymentOrder
@@ -41,14 +46,25 @@ fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit) {
     val context = LocalContext.current
     val activity = context as? MainActivity
 
-    // Listen to Razorpay live order events from the ViewModel
+    // Route to the correct payment gateway based on backend response
     LaunchedEffect(Unit) {
         vm.paymentOrder.collect { order ->
-            openRazorpay(activity, order) { success, paymentId, orderId, signature, error ->
-                if (success && paymentId != null && orderId != null && signature != null) {
-                    vm.verifyPayment(orderId, paymentId, signature, order.membershipId)
-                } else {
-                    vm.clearError()
+            if (order.gateway == "CASHFREE" && order.paymentSessionId != null) {
+                openCashfree(activity, order) { success, orderId, err ->
+                    if (success && orderId != null) {
+                        // Cashfree verifies server-side; gatewayPaymentId = orderId, no signature
+                        vm.verifyPayment(orderId, orderId, "", order.membershipId)
+                    } else {
+                        vm.setError(err ?: "Payment failed")
+                    }
+                }
+            } else {
+                openRazorpay(activity, order) { success, paymentId, orderId, signature, error ->
+                    if (success && paymentId != null && orderId != null && signature != null) {
+                        vm.verifyPayment(orderId, paymentId, signature, order.membershipId)
+                    } else {
+                        vm.clearError()
+                    }
                 }
             }
         }
@@ -134,7 +150,7 @@ fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit) {
                 Text("Select Your Seat", style = MaterialTheme.typography.titleMedium)
                 Text("${seats.count { !it.isBooked }} seats available", color = TextSub, fontSize = 12.sp)
                 Spacer(Modifier.height(16.dp))
-                if (isLoading) Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Amber) }
+                if (isLoading || seats.isEmpty()) Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Amber) }
                 else SeatGrid(seats = seats, selectedSeatNumber = selectedSeat?.seatNumber, onSeatClick = { vm.selectSeat(it) })
             }
             if (selectedSeat != null) {
@@ -245,6 +261,35 @@ private fun openRazorpay(
         put("theme", JSONObject().put("color", "#F59E0B"))
     }
     checkout.open(activity, options)
+}
+
+private fun openCashfree(
+    activity: MainActivity?,
+    order: PaymentOrder,
+    callback: (success: Boolean, orderId: String?, error: String?) -> Unit
+) {
+    activity ?: return
+    activity.onCashfreeResult = callback
+    try {
+        val env = if (BuildConfig.CASHFREE_ENV == "production")
+            CFSession.Environment.PRODUCTION else CFSession.Environment.SANDBOX
+        val cfSession = CFSession.CFSessionBuilder()
+            .setEnvironment(env)
+            .setPaymentSessionID(order.paymentSessionId!!)
+            .setOrderId(order.orderId)
+            .build()
+        val cfTheme = CFWebCheckoutTheme.CFWebCheckoutThemeBuilder()
+            .setNavigationBarBackgroundColor("#0D1B4B")
+            .setNavigationBarTextColor("#FFFFFF")
+            .build()
+        val cfPayment = CFWebCheckoutPayment.CFWebCheckoutPaymentBuilder()
+            .setSession(cfSession)
+            .setCFWebCheckoutUITheme(cfTheme)
+            .build()
+        CFPaymentGatewayService.getInstance().doPayment(activity, cfPayment)
+    } catch (e: Exception) {
+        callback(false, null, e.message ?: "Failed to open payment")
+    }
 }
 
 @Composable
