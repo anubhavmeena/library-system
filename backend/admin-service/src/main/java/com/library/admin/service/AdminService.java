@@ -516,8 +516,17 @@ public class AdminService {
         user.setGender(req.getGender()   != null && !req.getGender().isBlank()  ? req.getGender().trim()   : null);
         user.setDateOfBirth(req.getDateOfBirth() != null && !req.getDateOfBirth().isBlank()
                 ? LocalDate.parse(req.getDateOfBirth()) : null);
-        if (req.getJoinedAt() != null && !req.getJoinedAt().isBlank())
-            user.setCreatedAt(LocalDate.parse(req.getJoinedAt()).atStartOfDay());
+        if (req.getJoinedAt() != null && !req.getJoinedAt().isBlank()) {
+            LocalDate newStart = LocalDate.parse(req.getJoinedAt());
+            user.setCreatedAt(newStart.atStartOfDay());
+            membershipRepository.findByUserIdAndStatus(user.getId(), Membership.Status.ACTIVE)
+                .filter(m -> !m.getEndDate().isBefore(LocalDate.now()))
+                .ifPresent(m -> planRepository.findById(m.getPlanId()).ifPresent(plan -> {
+                    m.setStartDate(newStart);
+                    m.setEndDate(newStart.plusDays(plan.getDurationDays()));
+                    membershipRepository.save(m);
+                }));
+        }
         userRepository.save(user);
         return getStudentDetails(userId);
     }

@@ -167,11 +167,12 @@ fun AdminStudentDetailScreen(
 
         // ── Payment History ───────────────────────────────────────────────────
         val studentPayments by vm.studentPayments.collectAsState()
+        val successPayments = studentPayments.filter { it.status == "SUCCESS" }
         LaunchedEffect(studentId) { vm.loadStudentPayments(s.id) }
-        if (studentPayments.isNotEmpty()) {
+        if (successPayments.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             SectionHeader("Payment History")
-            studentPayments.forEach { p ->
+            successPayments.forEach { p ->
                 AppCard(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {

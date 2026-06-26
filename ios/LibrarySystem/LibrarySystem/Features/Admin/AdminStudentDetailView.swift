@@ -189,14 +189,18 @@ struct AdminStudentDetailView: View {
         }
     }
 
+    private var successPayments: [PaymentHistoryItem] {
+        vm.studentPayments.filter { $0.status == "SUCCESS" }
+    }
+
     private var paymentHistorySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Payment History").font(.headlineSmall).foregroundColor(.textPrimary)
-            if vm.studentPayments.isEmpty {
+            if successPayments.isEmpty {
                 Text("No payments found").font(.bodySmall).foregroundColor(.textMuted)
                     .frame(maxWidth: .infinity).padding(.vertical, 8)
             } else {
-                ForEach(vm.studentPayments) { p in
+                ForEach(successPayments) { p in
                     AppCard {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {

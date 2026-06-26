@@ -690,11 +690,11 @@ export default function AdminStudentsPage() {
                             <h4 className="text-white font-semibold text-sm mb-3">Payment History</h4>
                             {studentPaymentsLoading ? (
                                 <div className="shimmer h-16 rounded-xl" />
-                            ) : studentPayments.length === 0 ? (
+                            ) : studentPayments.filter(p => p.status === 'SUCCESS').length === 0 ? (
                                 <p className="text-primary-500 text-xs text-center py-3">No payments found.</p>
                             ) : (
                                 <div className="space-y-2">
-                                    {studentPayments.map(p => {
+                                    {studentPayments.filter(p => p.status === 'SUCCESS').map(p => {
                                         const isCash = p.paymentGateway === 'CASH'
                                         return (
                                             <div key={p.id} className="rounded-lg bg-primary-800/40 border border-primary-700/30 px-3 py-2.5 text-xs">
