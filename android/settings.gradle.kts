@@ -11,7 +11,7 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven("https://jitpack.io")
-        maven("https://maven.cashfree.com/release")
+        maven("https://maven.cashfree.com/release") { content { includeGroup("com.cashfree.pg") } }
     }
 }
 

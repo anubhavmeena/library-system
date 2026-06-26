@@ -99,7 +99,7 @@ fun AdminSeatsScreen(vm: AdminViewModel) {
 
         Spacer(Modifier.height(16.dp))
         AppCard(Modifier.fillMaxWidth()) {
-            if (isLoading) {
+            if (isLoading || seats.isEmpty()) {
                 Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Amber)
                 }

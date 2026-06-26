@@ -55,5 +55,6 @@ dependencies {
     implementation(libs.cashfree.pg)
     implementation(libs.androidx.splashscreen)
     implementation(libs.androidx.appcompat)
+    implementation(libs.ucrop)
     debugImplementation(libs.androidx.ui.tooling)
 }

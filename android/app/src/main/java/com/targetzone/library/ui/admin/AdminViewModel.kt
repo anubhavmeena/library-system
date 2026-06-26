@@ -116,6 +116,7 @@ class AdminViewModel(
 
     fun loadAdminSeats(shift: String, date: String? = null) = viewModelScope.launch {
         isLoading.value = true
+        adminSeats.value = emptyList()
         adminRepo.getAdminSeatMap(shift, date)
             .onSuccess { adminSeats.value = it }
             .onFailure { error.value = it.message }

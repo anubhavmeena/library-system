@@ -238,4 +238,76 @@ class ExpiryReminderSchedulerTest {
         assertThat(mem.isReminderSent()).isFalse(); // not modified
         verify(membershipRepository, never()).save(any());
     }
+
+    // ── markExpiredAndNotifyAdmin ─────────────────────────────────────────────
+
+    @Test
+    void markExpiredAndNotifyAdmin_noExpiredMemberships_returnsEarly() {
+        when(membershipRepository.findExpiredActive(any())).thenReturn(List.of());
+
+        scheduler.markExpiredAndNotifyAdmin();
+
+        verify(kafkaTemplate, never()).send(any(), any(), any());
+        verify(membershipRepository, never()).save(any());
+    }
+
+    @Test
+    void markExpiredAndNotifyAdmin_expiredMembership_markedExpiredAndKafkaSent() {
+        UUID uid = UUID.randomUUID();
+        Membership mem = membership(uid, -1); // expired yesterday
+        User u = user(uid);
+
+        when(membershipRepository.findExpiredActive(any())).thenReturn(List.of(mem));
+        when(userRepository.findAllById(anyIterable())).thenReturn(List.of(u));
+        when(membershipRepository.findQueuedByUserId(uid)).thenReturn(Optional.empty());
+
+        scheduler.markExpiredAndNotifyAdmin();
+
+        ArgumentCaptor<Membership> memCaptor = ArgumentCaptor.forClass(Membership.class);
+        verify(membershipRepository, atLeastOnce()).save(memCaptor.capture());
+        assertThat(memCaptor.getAllValues()).anyMatch(m -> m.getStatus() == Membership.Status.EXPIRED);
+        verify(kafkaTemplate).send(eq("renewal-reminder"), eq(uid.toString()), any(RenewalReminderEvent.class));
+    }
+
+    @Test
+    void markExpiredAndNotifyAdmin_kafkaEvent_hasSeatExpiredTypeAndZeroDays() {
+        UUID uid = UUID.randomUUID();
+        Membership mem = membership(uid, -1);
+        User u = user(uid);
+
+        when(membershipRepository.findExpiredActive(any())).thenReturn(List.of(mem));
+        when(userRepository.findAllById(anyIterable())).thenReturn(List.of(u));
+        when(membershipRepository.findQueuedByUserId(uid)).thenReturn(Optional.empty());
+
+        scheduler.markExpiredAndNotifyAdmin();
+
+        ArgumentCaptor<RenewalReminderEvent> captor = ArgumentCaptor.forClass(RenewalReminderEvent.class);
+        verify(kafkaTemplate).send(eq("renewal-reminder"), eq(uid.toString()), captor.capture());
+        RenewalReminderEvent event = captor.getValue();
+        assertThat(event.getEventType()).isEqualTo("SEAT_EXPIRED");
+        assertThat(event.getDaysRemaining()).isEqualTo(0);
+        assertThat(event.getSeatNumber()).isEqualTo("B7");
+        assertThat(event.getUserName()).isEqualTo("Bob");
+    }
+
+    @Test
+    void markExpiredAndNotifyAdmin_queuedPlanExists_getsActivated() {
+        UUID uid = UUID.randomUUID();
+        Membership expired = membership(uid, -1);
+        Membership queued  = membership(uid, 30);
+        queued.setStatus(Membership.Status.QUEUED);
+        User u = user(uid);
+
+        when(membershipRepository.findExpiredActive(any())).thenReturn(List.of(expired));
+        when(userRepository.findAllById(anyIterable())).thenReturn(List.of(u));
+        when(membershipRepository.findQueuedByUserId(uid)).thenReturn(Optional.of(queued));
+
+        scheduler.markExpiredAndNotifyAdmin();
+
+        ArgumentCaptor<Membership> captor = ArgumentCaptor.forClass(Membership.class);
+        verify(membershipRepository, times(2)).save(captor.capture());
+        List<Membership> saved = captor.getAllValues();
+        assertThat(saved).anyMatch(m -> m.getStatus() == Membership.Status.EXPIRED);
+        assertThat(saved).anyMatch(m -> m.getStatus() == Membership.Status.ACTIVE);
+    }
 }

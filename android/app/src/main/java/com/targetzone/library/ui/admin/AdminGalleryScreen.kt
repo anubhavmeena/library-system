@@ -161,7 +161,7 @@ fun AdminGalleryScreen(vm: AdminViewModel) {
             FloatingActionButton(
                 onClick = { uploadDialog = true },
                 containerColor = Amber,
-                contentColor = NavyDark
+                contentColor = NavyDeep
             ) { Icon(Icons.Default.Add, "Upload Photo") }
         }
     }
@@ -196,7 +196,7 @@ fun AdminGalleryScreen(vm: AdminViewModel) {
                         Button(
                             onClick = { pickImage.launch("image/*") },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = NavyDark)
+                            colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = NavyDeep)
                         ) { Text("Pick Image") }
                     }
                 }

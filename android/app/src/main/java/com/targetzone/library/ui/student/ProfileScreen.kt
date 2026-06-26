@@ -1,5 +1,6 @@
 package com.targetzone.library.ui.student
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -33,14 +34,17 @@ import com.targetzone.library.data.model.UpdateProfileRequest
 import com.targetzone.library.ui.components.AppCard
 import com.targetzone.library.ui.components.AppTextField
 import com.targetzone.library.ui.theme.*
+import com.yalantis.ucrop.UCrop
 import java.io.File
 
 @Composable
 fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
     val profile   by vm.profile.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
+    val error     by vm.error.collectAsState()
     val context   = LocalContext.current
-    var editing   by remember { mutableStateOf(false) }
+    var editing       by remember { mutableStateOf(false) }
+    var pendingCropFile by remember { mutableStateOf<File?>(null) }
 
     var name       by remember(profile) { mutableStateOf(profile?.name ?: "") }
     var fatherName by remember(profile) { mutableStateOf(profile?.fatherName ?: "") }
@@ -50,10 +54,32 @@ fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
 
     LaunchedEffect(Unit) { vm.loadProfile() }
 
+    // Step 2: receive UCrop result → upload cropped file directly
+    val cropLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        when (result.resultCode) {
+            Activity.RESULT_OK -> {
+                pendingCropFile?.takeIf { it.exists() && it.length() > 0 }?.let { vm.uploadPhoto(it) }
+                pendingCropFile = null
+            }
+            UCrop.RESULT_ERROR -> {
+                val msg = result.data?.let { UCrop.getError(it)?.message } ?: "Crop failed"
+                vm.setError(msg)
+                pendingCropFile = null
+            }
+        }
+    }
+
+    // Step 1: pick image from gallery, then hand off to UCrop
     val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
-            val file = uriToFile(context, it) ?: return@let
-            vm.uploadPhoto(file)
+            val destFile = File(context.cacheDir, "cropped_${System.currentTimeMillis()}.jpg")
+            pendingCropFile = destFile
+            // Uri.fromFile is safe here: UCropActivity runs in the same process
+            val uCropIntent = UCrop.of(it, Uri.fromFile(destFile))
+                .withAspectRatio(1f, 1f)
+                .withMaxResultSize(512, 512)
+                .getIntent(context)
+            cropLauncher.launch(uCropIntent)
         }
     }
 
@@ -101,7 +127,8 @@ fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
                 }
             }
             Box(
-                Modifier.size(28.dp).clip(CircleShape).background(Amber).align(Alignment.BottomEnd).clickable { photoLauncher.launch("image/*") },
+                Modifier.size(28.dp).clip(CircleShape).background(Amber).align(Alignment.BottomEnd)
+                    .clickable { photoLauncher.launch("image/*") },
                 contentAlignment = Alignment.Center
             ) { Icon(Icons.Default.CameraAlt, null, tint = NavyDeep, modifier = Modifier.size(14.dp)) }
         }
@@ -109,6 +136,13 @@ fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
         Spacer(Modifier.height(8.dp))
         Text(profile?.name ?: "", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 18.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
         Text(profile?.mobile ?: "", color = TextSub, fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+        error?.let {
+            Spacer(Modifier.height(8.dp))
+            Card(colors = CardDefaults.cardColors(containerColor = RedFaint), modifier = Modifier.fillMaxWidth()) {
+                Text(it, color = RedAlert, modifier = Modifier.padding(12.dp), fontSize = 13.sp)
+            }
+            vm.clearError()
+        }
         Spacer(Modifier.height(24.dp))
 
         AppCard(Modifier.fillMaxWidth()) {

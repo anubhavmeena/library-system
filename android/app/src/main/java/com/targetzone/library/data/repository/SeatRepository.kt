@@ -9,7 +9,14 @@ class SeatRepository {
 
     suspend fun getAvailability(shift: String, date: String? = null): Result<List<Seat>> = runCatching {
         val res = api.getSeatAvailability(shift = shift, date = date)
-        res.body()?.data ?: emptyList()
+        res.body()?.data?.seats?.map { item ->
+            Seat(
+                id = item.id,
+                seatNumber = item.seatNumber,
+                row = item.rowLabel,
+                isBooked = item.isBooked
+            )
+        } ?: emptyList()
     }
 
     suspend fun bookSeat(req: BookSeatRequest): Result<Unit> = runCatching {

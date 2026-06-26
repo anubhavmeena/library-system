@@ -18,8 +18,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cashfree.pg.api.CFPaymentGatewayService
 import com.cashfree.pg.core.api.CFSession
-import com.cashfree.pg.core.api.webcheckout.CFWebCheckoutPayment
-import com.cashfree.pg.core.api.webcheckout.CFWebCheckoutTheme
+import com.cashfree.pg.core.api.CFTheme
+import com.cashfree.pg.ui.api.CFDropCheckoutPayment
 import com.razorpay.Checkout
 import com.targetzone.library.BuildConfig
 import com.targetzone.library.MainActivity
@@ -278,13 +278,18 @@ private fun openCashfree(
             .setPaymentSessionID(order.paymentSessionId!!)
             .setOrderId(order.orderId)
             .build()
-        val cfTheme = CFWebCheckoutTheme.CFWebCheckoutThemeBuilder()
+        val cfTheme = CFTheme.CFThemeBuilder()
+            .setPrimaryTextColor("#FFFFFF")
+            .setSecondaryTextColor("#AAAAAA")
+            .setBackgroundColor("#0D1B4B")
             .setNavigationBarBackgroundColor("#0D1B4B")
             .setNavigationBarTextColor("#FFFFFF")
+            .setButtonBackgroundColor("#F59E0B")
+            .setButtonTextColor("#000000")
             .build()
-        val cfPayment = CFWebCheckoutPayment.CFWebCheckoutPaymentBuilder()
+        val cfPayment = CFDropCheckoutPayment.CFDropCheckoutPaymentBuilder()
             .setSession(cfSession)
-            .setCFWebCheckoutUITheme(cfTheme)
+            .setCFNativeCheckoutUITheme(cfTheme)
             .build()
         CFPaymentGatewayService.getInstance().doPayment(activity, cfPayment)
     } catch (e: Exception) {

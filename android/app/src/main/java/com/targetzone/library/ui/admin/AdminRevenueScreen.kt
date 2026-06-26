@@ -32,7 +32,7 @@ fun AdminRevenueScreen(vm: AdminViewModel) {
 
     val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     val cal = remember { Calendar.getInstance() }
-    var fromDate by remember { mutableStateOf(sdf.format(Date(cal.apply { set(Calendar.DAY_OF_MONTH, 1) }.time))) }
+    var fromDate by remember { mutableStateOf(sdf.format(cal.apply { set(Calendar.DAY_OF_MONTH, 1) }.time)) }
     var toDate   by remember { mutableStateOf(sdf.format(Date())) }
 
     var drillDate by remember { mutableStateOf<String?>(null) }
