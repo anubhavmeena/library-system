@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
-const EMPTY_FORM = { name: '', phone: '', fees: '', date: '', seatNumber: '' }
+const EMPTY_FORM = { name: '', phone: '' }
 
 export default function AdminImportPage() {
     const { t } = useTranslation()
@@ -66,11 +66,8 @@ export default function AdminImportPage() {
         setSubmitting(true)
         try {
             await api.post('/admin/students/import/single', {
-                name:       form.name.trim(),
-                phone:      form.phone.trim(),
-                fees:       form.fees.trim() || null,
-                date:       form.date || null,
-                seatNumber: form.seatNumber.trim().toUpperCase(),
+                name:  form.name.trim(),
+                phone: form.phone.trim(),
             })
             toast.success(t('adminImport.manual.success'))
             setForm(EMPTY_FORM)
@@ -234,36 +231,6 @@ export default function AdminImportPage() {
                                 value={form.phone}
                                 onChange={e => field('phone', e.target.value.replace(/[^0-9]/g, ''))}
                                 maxLength={10}
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="label">{t('adminImport.manual.fees')}</label>
-                            <input
-                                className="input w-full"
-                                type="number"
-                                min="0"
-                                placeholder={t('adminImport.manual.feesPlaceholder')}
-                                value={form.fees}
-                                onChange={e => field('fees', e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <label className="label">{t('adminImport.manual.date')}</label>
-                            <input
-                                className="input w-full"
-                                type="date"
-                                value={form.date}
-                                onChange={e => field('date', e.target.value)}
-                            />
-                        </div>
-                        <div className="sm:col-span-2">
-                            <label className="label">{t('adminImport.manual.seat')} *</label>
-                            <input
-                                className="input w-full sm:w-48"
-                                placeholder={t('adminImport.manual.seatPlaceholder')}
-                                value={form.seatNumber}
-                                onChange={e => field('seatNumber', e.target.value.toUpperCase())}
                                 required
                             />
                         </div>

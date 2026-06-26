@@ -173,6 +173,8 @@ public class AdminService {
             });
         } else if (membershipRepository.existsByUserId(user.getId())) {
             dto.setMembershipStatus("EXPIRED");
+            membershipRepository.findFirstByUserIdOrderByEndDateDesc(user.getId())
+                    .ifPresent(last -> dto.setMembershipEnd(last.getEndDate().toString()));
         }
         return dto;
     }

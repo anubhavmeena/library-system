@@ -51,6 +51,8 @@ export default function AdminCreateMembershipPage() {
     const [studentsLoading, setStudentsLoading] = useState(true)
     const [search, setSearch]                 = useState('')
     const [selectedStudent, setSelectedStudent] = useState(null)
+    const [bookingType, setBookingType]       = useState(null)  // null | 'renewal' | 'new'
+    const [renewalLoading, setRenewalLoading] = useState(false)
 
     // step 2
     const [plans, setPlans]             = useState([])
@@ -115,6 +117,21 @@ export default function AdminCreateMembershipPage() {
 
     const canGoStep3 = selectedPlan && startDate &&
         (selectedPlan.planType === 'FULL_DAY' || selectedShift)
+
+    const handleSelectRenewal = async () => {
+        setRenewalLoading(true)
+        try {
+            const res = await api.get(`/admin/students/${selectedStudent.id}`)
+            const detail = res.data.data
+            setStartDate(detail.membershipEnd || TODAY)
+            setBookingType('renewal')
+            setStep(2)
+        } catch {
+            toast.error('Failed to load membership details')
+        } finally {
+            setRenewalLoading(false)
+        }
+    }
 
     const handleSubmit = async () => {
         setSubmitting(true)
@@ -196,8 +213,20 @@ export default function AdminCreateMembershipPage() {
                             {filteredStudents.map(s => (
                                 <button
                                     key={s.id}
-                                    onClick={() => { setSelectedStudent(s); setStep(2) }}
-                                    className="w-full flex items-center gap-4 p-4 rounded-xl border border-primary-700/30 hover:border-red-500/40 hover:bg-red-500/5 transition-all text-left">
+                                    onClick={() => {
+                                        if (s.membershipStatus === 'EXPIRED') {
+                                            setSelectedStudent(s)
+                                            setBookingType(null)
+                                        } else {
+                                            setSelectedStudent(s)
+                                            setBookingType('new')
+                                            setStep(2)
+                                        }
+                                    }}
+                                    className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left
+                                        ${selectedStudent?.id === s.id
+                                            ? 'border-amber-500/50 bg-amber-500/5'
+                                            : 'border-primary-700/30 hover:border-red-500/40 hover:bg-red-500/5'}`}>
                                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-400 to-primary-600 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
                                         {s.name?.[0]?.toUpperCase() || '?'}
                                     </div>
@@ -221,6 +250,29 @@ export default function AdminCreateMembershipPage() {
                             ))}
                         </div>
                     )}
+
+                    {/* Renewal / New Booking prompt */}
+                    {selectedStudent?.membershipStatus === 'EXPIRED' && bookingType === null && (
+                        <div className="mt-4 p-5 rounded-xl border border-amber-500/30 bg-amber-500/5">
+                            <p className="text-sm text-amber-300 font-medium mb-1">Previous membership found</p>
+                            <p className="text-xs text-primary-400 mb-4">
+                                <span className="text-white">{selectedStudent.name}</span> had a membership that expired. How would you like to proceed?
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={handleSelectRenewal}
+                                    disabled={renewalLoading}
+                                    className="flex-1 py-3 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-300 text-sm font-medium hover:bg-amber-500/20 transition-all disabled:opacity-50">
+                                    {renewalLoading ? 'Loading…' : '🔄 Renewal — continue from last expiry'}
+                                </button>
+                                <button
+                                    onClick={() => { setBookingType('new'); setStartDate(TODAY); setStep(2) }}
+                                    className="flex-1 py-3 rounded-xl border border-primary-700/30 text-primary-300 text-sm font-medium hover:border-red-500/30 hover:bg-red-500/5 transition-all">
+                                    ➕ New Booking — pick a start date
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -235,7 +287,7 @@ export default function AdminCreateMembershipPage() {
                             <p className="text-white font-semibold">{selectedStudent?.name}</p>
                             <p className="text-primary-400 text-xs">{selectedStudent?.mobile || selectedStudent?.email}</p>
                         </div>
-                        <button onClick={() => { setStep(1); setSelectedStudent(null) }}
+                        <button onClick={() => { setStep(1); setSelectedStudent(null); setBookingType(null); setStartDate(TODAY) }}
                                 className="ml-auto text-primary-500 text-xs hover:text-primary-300">
                             {t('adminNewMembership.change')}
                         </button>
@@ -288,27 +340,45 @@ export default function AdminCreateMembershipPage() {
 
                     <div className="card p-6">
                         <h2 className="section-title mb-4">{t('adminNewMembership.step2.startDate')}</h2>
-                        <div className="flex flex-wrap items-center gap-4">
-                            <LocalizationProvider dateAdapter={AdapterDateFns}>
-                                <DatePicker
-                                    value={startDate ? parseISO(startDate) : null}
-                                    onChange={d => d && setStartDate(format(d, 'yyyy-MM-dd'))}
-                                    minDate={parseISO(TODAY)}
-                                    sx={{ width: 200, ...DATE_PICKER_SX }}
-                                    slotProps={{ textField: { size: 'small' }, popper: { sx: DATE_PICKER_POPPER_SX } }}
-                                />
-                            </LocalizationProvider>
-                            {selectedPlan && (
-                                <div className="text-sm text-primary-400">
-                                    {t('adminNewMembership.step2.endDateLabel')}
-                                    <span className="text-white font-medium ml-1">{endDate}</span>
+                        {bookingType === 'renewal' ? (
+                            <div className="flex flex-wrap items-center gap-4">
+                                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                                    <span className="text-xl">🔄</span>
+                                    <div>
+                                        <p className="text-xs text-amber-400/80 mb-0.5">Renewing from last expiry</p>
+                                        <p className="text-white font-semibold font-mono">{startDate}</p>
+                                    </div>
                                 </div>
-                            )}
-                        </div>
+                                {selectedPlan && (
+                                    <div className="text-sm text-primary-400">
+                                        {t('adminNewMembership.step2.endDateLabel')}
+                                        <span className="text-white font-medium ml-1">{endDate}</span>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="flex flex-wrap items-center gap-4">
+                                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                    <DatePicker
+                                        value={startDate ? parseISO(startDate) : null}
+                                        onChange={d => d && setStartDate(format(d, 'yyyy-MM-dd'))}
+                                        minDate={parseISO(TODAY)}
+                                        sx={{ width: 200, ...DATE_PICKER_SX }}
+                                        slotProps={{ textField: { size: 'small' }, popper: { sx: DATE_PICKER_POPPER_SX } }}
+                                    />
+                                </LocalizationProvider>
+                                {selectedPlan && (
+                                    <div className="text-sm text-primary-400">
+                                        {t('adminNewMembership.step2.endDateLabel')}
+                                        <span className="text-white font-medium ml-1">{endDate}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex gap-3">
-                        <button onClick={() => setStep(1)} className="btn-ghost border border-primary-700/40 px-6 py-2.5 rounded-xl text-sm">
+                        <button onClick={() => { setStep(1); setSelectedStudent(null); setBookingType(null); setStartDate(TODAY) }} className="btn-ghost border border-primary-700/40 px-6 py-2.5 rounded-xl text-sm">
                             ← {t('adminNewMembership.back')}
                         </button>
                         <button

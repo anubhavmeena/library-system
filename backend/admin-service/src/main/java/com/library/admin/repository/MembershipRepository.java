@@ -64,6 +64,8 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
 
     boolean existsByUserId(UUID userId);
 
+    Optional<Membership> findFirstByUserIdOrderByEndDateDesc(UUID userId);
+
     @Modifying
     @Transactional
     @Query("DELETE FROM Membership m WHERE m.userId = :userId")

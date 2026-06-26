@@ -48,18 +48,19 @@ public class ImportService {
     );
 
     public void importSingleStudent(ManualStudentImportRequest req) {
-        List<Plan> activePlans = planRepository.findAll().stream()
-                .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
-                .toList();
-        String[] cols = {
-            "1",
-            req.getName(),
-            req.getPhone(),
-            req.getFees() != null ? req.getFees() : "0",
-            req.getDate()  != null ? req.getDate()  : "",
-            req.getSeatNumber()
-        };
-        processRow(cols, activePlans, null);
+        String phone = req.getPhone().replaceAll("[^0-9]", "");
+        if (phone.isBlank()) throw new IllegalArgumentException("Phone number is invalid");
+        userRepository.findByMobile(phone).orElseGet(() -> {
+            User u = User.builder()
+                    .id(UUID.randomUUID())
+                    .name(req.getName().trim())
+                    .mobile(phone)
+                    .role(User.Role.STUDENT)
+                    .isActive(true)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            return userRepository.save(u);
+        });
     }
 
     public ImportResultDto importStudents(MultipartFile file) throws Exception {
