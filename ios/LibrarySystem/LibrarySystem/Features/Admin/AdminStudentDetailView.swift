@@ -192,9 +192,10 @@ struct AdminStudentDetailView: View {
                                 Spacer()
                                 StatusChip(status: p.status)
                             }
-                            if let gw = p.paymentGateway {
-                                Text(gw).font(.labelSmall).foregroundColor(.textMuted)
-                            }
+                            let isCash = p.paymentGateway == "CASH"
+                            Text(isCash ? "Cash" : "Online")
+                                .font(.labelSmall)
+                                .foregroundColor(isCash ? .amber : .emerald)
                             if let ref = p.gatewayOrderId {
                                 Text("Ref: \(ref)").font(.bodySmall).foregroundColor(.textMuted)
                                     .lineLimit(1)

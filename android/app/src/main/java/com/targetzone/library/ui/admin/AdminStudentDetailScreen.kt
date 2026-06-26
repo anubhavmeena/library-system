@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +23,7 @@ import com.targetzone.library.data.model.UpdateStudentRequest
 import com.targetzone.library.ui.components.*
 import com.targetzone.library.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminStudentDetailScreen(
     vm: AdminViewModel,
@@ -172,7 +174,8 @@ fun AdminStudentDetailScreen(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("₹${p.amount.toInt()}", fontWeight = FontWeight.SemiBold, color = TextPrimary)
-                            if (p.paymentGateway != null) Text(p.paymentGateway, color = TextMuted, fontSize = 11.sp)
+                            val isCash = p.paymentGateway == "CASH"
+                            Text(if (isCash) "Cash" else "Online", color = if (isCash) Amber else Emerald, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                             if (p.createdAt != null) Text(p.createdAt.take(10), color = TextMuted, fontSize = 11.sp)
                         }
                         StatusChip(p.status)

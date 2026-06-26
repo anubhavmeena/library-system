@@ -633,7 +633,7 @@ export default function AdminStudentsPage() {
                             ) : (
                                 <div className="space-y-2">
                                     {studentPayments.map(p => {
-                                        const isCash = !p.paymentGateway || p.gatewayOrderId?.startsWith('dev_')
+                                        const isCash = p.paymentGateway === 'CASH'
                                         return (
                                             <div key={p.id} className="rounded-lg bg-primary-800/40 border border-primary-700/30 px-3 py-2.5 text-xs">
                                                 <div className="flex items-center justify-between mb-1.5">
