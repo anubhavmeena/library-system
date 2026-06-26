@@ -377,8 +377,8 @@ public class PaymentService {
                 return resp.getBody().getData();
             }
         } catch (Exception e) {
-            log.warn("Could not fetch user details for Cashfree order (userId={}): {}",
-                    userId, e.getMessage());
+            log.error("Could not fetch user profile (userId={}) — booking notification will use fallback name: {}",
+                    userId, e.getMessage(), e);
         }
         return new UserProfileDto();
     }

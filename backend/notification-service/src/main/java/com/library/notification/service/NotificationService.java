@@ -38,9 +38,10 @@ public class NotificationService {
     // Sends WhatsApp + email to student, and an alert to admin
 
     public void sendBookingConfirmation(BookingConfirmedEvent event) {
-        String whatsappMsg  = buildBookingWhatsApp(event);
+        String name         = hasValue(event.getUserName()) ? event.getUserName() : "Student";
+        String whatsappMsg  = buildBookingWhatsApp(event, name);
         String emailSubject = "✅ Your Library Seat is Confirmed!";
-        String emailBody    = buildBookingEmail(event);
+        String emailBody    = buildBookingEmail(event, name);
 
         // Notify student via WhatsApp
         if (hasValue(event.getUserMobile())) {
@@ -66,7 +67,7 @@ public class NotificationService {
                         "Plan    : %s\n"     +
                         "Shift   : %s\n"     +
                         "Amount  : ₹%.0f",
-                event.getUserName(),
+                name,
                 event.getSeatNumber(),
                 event.getPlanName(),
                 formatShift(event.getShift()),
@@ -80,7 +81,7 @@ public class NotificationService {
         // Alert admin via email (always sent if adminEmail is configured)
         emailService.sendText(
                 adminEmail,
-                "New Booking — " + event.getUserName() + " | Seat " + event.getSeatNumber(),
+                "New Booking — " + name + " | Seat " + event.getSeatNumber(),
                 adminMsg,
                 null,
                 "ADMIN_BOOKING_ALERT"
@@ -307,7 +308,7 @@ public class NotificationService {
 
     // ── Message Builders ──────────────────────────────────────────────────────
 
-    private String buildBookingWhatsApp(BookingConfirmedEvent e) {
+    private String buildBookingWhatsApp(BookingConfirmedEvent e, String name) {
         return String.format(
                 "✅ Booking Confirmed!\n\n"                   +
                         "Hi *%s*,\n\n"                                +
@@ -322,7 +323,7 @@ public class NotificationService {
                         "━━━━━━━━━━━━━━━━━━━━\n\n"                    +
                         "Please carry a valid ID on your first visit.\n\n" +
                         "📍 Happy studying! — Target Zone Library",
-                e.getUserName(),
+                name,
                 e.getPlanName(),
                 e.getSeatNumber(),
                 formatShift(e.getShift()),
@@ -332,7 +333,7 @@ public class NotificationService {
         );
     }
 
-    private String buildBookingEmail(BookingConfirmedEvent e) {
+    private String buildBookingEmail(BookingConfirmedEvent e, String name) {
         return String.format(
                 "Dear %s,\n\n"                                            +
                         "Your library membership has been confirmed!\n\n"         +
@@ -351,7 +352,7 @@ public class NotificationService {
                         "Best regards,\n"                                         +
                         "Target Zone Library Team\n"                                    +
                         "https://targetzone.co.in",
-                e.getUserName(),
+                name,
                 e.getPlanName(),
                 e.getSeatNumber(),
                 formatShift(e.getShift()),
