@@ -35,6 +35,12 @@ struct User: Codable, Identifiable {
     }
 }
 
+struct AdminContact: Codable {
+    let name: String?
+    let mobile: String?
+    let email: String?
+}
+
 struct AuthResponse: Codable {
     let user: User
     let accessToken: String

@@ -30,6 +30,10 @@ final class StudentViewModel: ObservableObject {
     // Gallery
     @Published var galleryPhotos: [GalleryPhoto] = []
 
+    // Contact Admin
+    @Published var adminContact: AdminContact?
+    @Published var callAdminSent = false
+
     // UI State
     @Published var isLoading = false
     @Published var error: String?
@@ -218,6 +222,26 @@ final class StudentViewModel: ObservableObject {
                 successMsg = "Feedback submitted"
             } catch { self.error = error.localizedDescription }
             isLoading = false
+        }
+    }
+
+    // MARK: - Contact Admin
+
+    func loadAdminContact() {
+        Task {
+            do {
+                adminContact = try await userRepo.getAdminContact()
+            } catch { /* non-critical */ }
+        }
+    }
+
+    func callAdmin() {
+        guard !callAdminSent else { return }
+        callAdminSent = true
+        Task {
+            try? await membershipRepo.callAdmin()
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            callAdminSent = false
         }
     }
 

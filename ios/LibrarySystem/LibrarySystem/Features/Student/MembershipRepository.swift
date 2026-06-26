@@ -50,4 +50,8 @@ struct MembershipRepository {
     func downloadIdCard() async throws -> Data {
         try await api.download(.downloadIdCard, token: token)
     }
+
+    func callAdmin() async throws {
+        try await api.requestVoid(.callAdmin, token: token)
+    }
 }

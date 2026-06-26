@@ -42,6 +42,9 @@ struct StudentTabView: View {
                 Color.navyDeep.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 12) {
+                        NavigationLink { ContactAdminView(vm: vm) } label: {
+                            moreRow(icon: "phone.circle.fill", label: "Contact Admin")
+                        }
                         NavigationLink { StudentGalleryView(vm: vm) } label: {
                             moreRow(icon: "photo.fill.on.rectangle.fill", label: "Photo Gallery")
                         }

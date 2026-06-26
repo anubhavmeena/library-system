@@ -37,7 +37,8 @@ extension Endpoint {
     }
 
     // MARK: - User
-    static let getProfile = Endpoint(path: "users/me")
+    static let getProfile     = Endpoint(path: "users/me")
+    static let getAdminContact = Endpoint(path: "users/admin-contact")
     static func updateProfile(_ req: UpdateProfileRequest) -> Endpoint {
         Endpoint(path: "users/me", method: .PATCH, body: encode(req))
     }
@@ -179,6 +180,9 @@ extension Endpoint {
     static func importSingleStudent(_ req: ManualImportRequest) -> Endpoint {
         Endpoint(path: "admin/students/import/single", method: .POST, body: encode(req))
     }
+
+    // MARK: - Seat Assistance
+    static let callAdmin = Endpoint(path: "memberships/my/call-admin", method: .POST)
 
     // MARK: - ID Card
     static let downloadIdCard = Endpoint(path: "memberships/my/id-card")

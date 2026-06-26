@@ -9,6 +9,10 @@ struct UserRepository {
         try await api.request(.getProfile, token: token)
     }
 
+    func getAdminContact() async throws -> AdminContact {
+        try await api.request(.getAdminContact, token: token)
+    }
+
     func updateProfile(name: String, fatherName: String?, address: String?,
                        gender: String?, dateOfBirth: String?, email: String?) async throws -> User {
         let req = UpdateProfileRequest(name: name, fatherName: fatherName, address: address,
