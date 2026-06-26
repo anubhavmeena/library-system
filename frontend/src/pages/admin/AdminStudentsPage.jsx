@@ -42,8 +42,11 @@ export default function AdminStudentsPage() {
     const [studentPayments, setStudentPayments]               = useState([])
     const [studentPaymentsLoading, setStudentPaymentsLoading] = useState(false)
 
-    const [msgText, setMsgText]       = useState('')
+    const [msgTarget,  setMsgTarget]  = useState(null)
+    const [msgText,    setMsgText]    = useState('')
     const [msgSending, setMsgSending] = useState(false)
+
+    const [plans, setPlans] = useState([])
 
     const { t } = useTranslation()
 
@@ -71,6 +74,10 @@ export default function AdminStudentsPage() {
         const close = () => setOpenDropdown(null)
         document.addEventListener('click', close)
         return () => document.removeEventListener('click', close)
+    }, [])
+
+    useEffect(() => {
+        api.get('/plans').then(r => setPlans(r.data.data ?? [])).catch(() => {})
     }, [])
 
     useEffect(() => {
@@ -315,7 +322,7 @@ export default function AdminStudentsPage() {
                                             <button onClick={() => {
                                                 setDetail(s)
                                                 setEditMode(false)
-                                                setEditForm({ name: s.name||'', mobile: s.mobile||'', email: s.email||'', address: s.address||'', gender: s.gender||'', dateOfBirth: s.dateOfBirth||'' })
+                                                setEditForm({ name: s.name||'', mobile: s.mobile||'', email: s.email||'', address: s.address||'', gender: s.gender||'', dateOfBirth: s.dateOfBirth||'', joinedAt: s.joinedAt?.split('T')[0]||'', seatNumber: s.seatNumber||'', planId: s.membershipPlanId||'' })
                                             }}
                                                     className="text-xs px-3 py-1.5 rounded-lg bg-primary-700/50 text-primary-300 hover:text-white border border-primary-700/40 transition-all">
                                                 {t('adminStudents.view')}
@@ -348,6 +355,11 @@ export default function AdminStudentsPage() {
                                                                 {clearingFees === s.id ? 'Clearing…' : 'Clear Pending Fees'}
                                                             </button>
                                                         )}
+                                                        <button
+                                                            onClick={() => { setMsgTarget(s); setOpenDropdown(null) }}
+                                                            className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40">
+                                                            Message
+                                                        </button>
                                                         <button
                                                             onClick={() => { setDeleteTarget(s); setOpenDropdown(null) }}
                                                             className="w-full text-left text-xs px-3 py-2.5 text-red-400 hover:bg-primary-700/60 transition-colors">
@@ -495,7 +507,7 @@ export default function AdminStudentsPage() {
             )}
 
             {detail && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => { setDetail(null); setEditMode(false); setMsgText('') }}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => { setDetail(null); setEditMode(false) }}>
                     <div className="card p-6 w-full max-w-md border-primary-700/30 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         {/* Header */}
                         <div className="flex items-center justify-between mb-5">
@@ -508,7 +520,7 @@ export default function AdminStudentsPage() {
                                     </button>
                                 ) : (
                                     <>
-                                        <button onClick={() => { setEditMode(false); setEditForm({ name: detail.name||'', mobile: detail.mobile||'', email: detail.email||'', address: detail.address||'', gender: detail.gender||'', dateOfBirth: detail.dateOfBirth||'' }) }}
+                                        <button onClick={() => { setEditMode(false); setEditForm({ name: detail.name||'', mobile: detail.mobile||'', email: detail.email||'', address: detail.address||'', gender: detail.gender||'', dateOfBirth: detail.dateOfBirth||'', joinedAt: detail.joinedAt?.split('T')[0]||'', seatNumber: detail.seatNumber||'', planId: detail.membershipPlanId||'' }) }}
                                             className="text-xs px-3 py-1 rounded-lg bg-primary-700/50 text-primary-300 hover:text-white border border-primary-700/40 transition-all">
                                             Cancel
                                         </button>
@@ -519,8 +531,19 @@ export default function AdminStudentsPage() {
                                                 try {
                                                     const res = await api.patch(`/admin/students/${detail.id}`, editForm)
                                                     const updated = res.data.data
-                                                    setDetail(updated)
-                                                    setEditForm({ name: updated.name||'', mobile: updated.mobile||'', email: updated.email||'', address: updated.address||'', gender: updated.gender||'', dateOfBirth: updated.dateOfBirth||'' })
+                                                    const membershipPatches = []
+                                                    if (detail.membershipId) {
+                                                        if (editForm.seatNumber && editForm.seatNumber !== detail.seatNumber)
+                                                            membershipPatches.push(api.patch(`/admin/memberships/${detail.membershipId}/seat`, { seatNumber: editForm.seatNumber }))
+                                                        if (editForm.planId && editForm.planId !== detail.membershipPlanId)
+                                                            membershipPatches.push(api.patch(`/admin/memberships/${detail.membershipId}/plan`, { planId: editForm.planId }))
+                                                    }
+                                                    await Promise.all(membershipPatches)
+                                                    const latest = membershipPatches.length > 0
+                                                        ? (await api.get(`/admin/students/${detail.id}`)).data.data
+                                                        : updated
+                                                    setDetail(latest)
+                                                    setEditForm({ name: latest.name||'', mobile: latest.mobile||'', email: latest.email||'', address: latest.address||'', gender: latest.gender||'', dateOfBirth: latest.dateOfBirth||'', joinedAt: latest.joinedAt?.split('T')[0]||'', seatNumber: latest.seatNumber||'', planId: latest.membershipPlanId||'' })
                                                     setEditMode(false)
                                                     fetchStudents()
                                                     toast.success('Student profile updated')
@@ -535,7 +558,7 @@ export default function AdminStudentsPage() {
                                         </button>
                                     </>
                                 )}
-                                <button onClick={() => { setDetail(null); setEditMode(false); setMsgText('') }} className="text-primary-400 hover:text-white ml-1">✕</button>
+                                <button onClick={() => { setDetail(null); setEditMode(false) }} className="text-primary-400 hover:text-white ml-1">✕</button>
                             </div>
                         </div>
 
@@ -593,20 +616,61 @@ export default function AdminStudentsPage() {
                                 }
                             </div>
 
-                            {/* Read-only membership fields */}
-                            {[
-                                { l: t('adminStudents.modal.seat'),           v: detail.seatNumber || t('adminStudents.modal.noSeat') },
-                                { l: t('adminStudents.modal.plan'),           v: detail.planName || t('adminStudents.modal.noPlan') },
-                                { l: t('adminStudents.modal.expires'),        v: detail.membershipEnd || '—' },
-                                { l: t('adminStudents.modal.daysLeftLabel'),  v: detail.daysRemaining ? t('adminStudents.modal.daysLeft', { count: detail.daysRemaining }) : '—' },
-                                { l: t('adminStudents.modal.payment'),        v: detail.paymentMode === 'CASH' ? `💵 ${t('adminStudents.cash')}` : detail.paymentMode === 'ONLINE' ? `💳 ${t('adminStudents.online')}` : '—' },
-                                { l: t('adminStudents.modal.joined'),         v: detail.joinedAt?.split('T')[0] || '—' },
-                            ].map(({ l, v }) => (
-                                <div key={l} className="flex justify-between py-1.5 border-b border-primary-700/20 last:border-0 text-sm">
-                                    <span className="text-primary-400">{l}</span>
-                                    <span className="text-white text-right max-w-[55%] truncate">{v}</span>
-                                </div>
-                            ))}
+                            {/* Seat — editable when membership exists */}
+                            <div className="flex justify-between items-center py-1.5 border-b border-primary-700/20 text-sm gap-4">
+                                <span className="text-primary-400 shrink-0">{t('adminStudents.modal.seat')}</span>
+                                {editMode && detail.membershipId
+                                    ? <input type="text" className="input text-sm py-0.5 text-right w-32 font-mono"
+                                        value={editForm.seatNumber} placeholder="e.g. A12"
+                                        onChange={e => setEditForm(f => ({ ...f, seatNumber: e.target.value.toUpperCase() }))} />
+                                    : <span className="text-white font-mono">{detail.seatNumber || t('adminStudents.modal.noSeat')}</span>
+                                }
+                            </div>
+
+                            {/* Plan — dropdown in edit mode */}
+                            <div className="flex justify-between items-center py-1.5 border-b border-primary-700/20 text-sm gap-4">
+                                <span className="text-primary-400 shrink-0">{t('adminStudents.modal.plan')}</span>
+                                {editMode && detail.membershipId
+                                    ? <select className="input text-sm py-0.5 w-44 text-right"
+                                        value={editForm.planId}
+                                        onChange={e => setEditForm(f => ({ ...f, planId: e.target.value }))}>
+                                        <option value="">— no change —</option>
+                                        {plans.filter(p => p.isActive).map(p => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
+                                    </select>
+                                    : <span className="text-white">{detail.planName || t('adminStudents.modal.noPlan')}</span>
+                                }
+                            </div>
+
+                            {/* Expires (always read-only) */}
+                            <div className="flex justify-between py-1.5 border-b border-primary-700/20 text-sm">
+                                <span className="text-primary-400">{t('adminStudents.modal.expires')}</span>
+                                <span className="text-white">{detail.membershipEnd || '—'}</span>
+                            </div>
+
+                            {/* Days remaining (always read-only) */}
+                            <div className="flex justify-between py-1.5 border-b border-primary-700/20 text-sm">
+                                <span className="text-primary-400">{t('adminStudents.modal.daysLeftLabel')}</span>
+                                <span className="text-white">{detail.daysRemaining ? t('adminStudents.modal.daysLeft', { count: detail.daysRemaining }) : '—'}</span>
+                            </div>
+
+                            {/* Payment mode (always read-only) */}
+                            <div className="flex justify-between py-1.5 border-b border-primary-700/20 text-sm">
+                                <span className="text-primary-400">{t('adminStudents.modal.payment')}</span>
+                                <span className="text-white">{detail.paymentMode === 'CASH' ? `💵 ${t('adminStudents.cash')}` : detail.paymentMode === 'ONLINE' ? `💳 ${t('adminStudents.online')}` : '—'}</span>
+                            </div>
+
+                            {/* Joined — editable */}
+                            <div className="flex justify-between items-center py-1.5 border-b border-primary-700/20 text-sm gap-4">
+                                <span className="text-primary-400 shrink-0">{t('adminStudents.modal.joined')}</span>
+                                {editMode
+                                    ? <input type="date" className="input text-sm py-0.5 w-44 text-right"
+                                        value={editForm.joinedAt}
+                                        onChange={e => setEditForm(f => ({ ...f, joinedAt: e.target.value }))} />
+                                    : <span className="text-white">{detail.joinedAt?.split('T')[0] || '—'}</span>
+                                }
+                            </div>
 
                             <div className="flex justify-between py-1.5 text-sm">
                                 <span className="text-primary-400">{t('adminStudents.modal.aadhaar')}</span>
@@ -619,35 +683,6 @@ export default function AdminStudentsPage() {
                                     <span className="text-primary-600 text-xs">{t('adminStudents.modal.aadhaarNone')}</span>
                                 )}
                             </div>
-                        </div>
-
-                        {/* Send Message */}
-                        <div className="mt-5 pt-5 border-t border-primary-700/30">
-                            <h4 className="text-white font-semibold text-sm mb-3">Send Message</h4>
-                            <textarea
-                                rows={3}
-                                value={msgText}
-                                onChange={e => setMsgText(e.target.value)}
-                                placeholder="Type a WhatsApp message to send this student…"
-                                className="input w-full text-sm resize-none"
-                            />
-                            <button
-                                disabled={msgSending || msgText.trim().length < 5}
-                                onClick={async () => {
-                                    setMsgSending(true)
-                                    try {
-                                        await api.post(`/admin/students/${detail.id}/message`, { message: msgText.trim() })
-                                        toast.success('Message sent')
-                                        setMsgText('')
-                                    } catch (e) {
-                                        toast.error(e.response?.data?.message || 'Failed to send')
-                                    } finally {
-                                        setMsgSending(false)
-                                    }
-                                }}
-                                className="mt-2 w-full text-sm px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 transition-colors">
-                                {msgSending ? 'Sending…' : 'Send via WhatsApp'}
-                            </button>
                         </div>
 
                         {/* Payment History */}
@@ -707,6 +742,46 @@ export default function AdminStudentsPage() {
                                 disabled={deleting}
                                 className="text-sm px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 transition-colors">
                                 {deleting ? 'Deleting…' : 'Delete'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {msgTarget && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => { setMsgTarget(null); setMsgText('') }}>
+                    <div className="card p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-semibold text-white mb-1">Send Message</h3>
+                        <p className="text-sm text-primary-400 mb-4">
+                            WhatsApp → <span className="text-white">{msgTarget.name}</span> ({msgTarget.mobile})
+                        </p>
+                        <textarea
+                            rows={4}
+                            value={msgText}
+                            onChange={e => setMsgText(e.target.value)}
+                            placeholder="Type a WhatsApp message…"
+                            className="input w-full text-sm resize-none mb-3"
+                        />
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => { setMsgTarget(null); setMsgText('') }} className="btn-outline text-sm px-4 py-2">
+                                Cancel
+                            </button>
+                            <button
+                                disabled={msgSending || msgText.trim().length < 5}
+                                onClick={async () => {
+                                    setMsgSending(true)
+                                    try {
+                                        await api.post(`/admin/students/${msgTarget.id}/message`, { message: msgText.trim() })
+                                        toast.success('Message sent')
+                                        setMsgTarget(null)
+                                        setMsgText('')
+                                    } catch (e) {
+                                        toast.error(e.response?.data?.message || 'Failed to send')
+                                    } finally {
+                                        setMsgSending(false)
+                                    }
+                                }}
+                                className="text-sm px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 transition-colors">
+                                {msgSending ? 'Sending…' : 'Send via WhatsApp'}
                             </button>
                         </div>
                     </div>

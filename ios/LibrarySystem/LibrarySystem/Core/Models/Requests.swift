@@ -69,6 +69,11 @@ struct UpdateStudentRequest: Codable {
     let address: String?
     let gender: String?
     let dateOfBirth: String?
+    let joinedAt: String?
+}
+
+struct UpdateMembershipPlanRequest: Codable {
+    let planId: String
 }
 
 struct ChangeSeatRequest: Codable {

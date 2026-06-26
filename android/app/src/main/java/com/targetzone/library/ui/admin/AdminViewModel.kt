@@ -98,6 +98,12 @@ class AdminViewModel(
             .onFailure { error.value = it.message }
     }
 
+    fun updateMembershipPlan(membershipId: String, planId: String, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.updateMembershipPlan(membershipId, planId)
+            .onSuccess { successMsg.value = "Plan updated"; onDone() }
+            .onFailure { error.value = it.message }
+    }
+
     fun loadExpiring(withinDays: Int = 7) = viewModelScope.launch {
         isLoading.value = true
         adminRepo.getExpiringMemberships(withinDays)

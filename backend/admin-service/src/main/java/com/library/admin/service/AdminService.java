@@ -162,6 +162,11 @@ public class AdminService {
 
         StudentDto dto = StudentDto.fromEntities(user, mem);
         if (mem != null) {
+            planRepository.findById(mem.getPlanId()).ifPresent(plan -> {
+                dto.setMembershipPlanId(plan.getId().toString());
+                dto.setPlanName(plan.getName());
+                dto.setPlanType(plan.getPlanType().name());
+            });
             paymentRepository.findFirstByMembershipId(mem.getId()).ifPresent(p -> {
                 dto.setPaymentMode("CASH".equalsIgnoreCase(p.getPaymentGateway()) ? "CASH" : "ONLINE");
                 dto.setPendingAmount(p.getPendingAmount() != null ? p.getPendingAmount() : BigDecimal.ZERO);
@@ -511,6 +516,8 @@ public class AdminService {
         user.setGender(req.getGender()   != null && !req.getGender().isBlank()  ? req.getGender().trim()   : null);
         user.setDateOfBirth(req.getDateOfBirth() != null && !req.getDateOfBirth().isBlank()
                 ? LocalDate.parse(req.getDateOfBirth()) : null);
+        if (req.getJoinedAt() != null && !req.getJoinedAt().isBlank())
+            user.setCreatedAt(LocalDate.parse(req.getJoinedAt()).atStartOfDay());
         userRepository.save(user);
         return getStudentDetails(userId);
     }

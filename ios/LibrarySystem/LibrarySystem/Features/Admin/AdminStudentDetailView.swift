@@ -319,23 +319,29 @@ private struct EditStudentSheet: View {
     @ObservedObject var vm: AdminViewModel
     let onDismiss: () -> Void
 
-    @State private var name:        String
-    @State private var mobile:      String
-    @State private var email:       String
-    @State private var address:     String
-    @State private var gender:      String
-    @State private var dateOfBirth: String
+    @State private var name:         String
+    @State private var mobile:       String
+    @State private var email:        String
+    @State private var address:      String
+    @State private var gender:       String
+    @State private var dateOfBirth:  String
+    @State private var joinedAt:     String
+    @State private var seatNumber:   String
+    @State private var selectedPlanId: String
 
     init(s: StudentDetail, vm: AdminViewModel, onDismiss: @escaping () -> Void) {
         self.s = s
         self.vm = vm
         self.onDismiss = onDismiss
-        _name        = State(initialValue: s.name)
-        _mobile      = State(initialValue: s.mobile)
-        _email       = State(initialValue: s.email ?? "")
-        _address     = State(initialValue: s.address ?? "")
-        _gender      = State(initialValue: s.gender ?? "")
-        _dateOfBirth = State(initialValue: s.dateOfBirth ?? "")
+        _name           = State(initialValue: s.name)
+        _mobile         = State(initialValue: s.mobile)
+        _email          = State(initialValue: s.email ?? "")
+        _address        = State(initialValue: s.address ?? "")
+        _gender         = State(initialValue: s.gender ?? "")
+        _dateOfBirth    = State(initialValue: s.dateOfBirth ?? "")
+        _joinedAt       = State(initialValue: String(s.joinedAt?.prefix(10) ?? ""))
+        _seatNumber     = State(initialValue: s.seatNumber ?? "")
+        _selectedPlanId = State(initialValue: s.membershipPlanId ?? "")
     }
 
     private let genderOptions = ["", "Male", "Female", "Other"]
@@ -346,11 +352,12 @@ private struct EditStudentSheet: View {
                 Color.navyDeep.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 12) {
-                        editField("Name",                text: $name)
-                        editField("Mobile",              text: $mobile,      keyboard: .phonePad)
-                        editField("Email",               text: $email,       keyboard: .emailAddress)
-                        editField("Address",             text: $address,     lines: 2)
-                        editField("Date of Birth",       text: $dateOfBirth, placeholder: "yyyy-MM-dd")
+                        editField("Name",          text: $name)
+                        editField("Mobile",        text: $mobile,      keyboard: .phonePad)
+                        editField("Email",         text: $email,       keyboard: .emailAddress)
+                        editField("Address",       text: $address,     lines: 2)
+                        editField("Date of Birth", text: $dateOfBirth, placeholder: "yyyy-MM-dd")
+                        editField("Joined Date",   text: $joinedAt,    placeholder: "yyyy-MM-dd")
 
                         // Gender picker
                         VStack(alignment: .leading, spacing: 6) {
@@ -366,6 +373,26 @@ private struct EditStudentSheet: View {
                         .background(Color.navyMid)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
 
+                        if s.membershipId != nil {
+                            editField("Seat Number", text: $seatNumber)
+
+                            // Plan picker
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Plan").font(.labelSmall).foregroundColor(.textMuted)
+                                Picker("", selection: $selectedPlanId) {
+                                    Text("— no change —").tag(s.membershipPlanId ?? "")
+                                    ForEach(vm.plans, id: \.id) { plan in
+                                        Text(plan.name).tag(plan.id)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .tint(.amber)
+                                .padding(8)
+                                .background(Color.navyMid)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
+                        }
+
                         PrimaryButton("Save Changes") {
                             let req = UpdateStudentRequest(
                                 name:        name.trimmingCharacters(in: .whitespaces),
@@ -373,9 +400,19 @@ private struct EditStudentSheet: View {
                                 email:       email.trimmingCharacters(in: .whitespaces).isEmpty  ? nil : email.trimmingCharacters(in: .whitespaces),
                                 address:     address.trimmingCharacters(in: .whitespaces).isEmpty ? nil : address.trimmingCharacters(in: .whitespaces),
                                 gender:      gender.isEmpty ? nil : gender,
-                                dateOfBirth: dateOfBirth.trimmingCharacters(in: .whitespaces).isEmpty ? nil : dateOfBirth.trimmingCharacters(in: .whitespaces)
+                                dateOfBirth: dateOfBirth.trimmingCharacters(in: .whitespaces).isEmpty ? nil : dateOfBirth.trimmingCharacters(in: .whitespaces),
+                                joinedAt:    joinedAt.trimmingCharacters(in: .whitespaces).isEmpty ? nil : joinedAt.trimmingCharacters(in: .whitespaces)
                             )
                             vm.updateStudent(id: s.id, req: req)
+                            if let mid = s.membershipId {
+                                let trimSeat = seatNumber.trimmingCharacters(in: .whitespaces)
+                                if !trimSeat.isEmpty && trimSeat != s.seatNumber {
+                                    vm.changeSeat(membershipId: mid, seatNumber: trimSeat)
+                                }
+                                if !selectedPlanId.isEmpty && selectedPlanId != s.membershipPlanId {
+                                    vm.updateMembershipPlan(membershipId: mid, planId: selectedPlanId)
+                                }
+                            }
                             onDismiss()
                         }
                         .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -385,6 +422,7 @@ private struct EditStudentSheet: View {
             }
             .navigationTitle("Edit Profile")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear { vm.loadPlans() }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel", action: onDismiss).foregroundColor(.amber)

@@ -202,4 +202,21 @@ public class AdminMembershipService {
                 .map(Plan::getName).orElse(null);
         return MembershipDto.fromEntity(membership, planName);
     }
+
+    @Transactional
+    public void updateMembershipPlan(String membershipId, com.library.admin.dto.UpdateMembershipPlanRequest req) {
+        Membership membership = membershipRepository.findById(UUID.fromString(membershipId))
+                .orElseThrow(() -> new com.library.admin.exception.ResourceNotFoundException(
+                        "Membership not found: " + membershipId));
+        Plan plan = planRepository.findById(UUID.fromString(req.getPlanId()))
+                .orElseThrow(() -> new com.library.admin.exception.ResourceNotFoundException(
+                        "Plan not found: " + req.getPlanId()));
+        if (!Boolean.TRUE.equals(plan.getIsActive()))
+            throw new IllegalArgumentException("Plan is not active");
+
+        membership.setPlanId(plan.getId());
+        membership.setEndDate(membership.getStartDate().plusDays(plan.getDurationDays()));
+        membershipRepository.save(membership);
+        log.info("Plan updated for membership {} to plan {}", membershipId, plan.getName());
+    }
 }

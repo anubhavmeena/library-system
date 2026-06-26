@@ -10,4 +10,5 @@ public class UpdateStudentRequest {
     private String address;
     private String gender;
     private String dateOfBirth;
+    private String joinedAt;
 }

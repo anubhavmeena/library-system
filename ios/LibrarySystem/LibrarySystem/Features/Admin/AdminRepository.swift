@@ -49,6 +49,11 @@ struct AdminRepository {
         try await api.requestVoid(.changeSeat(membershipId: membershipId, req: req), token: token)
     }
 
+    func updateMembershipPlan(membershipId: String, planId: String) async throws {
+        let req = UpdateMembershipPlanRequest(planId: planId)
+        try await api.requestVoid(.updateMembershipPlan(membershipId: membershipId, req: req), token: token)
+    }
+
     func getExpiringMemberships(withinDays: Int = 7) async throws -> [ReminderStudent] {
         try await api.request(.getExpiringMemberships(withinDays: withinDays), token: token)
     }

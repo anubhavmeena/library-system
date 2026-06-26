@@ -202,6 +202,7 @@ struct StudentDetail: Codable, Identifiable {
     let isActive: Bool
     let joinedAt: String?
     let membershipId: String?
+    let membershipPlanId: String?
     let planName: String?
     let planType: String?
     let seatNumber: String?

@@ -122,6 +122,12 @@ interface ApiService {
         @Body req: ChangeSeatRequest
     ): Response<ApiResponse<Any?>>
 
+    @PATCH("admin/memberships/{id}/plan")
+    suspend fun updateMembershipPlan(
+        @Path("id") membershipId: String,
+        @Body req: UpdateMembershipPlanRequest
+    ): Response<ApiResponse<String?>>
+
     @GET("admin/memberships/expiring")
     suspend fun getExpiringMemberships(
         @Query("withinDays") withinDays: Int = 7

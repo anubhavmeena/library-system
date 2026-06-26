@@ -25,6 +25,7 @@ public class StudentDto {
 
     // ── Active membership (all nullable if student has no plan) ────────────
     private String membershipId;
+    private String membershipPlanId;  // raw UUID of the plan
     private String planName;
     private String planType;          // HALF_DAY | FULL_DAY
     private String seatNumber;

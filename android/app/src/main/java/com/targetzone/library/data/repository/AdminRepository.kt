@@ -25,6 +25,10 @@ class AdminRepository {
         api.changeSeat(membershipId, ChangeSeatRequest(seatNumber = seatNumber))
     }
 
+    suspend fun updateMembershipPlan(membershipId: String, planId: String): Result<Unit> = runCatching {
+        api.updateMembershipPlan(membershipId, UpdateMembershipPlanRequest(planId = planId))
+    }
+
     suspend fun getExpiringMemberships(withinDays: Int): Result<List<ReminderStudent>> = runCatching {
         val res = api.getExpiringMemberships(withinDays = withinDays)
         res.body()?.data ?: emptyList()

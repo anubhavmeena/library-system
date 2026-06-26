@@ -161,6 +161,7 @@ data class StudentDetail(
     val isActive: Boolean = true,
     val joinedAt: String? = null,
     val membershipId: String? = null,
+    val membershipPlanId: String? = null,
     val planName: String? = null,
     val planType: String? = null,
     val seatNumber: String? = null,
@@ -266,8 +267,11 @@ data class UpdateStudentRequest(
     val email: String?,
     val address: String?,
     val gender: String?,
-    val dateOfBirth: String?
+    val dateOfBirth: String?,
+    val joinedAt: String? = null
 )
+
+data class UpdateMembershipPlanRequest(val planId: String)
 
 data class SaveExpenseRequest(
     val year: Int,

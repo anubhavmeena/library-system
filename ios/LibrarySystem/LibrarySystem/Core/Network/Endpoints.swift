@@ -105,6 +105,9 @@ extension Endpoint {
     static func changeSeat(membershipId: String, req: ChangeSeatRequest) -> Endpoint {
         Endpoint(path: "admin/memberships/\(membershipId)/seat", method: .PATCH, body: encode(req))
     }
+    static func updateMembershipPlan(membershipId: String, req: UpdateMembershipPlanRequest) -> Endpoint {
+        Endpoint(path: "admin/memberships/\(membershipId)/plan", method: .PATCH, body: encode(req))
+    }
     static func getExpiringMemberships(withinDays: Int = 7) -> Endpoint {
         Endpoint(path: "admin/memberships/expiring",
                  queryItems: [URLQueryItem(name: "withinDays", value: "\(withinDays)")])

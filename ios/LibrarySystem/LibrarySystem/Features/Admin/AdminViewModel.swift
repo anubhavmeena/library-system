@@ -95,6 +95,15 @@ final class AdminViewModel: ObservableObject {
         }
     }
 
+    func updateMembershipPlan(membershipId: String, planId: String) {
+        Task {
+            do {
+                try await repo.updateMembershipPlan(membershipId: membershipId, planId: planId)
+                successMsg = "Plan updated"
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
     func loadPendingFeeStudents() {
         isLoading = true
         Task {

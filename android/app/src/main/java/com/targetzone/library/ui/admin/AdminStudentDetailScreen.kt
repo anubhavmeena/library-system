@@ -229,14 +229,28 @@ fun AdminStudentDetailScreen(
 
     // Edit profile dialog
     if (editOpen) {
-        var eName by remember(s.name)        { mutableStateOf(s.name) }
-        var eMobile by remember(s.mobile)    { mutableStateOf(s.mobile) }
-        var eEmail by remember(s.email)      { mutableStateOf(s.email ?: "") }
-        var eAddress by remember(s.address)  { mutableStateOf(s.address ?: "") }
-        var eGender by remember(s.gender)    { mutableStateOf(s.gender ?: "") }
-        var eDob by remember(s.dateOfBirth)  { mutableStateOf(s.dateOfBirth ?: "") }
+        val plans by vm.plans.collectAsState()
+        LaunchedEffect(Unit) { vm.loadPlans() }
+
+        var eName by remember(s.name)              { mutableStateOf(s.name) }
+        var eMobile by remember(s.mobile)          { mutableStateOf(s.mobile) }
+        var eEmail by remember(s.email)            { mutableStateOf(s.email ?: "") }
+        var eAddress by remember(s.address)        { mutableStateOf(s.address ?: "") }
+        var eGender by remember(s.gender)          { mutableStateOf(s.gender ?: "") }
+        var eDob by remember(s.dateOfBirth)        { mutableStateOf(s.dateOfBirth ?: "") }
+        var eJoinedAt by remember(s.joinedAt)      { mutableStateOf(s.joinedAt?.take(10) ?: "") }
+        var eSeatNumber by remember(s.seatNumber)  { mutableStateOf(s.seatNumber ?: "") }
+        var ePlanId by remember(s.membershipPlanId){ mutableStateOf(s.membershipPlanId ?: "") }
+
         val genderOptions = listOf("", "Male", "Female", "Other")
         var genderExpanded by remember { mutableStateOf(false) }
+        var planExpanded   by remember { mutableStateOf(false) }
+
+        val tfColors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Amber, focusedLabelColor = Amber, cursorColor = Amber,
+            unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted,
+            focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
+        )
 
         Dialog(onDismissRequest = { editOpen = false }) {
             Surface(shape = RoundedCornerShape(16.dp), color = NavyMid) {
@@ -245,42 +259,59 @@ fun AdminStudentDetailScreen(
                     Text(s.name, color = TextSub, fontSize = 12.sp)
                     Spacer(Modifier.height(16.dp))
 
-                    OutlinedTextField(eName, { eName = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber, focusedLabelColor = Amber, cursorColor = Amber, unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary))
+                    OutlinedTextField(eName, { eName = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth(), singleLine = true, colors = tfColors)
                     Spacer(Modifier.height(10.dp))
-                    OutlinedTextField(eMobile, { eMobile = it }, label = { Text("Mobile") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber, focusedLabelColor = Amber, cursorColor = Amber, unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary))
+                    OutlinedTextField(eMobile, { eMobile = it }, label = { Text("Mobile") }, modifier = Modifier.fillMaxWidth(), singleLine = true, colors = tfColors)
                     Spacer(Modifier.height(10.dp))
-                    OutlinedTextField(eEmail, { eEmail = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber, focusedLabelColor = Amber, cursorColor = Amber, unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary))
+                    OutlinedTextField(eEmail, { eEmail = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth(), singleLine = true, colors = tfColors)
                     Spacer(Modifier.height(10.dp))
-                    OutlinedTextField(eAddress, { eAddress = it }, label = { Text("Address") }, modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber, focusedLabelColor = Amber, cursorColor = Amber, unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary))
+                    OutlinedTextField(eAddress, { eAddress = it }, label = { Text("Address") }, modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 3, colors = tfColors)
                     Spacer(Modifier.height(10.dp))
 
                     // Gender dropdown
                     ExposedDropdownMenuBox(expanded = genderExpanded, onExpandedChange = { genderExpanded = it }) {
                         OutlinedTextField(
-                            value = eGender.ifBlank { "—" },
-                            onValueChange = {},
-                            readOnly = true,
+                            value = eGender.ifBlank { "—" }, onValueChange = {}, readOnly = true,
                             label = { Text("Gender") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(genderExpanded) },
-                            modifier = Modifier.fillMaxWidth().menuAnchor(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber, focusedLabelColor = Amber, unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary)
+                            modifier = Modifier.fillMaxWidth().menuAnchor(), colors = tfColors
                         )
                         ExposedDropdownMenu(expanded = genderExpanded, onDismissRequest = { genderExpanded = false }, containerColor = NavyMid) {
                             genderOptions.forEach { opt ->
-                                DropdownMenuItem(
-                                    text = { Text(opt.ifBlank { "—" }, color = TextPrimary) },
-                                    onClick = { eGender = opt; genderExpanded = false }
-                                )
+                                DropdownMenuItem(text = { Text(opt.ifBlank { "—" }, color = TextPrimary) },
+                                    onClick = { eGender = opt; genderExpanded = false })
                             }
                         }
                     }
                     Spacer(Modifier.height(10.dp))
-                    OutlinedTextField(eDob, { eDob = it }, label = { Text("Date of Birth (yyyy-MM-dd)") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber, focusedLabelColor = Amber, cursorColor = Amber, unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary))
+                    OutlinedTextField(eDob, { eDob = it }, label = { Text("Date of Birth (yyyy-MM-dd)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, colors = tfColors)
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(eJoinedAt, { eJoinedAt = it }, label = { Text("Joined Date (yyyy-MM-dd)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, colors = tfColors)
+
+                    if (!s.membershipId.isNullOrBlank()) {
+                        Spacer(Modifier.height(10.dp))
+                        OutlinedTextField(eSeatNumber, { eSeatNumber = it.uppercase() }, label = { Text("Seat Number") }, modifier = Modifier.fillMaxWidth(), singleLine = true, colors = tfColors)
+                        Spacer(Modifier.height(10.dp))
+
+                        // Plan dropdown
+                        ExposedDropdownMenuBox(expanded = planExpanded, onExpandedChange = { planExpanded = it }) {
+                            OutlinedTextField(
+                                value = plans.firstOrNull { it.id == ePlanId }?.name ?: "— no change —",
+                                onValueChange = {}, readOnly = true,
+                                label = { Text("Plan") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(planExpanded) },
+                                modifier = Modifier.fillMaxWidth().menuAnchor(), colors = tfColors
+                            )
+                            ExposedDropdownMenu(expanded = planExpanded, onDismissRequest = { planExpanded = false }, containerColor = NavyMid) {
+                                DropdownMenuItem(text = { Text("— no change —", color = TextMuted) },
+                                    onClick = { ePlanId = s.membershipPlanId ?: ""; planExpanded = false })
+                                plans.filter { it.isActive != false }.forEach { plan ->
+                                    DropdownMenuItem(text = { Text(plan.name, color = TextPrimary) },
+                                        onClick = { ePlanId = plan.id; planExpanded = false })
+                                }
+                            }
+                        }
+                    }
 
                     Spacer(Modifier.height(16.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -294,9 +325,19 @@ fun AdminStudentDetailScreen(
                                     email       = eEmail.trim().ifBlank { null },
                                     address     = eAddress.trim().ifBlank { null },
                                     gender      = eGender.trim().ifBlank { null },
-                                    dateOfBirth = eDob.trim().ifBlank { null }
+                                    dateOfBirth = eDob.trim().ifBlank { null },
+                                    joinedAt    = eJoinedAt.trim().ifBlank { null }
                                 )
-                                vm.updateStudentProfile(s.id, req) { editOpen = false }
+                                vm.updateStudentProfile(s.id, req) {
+                                    val mid = s.membershipId
+                                    if (mid != null) {
+                                        if (eSeatNumber.isNotBlank() && eSeatNumber != s.seatNumber)
+                                            vm.changeSeat(mid, eSeatNumber) {}
+                                        if (ePlanId.isNotBlank() && ePlanId != s.membershipPlanId)
+                                            vm.updateMembershipPlan(mid, ePlanId) {}
+                                    }
+                                    editOpen = false
+                                }
                             },
                             enabled = eName.isNotBlank(),
                             colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = NavyDeep)
