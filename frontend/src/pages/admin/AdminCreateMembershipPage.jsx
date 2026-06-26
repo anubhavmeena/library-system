@@ -109,10 +109,11 @@ export default function AdminCreateMembershipPage() {
     const resolvedShift = selectedPlan?.planType === 'FULL_DAY' ? 'FULL_DAY' : selectedShift
 
     const filteredStudents = students.filter(s =>
+        s.membershipStatus !== 'ACTIVE' && (
         !search ||
         s.name?.toLowerCase().includes(search.toLowerCase()) ||
         s.mobile?.includes(search) ||
-        s.email?.toLowerCase().includes(search.toLowerCase())
+        s.email?.toLowerCase().includes(search.toLowerCase()))
     )
 
     const canGoStep3 = selectedPlan && startDate &&
