@@ -35,6 +35,13 @@ public class MembershipController {
     // ── Active membership ──────────────────────────────────────────────────────
     // X-User-Id injected by API Gateway after JWT validation
 
+    @PostMapping("/api/memberships/my/call-admin")
+    public ResponseEntity<ApiResponse<Void>> callAdmin(
+            @RequestHeader("X-User-Id") String userId) {
+        membershipService.callAdmin(userId);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
     @GetMapping("/api/memberships/my")
     public ResponseEntity<ApiResponse<MembershipDto>> getMyActiveMembership(
             @RequestHeader("X-User-Id") String userId) {

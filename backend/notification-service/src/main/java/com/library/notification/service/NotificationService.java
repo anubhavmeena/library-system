@@ -3,6 +3,7 @@ package com.library.notification.service;
 import com.library.notification.dto.BookingConfirmedEvent;
 import com.library.notification.dto.BroadcastNotificationEvent;
 import com.library.notification.dto.RenewalReminderEvent;
+import com.library.notification.dto.SeatAssistanceEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -257,6 +258,24 @@ public class NotificationService {
         }
 
         log.info("Broadcast sent to user: {}", event.getUserId());
+    }
+
+    // ── Seat Assistance Admin Alert ───────────────────────────────────────────
+    // Sent when a student taps "Call Admin" from the Contact Admin page
+
+    public void sendSeatAssistanceAlert(SeatAssistanceEvent event) {
+        String msg = String.format(
+                "🙋 Student needs help at their seat!\n\nName : %s\nSeat : %s",
+                event.getUserName(),
+                event.getSeatNumber()
+        );
+
+        for (String number : adminWhatsappNumbers()) {
+            whatsAppService.send(number, msg, null, "SEAT_ASSISTANCE");
+        }
+
+        log.info("Seat assistance alert sent to admin for user: {} seat: {}",
+                event.getUserId(), event.getSeatNumber());
     }
 
     // ── Seat Expired Admin Alert ──────────────────────────────────────────────

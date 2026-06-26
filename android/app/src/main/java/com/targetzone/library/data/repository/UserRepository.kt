@@ -1,6 +1,7 @@
 package com.targetzone.library.data.repository
 
 import com.targetzone.library.data.api.ApiClient
+import com.targetzone.library.data.model.AdminContact
 import com.targetzone.library.data.model.UpdateProfileRequest
 import com.targetzone.library.data.model.User
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -14,6 +15,10 @@ class UserRepository {
     suspend fun getProfile(): Result<User> = runCatching {
         val res = api.getProfile()
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to load profile")
+    }
+
+    suspend fun getAdminContact(): Result<AdminContact?> = runCatching {
+        api.getAdminContact().body()?.data
     }
 
     suspend fun updateProfile(req: UpdateProfileRequest): Result<User> = runCatching {
@@ -34,7 +39,13 @@ class UserRepository {
     }
 
     suspend fun uploadAadhaar(file: File): Result<String> = runCatching {
-        val requestFile = file.asRequestBody("*/*".toMediaTypeOrNull())
+        val mimeType = when (file.extension.lowercase()) {
+            "pdf"  -> "application/pdf"
+            "png"  -> "image/png"
+            "webp" -> "image/webp"
+            else   -> "image/jpeg"
+        }
+        val requestFile = file.asRequestBody(mimeType.toMediaTypeOrNull())
         val part = MultipartBody.Part.createFormData("file", file.name, requestFile)
         val res = api.uploadAadhaar(part)
         res.body()?.data?.get("photoUrl") ?: throw Exception("Upload failed")

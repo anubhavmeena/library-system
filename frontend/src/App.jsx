@@ -38,6 +38,7 @@ import AdminMailboxPage   from './pages/admin/AdminMailboxPage'
 
 import FeedbackPage       from './pages/student/FeedbackPage'
 import StudentGalleryPage from './pages/student/StudentGalleryPage'
+import ContactAdminPage   from './pages/student/ContactAdminPage'
 
 const PUBLIC_PATHS = new Set(['/', '/about', '/login', '/register', '/terms',
     '/privacy-policy', '/refund-policy', '/cancellation-policy'])
@@ -86,6 +87,7 @@ export default function App() {
                 <Route path="payment-success"  element={<PaymentSuccessPage />} />
                 <Route path="feedback"         element={<FeedbackPage />} />
                 <Route path="gallery"          element={<StudentGalleryPage />} />
+                <Route path="contact-admin"    element={<ContactAdminPage />} />
             </Route>
 
             <Route path="/admin" element={

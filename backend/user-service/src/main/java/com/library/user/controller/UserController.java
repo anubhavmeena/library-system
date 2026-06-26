@@ -22,6 +22,11 @@ public class UserController {
 
     // X-User-Id is injected by the API Gateway after JWT validation
 
+    @GetMapping("/admin-contact")
+    public ResponseEntity<ApiResponse<AdminContactDto>> getAdminContact() {
+        return ResponseEntity.ok(ApiResponse.success(userService.getAdminContact()));
+    }
+
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserDto>> getMyProfile(
             @RequestHeader("X-User-Id") String userId) {

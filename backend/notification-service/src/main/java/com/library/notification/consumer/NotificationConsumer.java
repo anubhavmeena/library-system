@@ -3,6 +3,7 @@ package com.library.notification.consumer;
 import com.library.notification.dto.BookingConfirmedEvent;
 import com.library.notification.dto.BroadcastNotificationEvent;
 import com.library.notification.dto.RenewalReminderEvent;
+import com.library.notification.dto.SeatAssistanceEvent;
 import com.library.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -87,6 +88,29 @@ public class NotificationConsumer {
             notificationService.sendBroadcast(event);
         } catch (Exception e) {
             log.error("Failed to process broadcast for user {}: {}",
+                    event.getUserId(), e.getMessage(), e);
+        }
+    }
+
+    // ── seat-assistance → admin WhatsApp alert ────────────────────────────────
+    // Published by membership-service when student taps "Call Admin" on their seat
+
+    @KafkaListener(
+            topics = "seat-assistance",
+            groupId = "notification-seat-assistance-group",
+            containerFactory = "seatAssistanceKafkaListenerContainerFactory"
+    )
+    public void handleSeatAssistance(
+            @Payload SeatAssistanceEvent event,
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(KafkaHeaders.OFFSET) long offset) {
+
+        log.info("Consumed [{}] offset={} userId={} seat={}",
+                topic, offset, event.getUserId(), event.getSeatNumber());
+        try {
+            notificationService.sendSeatAssistanceAlert(event);
+        } catch (Exception e) {
+            log.error("Failed to process seat-assistance for user {}: {}",
                     event.getUserId(), e.getMessage(), e);
         }
     }

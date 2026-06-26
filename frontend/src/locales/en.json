@@ -142,7 +142,8 @@
         "facilities": "Facilities",
         "profile": "My Profile",
         "feedback": "Feedback",
-        "gallery": "Gallery"
+        "gallery": "Gallery",
+        "contactAdmin": "Contact Admin"
       },
       "logout": "Logout",
       "mobileTitle": "Target Zone Library"

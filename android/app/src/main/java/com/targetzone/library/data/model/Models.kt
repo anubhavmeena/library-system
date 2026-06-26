@@ -7,6 +7,12 @@ data class ApiResponse<T>(
     val data: T?
 )
 
+data class AdminContact(
+    val name: String? = null,
+    val mobile: String? = null,
+    val email: String? = null
+)
+
 data class User(
     val id: String = "",
     val name: String = "",
@@ -68,6 +74,20 @@ data class Seat(
     val membershipEnd: String? = null
 )
 
+// student seat availability API response shape  (GET /api/seats/availability)
+data class SeatAvailabilityResponse(
+    val totalSeats: Int = 0,
+    val availableSeats: Int = 0,
+    val seats: List<SeatAvailabilityItem> = emptyList()
+)
+
+data class SeatAvailabilityItem(
+    val id: String? = null,
+    val seatNumber: String = "",
+    val rowLabel: String = "",
+    val isBooked: Boolean = false
+)
+
 // admin seat-map API response shape
 data class SeatMapDto(
     val shift: String = "",
@@ -92,7 +112,9 @@ data class PaymentOrder(
     val orderId: String = "",
     val membershipId: String = "",
     val amount: Double = 0.0,
-    val razorpayKeyId: String = ""
+    val gateway: String = "",             // "CASHFREE" | "RAZORPAY"
+    val paymentSessionId: String? = null, // Cashfree only
+    val razorpayKeyId: String = ""        // Razorpay only
 )
 
 data class AdminStats(

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Receipt
@@ -40,11 +41,11 @@ import kotlinx.coroutines.launch
 private data class NavItem(val route: String, val icon: ImageVector, val label: String)
 
 private val studentNavItems = listOf(
-    NavItem("dashboard",  Icons.Default.Home,          "Home"),
-    NavItem("membership", Icons.Default.CardMembership, "Membership"),
-    NavItem("booking",    Icons.Default.EventSeat,      "Book"),
-    NavItem("profile",    Icons.Default.Person,         "Profile"),
-    NavItem("gallery",    Icons.Default.Photo,          "Gallery"),
+    NavItem("dashboard",     Icons.Default.Home,          "Home"),
+    NavItem("membership",    Icons.Default.CardMembership, "Membership"),
+    NavItem("booking",       Icons.Default.EventSeat,      "Book"),
+    NavItem("profile",       Icons.Default.Person,         "Profile"),
+    NavItem("contact-admin", Icons.Default.Phone,          "Contact"),
 )
 
 private val adminNavItems = listOf(
@@ -75,7 +76,7 @@ fun AppNavigation(tokenManager: TokenManager) {
 
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route ?: ""
 
-    val isStudentRoute = studentNavItems.any { currentRoute.startsWith(it.route) } || currentRoute in listOf("booking", "membership", "profile", "facilities", "feedback", "payment-success")
+    val isStudentRoute = studentNavItems.any { currentRoute.startsWith(it.route) } || currentRoute in listOf("booking", "membership", "profile", "facilities", "feedback", "gallery", "contact-admin", "payment-success")
     val isAdminRoute   = adminNavItems.any { currentRoute.startsWith(it.route) } || currentRoute.startsWith("admin/")
 
     Scaffold(
@@ -148,6 +149,10 @@ fun AppNavigation(tokenManager: TokenManager) {
             composable("facilities")      { FacilitiesScreen() }
             composable("feedback")        { FeedbackScreen(studentVm) }
             composable("gallery")         { StudentGalleryScreen(studentVm) }
+            composable("contact-admin")   {
+                val membership by studentVm.membership.collectAsState()
+                ContactAdminScreen(studentVm, membership)
+            }
             composable("payment-success") { PaymentSuccessScreen(studentVm) { navController.navigate("dashboard") { popUpTo("payment-success") { inclusive = true } } } }
 
             // Admin routes
@@ -244,10 +249,10 @@ private fun StudentBottomBar(currentRoute: String, navController: androidx.navig
             )
         }
         NavigationBarItem(
-            selected = false,
-            onClick = { navController.navigate("facilities") },
-            icon = { Icon(Icons.Default.Info, "More", modifier = Modifier.size(22.dp)) },
-            label = { Text("More", fontSize = 11.sp) },
+            selected = currentRoute == "gallery",
+            onClick = { navController.navigate("gallery") },
+            icon = { Icon(Icons.Default.Photo, "Gallery", modifier = Modifier.size(22.dp)) },
+            label = { Text("Gallery", fontSize = 11.sp) },
             colors = NavigationBarItemDefaults.colors(selectedIconColor = Amber, selectedTextColor = Amber, indicatorColor = AmberFaint, unselectedIconColor = TextMuted, unselectedTextColor = TextMuted)
         )
     }

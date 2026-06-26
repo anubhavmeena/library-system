@@ -19,8 +19,9 @@ export default function StudentLayout() {
         { to: '/student/booking',   icon: '⊞', label: t('student.sidebar.nav.booking') },
         { to: '/student/facilities',icon: '⌂', label: t('student.sidebar.nav.facilities') },
         { to: '/student/profile',   icon: '◉', label: t('student.sidebar.nav.profile') },
-        { to: '/student/feedback',  icon: '◎', label: t('student.sidebar.nav.feedback') },
-        { to: '/student/gallery',   icon: '◼', label: t('student.sidebar.nav.gallery') },
+        { to: '/student/feedback',      icon: '◎', label: t('student.sidebar.nav.feedback') },
+        { to: '/student/gallery',       icon: '◼', label: t('student.sidebar.nav.gallery') },
+        { to: '/student/contact-admin', icon: '☎', label: t('student.sidebar.nav.contactAdmin') },
     ]
 
     return (

@@ -3,6 +3,7 @@ package com.library.notification.config;
 import com.library.notification.dto.BookingConfirmedEvent;
 import com.library.notification.dto.BroadcastNotificationEvent;
 import com.library.notification.dto.RenewalReminderEvent;
+import com.library.notification.dto.SeatAssistanceEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -91,6 +92,36 @@ public class KafkaConfig {
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
         factory.setConcurrency(2);
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.BATCH);
+        factory.setCommonErrorHandler(skipOnError());
+        return factory;
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, SeatAssistanceEvent>
+            seatAssistanceKafkaListenerContainerFactory() {
+
+        JsonDeserializer<SeatAssistanceEvent> valueDeser =
+                new JsonDeserializer<>(SeatAssistanceEvent.class);
+        valueDeser.addTrustedPackages("com.library.*");
+        valueDeser.ignoreTypeHeaders();
+
+        DefaultKafkaConsumerFactory<String, SeatAssistanceEvent> consumerFactory =
+                new DefaultKafkaConsumerFactory<>(
+                        Map.of(
+                                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
+                                ConsumerConfig.GROUP_ID_CONFIG, "notification-seat-assistance-group",
+                                ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
+                                ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false
+                        ),
+                        new StringDeserializer(),
+                        valueDeser
+                );
+
+        ConcurrentKafkaListenerContainerFactory<String, SeatAssistanceEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory);
+        factory.setConcurrency(1);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.BATCH);
         factory.setCommonErrorHandler(skipOnError());
         return factory;

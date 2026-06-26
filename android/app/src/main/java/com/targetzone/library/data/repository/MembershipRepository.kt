@@ -50,4 +50,9 @@ class MembershipRepository {
         val res = api.getPaymentHistory()
         res.body()?.data ?: emptyList()
     }
+
+    suspend fun callAdmin(): Result<Unit> = runCatching {
+        api.callAdmin()
+        Unit
+    }
 }

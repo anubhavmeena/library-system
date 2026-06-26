@@ -27,6 +27,12 @@ interface ApiService {
     @GET("users/me")
     suspend fun getProfile(): Response<ApiResponse<User>>
 
+    @GET("users/admin-contact")
+    suspend fun getAdminContact(): Response<ApiResponse<AdminContact>>
+
+    @HTTP(method = "POST", path = "memberships/my/call-admin", hasBody = false)
+    suspend fun callAdmin(): Response<ApiResponse<Any?>>
+
     @PATCH("users/me")
     suspend fun updateProfile(@Body req: UpdateProfileRequest): Response<ApiResponse<User>>
 
@@ -67,7 +73,7 @@ interface ApiService {
     suspend fun getSeatAvailability(
         @Query("shift") shift: String,
         @Query("date") date: String? = null
-    ): Response<ApiResponse<List<Seat>>>
+    ): Response<ApiResponse<SeatAvailabilityResponse>>
 
     @POST("seats/book")
     suspend fun bookSeat(@Body req: BookSeatRequest): Response<ApiResponse<Any?>>

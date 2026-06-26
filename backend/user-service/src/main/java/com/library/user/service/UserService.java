@@ -34,6 +34,16 @@ public class UserService {
         return UserDto.fromEntity(findUser(userId));
     }
 
+    public AdminContactDto getAdminContact() {
+        return userRepository.findFirstByRole(User.Role.ADMIN)
+                .map(u -> AdminContactDto.builder()
+                        .name(u.getName())
+                        .mobile(u.getMobile())
+                        .email(u.getEmail())
+                        .build())
+                .orElse(AdminContactDto.builder().name("Admin").build());
+    }
+
     @Transactional
     public UserDto updateProfile(String userId, UpdateProfileRequest request) {
         User user = findUser(userId);

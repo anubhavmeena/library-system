@@ -38,6 +38,8 @@ class StudentViewModel(
     val myFeedback        = MutableStateFlow<List<FeedbackItem>>(emptyList())
     val membershipHistory = MutableStateFlow<List<Membership>>(emptyList())
     val galleryPhotos     = MutableStateFlow<List<GalleryPhoto>>(emptyList())
+    val adminContact      = MutableStateFlow<AdminContact?>(null)
+    val callAdminSent     = MutableStateFlow(false)
 
     val isLoading     = MutableStateFlow(false)
     val error         = MutableStateFlow<String?>(null)
@@ -63,6 +65,7 @@ class StudentViewModel(
 
     fun loadSeats(shift: String) = viewModelScope.launch {
         isLoading.value = true
+        seats.value = emptyList()
         seatRepo.getAvailability(shift)
             .onSuccess { seats.value = it }
             .onFailure { error.value = it.message }
@@ -155,6 +158,18 @@ class StudentViewModel(
             .onFailure { error.value = it.message }
     }
 
-    fun resetBooking() { selectedSeat.value = null; bookingSuccess.value = false; error.value = null }
+    fun loadAdminContact() = viewModelScope.launch {
+        userRepo.getAdminContact().onSuccess { adminContact.value = it }
+    }
+
+    fun callAdmin() = viewModelScope.launch {
+        runCatching { membershipRepo.callAdmin() }
+        callAdminSent.value = true
+        kotlinx.coroutines.delay(10_000)
+        callAdminSent.value = false
+    }
+
+    fun resetBooking() { seats.value = emptyList(); selectedSeat.value = null; bookingSuccess.value = false; error.value = null }
     fun clearError() { error.value = null }
+    fun setError(msg: String) { error.value = msg }
 }
