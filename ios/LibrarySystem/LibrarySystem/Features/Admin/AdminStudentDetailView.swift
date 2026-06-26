@@ -8,6 +8,9 @@ struct AdminStudentDetailView: View {
     @State private var seatMapSeats:    [Seat] = []
     @State private var selectedNewSeat: String?
     @State private var showPayments     = false
+    @State private var showMessage      = false
+    @State private var messageText      = ""
+    @State private var showEdit         = false
 
     private let baseURL = "https://targetzone.co.in"
 
@@ -38,6 +41,12 @@ struct AdminStudentDetailView: View {
             }
             .sheet(isPresented: $showChangeSeat) {
                 changeSeatSheet
+            }
+            .sheet(isPresented: $showMessage) {
+                messageSheet
+            }
+            .sheet(isPresented: $showEdit) {
+                if let s = vm.selectedStudent { editSheet(s) }
             }
         }
         .navigationTitle("Student Details")
@@ -146,9 +155,13 @@ struct AdminStudentDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
 
+            OutlineButton("Edit Profile") { showEdit = true }
+
             if s.membershipId != nil {
                 OutlineButton("Change Seat") { showChangeSeat = true }
             }
+
+            OutlineButton("Send Message") { showMessage = true }
 
             Button {
                 showPayments.toggle()
@@ -211,6 +224,49 @@ struct AdminStudentDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private func editSheet(_ s: StudentDetail) -> some View {
+        EditStudentSheet(s: s, vm: vm, onDismiss: { showEdit = false })
+    }
+
+    private var messageSheet: some View {
+        NavigationStack {
+            ZStack {
+                Color.navyDeep.ignoresSafeArea()
+                VStack(alignment: .leading, spacing: 16) {
+                    if let student = vm.selectedStudent {
+                        Text("To: \(student.name)").font(.bodySmall).foregroundColor(.textMuted)
+                    }
+                    TextEditor(text: $messageText)
+                        .frame(minHeight: 120)
+                        .padding(10)
+                        .background(Color.navyMid)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .foregroundColor(.textPrimary)
+                        .font(.bodyMedium)
+
+                    PrimaryButton("Send via WhatsApp") {
+                        if let id = vm.selectedStudent?.id {
+                            vm.sendMessageToStudent(id: id, message: messageText.trimmingCharacters(in: .whitespacesAndNewlines))
+                            showMessage = false
+                            messageText = ""
+                        }
+                    }
+                    .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).count < 5)
+                }
+                .padding(16)
+                .frame(maxHeight: .infinity, alignment: .top)
+            }
+            .navigationTitle("Send Message")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { showMessage = false; messageText = "" }.foregroundColor(.amber)
+                }
+            }
+        }
+    }
+
     private var changeSeatSheet: some View {
         NavigationStack {
             ZStack {
@@ -253,6 +309,110 @@ struct AdminStudentDetailView: View {
             let shift = vm.selectedStudent?.shift ?? "FULL_DAY"
             Task {
                 seatMapSeats = (try? await SeatRepository.shared.getAvailability(shift: shift)) ?? []
+            }
+        }
+    }
+}
+
+private struct EditStudentSheet: View {
+    let s: StudentDetail
+    @ObservedObject var vm: AdminViewModel
+    let onDismiss: () -> Void
+
+    @State private var name:        String
+    @State private var mobile:      String
+    @State private var email:       String
+    @State private var address:     String
+    @State private var gender:      String
+    @State private var dateOfBirth: String
+
+    init(s: StudentDetail, vm: AdminViewModel, onDismiss: @escaping () -> Void) {
+        self.s = s
+        self.vm = vm
+        self.onDismiss = onDismiss
+        _name        = State(initialValue: s.name)
+        _mobile      = State(initialValue: s.mobile)
+        _email       = State(initialValue: s.email ?? "")
+        _address     = State(initialValue: s.address ?? "")
+        _gender      = State(initialValue: s.gender ?? "")
+        _dateOfBirth = State(initialValue: s.dateOfBirth ?? "")
+    }
+
+    private let genderOptions = ["", "Male", "Female", "Other"]
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.navyDeep.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 12) {
+                        editField("Name",                text: $name)
+                        editField("Mobile",              text: $mobile,      keyboard: .phonePad)
+                        editField("Email",               text: $email,       keyboard: .emailAddress)
+                        editField("Address",             text: $address,     lines: 2)
+                        editField("Date of Birth",       text: $dateOfBirth, placeholder: "yyyy-MM-dd")
+
+                        // Gender picker
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Gender").font(.labelSmall).foregroundColor(.textMuted)
+                            Picker("", selection: $gender) {
+                                ForEach(genderOptions, id: \.self) { opt in
+                                    Text(opt.isEmpty ? "—" : opt).tag(opt)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                        .padding(12)
+                        .background(Color.navyMid)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                        PrimaryButton("Save Changes") {
+                            let req = UpdateStudentRequest(
+                                name:        name.trimmingCharacters(in: .whitespaces),
+                                mobile:      mobile.trimmingCharacters(in: .whitespaces).isEmpty ? nil : mobile.trimmingCharacters(in: .whitespaces),
+                                email:       email.trimmingCharacters(in: .whitespaces).isEmpty  ? nil : email.trimmingCharacters(in: .whitespaces),
+                                address:     address.trimmingCharacters(in: .whitespaces).isEmpty ? nil : address.trimmingCharacters(in: .whitespaces),
+                                gender:      gender.isEmpty ? nil : gender,
+                                dateOfBirth: dateOfBirth.trimmingCharacters(in: .whitespaces).isEmpty ? nil : dateOfBirth.trimmingCharacters(in: .whitespaces)
+                            )
+                            vm.updateStudent(id: s.id, req: req)
+                            onDismiss()
+                        }
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    .padding(16)
+                }
+            }
+            .navigationTitle("Edit Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel", action: onDismiss).foregroundColor(.amber)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func editField(_ label: String, text: Binding<String>, placeholder: String = "", keyboard: UIKeyboardType = .default, lines: Int = 1) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).font(.labelSmall).foregroundColor(.textMuted)
+            if lines > 1 {
+                TextEditor(text: text)
+                    .frame(minHeight: CGFloat(lines) * 44)
+                    .padding(8)
+                    .background(Color.navyMid)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .foregroundColor(.textPrimary)
+                    .font(.bodyMedium)
+            } else {
+                TextField(placeholder.isEmpty ? label : placeholder, text: text)
+                    .keyboardType(keyboard)
+                    .padding(12)
+                    .background(Color.navyMid)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .foregroundColor(.textPrimary)
+                    .font(.bodyMedium)
             }
         }
     }

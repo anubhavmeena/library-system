@@ -139,6 +139,14 @@ public class AdminController {
                 "Pending fee reminders queued for " + count + " students"));
     }
 
+    @PostMapping("/students/{userId}/message")
+    public ResponseEntity<ApiResponse<String>> sendMessageToStudent(
+            @PathVariable String userId,
+            @Valid @RequestBody BroadcastRequest request) {
+        adminService.sendDirectMessage(userId, request);
+        return ResponseEntity.ok(ApiResponse.success("Message sent"));
+    }
+
     // ── Broadcast Notification ────────────────────────────────────────────────
     // Sends a custom WhatsApp message to all students with active memberships
 

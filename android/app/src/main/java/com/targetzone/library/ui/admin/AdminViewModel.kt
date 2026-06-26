@@ -143,6 +143,12 @@ class AdminViewModel(
         isLoading.value = false
     }
 
+    fun sendMessageToStudent(id: String, message: String, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.sendMessageToStudent(id, message)
+            .onSuccess { successMsg.value = "Message sent"; onDone() }
+            .onFailure { error.value = it.message }
+    }
+
     fun loadPlans() = viewModelScope.launch {
         membershipRepo.getPlans().onSuccess { plans.value = it }
     }

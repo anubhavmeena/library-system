@@ -54,7 +54,7 @@ export default function AdminLayout() {
                         </div>
                     </div>
                 </div>
-                <nav className="flex-1 px-3 py-4 space-y-1">
+                <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
                     {navItems.map(({ to, icon, label, badge }) => (
                         <NavLink key={to} to={to} onClick={() => setSidebarOpen(false)}
                                  className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-primary-300 hover:text-white hover:bg-primary-800/60'}`}>

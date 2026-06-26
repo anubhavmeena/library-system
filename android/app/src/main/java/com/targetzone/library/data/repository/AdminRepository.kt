@@ -73,6 +73,10 @@ class AdminRepository {
         res.body()?.data ?: res.body()?.message ?: "Broadcast sent"
     }
 
+    suspend fun sendMessageToStudent(id: String, message: String): Result<Unit> = runCatching {
+        api.sendMessageToStudent(id, BroadcastRequest(message = message))
+    }
+
     suspend fun createCashMembership(req: CreateCashMembershipRequest): Result<Membership> = runCatching {
         val res = api.createCashMembership(req)
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to create membership")

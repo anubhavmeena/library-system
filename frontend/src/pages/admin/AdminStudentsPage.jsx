@@ -42,6 +42,9 @@ export default function AdminStudentsPage() {
     const [studentPayments, setStudentPayments]               = useState([])
     const [studentPaymentsLoading, setStudentPaymentsLoading] = useState(false)
 
+    const [msgText, setMsgText]       = useState('')
+    const [msgSending, setMsgSending] = useState(false)
+
     const { t } = useTranslation()
 
     const fetchStudents = async () => {
@@ -312,7 +315,7 @@ export default function AdminStudentsPage() {
                                             <button onClick={() => {
                                                 setDetail(s)
                                                 setEditMode(false)
-                                                setEditForm({ name: s.name||'', email: s.email||'', address: s.address||'', gender: s.gender||'', dateOfBirth: s.dateOfBirth||'' })
+                                                setEditForm({ name: s.name||'', mobile: s.mobile||'', email: s.email||'', address: s.address||'', gender: s.gender||'', dateOfBirth: s.dateOfBirth||'' })
                                             }}
                                                     className="text-xs px-3 py-1.5 rounded-lg bg-primary-700/50 text-primary-300 hover:text-white border border-primary-700/40 transition-all">
                                                 {t('adminStudents.view')}
@@ -492,7 +495,7 @@ export default function AdminStudentsPage() {
             )}
 
             {detail && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => { setDetail(null); setEditMode(false) }}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => { setDetail(null); setEditMode(false); setMsgText('') }}>
                     <div className="card p-6 w-full max-w-md border-primary-700/30 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         {/* Header */}
                         <div className="flex items-center justify-between mb-5">
@@ -505,7 +508,7 @@ export default function AdminStudentsPage() {
                                     </button>
                                 ) : (
                                     <>
-                                        <button onClick={() => { setEditMode(false); setEditForm({ name: detail.name||'', email: detail.email||'', address: detail.address||'', gender: detail.gender||'', dateOfBirth: detail.dateOfBirth||'' }) }}
+                                        <button onClick={() => { setEditMode(false); setEditForm({ name: detail.name||'', mobile: detail.mobile||'', email: detail.email||'', address: detail.address||'', gender: detail.gender||'', dateOfBirth: detail.dateOfBirth||'' }) }}
                                             className="text-xs px-3 py-1 rounded-lg bg-primary-700/50 text-primary-300 hover:text-white border border-primary-700/40 transition-all">
                                             Cancel
                                         </button>
@@ -517,7 +520,7 @@ export default function AdminStudentsPage() {
                                                     const res = await api.patch(`/admin/students/${detail.id}`, editForm)
                                                     const updated = res.data.data
                                                     setDetail(updated)
-                                                    setEditForm({ name: updated.name||'', email: updated.email||'', address: updated.address||'', gender: updated.gender||'', dateOfBirth: updated.dateOfBirth||'' })
+                                                    setEditForm({ name: updated.name||'', mobile: updated.mobile||'', email: updated.email||'', address: updated.address||'', gender: updated.gender||'', dateOfBirth: updated.dateOfBirth||'' })
                                                     setEditMode(false)
                                                     fetchStudents()
                                                     toast.success('Student profile updated')
@@ -532,7 +535,7 @@ export default function AdminStudentsPage() {
                                         </button>
                                     </>
                                 )}
-                                <button onClick={() => { setDetail(null); setEditMode(false) }} className="text-primary-400 hover:text-white ml-1">✕</button>
+                                <button onClick={() => { setDetail(null); setEditMode(false); setMsgText('') }} className="text-primary-400 hover:text-white ml-1">✕</button>
                             </div>
                         </div>
 
@@ -556,14 +559,9 @@ export default function AdminStudentsPage() {
 
                         {/* Fields */}
                         <div className="space-y-2">
-                            {/* Mobile — always read-only */}
-                            <div className="flex justify-between py-1.5 border-b border-primary-700/20 text-sm">
-                                <span className="text-primary-400">{t('adminStudents.modal.mobile')}</span>
-                                <span className="text-white">{detail.mobile || '—'}</span>
-                            </div>
-
                             {/* Editable fields */}
                             {[
+                                { key: 'mobile',      label: t('adminStudents.modal.mobile'),  type: 'text',  placeholder: 'Mobile' },
                                 { key: 'email',       label: t('adminStudents.modal.email'),   type: 'text',  placeholder: 'Email' },
                                 { key: 'address',     label: t('adminStudents.modal.address'), type: 'text',  placeholder: 'Address' },
                                 { key: 'dateOfBirth', label: 'Date of Birth',                  type: 'date',  placeholder: '' },
@@ -621,6 +619,35 @@ export default function AdminStudentsPage() {
                                     <span className="text-primary-600 text-xs">{t('adminStudents.modal.aadhaarNone')}</span>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Send Message */}
+                        <div className="mt-5 pt-5 border-t border-primary-700/30">
+                            <h4 className="text-white font-semibold text-sm mb-3">Send Message</h4>
+                            <textarea
+                                rows={3}
+                                value={msgText}
+                                onChange={e => setMsgText(e.target.value)}
+                                placeholder="Type a WhatsApp message to send this student…"
+                                className="input w-full text-sm resize-none"
+                            />
+                            <button
+                                disabled={msgSending || msgText.trim().length < 5}
+                                onClick={async () => {
+                                    setMsgSending(true)
+                                    try {
+                                        await api.post(`/admin/students/${detail.id}/message`, { message: msgText.trim() })
+                                        toast.success('Message sent')
+                                        setMsgText('')
+                                    } catch (e) {
+                                        toast.error(e.response?.data?.message || 'Failed to send')
+                                    } finally {
+                                        setMsgSending(false)
+                                    }
+                                }}
+                                className="mt-2 w-full text-sm px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 transition-colors">
+                                {msgSending ? 'Sending…' : 'Send via WhatsApp'}
+                            </button>
                         </div>
 
                         {/* Payment History */}

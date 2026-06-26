@@ -31,6 +31,10 @@ struct AdminRepository {
         try await api.requestVoid(.toggleStudentStatus(id: id, req: req), token: token)
     }
 
+    func updateStudent(id: String, req: UpdateStudentRequest) async throws -> StudentDetail {
+        try await api.request(.updateStudent(id: id, req: req), token: token)
+    }
+
     func getStudentsWithPendingFees() async throws -> [StudentDetail] {
         try await api.request(.getStudentsWithPendingFees, token: token)
     }
@@ -77,6 +81,11 @@ struct AdminRepository {
     func sendBroadcast(message: String, targetGroup: String = "ALL") async throws {
         let req = BroadcastRequest(message: message, targetGroup: targetGroup)
         try await api.requestVoid(.sendBroadcast(req), token: token)
+    }
+
+    func sendMessageToStudent(id: String, message: String) async throws {
+        let req = BroadcastRequest(message: message, targetGroup: "ALL")
+        try await api.requestVoid(.sendMessageToStudent(id, req), token: token)
     }
 
     func getBroadcastHistory() async throws -> [BroadcastHistory] {

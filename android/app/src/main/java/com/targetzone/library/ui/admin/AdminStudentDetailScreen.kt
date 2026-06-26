@@ -3,6 +3,7 @@ package com.targetzone.library.ui.admin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,6 +39,7 @@ fun AdminStudentDetailScreen(
     var changeSeatOpen by remember { mutableStateOf(false) }
     var newSeat        by remember { mutableStateOf("") }
     var editOpen       by remember { mutableStateOf(false) }
+    var messageOpen    by remember { mutableStateOf(false) }
 
     LaunchedEffect(studentId) { vm.loadStudentDetail(studentId) }
 
@@ -188,7 +190,10 @@ fun AdminStudentDetailScreen(
 
         // ── Actions ───────────────────────────────────────────────────────────
         SectionHeader("Actions")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.horizontalScroll(rememberScrollState())
+        ) {
             OutlinedButton(
                 onClick = { vm.toggleStudentStatus(s.id, s.isActive) { vm.loadStudentDetail(studentId) } },
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = if (s.isActive) RedAlert else Emerald),
@@ -211,6 +216,12 @@ fun AdminStudentDetailScreen(
                     modifier = Modifier.height(40.dp)
                 ) { Text("Change Seat", fontSize = 13.sp) }
             }
+
+            OutlinedButton(
+                onClick = { messageOpen = true },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Emerald),
+                modifier = Modifier.height(40.dp)
+            ) { Text("Message", fontSize = 13.sp) }
         }
 
         Spacer(Modifier.height(8.dp))
@@ -219,6 +230,7 @@ fun AdminStudentDetailScreen(
     // Edit profile dialog
     if (editOpen) {
         var eName by remember(s.name)        { mutableStateOf(s.name) }
+        var eMobile by remember(s.mobile)    { mutableStateOf(s.mobile) }
         var eEmail by remember(s.email)      { mutableStateOf(s.email ?: "") }
         var eAddress by remember(s.address)  { mutableStateOf(s.address ?: "") }
         var eGender by remember(s.gender)    { mutableStateOf(s.gender ?: "") }
@@ -234,6 +246,9 @@ fun AdminStudentDetailScreen(
                     Spacer(Modifier.height(16.dp))
 
                     OutlinedTextField(eName, { eName = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber, focusedLabelColor = Amber, cursorColor = Amber, unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary))
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(eMobile, { eMobile = it }, label = { Text("Mobile") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber, focusedLabelColor = Amber, cursorColor = Amber, unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted, focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary))
                     Spacer(Modifier.height(10.dp))
                     OutlinedTextField(eEmail, { eEmail = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
@@ -275,6 +290,7 @@ fun AdminStudentDetailScreen(
                             onClick = {
                                 val req = UpdateStudentRequest(
                                     name        = eName.trim(),
+                                    mobile      = eMobile.trim().ifBlank { null },
                                     email       = eEmail.trim().ifBlank { null },
                                     address     = eAddress.trim().ifBlank { null },
                                     gender      = eGender.trim().ifBlank { null },
@@ -285,6 +301,43 @@ fun AdminStudentDetailScreen(
                             enabled = eName.isNotBlank(),
                             colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = NavyDeep)
                         ) { Text("Save") }
+                    }
+                }
+            }
+        }
+    }
+
+    // Send message dialog
+    if (messageOpen) {
+        var msgBody by remember { mutableStateOf("") }
+        Dialog(onDismissRequest = { messageOpen = false; msgBody = "" }) {
+            Surface(shape = RoundedCornerShape(16.dp), color = NavyMid) {
+                Column(Modifier.padding(20.dp)) {
+                    Text("Message ${s.name}", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                    Text("Sends via WhatsApp to ${s.mobile}", color = TextSub, fontSize = 12.sp)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = msgBody,
+                        onValueChange = { msgBody = it },
+                        label = { Text("Message") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        maxLines = 6,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Emerald, focusedLabelColor = Emerald, cursorColor = Emerald,
+                            unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted,
+                            focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
+                        )
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { messageOpen = false; msgBody = "" }) { Text("Cancel", color = TextSub) }
+                        Spacer(Modifier.width(8.dp))
+                        Button(
+                            onClick = { vm.sendMessageToStudent(s.id, msgBody.trim()) { messageOpen = false; msgBody = "" } },
+                            enabled = msgBody.trim().length >= 5,
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald, contentColor = NavyDeep)
+                        ) { Text("Send") }
                     }
                 }
             }

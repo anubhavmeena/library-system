@@ -148,6 +148,12 @@ interface ApiService {
     @POST("admin/broadcast")
     suspend fun sendBroadcast(@Body req: BroadcastRequest): Response<ApiResponse<String?>>
 
+    @POST("admin/students/{id}/message")
+    suspend fun sendMessageToStudent(
+        @Path("id") id: String,
+        @Body req: BroadcastRequest
+    ): Response<ApiResponse<String?>>
+
     @POST("admin/memberships/cash")
     suspend fun createCashMembership(@Body req: CreateCashMembershipRequest): Response<ApiResponse<Membership>>
 

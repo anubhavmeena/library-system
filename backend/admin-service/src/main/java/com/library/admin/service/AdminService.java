@@ -504,8 +504,9 @@ public class AdminService {
     public StudentDto updateStudent(String userId, UpdateStudentRequest req) {
         User user = userRepository.findById(UUID.fromString(userId))
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + userId));
-        if (req.getName()  != null && !req.getName().isBlank()) user.setName(req.getName().trim());
-        if (req.getEmail() != null) user.setEmail(req.getEmail().isBlank() ? null : req.getEmail().trim());
+        if (req.getName()   != null && !req.getName().isBlank())   user.setName(req.getName().trim());
+        if (req.getMobile() != null && !req.getMobile().isBlank()) user.setMobile(req.getMobile().trim());
+        if (req.getEmail()  != null) user.setEmail(req.getEmail().isBlank() ? null : req.getEmail().trim());
         user.setAddress(req.getAddress() != null && !req.getAddress().isBlank() ? req.getAddress().trim() : null);
         user.setGender(req.getGender()   != null && !req.getGender().isBlank()  ? req.getGender().trim()   : null);
         user.setDateOfBirth(req.getDateOfBirth() != null && !req.getDateOfBirth().isBlank()
@@ -545,6 +546,22 @@ public class AdminService {
         membershipRepository.deleteByUserId(id);
         userRepository.deleteById(id);
         log.info("Student deleted: {}", userId);
+    }
+
+    // ── Direct Message ────────────────────────────────────────────────────────
+
+    public void sendDirectMessage(String userId, BroadcastRequest req) {
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
+        BroadcastNotificationEvent event = BroadcastNotificationEvent.builder()
+                .userId(user.getId().toString())
+                .mobile(user.getMobile())
+                .userName(user.getName())
+                .message(req.getMessage())
+                .isFirst(false)
+                .build();
+        kafkaTemplate.send("broadcast-notification", user.getId().toString(), event);
+        log.info("Direct message queued for student: {}", userId);
     }
 
     // ── Broadcast Notification ────────────────────────────────────────────────

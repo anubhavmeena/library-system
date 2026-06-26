@@ -62,6 +62,15 @@ struct ToggleStatusRequest: Codable {
     let active: Bool
 }
 
+struct UpdateStudentRequest: Codable {
+    let name: String
+    let mobile: String?
+    let email: String?
+    let address: String?
+    let gender: String?
+    let dateOfBirth: String?
+}
+
 struct ChangeSeatRequest: Codable {
     let seatNumber: String
 }

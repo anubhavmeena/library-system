@@ -262,6 +262,7 @@ data class ImportRowError(
 
 data class UpdateStudentRequest(
     val name: String,
+    val mobile: String?,
     val email: String?,
     val address: String?,
     val gender: String?,

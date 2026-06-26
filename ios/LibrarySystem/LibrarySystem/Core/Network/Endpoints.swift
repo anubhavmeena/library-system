@@ -93,6 +93,9 @@ extension Endpoint {
     static func toggleStudentStatus(id: String, req: ToggleStatusRequest) -> Endpoint {
         Endpoint(path: "admin/students/\(id)/status", method: .PATCH, body: encode(req))
     }
+    static func updateStudent(id: String, req: UpdateStudentRequest) -> Endpoint {
+        Endpoint(path: "admin/students/\(id)", method: .PATCH, body: encode(req))
+    }
     static let getStudentsWithPendingFees = Endpoint(path: "admin/students/pending-fees")
     static func clearPendingFees(userId: String) -> Endpoint {
         Endpoint(path: "admin/students/\(userId)/clear-pending-fees", method: .PATCH)
@@ -126,6 +129,9 @@ extension Endpoint {
         Endpoint(path: "admin/broadcast", method: .POST, body: encode(req))
     }
     static let getBroadcastHistory = Endpoint(path: "admin/broadcast/history")
+    static func sendMessageToStudent(_ id: String, _ req: BroadcastRequest) -> Endpoint {
+        Endpoint(path: "admin/students/\(id)/message", method: .POST, body: encode(req))
+    }
 
     // MARK: - Admin: Feedback
     static let getAllFeedback = Endpoint(path: "admin/feedback")

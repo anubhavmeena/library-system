@@ -76,6 +76,16 @@ final class AdminViewModel: ObservableObject {
         }
     }
 
+    func updateStudent(id: String, req: UpdateStudentRequest) {
+        Task {
+            do {
+                let updated = try await repo.updateStudent(id: id, req: req)
+                selectedStudent = updated
+                successMsg = "Profile updated"
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
     func changeSeat(membershipId: String, seatNumber: String) {
         Task {
             do {
@@ -163,6 +173,16 @@ final class AdminViewModel: ObservableObject {
                     feedback[idx] = updated
                 }
                 successMsg = "Feedback updated"
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    // MARK: - Direct Message
+    func sendMessageToStudent(id: String, message: String) {
+        Task {
+            do {
+                try await repo.sendMessageToStudent(id: id, message: message)
+                successMsg = "Message sent"
             } catch { self.error = error.localizedDescription }
         }
     }
