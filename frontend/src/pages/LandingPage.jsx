@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom'
-import { BookOpen, Clock, Wifi, Coffee, Users, Star, ArrowRight, CheckCircle2, Wind, Droplets, Newspaper, Car, MapPin } from 'lucide-react'
+import { BookOpen, Clock, Wifi, Coffee, Users, Star, ArrowRight, CheckCircle2, Wind, Droplets, Newspaper, Car, MapPin, Camera, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Helmet } from 'react-helmet-async'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 import PhotoSlideshow from '../components/PhotoSlideshow'
 
-const FEATURE_ICONS = [Clock, Wifi, Coffee, Users, Wind, Droplets, Newspaper, Car]
-const FEATURE_KEYS  = ['flexibleShifts', 'wifi', 'refreshment', 'seats', 'ac', 'roCooler', 'newspaper', 'parking']
+const FEATURE_ICONS = [Clock, Wifi, Coffee, Users, Wind, Droplets, Newspaper, Car, Camera, Zap]
+const FEATURE_KEYS  = ['flexibleShifts', 'wifi', 'refreshment', 'seats', 'ac', 'roCooler', 'newspaper', 'parking', 'cctv', 'chargingPoint']
 
 // Add your library photos to frontend/public/gallery/ and list them here.
 // Filenames are served directly from the /gallery/ path at runtime.

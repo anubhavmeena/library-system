@@ -19,7 +19,9 @@
       "ac":        { "title": "Air Conditioning",   "desc": "Climate-controlled study environment all day long" },
       "roCooler":  { "title": "RO Cooler Water",    "desc": "Clean purified drinking water available at all times" },
       "newspaper": { "title": "Newspaper",           "desc": "Daily Hindi & English newspapers for current affairs prep" },
-      "parking":   { "title": "Indoor Parking",      "desc": "Free covered parking for two-wheelers" }
+      "parking":        { "title": "Indoor Parking",      "desc": "Free covered parking for two-wheelers" },
+      "cctv":           { "title": "CCTV Surveillance",  "desc": "24×7 CCTV monitoring across the entire study hall and premises" },
+      "chargingPoint":  { "title": "Charging Point",      "desc": "Dedicated power socket at every desk to keep your devices charged" }
     },
     "gallery": {
       "title": "Our Library Space",
