@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { BookOpen, Clock, Wifi, Coffee, Users, Star, ArrowRight, CheckCircle2, Wind, Droplets, Newspaper, Car } from 'lucide-react'
+import { BookOpen, Clock, Wifi, Coffee, Users, Star, ArrowRight, CheckCircle2, Wind, Droplets, Newspaper, Car, MapPin } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Helmet } from 'react-helmet-async'
 import LanguageSwitcher from '../components/LanguageSwitcher'
@@ -154,7 +154,10 @@ export default function LandingPage() {
                         referrerPolicy="strict-origin-when-cross-origin"
                     />
                 </div>
-                <p className="text-center text-primary-400 mt-4 text-sm">B-199, Malviya Nagar, Alwar</p>
+                <div className="flex items-center justify-center gap-2 mt-4">
+                    <MapPin size={16} className="text-amber-400 shrink-0" />
+                    <p className="text-white font-semibold text-base">B-199, Malviya Nagar, Alwar</p>
+                </div>
             </section>
 
             {/* Plans */}
