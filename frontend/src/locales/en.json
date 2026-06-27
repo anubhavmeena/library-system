@@ -14,8 +14,12 @@
       "subtitle": "Designed for serious students who demand the best",
       "flexibleShifts": { "title": "Flexible Shifts", "desc": "Morning (6AM–2PM) or Evening (2PM–10PM) or Full Day access" },
       "wifi": { "title": "High-Speed Wi-Fi", "desc": "Blazing fast internet for uninterrupted study sessions" },
-      "refreshment": { "title": "Refreshment Zone", "desc": "Tea, coffee and snacks available throughout the day" },
-      "seats": { "title": "110 Seats", "desc": "Spacious seating across 4 rows with aisle comfort" }
+      "refreshment": { "title": "Lunch Area", "desc": "Tea, coffee and snacks available throughout the day" },
+      "seats":     { "title": "110 Seats",          "desc": "Spacious seating across 4 rows with aisle comfort" },
+      "ac":        { "title": "Air Conditioning",   "desc": "Climate-controlled study environment all day long" },
+      "roCooler":  { "title": "RO Cooler Water",    "desc": "Clean purified drinking water available at all times" },
+      "newspaper": { "title": "Newspaper",           "desc": "Daily Hindi & English newspapers for current affairs prep" },
+      "parking":   { "title": "Indoor Parking",      "desc": "Free covered parking for two-wheelers" }
     },
     "gallery": {
       "title": "Our Library Space",
