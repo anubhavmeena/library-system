@@ -136,6 +136,27 @@ export default function LandingPage() {
                 </section>
             )}
 
+            {/* Our Location */}
+            <section className="py-20 px-6 md:px-12">
+                <div className="max-w-4xl mx-auto text-center mb-10">
+                    <h2 className="font-display text-4xl font-bold text-white mb-3">{t('landing.location.title')}</h2>
+                    <p className="text-primary-400">{t('landing.location.subtitle')}</p>
+                </div>
+                <div className="max-w-4xl mx-auto rounded-2xl overflow-hidden border border-primary-700/50 shadow-xl">
+                    <iframe
+                        title="Library Location"
+                        src="https://maps.google.com/maps?q=B-199+Malviya+Nagar+Alwar+Rajasthan&output=embed&z=16"
+                        width="100%"
+                        height="400"
+                        style={{ border: 0, display: 'block' }}
+                        allowFullScreen
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                    />
+                </div>
+                <p className="text-center text-primary-400 mt-4 text-sm">B-199, Malviya Nagar, Alwar</p>
+            </section>
+
             {/* Plans */}
             <section id="plans" className="py-20 px-6 md:px-12 bg-primary-900/30">
                 <div className="max-w-5xl mx-auto">
