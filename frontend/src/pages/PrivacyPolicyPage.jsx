@@ -8,6 +8,13 @@ export default function PrivacyPolicyPage() {
             <Helmet>
                 <title>Privacy Policy | Target Zone Library</title>
                 <meta name="description" content="Privacy policy for Target Zone Library — how we collect, use, and protect your personal data." />
+                <link rel="canonical" href="https://targetzone.co.in/privacy-policy" />
+                <meta property="og:type" content="website" />
+                <meta property="og:url" content="https://targetzone.co.in/privacy-policy" />
+                <meta property="og:title" content="Privacy Policy | Target Zone Library" />
+                <meta property="og:description" content="Privacy policy for Target Zone Library — how we collect, use, and protect your personal data." />
+                <meta property="og:image" content="https://targetzone.co.in/og-image.jpg" />
+                <meta property="og:site_name" content="Target Zone Library" />
             </Helmet>
             <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-12 py-4 bg-primary-900/80 backdrop-blur-xl border-b border-primary-700/20">
                 <div className="flex items-center gap-3">
@@ -68,7 +75,7 @@ export default function PrivacyPolicyPage() {
                         <h2 className="text-amber-400 font-semibold text-base mb-2">9. Contact</h2>
                         <p>For privacy-related queries, please contact:<br />
                         TARGET ZONE, B-199, Malviya Nagar, Alwar (301001), Rajasthan<br />
-                        Phone: 6003494209</p>
+                        Phone: +91 81329 78111</p>
                     </section>
                 </div>
             </div>

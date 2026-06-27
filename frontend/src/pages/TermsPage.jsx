@@ -8,6 +8,13 @@ export default function TermsPage() {
             <Helmet>
                 <title>Terms &amp; Conditions | Target Zone Library</title>
                 <meta name="description" content="Terms and conditions for using Target Zone Library seat booking services in Alwar, Rajasthan." />
+                <link rel="canonical" href="https://targetzone.co.in/terms" />
+                <meta property="og:type" content="website" />
+                <meta property="og:url" content="https://targetzone.co.in/terms" />
+                <meta property="og:title" content="Terms &amp; Conditions | Target Zone Library" />
+                <meta property="og:description" content="Terms and conditions for using Target Zone Library seat booking services in Alwar, Rajasthan." />
+                <meta property="og:image" content="https://targetzone.co.in/og-image.jpg" />
+                <meta property="og:site_name" content="Target Zone Library" />
             </Helmet>
             <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-12 py-4 bg-primary-900/80 backdrop-blur-xl border-b border-primary-700/20">
                 <div className="flex items-center gap-3">
@@ -68,7 +75,7 @@ export default function TermsPage() {
                         <h2 className="text-amber-400 font-semibold text-base mb-2">9. Contact</h2>
                         <p>For questions regarding these terms, please contact us at:<br />
                         TARGET ZONE, B-199, Malviya Nagar, Alwar (301001), Rajasthan<br />
-                        Phone: 6003494209</p>
+                        Phone: +91 81329 78111</p>
                     </section>
                 </div>
             </div>

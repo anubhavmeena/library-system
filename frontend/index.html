@@ -31,9 +31,8 @@
     <meta name="twitter:description" content="Book your study seat online. Flexible plans, open 6 AM–11 PM, instant WhatsApp confirmation." />
     <meta name="twitter:image"       content="https://targetzone.co.in/og-image.jpg" />
 
-    <!-- hreflang for English / Hindi language variants -->
-    <link rel="alternate" hreflang="en-in"   href="https://targetzone.co.in/" />
-    <link rel="alternate" hreflang="hi-in"   href="https://targetzone.co.in/" />
+    <!-- hreflang -->
+    <link rel="alternate" hreflang="en-in"    href="https://targetzone.co.in/" />
     <link rel="alternate" hreflang="x-default" href="https://targetzone.co.in/" />
 
     <!-- Favicon -->
@@ -81,6 +80,14 @@
         }
       ],
       "priceRange": "₹₹",
+      "areaServed": { "@type": "City", "name": "Alwar" },
+      "amenityFeature": [
+        { "@type": "LocationFeatureSpecification", "name": "Wi-Fi", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "Air Conditioning", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "Parking", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "CCTV", "value": true }
+      ],
+      "maximumAttendeeCapacity": 110,
       "hasOfferCatalog": {
         "@type": "OfferCatalog",
         "name": "Membership Plans",
@@ -90,6 +97,41 @@
           { "@type": "Offer", "name": "Full Day",      "description": "6 AM – 11 PM dedicated study seat access" }
         ]
       }
+    }
+    </script>
+
+    <!-- JSON-LD: FAQPage for rich results -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Where is Target Zone Library located in Alwar?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Target Zone Library is at B-199, Malviya Nagar, Alwar, Rajasthan 301001." }
+        },
+        {
+          "@type": "Question",
+          "name": "What are the timings of Target Zone Library in Alwar?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Open 7 days a week, 6:00 AM to 11:00 PM. Morning shift: 6 AM–2 PM, Evening shift: 2 PM–10 PM, Full Day: 6 AM–11 PM." }
+        },
+        {
+          "@type": "Question",
+          "name": "How much does a library seat cost in Alwar?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Monthly membership starts at ₹400 for a half-day shift (morning or evening) and ₹600 for full-day access at Target Zone Library, Alwar." }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I book a seat at Target Zone Library, Alwar?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Visit targetzone.co.in, register with your mobile number, choose a membership plan, and pick your preferred seat from the live seat map. WhatsApp confirmation is sent instantly." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Target Zone Library in Malviya Nagar have Wi-Fi and AC?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Target Zone Library offers high-speed Wi-Fi, air conditioning throughout the study hall, power outlets at every seat, RO water, and a refreshment zone." }
+        }
+      ]
     }
     </script>
 </head>

@@ -11,18 +11,18 @@ const FEATURE_KEYS  = ['flexibleShifts', 'wifi', 'refreshment', 'seats', 'ac', '
 // Add your library photos to frontend/public/gallery/ and list them here.
 // Filenames are served directly from the /gallery/ path at runtime.
 const GALLERY_PHOTOS = [
-    { src: '/gallery/photo1.jpg',  alt: 'Target Zone Library' },
-    { src: '/gallery/photo2.jpg',  alt: 'Target Zone Library' },
-    { src: '/gallery/photo3.jpg',  alt: 'Target Zone Library' },
-    { src: '/gallery/photo4.jpg',  alt: 'Target Zone Library' },
-    { src: '/gallery/photo5.jpg',  alt: 'Target Zone Library' },
-    { src: '/gallery/photo6.jpg',  alt: 'Target Zone Library' },
-    { src: '/gallery/photo7.jpg',  alt: 'Target Zone Library' },
-    { src: '/gallery/photo8.jpg',  alt: 'Target Zone Library' },
-    { src: '/gallery/photo9.jpg',  alt: 'Target Zone Library' },
-    { src: '/gallery/photo10.jpg', alt: 'Target Zone Library' },
-    { src: '/gallery/photo11.jpg', alt: 'Target Zone Library' },
-    { src: '/gallery/photo12.jpg', alt: 'Target Zone Library' },
+    { src: '/gallery/photo1.jpg',  alt: 'Spacious study hall at Target Zone Library, Malviya Nagar, Alwar' },
+    { src: '/gallery/photo2.jpg',  alt: 'Dedicated study seats with power outlets at Target Zone Library Alwar' },
+    { src: '/gallery/photo3.jpg',  alt: 'Air-conditioned reading room at Target Zone Library, Alwar' },
+    { src: '/gallery/photo4.jpg',  alt: 'Row A study seats — Target Zone Library Malviya Nagar' },
+    { src: '/gallery/photo5.jpg',  alt: 'Wi-Fi study space in Alwar — Target Zone Library' },
+    { src: '/gallery/photo6.jpg',  alt: 'Morning shift study session at Target Zone Library, Alwar' },
+    { src: '/gallery/photo7.jpg',  alt: 'Evening shift seats available — library in Alwar' },
+    { src: '/gallery/photo8.jpg',  alt: 'Refreshment zone at Target Zone Library, Malviya Nagar' },
+    { src: '/gallery/photo9.jpg',  alt: 'RO water cooler and amenities at Target Zone Library Alwar' },
+    { src: '/gallery/photo10.jpg', alt: 'Parking area outside Target Zone Library, Alwar' },
+    { src: '/gallery/photo11.jpg', alt: 'Newspaper reading section — Target Zone Library Alwar' },
+    { src: '/gallery/photo12.jpg', alt: 'Exterior entrance of Target Zone Library, B-199 Malviya Nagar, Alwar' },
 ]
 
 export default function LandingPage() {

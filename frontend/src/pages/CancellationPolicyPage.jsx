@@ -8,6 +8,13 @@ export default function CancellationPolicyPage() {
             <Helmet>
                 <title>Cancellation Policy | Target Zone Library</title>
                 <meta name="description" content="Cancellation policy for Target Zone Library seat bookings — how to cancel and what to expect." />
+                <link rel="canonical" href="https://targetzone.co.in/cancellation-policy" />
+                <meta property="og:type" content="website" />
+                <meta property="og:url" content="https://targetzone.co.in/cancellation-policy" />
+                <meta property="og:title" content="Cancellation Policy | Target Zone Library" />
+                <meta property="og:description" content="Cancellation policy for Target Zone Library seat bookings — how to cancel and what to expect." />
+                <meta property="og:image" content="https://targetzone.co.in/og-image.jpg" />
+                <meta property="og:site_name" content="Target Zone Library" />
             </Helmet>
             <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-12 py-4 bg-primary-900/80 backdrop-blur-xl border-b border-primary-700/20">
                 <div className="flex items-center gap-3">
@@ -36,7 +43,7 @@ export default function CancellationPolicyPage() {
 
                     <section>
                         <h2 className="text-amber-400 font-semibold text-base mb-2">3. How to Cancel</h2>
-                        <p>To cancel your membership, please contact the library admin directly at the front desk or call us at 6003494209. You may also raise a request through the in-app feedback/complaint section.</p>
+                        <p>To cancel your membership, please contact the library admin directly at the front desk or call us at +91 81329 78111. You may also raise a request through the in-app feedback/complaint section.</p>
                     </section>
 
                     <section>
@@ -53,7 +60,7 @@ export default function CancellationPolicyPage() {
                         <h2 className="text-amber-400 font-semibold text-base mb-2">6. Contact</h2>
                         <p>For cancellation requests or queries, please contact:<br />
                         TARGET ZONE, B-199, Malviya Nagar, Alwar (301001), Rajasthan<br />
-                        Phone: 6003494209</p>
+                        Phone: +91 81329 78111</p>
                     </section>
                 </div>
             </div>

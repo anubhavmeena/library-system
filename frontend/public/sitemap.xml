@@ -2,36 +2,43 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://targetzone.co.in/</loc>
+    <lastmod>2026-06-27</lastmod>
     <priority>1.0</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
     <loc>https://targetzone.co.in/about</loc>
+    <lastmod>2026-06-27</lastmod>
     <priority>0.8</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
     <loc>https://targetzone.co.in/login</loc>
+    <lastmod>2025-06-01</lastmod>
     <priority>0.5</priority>
     <changefreq>yearly</changefreq>
   </url>
   <url>
     <loc>https://targetzone.co.in/terms</loc>
+    <lastmod>2025-06-01</lastmod>
     <priority>0.3</priority>
     <changefreq>yearly</changefreq>
   </url>
   <url>
     <loc>https://targetzone.co.in/privacy-policy</loc>
+    <lastmod>2025-06-01</lastmod>
     <priority>0.3</priority>
     <changefreq>yearly</changefreq>
   </url>
   <url>
     <loc>https://targetzone.co.in/refund-policy</loc>
+    <lastmod>2025-06-01</lastmod>
     <priority>0.3</priority>
     <changefreq>yearly</changefreq>
   </url>
   <url>
     <loc>https://targetzone.co.in/cancellation-policy</loc>
+    <lastmod>2025-06-01</lastmod>
     <priority>0.3</priority>
     <changefreq>yearly</changefreq>
   </url>
