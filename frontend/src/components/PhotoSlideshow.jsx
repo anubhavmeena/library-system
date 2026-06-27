@@ -27,17 +27,16 @@ export default function PhotoSlideshow({ photos }) {
         >
             {/* Slide images */}
             <div className="relative aspect-video bg-primary-800">
-                {photos.map((photo, i) => (
-                    <img
-                        key={photo.src}
-                        src={photo.src}
-                        alt={photo.alt}
-                        onError={e => { e.currentTarget.src = TRANSPARENT }}
-                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
-                            i === current ? 'opacity-100' : 'opacity-0'
-                        }`}
-                    />
-                ))}
+                <img
+                    key={current}
+                    src={photos[current].src}
+                    alt={photos[current].alt}
+                    onError={e => { e.currentTarget.src = TRANSPARENT }}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    style={{ animation: 'slideshowFade 0.6s ease-in-out' }}
+                />
+                {/* Preload next photo */}
+                <img src={photos[(current + 1) % photos.length].src} alt="" aria-hidden="true" className="hidden" />
                 {/* Side vignettes for arrow contrast */}
                 <div className="absolute inset-0 bg-gradient-to-r from-primary-900/30 via-transparent to-primary-900/30 pointer-events-none" />
             </div>
