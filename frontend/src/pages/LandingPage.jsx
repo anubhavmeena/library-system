@@ -127,14 +127,12 @@ export default function LandingPage() {
 
             {/* Gallery slideshow */}
             {GALLERY_PHOTOS.length > 0 && (
-                <section className="py-20 px-6 md:px-12">
-                    <div className="max-w-5xl mx-auto">
-                        <div className="text-center mb-10">
-                            <h2 className="font-display text-4xl font-bold text-white mb-3">{t('landing.gallery.title')}</h2>
-                            <p className="text-primary-400">{t('landing.gallery.subtitle')}</p>
-                        </div>
-                        <PhotoSlideshow photos={GALLERY_PHOTOS} />
+                <section className="py-20">
+                    <div className="max-w-5xl mx-auto px-6 md:px-12 mb-10 text-center">
+                        <h2 className="font-display text-4xl font-bold text-white mb-3">{t('landing.gallery.title')}</h2>
+                        <p className="text-primary-400">{t('landing.gallery.subtitle')}</p>
                     </div>
+                    <PhotoSlideshow photos={GALLERY_PHOTOS} />
                 </section>
             )}
 

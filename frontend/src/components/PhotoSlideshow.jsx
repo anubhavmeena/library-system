@@ -19,8 +19,9 @@ export default function PhotoSlideshow({ photos }) {
     if (!photos.length) return null
 
     return (
+        <>
         <div
-            className="relative rounded-2xl overflow-hidden select-none shadow-2xl shadow-primary-900/50"
+            className="relative overflow-hidden select-none"
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
         >
@@ -39,8 +40,6 @@ export default function PhotoSlideshow({ photos }) {
                 ))}
                 {/* Side vignettes for arrow contrast */}
                 <div className="absolute inset-0 bg-gradient-to-r from-primary-900/30 via-transparent to-primary-900/30 pointer-events-none" />
-                {/* Bottom vignette for dots contrast */}
-                <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-primary-900/60 to-transparent pointer-events-none" />
             </div>
 
             {/* Prev / Next arrows */}
@@ -63,23 +62,25 @@ export default function PhotoSlideshow({ photos }) {
                 </>
             )}
 
-            {/* Dot indicators */}
-            {photos.length > 1 && (
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                    {photos.map((_, i) => (
-                        <button
-                            key={i}
-                            onClick={() => setCurrent(i)}
-                            aria-label={`Go to photo ${i + 1}`}
-                            className={`rounded-full transition-all duration-300 ${
-                                i === current
-                                    ? 'w-5 h-2 bg-amber-400'
-                                    : 'w-2 h-2 bg-white/50 hover:bg-white/80'
-                            }`}
-                        />
-                    ))}
-                </div>
-            )}
         </div>
+
+        {/* Dot indicators */}
+        {photos.length > 1 && (
+            <div className="flex justify-center gap-1.5 pt-4">
+                {photos.map((_, i) => (
+                    <button
+                        key={i}
+                        onClick={() => setCurrent(i)}
+                        aria-label={`Go to photo ${i + 1}`}
+                        className={`rounded-full transition-all duration-300 ${
+                            i === current
+                                ? 'w-5 h-2 bg-amber-400'
+                                : 'w-2 h-2 bg-white/50 hover:bg-white/80'
+                        }`}
+                    />
+                ))}
+            </div>
+        )}
+        </>
     )
 }
