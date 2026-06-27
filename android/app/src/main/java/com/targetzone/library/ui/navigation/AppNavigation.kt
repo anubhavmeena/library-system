@@ -6,10 +6,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AirlineSeatReclineNormal
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CardMembership
-import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.EventSeat
-import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -17,8 +15,6 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Photo
-import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -29,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import com.targetzone.library.data.TokenManager
+import com.targetzone.library.data.api.ApiClient
 import com.targetzone.library.data.model.User
 import com.targetzone.library.data.repository.AuthRepository
 import com.targetzone.library.ui.SplashScreen
@@ -53,10 +50,6 @@ private val adminNavItems = listOf(
     NavItem("admin/students",    Icons.Default.Group,        "Students"),
     NavItem("admin/seats",       Icons.Default.AirlineSeatReclineNormal, "Seats"),
     NavItem("admin/reminders",   Icons.Default.Notifications,"Alerts"),
-    NavItem("admin/feedback",    Icons.Default.Feedback,     "Feedback"),
-    NavItem("admin/expenses",    Icons.Default.Receipt,      "Expenses"),
-    NavItem("admin/import",      Icons.Default.CloudUpload,   "Import"),
-    NavItem("admin/gallery",     Icons.Default.PhotoLibrary, "Gallery"),
 )
 
 @Composable
@@ -73,6 +66,15 @@ fun AppNavigation(tokenManager: TokenManager) {
     val authVm = remember { AuthViewModel(authRepo) }
     val studentVm = remember { StudentViewModel(tokenManager = tokenManager) }
     val adminVm = remember { AdminViewModel() }
+
+    // Redirect to login on 401 (expired/invalid token)
+    LaunchedEffect(Unit) {
+        ApiClient.unauthorizedEvent.collect {
+            authVm.resetOtpState()
+            currentUser = null
+            navController.navigate("login") { popUpTo(0) { inclusive = true } }
+        }
+    }
 
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route ?: ""
 

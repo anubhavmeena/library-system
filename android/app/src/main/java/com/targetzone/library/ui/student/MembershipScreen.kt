@@ -129,9 +129,10 @@ fun MembershipScreen(vm: StudentViewModel, onBookNow: () -> Unit) {
             }
         }
 
-        if (myPayments.isNotEmpty()) {
+        val successPayments = myPayments.filter { it.status == "SUCCESS" }
+        if (successPayments.isNotEmpty()) {
             item { SectionHeader("Payment History") }
-            items(myPayments) { p ->
+            items(successPayments) { p ->
                 AppCard(Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {

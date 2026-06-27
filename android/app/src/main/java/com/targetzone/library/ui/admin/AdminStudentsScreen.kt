@@ -2,6 +2,7 @@ package com.targetzone.library.ui.admin
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -17,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.targetzone.library.data.model.StudentSummary
 import com.targetzone.library.ui.components.*
 import com.targetzone.library.ui.theme.*
@@ -26,17 +26,13 @@ import com.targetzone.library.ui.theme.*
 fun AdminStudentsScreen(vm: AdminViewModel, onViewDetails: (String) -> Unit = {}) {
     val students      by vm.students.collectAsState()
     val totalStudents by vm.totalStudents.collectAsState()
-    val seats         by vm.seats.collectAsState()
     val isLoading     by vm.isLoading.collectAsState()
     val error         by vm.error.collectAsState()
 
-    var search     by remember { mutableStateOf("") }
-    var statusFilter by remember { mutableStateOf("") }
+    var search        by remember { mutableStateOf("") }
+    var statusFilter  by remember { mutableStateOf("") }
     var mStatusFilter by remember { mutableStateOf("") }
-    var page       by remember { mutableIntStateOf(0) }
-
-    var changeSeatFor by remember { mutableStateOf<StudentSummary?>(null) }
-    var newSeat       by remember { mutableStateOf("") }
+    var page          by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(page, statusFilter, mStatusFilter) {
         vm.loadStudents(page, statusFilter.takeIf { it.isNotBlank() }, mStatusFilter.takeIf { it.isNotBlank() })
@@ -83,14 +79,7 @@ fun AdminStudentsScreen(vm: AdminViewModel, onViewDetails: (String) -> Unit = {}
                 items(students.filter {
                     search.isBlank() || it.name.contains(search, ignoreCase = true) || it.mobile.contains(search)
                 }) { student ->
-                    StudentCard(student,
-                        onToggleStatus = { vm.toggleStudentStatus(student.id, student.isActive) },
-                        onChangeSeat = {
-                            changeSeatFor = student
-                            student.membershipId?.let { mid -> vm.loadSeats(student.shift ?: "MORNING") }
-                        },
-                        onViewDetails = { onViewDetails(student.id) }
-                    )
+                    StudentCard(student, onClick = { onViewDetails(student.id) })
                     Spacer(Modifier.height(8.dp))
                 }
                 item {
@@ -105,36 +94,11 @@ fun AdminStudentsScreen(vm: AdminViewModel, onViewDetails: (String) -> Unit = {}
         }
     }
 
-    // Change seat dialog
-    changeSeatFor?.let { student ->
-        Dialog(onDismissRequest = { changeSeatFor = null }) {
-            Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp), color = NavyMid) {
-                Column(Modifier.padding(20.dp)) {
-                    Text("Change Seat – ${student.name}", style = MaterialTheme.typography.titleMedium)
-                    Text("Current: ${student.seatNumber ?: "—"} · ${student.shift ?: "—"}", color = TextSub, fontSize = 12.sp)
-                    Spacer(Modifier.height(12.dp))
-                    SeatGrid(seats = seats, selectedSeatNumber = newSeat.takeIf { it.isNotBlank() }, onSeatClick = { newSeat = it.seatNumber })
-                    Spacer(Modifier.height(12.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { changeSeatFor = null; newSeat = "" }) { Text("Cancel", color = TextSub) }
-                        Spacer(Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                student.membershipId?.let { mid -> vm.changeSeat(mid, newSeat) { changeSeatFor = null; newSeat = "" } }
-                            },
-                            enabled = newSeat.isNotBlank(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = NavyDeep)
-                        ) { Text("Apply") }
-                    }
-                }
-            }
-        }
-    }
 }
 
 @Composable
-private fun StudentCard(student: StudentSummary, onToggleStatus: () -> Unit, onChangeSeat: () -> Unit, onViewDetails: () -> Unit = {}) {
-    AppCard(Modifier.fillMaxWidth()) {
+private fun StudentCard(student: StudentSummary, onClick: () -> Unit) {
+    AppCard(Modifier.fillMaxWidth().clickable { onClick() }) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -158,34 +122,13 @@ private fun StudentCard(student: StudentSummary, onToggleStatus: () -> Unit, onC
                 if ((student.pendingAmount ?: 0.0) > 0.0) {
                     Box(
                         Modifier
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(50))
+                            .clip(RoundedCornerShape(50))
                             .background(RedFaint)
-                            .border(1.dp, RedAlert.copy(alpha = 0.3f), androidx.compose.foundation.shape.RoundedCornerShape(50))
+                            .border(1.dp, RedAlert.copy(alpha = 0.3f), RoundedCornerShape(50))
                             .padding(horizontal = 8.dp, vertical = 3.dp)
-                    ) { Text("₹${student.pendingAmount!!.toInt()} due", color = RedAlert, fontSize = 10.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) }
+                    ) { Text("₹${student.pendingAmount!!.toInt()} due", color = RedAlert, fontSize = 10.sp, fontWeight = FontWeight.SemiBold) }
                 }
             }
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = onToggleStatus,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = if (student.isActive) RedAlert else Emerald),
-                border = ButtonDefaults.outlinedButtonBorder,
-                modifier = Modifier.height(34.dp)
-            ) { Text(if (student.isActive) "Deactivate" else "Activate", fontSize = 12.sp) }
-            if (!student.membershipId.isNullOrBlank()) {
-                OutlinedButton(
-                    onClick = onChangeSeat,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
-                    modifier = Modifier.height(34.dp)
-                ) { Text("Change Seat", fontSize = 12.sp) }
-            }
-            OutlinedButton(
-                onClick = onViewDetails,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
-                modifier = Modifier.height(34.dp)
-            ) { Text("View Details", fontSize = 12.sp) }
         }
     }
 }

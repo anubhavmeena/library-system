@@ -1,6 +1,8 @@
 package com.targetzone.library.data.api
 
 import com.targetzone.library.data.TokenManager
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
@@ -17,6 +19,9 @@ object ApiClient {
 
     fun init(tm: TokenManager) { tokenManager = tm }
 
+    private val _unauthorizedEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val unauthorizedEvent = _unauthorizedEvent.asSharedFlow()
+
     private val okHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -27,7 +32,12 @@ object ApiClient {
                 val request = chain.request().newBuilder().apply {
                     if (!token.isNullOrBlank()) header("Authorization", "Bearer $token")
                 }.build()
-                chain.proceed(request)
+                val response = chain.proceed(request)
+                if (response.code == 401) {
+                    runBlocking { tokenManager?.clear() }
+                    _unauthorizedEvent.tryEmit(Unit)
+                }
+                response
             }
             .build()
     }
