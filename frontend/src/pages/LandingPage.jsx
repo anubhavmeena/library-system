@@ -145,13 +145,13 @@ export default function LandingPage() {
                 <div className="max-w-4xl mx-auto rounded-2xl overflow-hidden border border-primary-700/50 shadow-xl">
                     <iframe
                         title="Library Location"
-                        src="https://maps.google.com/maps?q=B-199+Malviya+Nagar+Alwar+Rajasthan&output=embed&z=16"
+                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3537.9506874694302!2d76.6097486!3d27.5329911!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39729b00315eecd1%3A0x804bed6d4f481bd0!2sTarget%20Zone%20Library!5e0!3m2!1sen!2sin!4v1782561486362!5m2!1sen!2sin"
                         width="100%"
-                        height="400"
+                        height="450"
                         style={{ border: 0, display: 'block' }}
                         allowFullScreen
                         loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
+                        referrerPolicy="strict-origin-when-cross-origin"
                     />
                 </div>
                 <p className="text-center text-primary-400 mt-4 text-sm">B-199, Malviya Nagar, Alwar</p>
