@@ -156,7 +156,7 @@ export default function LandingPage() {
                 </div>
                 <div className="flex items-center justify-center gap-2 mt-4">
                     <MapPin size={16} className="text-amber-400 shrink-0" />
-                    <p className="text-white font-semibold text-base">B-199, Malviya Nagar, Alwar</p>
+                    <p className="text-white font-semibold text-xl">B-199, Malviya Nagar, Alwar</p>
                 </div>
             </section>
 
