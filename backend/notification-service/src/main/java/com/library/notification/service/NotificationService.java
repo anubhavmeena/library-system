@@ -271,9 +271,24 @@ public class NotificationService {
                 event.getSeatNumber()
         );
 
-        for (String number : adminWhatsappNumbers()) {
-            whatsAppService.send(number, msg, null, "SEAT_ASSISTANCE");
+        // Send to admin's registered mobile (from DB via event payload)
+        if (hasValue(event.getAdminMobile())) {
+            whatsAppService.send(event.getAdminMobile(), msg, null, "SEAT_ASSISTANCE");
         }
+        // Also send to any additional numbers configured in ADMIN_WHATSAPP env var
+        for (String number : adminWhatsappNumbers()) {
+            if (!number.equals(event.getAdminMobile())) {
+                whatsAppService.send(number, msg, null, "SEAT_ASSISTANCE");
+            }
+        }
+
+        emailService.sendText(
+                adminEmail,
+                "🙋 Seat Assistance — " + event.getUserName() + " at Seat " + event.getSeatNumber(),
+                msg,
+                null,
+                "SEAT_ASSISTANCE"
+        );
 
         log.info("Seat assistance alert sent to admin for user: {} seat: {}",
                 event.getUserId(), event.getSeatNumber());

@@ -94,6 +94,7 @@ public class MembershipService {
                 .userName(user.getName() != null ? user.getName() : "Student")
                 .seatNumber(membership.getSeatNumber())
                 .eventType("SEAT_ASSISTANCE")
+                .adminMobile(fetchAdminMobile(userId))
                 .build();
 
         kafkaTemplate.send("seat-assistance", userId, event);
@@ -116,5 +117,22 @@ public class MembershipService {
             log.warn("Could not fetch user profile (userId={}): {}", userId, e.getMessage());
         }
         return new UserProfileDto();
+    }
+
+    private String fetchAdminMobile(String callerUserId) {
+        try {
+            String url = userServiceBaseUrl + "/api/users/admin-contact";
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-User-Id", callerUserId);
+            headers.set("X-User-Role", "STUDENT");
+            ResponseEntity<UserApiResponse> resp = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), UserApiResponse.class);
+            if (resp.getBody() != null && resp.getBody().getData() != null) {
+                return resp.getBody().getData().getMobile();
+            }
+        } catch (Exception e) {
+            log.warn("Could not fetch admin contact: {}", e.getMessage());
+        }
+        return null;
     }
 }

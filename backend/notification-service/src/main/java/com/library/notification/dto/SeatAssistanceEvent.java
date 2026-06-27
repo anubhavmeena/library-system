@@ -8,4 +8,5 @@ public class SeatAssistanceEvent {
     private String userName;
     private String seatNumber;
     private String eventType;
+    private String adminMobile;
 }
