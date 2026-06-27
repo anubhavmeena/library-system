@@ -18,8 +18,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.targetzone.library.R
 import com.targetzone.library.ui.components.AppTextField
+import com.targetzone.library.ui.components.LibraryPhotoSlideshow
 import com.targetzone.library.ui.components.PrimaryButton
 import com.targetzone.library.ui.theme.*
+
+// Drop library photos into res/drawable/ then list them here, e.g.:
+//   R.drawable.library_photo_1, R.drawable.library_photo_2, …
+private val LIBRARY_PHOTOS = listOf<Int>()
 
 @Composable
 fun LoginScreen(
@@ -43,19 +48,27 @@ fun LoginScreen(
             .fillMaxSize()
             .background(NavyDeep)
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
+            .padding(horizontal = 24.dp)
+            .padding(top = 56.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Image(
             painter = painterResource(R.drawable.ic_splash_logo),
             contentDescription = null,
-            modifier = Modifier.size(80.dp)
+            modifier = Modifier.size(72.dp)
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
         Text("Target Zone Library", style = MaterialTheme.typography.headlineMedium, color = Amber, textAlign = TextAlign.Center)
         Text("Student Login", style = MaterialTheme.typography.bodyMedium, color = TextSub, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(40.dp))
+        Spacer(Modifier.height(20.dp))
+
+        LibraryPhotoSlideshow(
+            photos = LIBRARY_PHOTOS,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(24.dp))
 
         state.error?.let {
             Card(colors = CardDefaults.cardColors(containerColor = RedFaint), modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {

@@ -3,8 +3,19 @@ import { BookOpen, Clock, Wifi, Coffee, Users, Star, ArrowRight, CheckCircle2 } 
 import { useTranslation } from 'react-i18next'
 import { Helmet } from 'react-helmet-async'
 import LanguageSwitcher from '../components/LanguageSwitcher'
+import PhotoSlideshow from '../components/PhotoSlideshow'
 
 const FEATURE_ICONS = [Clock, Wifi, Coffee, Users]
+
+// Add your library photos to frontend/public/gallery/ and list them here.
+// Filenames are served directly from the /gallery/ path at runtime.
+const GALLERY_PHOTOS = [
+    { src: '/gallery/photo1.jpg', alt: 'Target Zone Library — study hall' },
+    { src: '/gallery/photo2.jpg', alt: 'Target Zone Library — seating area' },
+    { src: '/gallery/photo3.jpg', alt: 'Target Zone Library — entrance' },
+    { src: '/gallery/photo4.jpg', alt: 'Target Zone Library — facilities' },
+    { src: '/gallery/photo5.jpg', alt: 'Target Zone Library — reading zone' },
+]
 const FEATURE_KEYS = ['flexibleShifts', 'wifi', 'refreshment', 'seats']
 
 export default function LandingPage() {
@@ -106,6 +117,19 @@ export default function LandingPage() {
                     </div>
                 </div>
             </section>
+
+            {/* Gallery slideshow */}
+            {GALLERY_PHOTOS.length > 0 && (
+                <section className="py-20 px-6 md:px-12">
+                    <div className="max-w-5xl mx-auto">
+                        <div className="text-center mb-10">
+                            <h2 className="font-display text-4xl font-bold text-white mb-3">{t('landing.gallery.title')}</h2>
+                            <p className="text-primary-400">{t('landing.gallery.subtitle')}</p>
+                        </div>
+                        <PhotoSlideshow photos={GALLERY_PHOTOS} />
+                    </div>
+                </section>
+            )}
 
             {/* Plans */}
             <section id="plans" className="py-20 px-6 md:px-12 bg-primary-900/30">

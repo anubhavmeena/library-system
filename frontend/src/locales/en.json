@@ -17,6 +17,10 @@
       "refreshment": { "title": "Refreshment Zone", "desc": "Tea, coffee and snacks available throughout the day" },
       "seats": { "title": "110 Seats", "desc": "Spacious seating across 4 rows with aisle comfort" }
     },
+    "gallery": {
+      "title": "Our Library Space",
+      "subtitle": "Take a look around — your next favourite study spot"
+    },
     "plans": {
       "title": "Simple Pricing",
       "subtitle": "Flexible plans for every commitment. No hidden fees.",
