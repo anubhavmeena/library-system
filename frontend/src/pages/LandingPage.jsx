@@ -10,11 +10,18 @@ const FEATURE_ICONS = [Clock, Wifi, Coffee, Users]
 // Add your library photos to frontend/public/gallery/ and list them here.
 // Filenames are served directly from the /gallery/ path at runtime.
 const GALLERY_PHOTOS = [
-    { src: '/gallery/photo1.jpg', alt: 'Target Zone Library — study hall' },
-    { src: '/gallery/photo2.jpg', alt: 'Target Zone Library — seating area' },
-    { src: '/gallery/photo3.jpg', alt: 'Target Zone Library — entrance' },
-    { src: '/gallery/photo4.jpg', alt: 'Target Zone Library — facilities' },
-    { src: '/gallery/photo5.jpg', alt: 'Target Zone Library — reading zone' },
+    { src: '/gallery/photo1.jpg',  alt: 'Target Zone Library' },
+    { src: '/gallery/photo2.jpg',  alt: 'Target Zone Library' },
+    { src: '/gallery/photo3.jpg',  alt: 'Target Zone Library' },
+    { src: '/gallery/photo4.jpg',  alt: 'Target Zone Library' },
+    { src: '/gallery/photo5.jpg',  alt: 'Target Zone Library' },
+    { src: '/gallery/photo6.jpg',  alt: 'Target Zone Library' },
+    { src: '/gallery/photo7.jpg',  alt: 'Target Zone Library' },
+    { src: '/gallery/photo8.jpg',  alt: 'Target Zone Library' },
+    { src: '/gallery/photo9.jpg',  alt: 'Target Zone Library' },
+    { src: '/gallery/photo10.jpg', alt: 'Target Zone Library' },
+    { src: '/gallery/photo11.jpg', alt: 'Target Zone Library' },
+    { src: '/gallery/photo12.jpg', alt: 'Target Zone Library' },
 ]
 const FEATURE_KEYS = ['flexibleShifts', 'wifi', 'refreshment', 'seats']
 
