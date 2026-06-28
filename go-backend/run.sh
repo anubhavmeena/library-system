@@ -67,16 +67,23 @@ done
 echo
 ok "Redis ready"
 
+# ─── Build all services ──────────────────────────────────────────────────────
+log "Building services..."
+for svc in notification-service auth-service user-service membership-service seat-service admin-service api-gateway; do
+    go build -o "$SCRIPT_DIR/$svc/.bin" "$SCRIPT_DIR/$svc/" \
+        && ok "Built $svc" \
+        || { err "Failed to build $svc"; exit 1; }
+done
+
 # ─── Service launcher ────────────────────────────────────────────────────────
 PIDS=()
 
 # Usage: start_svc <colour> <name> <dir>
 start_svc() {
     local colour="$1" name="$2" dir="$3"
-    local logfile="$SCRIPT_DIR/.logs/${name}.log"
     mkdir -p "$SCRIPT_DIR/.logs"
 
-    go run "$SCRIPT_DIR/$dir/" 2>&1 \
+    "$SCRIPT_DIR/$dir/.bin" 2>&1 \
         | sed "s/^/$(printf "${colour}[${name}]${RST} ")/" &
     PIDS+=($!)
     ok "Started ${name} (pid ${PIDS[-1]})"
