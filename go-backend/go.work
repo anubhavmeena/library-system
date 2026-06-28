@@ -1,0 +1,12 @@
+go 1.22
+
+use (
+	./admin-service
+	./api-gateway
+	./auth-service
+	./membership-service
+	./notification-service
+	./seat-service
+	./shared
+	./user-service
+)
