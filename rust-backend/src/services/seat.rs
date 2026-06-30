@@ -2,6 +2,7 @@ use crate::{
     app_state::AppState,
     error::AppError,
     models::seat::{AdminSeatBooking, SeatAvailability, SeatAvailabilityResponse, SeatBooking, StudentSeatBooking},
+    services::notification,
 };
 use chrono::NaiveDate;
 use redis::AsyncCommands;
@@ -173,6 +174,52 @@ pub async fn book_seat(
         .await?;
 
     invalidate_seat_cache(state, shift, start_date, end_date).await;
+
+    // Send booking notification to student and admin
+    let state2 = state.clone();
+    let seat_num = seat_number.to_string();
+    let shift_str = shift.to_string();
+    tokio::spawn(async move {
+        let user = sqlx::query_as::<_, crate::models::user::User>("SELECT * FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_optional(&state2.db)
+            .await;
+
+        let membership_plan = sqlx::query_as::<_, (String, String, rust_decimal::Decimal)>(
+            "SELECT mp.name, mp.plan_type, mp.price FROM memberships m
+             JOIN membership_plans mp ON mp.id = m.plan_id
+             WHERE m.id = $1",
+        )
+        .bind(membership_id)
+        .fetch_optional(&state2.db)
+        .await;
+
+        let payment_amount = sqlx::query_scalar::<_, Option<rust_decimal::Decimal>>(
+            "SELECT amount FROM payments WHERE membership_id = $1 AND status = 'SUCCESS' LIMIT 1",
+        )
+        .bind(membership_id)
+        .fetch_optional(&state2.db)
+        .await
+        .ok()
+        .flatten()
+        .flatten();
+
+        if let (Ok(Some(user)), Ok(Some((plan_name, plan_type, plan_price)))) = (user, membership_plan) {
+            let info = notification::BookingInfo {
+                user_name: user.name,
+                user_mobile: user.mobile,
+                user_email: user.email,
+                plan_name,
+                plan_type,
+                seat_number: Some(seat_num),
+                shift: shift_str,
+                start_date,
+                end_date,
+                amount_paid: payment_amount.unwrap_or(plan_price),
+            };
+            notification::send_booking_confirmed(&state2, &info).await;
+        }
+    });
 
     Ok(booking)
 }

@@ -17,39 +17,66 @@ pub struct BookingInfo {
     pub amount_paid: Decimal,
 }
 
+fn format_shift(shift: &str) -> &'static str {
+    match shift.to_uppercase().as_str() {
+        "MORNING" => "Morning (6AM-2PM)",
+        "EVENING" => "Evening (2PM-10PM)",
+        _ => "Full Day (6AM-10PM)",
+    }
+}
+
 pub async fn send_booking_confirmed(state: &Arc<AppState>, info: &BookingInfo) {
-    let msg = format!(
-        "🎉 Booking Confirmed!\nName: {}\nPlan: {} ({})\nSeat: {}\nShift: {}\nFrom: {} To: {}\nAmount: ₹{}",
-        info.user_name,
-        info.plan_name,
-        info.plan_type,
-        info.seat_number.as_deref().unwrap_or("N/A"),
-        info.shift,
-        info.start_date,
-        info.end_date,
-        info.amount_paid
+    let name = if info.user_name.is_empty() { "Student" } else { &info.user_name };
+    let shift_label = format_shift(&info.shift);
+    let seat = info.seat_number.as_deref().unwrap_or("N/A");
+
+    let whatsapp_msg = format!(
+        "Booking Confirmed! Hi {}, Target Zone Library - Membership Details: \
+Plan: {} | Seat: {} | Shift: {} | From: {} | To: {} | Paid: Rs.{:.0}. \
+Please carry a valid ID on your first visit. Happy studying! - Target Zone Library",
+        name, info.plan_name, seat, shift_label, info.start_date, info.end_date, info.amount_paid
+    );
+
+    let email_body = format!(
+        "Dear {},\n\nYour library membership has been confirmed!\n\n\
+MEMBERSHIP DETAILS\n\
+------------------\n\
+Plan        : {}\n\
+Seat Number : {}\n\
+Shift       : {}\n\
+Start Date  : {}\n\
+End Date    : {}\n\
+Amount Paid : Rs.{:.0}\n\n\
+Library Timings:\n\
+  Morning Shift : 6:00 AM - 2:00 PM\n\
+  Evening Shift : 2:00 PM - 10:00 PM\n\n\
+Please carry a valid photo ID on your first visit.\n\n\
+Best regards,\n\
+Target Zone Library Team\n\
+https://targetzone.co.in",
+        name, info.plan_name, seat, shift_label, info.start_date, info.end_date, info.amount_paid
     );
 
     if let Some(ref mobile) = info.user_mobile {
-        send_whatsapp(state, mobile, &msg).await;
+        send_whatsapp(state, mobile, &whatsapp_msg).await;
     }
     if let Some(ref email) = info.user_email {
-        send_email(state, email, "Booking Confirmed - Target Zone", &msg).await;
+        send_email(state, email, "Your Library Seat is Confirmed!", &email_body).await;
     }
 
     let admin_msg = format!(
-        "📚 New booking!\n{}\nSeat: {}\nShift: {}\n{} → {}\n₹{}",
-        info.user_name,
-        info.seat_number.as_deref().unwrap_or("N/A"),
-        info.shift,
-        info.start_date,
-        info.end_date,
-        info.amount_paid
+        "New Booking! Student: {} | Seat: {} | Plan: {} | Shift: {} | Amount: Rs.{:.0}",
+        name, seat, info.plan_name, shift_label, info.amount_paid
     );
     if !state.config.admin_whatsapp.is_empty() {
         send_whatsapp(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
     }
-    send_email(state, &state.config.admin_email.clone(), "New Booking", &admin_msg).await;
+    send_email(
+        state,
+        &state.config.admin_email.clone(),
+        &format!("New Booking - {} | Seat {}", name, seat),
+        &admin_msg,
+    ).await;
 }
 
 pub async fn send_welcome(state: &Arc<AppState>, name: &str, mobile: Option<&str>, email: Option<&str>) {
@@ -63,6 +90,32 @@ pub async fn send_welcome(state: &Arc<AppState>, name: &str, mobile: Option<&str
     if let Some(e) = email {
         send_email(state, e, "Welcome to Target Zone", &msg).await;
     }
+
+    let admin_msg = format!(
+        "🆕 New Student Registered!\nName: {}\nMobile: {}\nEmail: {}",
+        name,
+        mobile.unwrap_or("N/A"),
+        email.unwrap_or("N/A"),
+    );
+    if !state.config.admin_whatsapp.is_empty() {
+        send_whatsapp(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
+    }
+    send_email(state, &state.config.admin_email.clone(), &format!("New Registration — {name}"), &admin_msg).await;
+}
+
+pub async fn send_seat_assistance(
+    state: &Arc<AppState>,
+    user_name: &str,
+    seat_number: &str,
+) {
+    let msg = format!(
+        "🚨 Seat Assistance Request\nStudent: {}\nSeat: {}\nPlease attend to this student.",
+        user_name, seat_number
+    );
+    if !state.config.admin_whatsapp.is_empty() {
+        send_whatsapp(state, &state.config.admin_whatsapp.clone(), &msg).await;
+    }
+    send_email(state, &state.config.admin_email.clone(), "Seat Assistance Request", &msg).await;
 }
 
 pub async fn send_renewal_reminder(
@@ -100,6 +153,17 @@ pub async fn send_direct_message(
     }
 }
 
+pub async fn send_seat_expired(state: &Arc<AppState>, user_name: &str, seat_number: &str) {
+    let msg = format!(
+        "🪑 Seat Now Available!\nStudent: {}\nSeat: {} has been freed up and is available for new booking.",
+        user_name, seat_number
+    );
+    if !state.config.admin_whatsapp.is_empty() {
+        send_whatsapp(state, &state.config.admin_whatsapp.clone(), &msg).await;
+    }
+    send_email(state, &state.config.admin_email.clone(), "Seat Now Available", &msg).await;
+}
+
 pub async fn send_broadcast(
     state: &Arc<AppState>,
     recipients: &[(Option<String>, Option<String>)],
@@ -115,6 +179,13 @@ pub async fn send_broadcast(
             send_email(state, e, "Announcement from Target Zone", message).await;
         }
     }
+
+    let echo = format!("📢 Broadcast sent to {count} student(s):\n{message}");
+    if !state.config.admin_whatsapp.is_empty() {
+        send_whatsapp(state, &state.config.admin_whatsapp.clone(), &echo).await;
+    }
+    send_email(state, &state.config.admin_email.clone(), "Broadcast Sent", &echo).await;
+
     count
 }
 
@@ -253,16 +324,38 @@ async fn send_twilio_whatsapp(state: &Arc<AppState>, to: &str, message: &str) {
 }
 
 async fn send_meta_whatsapp(state: &Arc<AppState>, to: &str, message: &str) {
+    // Strip newlines/tabs — Meta template params reject them
+    let param = message
+        .replace(['\n', '\r', '\t'], " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+
     let clean_to = to.trim_start_matches('+');
+    let to_num = if clean_to.len() == 10 {
+        format!("91{clean_to}")
+    } else {
+        clean_to.to_string()
+    };
+
     let url = format!(
         "https://graph.facebook.com/v18.0/{}/messages",
         state.config.meta_whatsapp_phone_id
     );
     let body = json!({
         "messaging_product": "whatsapp",
-        "to": clean_to,
-        "type": "text",
-        "text": { "body": message }
+        "to": to_num,
+        "type": "template",
+        "template": {
+            "name": state.config.meta_whatsapp_notif_template,
+            "language": { "code": state.config.meta_whatsapp_language },
+            "components": [
+                {
+                    "type": "body",
+                    "parameters": [{ "type": "text", "text": param }]
+                }
+            ]
+        }
     });
     match state
         .http
@@ -273,7 +366,11 @@ async fn send_meta_whatsapp(state: &Arc<AppState>, to: &str, message: &str) {
         .await
     {
         Err(e) => tracing::error!("Meta WhatsApp network error: {e}"),
-        Ok(r) if !r.status().is_success() => tracing::error!("Meta WhatsApp rejected: {} for {to}", r.status()),
+        Ok(r) if !r.status().is_success() => {
+            let status = r.status();
+            let resp_body = r.text().await.unwrap_or_default();
+            tracing::error!("Meta WhatsApp rejected: {status} for {to} — {resp_body}");
+        }
         Ok(_) => tracing::info!("Meta WhatsApp sent to {to}"),
     }
 }
