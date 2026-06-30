@@ -9,11 +9,11 @@ class PhotoUploadResponseTest {
     @Test
     void builder_setsAllFields() {
         PhotoUploadResponse resp = PhotoUploadResponse.builder()
-                .photoUrl("/uploads/photos/user_abc.jpg")
+                .photoUrl("/java-uploads/photos/user_abc.jpg")
                 .message("Photo uploaded successfully")
                 .build();
 
-        assertThat(resp.getPhotoUrl()).isEqualTo("/uploads/photos/user_abc.jpg");
+        assertThat(resp.getPhotoUrl()).isEqualTo("/java-uploads/photos/user_abc.jpg");
         assertThat(resp.getMessage()).isEqualTo("Photo uploaded successfully");
     }
 
@@ -27,10 +27,10 @@ class PhotoUploadResponseTest {
     @Test
     void setters_work() {
         PhotoUploadResponse resp = new PhotoUploadResponse();
-        resp.setPhotoUrl("/uploads/photos/test.png");
+        resp.setPhotoUrl("/java-uploads/photos/test.png");
         resp.setMessage("Done");
 
-        assertThat(resp.getPhotoUrl()).isEqualTo("/uploads/photos/test.png");
+        assertThat(resp.getPhotoUrl()).isEqualTo("/java-uploads/photos/test.png");
         assertThat(resp.getMessage()).isEqualTo("Done");
     }
 }

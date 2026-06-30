@@ -50,7 +50,7 @@ public class GalleryService {
         String fileName = "gallery_" + UUID.randomUUID().toString().substring(0, 8) + ext;
         Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
 
-        String url = "/uploads/gallery/" + fileName;
+        String url = "/java-uploads/gallery/" + fileName;
         GalleryPhoto photo = GalleryPhoto.builder()
                 .url(url)
                 .caption(caption != null && !caption.isBlank() ? caption.trim() : null)

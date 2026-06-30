@@ -78,7 +78,7 @@ export default function ProfilePage() {
         setUploading(true)
         try {
             const r = await api.post('/users/me/photo', formData)
-            setProfile(p => ({ ...p, photoUrl: r.data.data.photoUrl }))
+            setProfile(p => ({ ...p, photoUrl: r.data.data.url }))
             toast.success(t('profile.toasts.photoUpdated'))
         } catch (e) {
             toast.error(e.response?.data?.message || t('profile.toasts.uploadFailed'))
@@ -96,7 +96,7 @@ export default function ProfilePage() {
         setUploadingAadhaar(true)
         try {
             const r = await api.post('/users/me/aadhaar', formData)
-            setProfile(p => ({ ...p, aadhaarUrl: r.data.data.photoUrl }))
+            setProfile(p => ({ ...p, aadhaarUrl: r.data.data.url }))
             toast.success(t('profile.aadhaar.toasts.uploaded'))
         } catch (e) {
             toast.error(e.response?.data?.message || t('profile.aadhaar.toasts.uploadFailed'))

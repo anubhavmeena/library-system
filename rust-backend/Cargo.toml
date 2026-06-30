@@ -1,0 +1,44 @@
+[package]
+name = "library-backend"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "library-backend"
+path = "src/main.rs"
+
+[dependencies]
+axum = { version = "0.7", features = ["multipart"] }
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.7", features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "uuid",
+    "chrono",
+    "rust_decimal",
+] }
+redis = { version = "0.25", features = ["tokio-comp"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+jsonwebtoken = "9"
+bcrypt = "0.15"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.11", features = ["json"] }
+dotenvy = "0.15"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "1"
+tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
+rand = "0.8"
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+rust_decimal = { version = "1", features = ["serde-with-str"] }
+async-trait = "0.1"
+bytes = "1"
+mime = "0.3"
+tokio-cron-scheduler = "0.10"
+tower = "0.4"
+anyhow = "1"
+csv = "1"

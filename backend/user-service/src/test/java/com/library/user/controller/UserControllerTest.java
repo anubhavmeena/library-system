@@ -147,7 +147,7 @@ class UserControllerTest {
     void uploadPhoto_validFile_returns200() throws Exception {
         when(userService.uploadPhoto(any(), any())).thenReturn(
                 PhotoUploadResponse.builder()
-                        .photoUrl("/uploads/photos/user_test.jpg")
+                        .photoUrl("/java-uploads/photos/user_test.jpg")
                         .message("Photo uploaded successfully")
                         .build());
 
@@ -159,7 +159,7 @@ class UserControllerTest {
                 .header("X-User-Id", UUID.randomUUID().toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.photoUrl").value("/uploads/photos/user_test.jpg"))
+                .andExpect(jsonPath("$.data.photoUrl").value("/java-uploads/photos/user_test.jpg"))
                 .andExpect(jsonPath("$.data.message").value("Photo uploaded successfully"));
     }
 

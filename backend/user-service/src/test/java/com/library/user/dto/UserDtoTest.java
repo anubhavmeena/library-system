@@ -18,7 +18,7 @@ class UserDtoTest {
                 .mobile("9876543210")
                 .email("alice@test.com")
                 .address("123 Main St")
-                .photoUrl("/uploads/photos/alice.jpg")
+                .photoUrl("/java-uploads/photos/alice.jpg")
                 .dateOfBirth(LocalDate.of(1995, 6, 15))
                 .gender("Female")
                 .role(User.Role.STUDENT)
@@ -37,7 +37,7 @@ class UserDtoTest {
         assertThat(dto.getMobile()).isEqualTo("9876543210");
         assertThat(dto.getEmail()).isEqualTo("alice@test.com");
         assertThat(dto.getAddress()).isEqualTo("123 Main St");
-        assertThat(dto.getPhotoUrl()).isEqualTo("/uploads/photos/alice.jpg");
+        assertThat(dto.getPhotoUrl()).isEqualTo("/java-uploads/photos/alice.jpg");
         assertThat(dto.getDateOfBirth()).isEqualTo("1995-06-15");
         assertThat(dto.getGender()).isEqualTo("Female");
         assertThat(dto.getRole()).isEqualTo("STUDENT");

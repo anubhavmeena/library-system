@@ -266,7 +266,7 @@ class UserServiceTest {
 
         PhotoUploadResponse resp = userService.uploadPhoto(userId, file);
 
-        assertThat(resp.getPhotoUrl()).startsWith("/uploads/photos/");
+        assertThat(resp.getPhotoUrl()).startsWith("/java-uploads/photos/");
         assertThat(resp.getPhotoUrl()).endsWith(".jpg");
         assertThat(resp.getMessage()).isEqualTo("Photo uploaded successfully");
 
@@ -350,7 +350,7 @@ class UserServiceTest {
         Files.createDirectories(photosDir);
         Path oldFile = photosDir.resolve("old_photo.jpg");
         Files.write(oldFile, "old".getBytes());
-        user.setPhotoUrl("/uploads/photos/old_photo.jpg");
+        user.setPhotoUrl("/java-uploads/photos/old_photo.jpg");
 
         when(userRepository.findById(UUID.fromString(userId))).thenReturn(Optional.of(user));
         when(userRepository.save(any())).thenReturn(user);
@@ -385,7 +385,7 @@ class UserServiceTest {
 
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
-        assertThat(captor.getValue().getPhotoUrl()).startsWith("/uploads/photos/");
+        assertThat(captor.getValue().getPhotoUrl()).startsWith("/java-uploads/photos/");
     }
 
     // ── deletePhoto ───────────────────────────────────────────────────────────
@@ -399,7 +399,7 @@ class UserServiceTest {
         Files.createDirectories(photosDir);
         Path photoFile = photosDir.resolve("photo.jpg");
         Files.write(photoFile, "content".getBytes());
-        user.setPhotoUrl("/uploads/photos/photo.jpg");
+        user.setPhotoUrl("/java-uploads/photos/photo.jpg");
 
         when(userRepository.findById(UUID.fromString(userId))).thenReturn(Optional.of(user));
         when(userRepository.save(any())).thenReturn(user);

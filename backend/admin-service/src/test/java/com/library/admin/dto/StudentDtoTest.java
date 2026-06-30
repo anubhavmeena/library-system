@@ -21,7 +21,7 @@ class StudentDtoTest {
                 .address("123 Main St")
                 .gender("F")
                 .dateOfBirth(LocalDate.of(1995, 5, 20))
-                .photoUrl("/uploads/photos/alice.jpg")
+                .photoUrl("/java-uploads/photos/alice.jpg")
                 .isActive(true)
                 .role(User.Role.STUDENT)
                 .createdAt(LocalDateTime.of(2024, 1, 10, 9, 0))
@@ -54,7 +54,7 @@ class StudentDtoTest {
         assertThat(dto.getEmail()).isEqualTo("alice@example.com");
         assertThat(dto.getAddress()).isEqualTo("123 Main St");
         assertThat(dto.getGender()).isEqualTo("F");
-        assertThat(dto.getPhotoUrl()).isEqualTo("/uploads/photos/alice.jpg");
+        assertThat(dto.getPhotoUrl()).isEqualTo("/java-uploads/photos/alice.jpg");
         assertThat(dto.getIsActive()).isTrue();
         assertThat(dto.getDateOfBirth()).isEqualTo("1995-05-20");
         assertThat(dto.getJoinedAt()).isEqualTo("2024-01-10T09:00");

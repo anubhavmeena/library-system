@@ -104,7 +104,7 @@ public class UserService {
         String fileName = "user_" + userId + "_" + UUID.randomUUID().toString().substring(0, 8) + ext;
         Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
 
-        String photoUrl = "/uploads/photos/" + fileName;
+        String photoUrl = "/java-uploads/photos/" + fileName;
         user.setPhotoUrl(photoUrl);
         userRepository.save(user);
 
@@ -138,7 +138,7 @@ public class UserService {
         String fileName = "aadhaar_" + userId + "_" + UUID.randomUUID().toString().substring(0, 8) + ext;
         Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
 
-        String aadhaarUrl = "/uploads/aadhaar/" + fileName;
+        String aadhaarUrl = "/java-uploads/aadhaar/" + fileName;
         user.setAadhaarUrl(aadhaarUrl);
         userRepository.save(user);
 

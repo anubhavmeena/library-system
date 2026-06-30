@@ -50,7 +50,7 @@ export default function AdminExpensesPage() {
         setLoading(true)
         try {
             const res = await api.get('/admin/expenses', { params: { year, month } })
-            const d = res.data.data
+            const d = res.data.data ?? {}
             setTankerQty(d.waterTankerQty ?? 0)
             setTankerPrice(d.waterTankerPrice ?? '')
             setElectricity(d.electricityBill ?? '')

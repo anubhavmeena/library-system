@@ -74,7 +74,7 @@ export default function LoginPage() {
         const verifyRes = await dispatch(verifyOtp({ contact: contact.trim(), otp }))
         if (!verifyOtp.fulfilled.match(verifyRes)) return toast.error(verifyRes.payload || 'Invalid OTP')
 
-        if (verifyRes.payload.newUser) {
+        if (verifyRes.payload.isNewUser) {
             setStep(3)
         } else {
             const loginRes = await dispatch(loginUser({ sessionToken: verifyRes.payload.sessionToken }))

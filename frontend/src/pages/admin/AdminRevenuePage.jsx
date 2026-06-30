@@ -320,12 +320,12 @@ export default function AdminRevenuePage() {
                             <Pie
                                 data={breakdown}
                                 dataKey="count"
-                                nameKey="amount"
+                                nameKey="gateway"
                                 cx="50%"
                                 cy="50%"
                                 outerRadius={110}
-                                label={({ amount, count }) =>
-                                    `₹${Number(amount).toLocaleString('en-IN')} (${count})`
+                                label={({ gateway, amount, count }) =>
+                                    `${gateway ?? '—'}: ₹${Number(amount).toLocaleString('en-IN')} (${count})`
                                 }
                                 labelLine={true}
                             >
@@ -334,14 +334,16 @@ export default function AdminRevenuePage() {
                                 ))}
                             </Pie>
                             <Tooltip
-                                formatter={(value) => [`${value} students`]}
-                                labelFormatter={(label) => `₹${Number(label).toLocaleString('en-IN')}`}
+                                formatter={(value, name, props) => [
+                                    `${value} payments · ₹${Number(props.payload.amount).toLocaleString('en-IN')}`,
+                                    props.payload.gateway ?? '—'
+                                ]}
                                 contentStyle={{ background: '#0d1b4b', border: '1px solid #1e3a5f', borderRadius: 12 }}
                                 labelStyle={{ color: '#94a3b8' }}
                                 itemStyle={{ color: '#f8fafc' }}
                             />
                             <Legend
-                                formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`}
+                                formatter={(value) => value ?? '—'}
                                 wrapperStyle={{ color: '#94a3b8', fontSize: 12 }}
                             />
                         </PieChart>
