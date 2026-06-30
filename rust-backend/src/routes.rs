@@ -46,6 +46,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/memberships/my/all",         get(membership::get_my_all_memberships))
         .route("/api/memberships/my/queued",      get(membership::get_my_queued_membership))
         .route("/api/memberships/my/call-admin",  post(membership::call_admin))
+        .route("/api/memberships/my/id-card",     get(membership::download_id_card))
 
         // ── Payments ──────────────────────────────────────────────────────────
         .route("/api/payments/my",           get(payment::get_payment_history))

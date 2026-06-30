@@ -103,7 +103,7 @@ pub async fn login(
 
     let token = jwt::create_token(
         user.id,
-        &user.role,
+        "STUDENT",
         &user.name,
         user.email.as_deref(),
         user.mobile.as_deref(),
@@ -111,7 +111,7 @@ pub async fn login(
         state.config.jwt_expiry_ms,
     )?;
 
-    Ok((token, user))
+    Ok((token, User { role: "STUDENT".to_string(), ..user }))
 }
 
 pub async fn admin_login(

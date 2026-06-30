@@ -56,3 +56,77 @@ impl IntoResponse for AppError {
 }
 
 pub type Result<T> = std::result::Result<T, AppError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::response::IntoResponse;
+
+    fn status(err: AppError) -> StatusCode {
+        err.into_response().status()
+    }
+
+    #[test]
+    fn not_found_is_404() {
+        assert_eq!(status(AppError::NotFound("thing".into())), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn bad_request_is_400() {
+        assert_eq!(status(AppError::BadRequest("invalid input".into())), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn unauthorized_is_401() {
+        assert_eq!(status(AppError::Unauthorized), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn forbidden_is_403() {
+        assert_eq!(status(AppError::Forbidden), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn conflict_is_409() {
+        assert_eq!(status(AppError::Conflict("duplicate".into())), StatusCode::CONFLICT);
+    }
+
+    #[test]
+    fn internal_is_500() {
+        assert_eq!(status(AppError::Internal("something crashed".into())), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn not_found_display_includes_message() {
+        let e = AppError::NotFound("seat A1".into());
+        assert!(e.to_string().contains("seat A1"));
+    }
+
+    #[test]
+    fn bad_request_display_includes_message() {
+        let e = AppError::BadRequest("OTP expired".into());
+        assert!(e.to_string().contains("OTP expired"));
+    }
+
+    #[test]
+    fn conflict_display_includes_message() {
+        let e = AppError::Conflict("Seat A1 is already booked".into());
+        assert!(e.to_string().contains("Seat A1 is already booked"));
+    }
+
+    #[test]
+    fn internal_display_includes_message() {
+        let e = AppError::Internal("payment gateway timeout".into());
+        assert!(e.to_string().contains("payment gateway timeout"));
+    }
+
+    #[test]
+    fn unauthorized_display_is_unauthorized() {
+        assert!(AppError::Unauthorized.to_string().contains("Unauthorized"));
+    }
+
+    #[test]
+    fn forbidden_display_is_forbidden() {
+        assert!(AppError::Forbidden.to_string().contains("Forbidden"));
+    }
+}

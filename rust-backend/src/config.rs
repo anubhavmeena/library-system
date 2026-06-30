@@ -109,3 +109,145 @@ impl Config {
         self.cashfree_app_id.is_empty()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn base_config() -> Config {
+        Config {
+            database_url: "postgres://test:test@localhost:5432/testdb".to_string(),
+            redis_url: "redis://localhost:6379".to_string(),
+            jwt_secret: "test-secret-key-at-least-32-bytes-long!".to_string(),
+            jwt_expiry_ms: 86_400_000,
+            upload_dir: "/tmp/uploads".to_string(),
+            port: 8080,
+            twilio_account_sid: "".to_string(),
+            twilio_auth_token: "".to_string(),
+            twilio_phone_number: "".to_string(),
+            twilio_whatsapp_from: "whatsapp:+14155238886".to_string(),
+            sendgrid_api_key: "".to_string(),
+            meta_whatsapp_token: "".to_string(),
+            meta_whatsapp_phone_id: "".to_string(),
+            meta_whatsapp_otp_template: "otpvm".to_string(),
+            meta_whatsapp_notif_template: "tznallh".to_string(),
+            meta_whatsapp_language: "en".to_string(),
+            payment_gateway: "CASHFREE".to_string(),
+            razorpay_key_id: "".to_string(),
+            razorpay_key_secret: "".to_string(),
+            cashfree_app_id: "".to_string(),
+            cashfree_secret_key: "".to_string(),
+            cashfree_env: "sandbox".to_string(),
+            cashfree_base_url: "https://sandbox.cashfree.com".to_string(),
+            admin_email: "admin@test.com".to_string(),
+            admin_whatsapp: "".to_string(),
+            admin_phones: vec![],
+        }
+    }
+
+    #[test]
+    fn is_twilio_dev_when_sid_empty() {
+        assert!(base_config().is_twilio_dev());
+    }
+
+    #[test]
+    fn is_not_twilio_dev_when_sid_set() {
+        let mut c = base_config();
+        c.twilio_account_sid = "ACxxxxxxxx".to_string();
+        assert!(!c.is_twilio_dev());
+    }
+
+    #[test]
+    fn is_sendgrid_dev_when_api_key_empty() {
+        assert!(base_config().is_sendgrid_dev());
+    }
+
+    #[test]
+    fn is_not_sendgrid_dev_when_api_key_set() {
+        let mut c = base_config();
+        c.sendgrid_api_key = "SG.real_key".to_string();
+        assert!(!c.is_sendgrid_dev());
+    }
+
+    #[test]
+    fn is_razorpay_dev_when_key_id_empty() {
+        assert!(base_config().is_razorpay_dev());
+    }
+
+    #[test]
+    fn is_not_razorpay_dev_when_key_id_set() {
+        let mut c = base_config();
+        c.razorpay_key_id = "rzp_live_xxxxx".to_string();
+        assert!(!c.is_razorpay_dev());
+    }
+
+    #[test]
+    fn is_cashfree_dev_when_app_id_empty() {
+        assert!(base_config().is_cashfree_dev());
+    }
+
+    #[test]
+    fn is_not_cashfree_dev_when_app_id_set() {
+        let mut c = base_config();
+        c.cashfree_app_id = "CF_APP_ID_123".to_string();
+        assert!(!c.is_cashfree_dev());
+    }
+
+    #[test]
+    fn cashfree_sandbox_url_used_by_default() {
+        let c = base_config();
+        assert!(c.cashfree_base_url.contains("sandbox.cashfree.com"));
+    }
+
+    #[test]
+    fn cashfree_production_url_has_no_sandbox() {
+        let mut c = base_config();
+        c.cashfree_base_url = "https://api.cashfree.com".to_string();
+        assert!(c.cashfree_base_url.contains("api.cashfree.com"));
+        assert!(!c.cashfree_base_url.contains("sandbox"));
+    }
+
+    #[test]
+    fn admin_phones_empty_vec_by_default() {
+        assert!(base_config().admin_phones.is_empty());
+    }
+
+    #[test]
+    fn admin_phones_multi_element() {
+        let mut c = base_config();
+        c.admin_phones = vec!["9876543210".to_string(), "9123456789".to_string()];
+        assert_eq!(c.admin_phones.len(), 2);
+        assert!(c.admin_phones.contains(&"9876543210".to_string()));
+    }
+
+    #[test]
+    fn admin_phones_csv_parsing_logic() {
+        // Mirrors what from_env() does when ADMIN_PHONES="111,222, 333"
+        let raw = "111,222, 333";
+        let parsed: Vec<String> = raw
+            .split(',')
+            .filter(|s| !s.trim().is_empty())
+            .map(|s| s.trim().to_string())
+            .collect();
+        assert_eq!(parsed, vec!["111", "222", "333"]);
+    }
+
+    #[test]
+    fn admin_phones_empty_string_gives_empty_vec() {
+        let parsed: Vec<String> = ""
+            .split(',')
+            .filter(|s| !s.trim().is_empty())
+            .map(|s| s.trim().to_string())
+            .collect();
+        assert!(parsed.is_empty());
+    }
+
+    #[test]
+    fn dev_mode_all_credentials_empty_by_default() {
+        let c = base_config();
+        assert!(c.is_twilio_dev());
+        assert!(c.is_sendgrid_dev());
+        assert!(c.is_razorpay_dev());
+        assert!(c.is_cashfree_dev());
+    }
+}

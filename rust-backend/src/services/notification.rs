@@ -252,6 +252,14 @@ pub async fn send_meta_otp(state: &Arc<AppState>, mobile: &str, otp: &str) {
     }
 }
 
+pub async fn send_whatsapp_to(state: &Arc<AppState>, to: &str, message: &str) {
+    send_whatsapp(state, to, message).await;
+}
+
+pub async fn send_email_to(state: &Arc<AppState>, to: &str, subject: &str, body: &str) {
+    send_email(state, to, subject, body).await;
+}
+
 async fn send_whatsapp(state: &Arc<AppState>, to: &str, message: &str) {
     if !state.config.meta_whatsapp_token.is_empty() {
         send_meta_whatsapp(state, to, message).await;

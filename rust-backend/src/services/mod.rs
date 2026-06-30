@@ -1,5 +1,6 @@
 pub mod admin;
 pub mod auth;
+pub mod idcard;
 pub mod jwt;
 pub mod membership;
 pub mod notification;

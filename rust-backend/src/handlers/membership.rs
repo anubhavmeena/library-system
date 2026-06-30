@@ -1,10 +1,17 @@
 use crate::{
     app_state::AppState,
+    error::AppError,
     middleware::AuthUser,
     response::ApiResponse,
-    services::membership as svc,
+    services::{idcard, membership as svc, notification},
 };
-use axum::extract::State;
+use axum::{
+    body::Body,
+    extract::State,
+    http::{header, StatusCode},
+    response::Response,
+};
+use bytes::Bytes;
 use std::sync::Arc;
 
 pub async fn list_plans(
@@ -40,8 +47,39 @@ pub async fn get_my_queued_membership(
 
 pub async fn call_admin(
     State(state): State<Arc<AppState>>,
-    _user: AuthUser,
-) -> impl axum::response::IntoResponse {
-    let contact = crate::services::user::get_admin_contact(&state).await;
-    ApiResponse::success("Admin contact", contact)
+    user: AuthUser,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let membership = svc::get_active_membership(&state, user.user_id)
+        .await?
+        .ok_or_else(|| AppError::BadRequest("No active membership found".into()))?;
+
+    let seat_number = membership
+        .seat_number
+        .ok_or_else(|| AppError::BadRequest("No seat assigned to your membership".into()))?;
+
+    let state2 = state.clone();
+    let name = user.name.clone();
+    let seat = seat_number.clone();
+    tokio::spawn(async move {
+        notification::send_seat_assistance(&state2, &name, &seat).await;
+    });
+
+    Ok(ApiResponse::success("Admin has been notified", ()))
+}
+
+pub async fn download_id_card(
+    State(state): State<Arc<AppState>>,
+    user: AuthUser,
+) -> crate::error::Result<Response> {
+    let pdf = idcard::generate(&state, user.user_id).await?;
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/pdf")
+        .header(
+            header::CONTENT_DISPOSITION,
+            r#"attachment; filename="id-card.pdf""#,
+        )
+        .body(Body::from(Bytes::from(pdf)))
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(response)
 }

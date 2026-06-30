@@ -292,6 +292,7 @@ pub struct DirectMessageRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SendRemindersRequest {
     pub user_ids: Option<Vec<Uuid>>,
 }

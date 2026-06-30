@@ -147,8 +147,67 @@ pub async fn save_file(
     Ok(format!("/uploads/{user_id}/{kind}_{safe_name}"))
 }
 
-fn sanitize_filename(name: &str) -> String {
+pub(crate) fn sanitize_filename(name: &str) -> String {
     name.chars()
         .map(|c| if c.is_alphanumeric() || c == '.' || c == '-' { c } else { '_' })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_filename;
+
+    #[test]
+    fn alphanumeric_dot_hyphen_pass_through() {
+        assert_eq!(sanitize_filename("photo-123.jpg"), "photo-123.jpg");
+    }
+
+    #[test]
+    fn spaces_replaced_with_underscore() {
+        assert_eq!(sanitize_filename("my photo file.jpg"), "my_photo_file.jpg");
+    }
+
+    #[test]
+    fn slashes_replaced_with_underscore() {
+        assert_eq!(sanitize_filename("path/to/file.jpg"), "path_to_file.jpg");
+    }
+
+    #[test]
+    fn special_chars_at_hash_dollar_replaced() {
+        assert_eq!(sanitize_filename("file@#$.jpg"), "file___.jpg");
+    }
+
+    #[test]
+    fn empty_string_stays_empty() {
+        assert_eq!(sanitize_filename(""), "");
+    }
+
+    #[test]
+    fn multiple_dots_preserved() {
+        assert_eq!(sanitize_filename("my.file.name.jpg"), "my.file.name.jpg");
+    }
+
+    #[test]
+    fn path_traversal_dots_preserved_slashes_replaced() {
+        assert_eq!(sanitize_filename("../../etc/passwd"), ".._.._etc_passwd");
+    }
+
+    #[test]
+    fn result_contains_no_spaces_or_slashes() {
+        let inputs = ["hello world.jpg", "a/b/c.png", "foo bar baz.webp"];
+        for input in inputs {
+            let result = sanitize_filename(input);
+            assert!(!result.contains(' '), "space in result for: {input}");
+            assert!(!result.contains('/'), "slash in result for: {input}");
+        }
+    }
+
+    #[test]
+    fn url_built_from_sanitized_filename_has_no_spaces() {
+        let user_id = uuid::Uuid::new_v4();
+        let safe = sanitize_filename("my photo.jpg");
+        let url = format!("/uploads/{user_id}/photo_{safe}");
+        assert!(!url.contains(' '));
+        assert!(url.starts_with("/uploads/"));
+    }
 }

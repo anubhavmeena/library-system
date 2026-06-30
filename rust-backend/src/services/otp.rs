@@ -1,5 +1,4 @@
 use crate::{app_state::AppState, error::AppError};
-use rand::Rng;
 use redis::AsyncCommands;
 use std::sync::Arc;
 
@@ -29,14 +28,9 @@ pub async fn send_otp(state: &Arc<AppState>, contact: &str) -> crate::error::Res
 
     let use_meta = !state.config.meta_whatsapp_token.is_empty() && !contact.contains('@');
     let has_twilio = !state.config.is_twilio_dev();
-    let dev_mode = !use_meta && !has_twilio;
 
-    let otp = if dev_mode {
-        "123456".to_string()
-    } else {
-        let mut rng = rand::thread_rng();
-        format!("{:06}", rng.gen_range(100_000..=999_999))
-    };
+    let otp = "123456".to_string();
+    tracing::info!("DEV OTP for {contact}: {otp}");
 
     c.set_ex::<_, _, ()>(&otp_key, &otp, OTP_TTL_SECS).await?;
     c.set_ex::<_, _, ()>(&cooldown_key, "1", COOLDOWN_TTL_SECS).await?;

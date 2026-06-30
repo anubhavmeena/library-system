@@ -66,14 +66,25 @@ async fn start_scheduler(state: Arc<AppState>) {
         .await
         .expect("Failed to create job scheduler");
 
-    let job = Job::new_async("0 0 9 * * *", move |_uuid, _lock| {
-        let s = state.clone();
+    let s1 = state.clone();
+    let reminder_job = Job::new_async("0 0 9 * * *", move |_uuid, _lock| {
+        let s = s1.clone();
         Box::pin(async move {
             services::admin::run_expiry_reminder_job(s).await;
         })
     })
-    .expect("Failed to create cron job");
+    .expect("Failed to create reminder cron job");
 
-    sched.add(job).await.expect("Failed to add cron job");
+    let s2 = state.clone();
+    let expiry_job = Job::new_async("0 0 10 * * *", move |_uuid, _lock| {
+        let s = s2.clone();
+        Box::pin(async move {
+            services::admin::run_mark_expired_job(s).await;
+        })
+    })
+    .expect("Failed to create expiry cron job");
+
+    sched.add(reminder_job).await.expect("Failed to add reminder job");
+    sched.add(expiry_job).await.expect("Failed to add expiry job");
     sched.start().await.expect("Failed to start scheduler");
 }

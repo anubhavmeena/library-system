@@ -143,7 +143,7 @@ pub async fn expiring_memberships(
     _admin: AdminUser,
     Query(q): Query<std::collections::HashMap<String, String>>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    let days: i32 = q.get("days").and_then(|d| d.parse().ok()).unwrap_or(7);
+    let days: i32 = q.get("withinDays").and_then(|d| d.parse().ok()).unwrap_or(7);
     let data = svc::get_expiring_memberships(&state, days).await?;
     Ok(ApiResponse::success("Expiring memberships", data))
 }
@@ -156,7 +156,7 @@ pub async fn send_reminders(
     let count = svc::send_renewal_reminders(&state, req.user_ids).await?;
     Ok(ApiResponse::success(
         "Reminders sent",
-        serde_json::json!({ "count": count }),
+        format!("Sent renewal reminders to {} student(s)", count),
     ))
 }
 
@@ -169,7 +169,7 @@ pub async fn send_pending_fee_reminders(
     let count = svc::send_pending_fee_reminders(&state, user_ids).await?;
     Ok(ApiResponse::success(
         "Pending fee reminders sent",
-        serde_json::json!({ "count": count }),
+        format!("Sent pending fee reminders to {} student(s)", count),
     ))
 }
 

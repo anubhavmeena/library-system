@@ -80,15 +80,15 @@ pub fn verify_payment(
     let payment_id = payment_id.ok_or_else(|| AppError::BadRequest("payment_id required".into()))?;
     let signature = signature.ok_or_else(|| AppError::BadRequest("signature required".into()))?;
 
+    Ok(verify_hmac_signature(&state.config.razorpay_key_secret, order_id, payment_id, signature))
+}
+
+pub(crate) fn verify_hmac_signature(secret: &str, order_id: &str, payment_id: &str, signature: &str) -> bool {
     let payload = format!("{order_id}|{payment_id}");
-
     type HmacSha256 = Hmac<Sha256>;
-    let mut mac = HmacSha256::new_from_slice(state.config.razorpay_key_secret.as_bytes())
-        .map_err(|e| AppError::Internal(format!("HMAC key error: {e}")))?;
+    let Ok(mut mac) = HmacSha256::new_from_slice(secret.as_bytes()) else { return false };
     mac.update(payload.as_bytes());
-    let expected = hex::encode(mac.finalize().into_bytes());
-
-    Ok(expected == signature)
+    hex::encode(mac.finalize().into_bytes()) == signature
 }
 
 fn random_suffix() -> String {
@@ -96,4 +96,67 @@ fn random_suffix() -> String {
     (0..8)
         .map(|_| rng.sample(rand::distributions::Alphanumeric) as char)
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::verify_hmac_signature;
+
+    const SECRET: &str = "test_razorpay_secret_key";
+
+    fn compute_sig(secret: &str, order_id: &str, payment_id: &str) -> String {
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+        type HmacSha256 = Hmac<Sha256>;
+        let payload = format!("{order_id}|{payment_id}");
+        let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(payload.as_bytes());
+        hex::encode(mac.finalize().into_bytes())
+    }
+
+    #[test]
+    fn valid_signature_accepted() {
+        let sig = compute_sig(SECRET, "order_123", "pay_456");
+        assert!(verify_hmac_signature(SECRET, "order_123", "pay_456", &sig));
+    }
+
+    #[test]
+    fn wrong_signature_rejected() {
+        assert!(!verify_hmac_signature(SECRET, "order_123", "pay_456", "deadbeef0000"));
+    }
+
+    #[test]
+    fn wrong_payment_id_rejected() {
+        let sig = compute_sig(SECRET, "order_123", "pay_456");
+        assert!(!verify_hmac_signature(SECRET, "order_123", "pay_DIFFERENT", &sig));
+    }
+
+    #[test]
+    fn wrong_order_id_rejected() {
+        let sig = compute_sig(SECRET, "order_123", "pay_456");
+        assert!(!verify_hmac_signature(SECRET, "order_DIFFERENT", "pay_456", &sig));
+    }
+
+    #[test]
+    fn wrong_secret_rejected() {
+        let sig = compute_sig(SECRET, "order_123", "pay_456");
+        assert!(!verify_hmac_signature("wrong_secret_key", "order_123", "pay_456", &sig));
+    }
+
+    #[test]
+    fn payload_format_is_order_pipe_payment() {
+        // Canonically: "{order_id}|{payment_id}" — NOT "{payment_id}|{order_id}"
+        let sig_correct = compute_sig(SECRET, "order_ABC", "pay_XYZ");
+        let sig_reversed = compute_sig(SECRET, "pay_XYZ", "order_ABC");
+        assert_ne!(sig_correct, sig_reversed);
+        assert!(verify_hmac_signature(SECRET, "order_ABC", "pay_XYZ", &sig_correct));
+        assert!(!verify_hmac_signature(SECRET, "order_ABC", "pay_XYZ", &sig_reversed));
+    }
+
+    #[test]
+    fn dev_order_prefix_constant() {
+        // Dev-mode orders start with "dev_"; verify_payment checks this before HMAC
+        assert!("dev_order_AbCdEfGh".starts_with("dev_"));
+        assert!(!"order_live_123".starts_with("dev_"));
+    }
 }

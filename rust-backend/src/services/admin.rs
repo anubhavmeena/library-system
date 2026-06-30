@@ -110,16 +110,18 @@ const STUDENT_SELECT: &str = "
         u.id, u.name, u.mobile, u.email, u.photo_url, u.aadhaar_url,
         u.is_active, u.created_at AS joined_at, u.gender, u.address, u.date_of_birth,
         m.id AS membership_id, m.plan_id AS membership_plan_id, mp.name AS plan_name,
-        COALESCE(m.seat_number, (
+        CASE WHEN m.status = 'ACTIVE' THEN COALESCE(m.seat_number, (
             SELECT s.seat_number FROM seat_bookings sb
             JOIN seats s ON s.id = sb.seat_id
             WHERE sb.membership_id = m.id AND sb.status = 'ACTIVE'
             LIMIT 1
-        )) AS seat_number, m.shift,
+        )) END AS seat_number, m.shift,
         m.start_date AS membership_start, m.end_date AS membership_end,
         m.status AS membership_status,
         (m.end_date - CURRENT_DATE)::int AS days_remaining,
-        p.payment_gateway AS payment_mode,
+        CASE WHEN p.payment_gateway = 'CASH' THEN 'CASH'
+             WHEN p.payment_gateway IS NOT NULL THEN 'ONLINE'
+             ELSE NULL END AS payment_mode,
         ps.pending_amount
     FROM users u
     LEFT JOIN LATERAL (
@@ -553,6 +555,9 @@ pub async fn send_renewal_reminders(
     state: &Arc<AppState>,
     user_ids: Option<Vec<Uuid>>,
 ) -> crate::error::Result<i64> {
+    // Treat empty vec the same as None (send to all) — matches frontend behaviour
+    let user_ids = user_ids.filter(|v| !v.is_empty());
+
     let rows: Vec<(Uuid, String, Option<String>, Option<String>, NaiveDate, bool)> = if let Some(ids) = &user_ids {
         sqlx::query_as(
             "SELECT m.id, u.name, u.mobile, u.email, m.end_date, m.reminder_sent
@@ -601,6 +606,21 @@ pub async fn send_renewal_reminders(
         }
     }
 
+    if count > 0 {
+        let admin_msg = format!(
+            "Renewal Reminders Sent! {count} student(s) notified about upcoming membership expiry."
+        );
+        if !state.config.admin_whatsapp.is_empty() {
+            notification::send_whatsapp_to(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
+        }
+        notification::send_email_to(
+            state,
+            &state.config.admin_email.clone(),
+            &format!("Renewal Reminders Sent — {count} student(s)"),
+            &admin_msg,
+        ).await;
+    }
+
     Ok(count)
 }
 
@@ -608,7 +628,10 @@ pub async fn send_pending_fee_reminders(
     state: &Arc<AppState>,
     user_ids: Option<Vec<Uuid>>,
 ) -> crate::error::Result<i64> {
-    let rows: Vec<(String, Option<String>, Option<String>, Option<Decimal>)> = if let Some(ref ids) = user_ids {
+    // Treat empty vec the same as None (send to all) — matches frontend behaviour
+    let ids = user_ids.filter(|v| !v.is_empty());
+
+    let rows: Vec<(String, Option<String>, Option<String>, Option<Decimal>)> = if let Some(ref ids) = ids {
         sqlx::query_as(
             "SELECT u.name, u.mobile, u.email, SUM(p.pending_amount)
              FROM users u JOIN payments p ON p.user_id = u.id
@@ -631,12 +654,29 @@ pub async fn send_pending_fee_reminders(
     };
 
     let count = rows.len() as i64;
-    for (name, mobile, email, pending) in rows {
+    for (name, mobile, email, pending) in &rows {
+        let amount = pending.unwrap_or_default();
         let msg = format!(
-            "Hi {name}! You have a pending fee of ₹{} at Target Zone. Please clear it at the earliest.",
-            pending.unwrap_or_default()
+            "Pending Fee Reminder - Hi {name}, you have a pending library fee of Rs.{amount:.0}. \
+Please visit the library or contact us to clear your dues. - Target Zone Library Team"
         );
         notification::send_direct_message(state, mobile.as_deref(), email.as_deref(), &msg).await;
+    }
+
+    // Admin summary copy
+    if count > 0 {
+        let admin_msg = format!(
+            "Pending Fee Reminders Sent! {count} student(s) notified about outstanding dues."
+        );
+        if !state.config.admin_whatsapp.is_empty() {
+            notification::send_whatsapp_to(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
+        }
+        notification::send_email_to(
+            state,
+            &state.config.admin_email.clone(),
+            &format!("Pending Fee Reminders Sent — {count} student(s)"),
+            &admin_msg,
+        ).await;
     }
 
     Ok(count)
@@ -669,15 +709,21 @@ pub async fn broadcast(
     .fetch_all(&state.db)
     .await?;
 
-    let count = notification::send_broadcast(state, &users, message).await;
+    let recipient_count = users.iter().filter(|(m, _)| m.is_some()).count() as i32;
 
     let bcast = sqlx::query_as::<_, BroadcastMessage>(
         "INSERT INTO broadcast_messages (id, message, recipient_count) VALUES (gen_random_uuid(), $1, $2) RETURNING *",
     )
     .bind(message)
-    .bind(count as i32)
+    .bind(recipient_count)
     .fetch_one(&state.db)
     .await?;
+
+    let s = state.clone();
+    let msg = message.to_string();
+    tokio::spawn(async move {
+        notification::send_broadcast(&s, &users, &msg).await;
+    });
 
     Ok(bcast)
 }
@@ -751,7 +797,11 @@ pub async fn create_cash_membership(
 
             sqlx::query(
                 "INSERT INTO seat_bookings (seat_id, user_id, membership_id, shift, booking_date, end_date)
-                 VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 ON CONFLICT (seat_id, shift, booking_date) DO UPDATE SET
+                     status = 'ACTIVE', user_id = EXCLUDED.user_id,
+                     membership_id = EXCLUDED.membership_id, end_date = EXCLUDED.end_date
+                 WHERE seat_bookings.status != 'ACTIVE'",
             )
             .bind(seat.id)
             .bind(req.user_id)
@@ -763,6 +813,30 @@ pub async fn create_cash_membership(
             .await
             .ok();
         }
+    }
+
+    // Send booking confirmation notification to student and admin
+    if let Ok(user) = sqlx::query_as::<_, crate::models::user::User>(
+        "SELECT * FROM users WHERE id = $1",
+    )
+    .bind(req.user_id)
+    .fetch_one(&state.db)
+    .await
+    {
+        let info = notification::BookingInfo {
+            user_name: user.name.clone(),
+            user_mobile: user.mobile.clone(),
+            user_email: user.email.clone(),
+            plan_name: plan.name.clone(),
+            plan_type: plan.plan_type.clone(),
+            seat_number: req.seat_number.clone(),
+            shift: req.shift.clone(),
+            start_date: req.start_date,
+            end_date,
+            amount_paid: req.amount,
+        };
+        let s = state.clone();
+        tokio::spawn(async move { notification::send_booking_confirmed(&s, &info).await });
     }
 
     Ok(serde_json::json!({
@@ -805,10 +879,14 @@ pub async fn change_membership_seat(
     .execute(&state.db)
     .await?;
 
-    // Create new booking
+    // Create new booking, reclaiming any released slot for the same date
     sqlx::query(
         "INSERT INTO seat_bookings (seat_id, user_id, membership_id, shift, booking_date, end_date)
-         VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (seat_id, shift, booking_date) DO UPDATE SET
+             status = 'ACTIVE', user_id = EXCLUDED.user_id,
+             membership_id = EXCLUDED.membership_id, end_date = EXCLUDED.end_date
+         WHERE seat_bookings.status != 'ACTIVE'",
     )
     .bind(new_seat.id)
     .bind(membership.user_id)
@@ -827,6 +905,12 @@ pub async fn change_membership_seat(
     .bind(new_seat_number)
     .execute(&state.db)
     .await?;
+
+    if let Some(ref shift) = membership.shift {
+        crate::services::seat::invalidate_seat_cache(
+            state, shift, membership.start_date, membership.end_date,
+        ).await;
+    }
 
     Ok(())
 }
@@ -851,6 +935,14 @@ pub async fn update_membership_plan(
         .bind(extra_days.to_string())
         .execute(&state.db)
         .await?;
+        sqlx::query(
+            "UPDATE seat_bookings SET end_date = end_date + ($2 || ' days')::INTERVAL
+             WHERE membership_id = $1 AND status = 'ACTIVE'",
+        )
+        .bind(membership_id)
+        .bind(extra_days.to_string())
+        .execute(&state.db)
+        .await?;
     }
     if let Some(end_date) = req.end_date {
         sqlx::query("UPDATE memberships SET end_date = $2 WHERE id = $1")
@@ -858,6 +950,13 @@ pub async fn update_membership_plan(
             .bind(end_date)
             .execute(&state.db)
             .await?;
+        sqlx::query(
+            "UPDATE seat_bookings SET end_date = $2 WHERE membership_id = $1 AND status = 'ACTIVE'",
+        )
+        .bind(membership_id)
+        .bind(end_date)
+        .execute(&state.db)
+        .await?;
     }
 
     sqlx::query_as::<_, Membership>("SELECT * FROM memberships WHERE id = $1")
@@ -1105,7 +1204,7 @@ pub async fn save_expense(
     Ok(MonthlyExpenseWithItems { expense, misc_items, total })
 }
 
-// ── Scheduler (called by background task) ────────────────────────────────────
+// ── Scheduler (called by background tasks) ───────────────────────────────────
 
 pub async fn run_expiry_reminder_job(state: Arc<AppState>) {
     tracing::info!("Running expiry reminder scheduler job");
@@ -1113,4 +1212,91 @@ pub async fn run_expiry_reminder_job(state: Arc<AppState>) {
         Ok(n) => tracing::info!("Sent {n} renewal reminders"),
         Err(e) => tracing::error!("Reminder job error: {e}"),
     }
+}
+
+pub async fn run_mark_expired_job(state: Arc<AppState>) {
+    tracing::info!("Running mark-expired scheduler job");
+    let today = chrono::Local::now().date_naive();
+
+    let expired = match sqlx::query_as::<_, (uuid::Uuid, uuid::Uuid, Option<String>)>(
+        "SELECT m.id, m.user_id, u.name
+         FROM memberships m
+         JOIN users u ON u.id = m.user_id
+         WHERE m.status = 'ACTIVE' AND m.end_date < $1",
+    )
+    .bind(today)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => { tracing::error!("mark_expired query error: {e}"); return; }
+    };
+
+    if expired.is_empty() {
+        tracing::info!("mark_expired: no newly expired memberships");
+        return;
+    }
+
+    for (mem_id, user_id, name) in &expired {
+        if let Err(e) = sqlx::query("UPDATE memberships SET status = 'EXPIRED' WHERE id = $1")
+            .bind(mem_id)
+            .execute(&state.db)
+            .await
+        {
+            tracing::error!("Failed to expire membership {mem_id}: {e}");
+            continue;
+        }
+
+        // Activate any queued plan for this user
+        let queued = sqlx::query_as::<_, (uuid::Uuid, Option<String>)>(
+            "SELECT id, seat_number FROM memberships WHERE user_id = $1 AND status = 'QUEUED' ORDER BY created_at LIMIT 1",
+        )
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await;
+
+        match queued {
+            Ok(Some((queued_id, queued_seat))) => {
+                if let Err(e) = sqlx::query("UPDATE memberships SET status = 'ACTIVE' WHERE id = $1")
+                    .bind(queued_id)
+                    .execute(&state.db)
+                    .await
+                {
+                    tracing::error!("Failed to activate queued membership {queued_id}: {e}");
+                } else {
+                    tracing::info!("Activated queued plan {queued_id} for user {user_id} — seat {:?}", queued_seat);
+                }
+            }
+            Ok(None) => {}
+            Err(e) => tracing::error!("Failed to query queued membership for user {user_id}: {e}"),
+        }
+
+        let seat_number = sqlx::query_scalar::<_, Option<String>>(
+            "SELECT COALESCE(m.seat_number, (
+                SELECT s.seat_number FROM seat_bookings sb
+                JOIN seats s ON s.id = sb.seat_id
+                WHERE sb.membership_id = $1 AND sb.status = 'ACTIVE'
+                LIMIT 1
+             )) FROM memberships m WHERE m.id = $1",
+        )
+        .bind(mem_id)
+        .fetch_optional(&state.db)
+        .await
+        .ok()
+        .flatten()
+        .flatten()
+        .unwrap_or_else(|| "N/A".to_string());
+
+        let user_name = name.as_deref().unwrap_or("Unknown");
+        tracing::info!("Seat {} marked expired for user '{}'", seat_number, user_name);
+
+        let s = state.clone();
+        let uname = user_name.to_string();
+        let seat = seat_number.clone();
+        tokio::spawn(async move {
+            notification::send_seat_expired(&s, &uname, &seat).await;
+        });
+    }
+
+    tracing::info!("mark_expired: {} memberships marked EXPIRED", expired.len());
 }

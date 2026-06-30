@@ -289,7 +289,10 @@ pub async fn verify_payment(
                 let _ = sqlx::query(
                     "INSERT INTO seat_bookings (seat_id, user_id, membership_id, shift, booking_date, end_date)
                      VALUES ($1, $2, $3, $4, $5, $6)
-                     ON CONFLICT (seat_id, shift, booking_date) DO NOTHING",
+                     ON CONFLICT (seat_id, shift, booking_date) DO UPDATE SET
+                         status = 'ACTIVE', user_id = EXCLUDED.user_id,
+                         membership_id = EXCLUDED.membership_id, end_date = EXCLUDED.end_date
+                     WHERE seat_bookings.status != 'ACTIVE'",
                 )
                 .bind(seat.id)
                 .bind(user_id)
