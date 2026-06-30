@@ -189,7 +189,10 @@ pub async fn broadcast(
     Json(req): Json<BroadcastRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let bcast = svc::broadcast(&state, &req.message).await?;
-    Ok(ApiResponse::success("Broadcast sent", bcast))
+    Ok(ApiResponse::success(
+        "Broadcast sent",
+        format!("Broadcast sent to {} member(s)", bcast.recipient_count),
+    ))
 }
 
 pub async fn broadcast_history(
