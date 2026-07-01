@@ -124,7 +124,12 @@ export default function AdminCreateMembershipPage() {
         try {
             const res = await api.get(`/admin/students/${selectedStudent.id}`)
             const detail = res.data.data
-            setStartDate(detail.membershipEnd || TODAY)
+            // membershipEnd is the last day still occupied by the current booking
+            // (endDate is inclusive in the seat conflict/availability checks), so
+            // the renewal must start the day after to avoid a same-seat overlap.
+            setStartDate(detail.membershipEnd
+                ? format(addDays(parseISO(detail.membershipEnd), 1), 'yyyy-MM-dd')
+                : TODAY)
             setBookingType('renewal')
             setStep(2)
         } catch {
