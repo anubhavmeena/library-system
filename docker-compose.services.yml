@@ -307,6 +307,8 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       <<: [*spring-env, *db-env, *kafka-env, *jvm-heavy]
+      REDIS_HOST:       redis
+      REDIS_PORT:       6379
       SMTP_HOST:        host.docker.internal
       SMTP_PORT:        "25"
       IMAP_HOST:        host.docker.internal

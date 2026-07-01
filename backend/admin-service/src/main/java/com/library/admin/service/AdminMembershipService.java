@@ -9,6 +9,7 @@ import com.library.admin.exception.ResourceNotFoundException;
 import com.library.admin.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class AdminMembershipService {
     private final SeatRepository         seatRepository;
     private final SeatBookingRepository  seatBookingRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     @Transactional
     public MembershipDto createCashMembership(CreateCashMembershipRequest req) {
@@ -128,6 +130,11 @@ public class AdminMembershipService {
                 .build();
         seatBookingRepository.save(booking);
 
+        // Bust seat-service's Redis cache so /seats/availability reflects this
+        // booking immediately — this write bypasses seat-service's own bookSeat(),
+        // which is the only other place that busts this cache.
+        invalidateSeatCache(resolvedShift, startDate, endDate);
+
         // 11. Publish booking-confirmed Kafka event (best-effort)
         try {
             BookingConfirmedEvent event = BookingConfirmedEvent.builder()
@@ -197,6 +204,10 @@ public class AdminMembershipService {
                     seatBookingRepository.save(b);
                 });
 
+        // Bust seat-service's Redis cache — both the old and new seat's occupancy
+        // for this shift/date range changed
+        invalidateSeatCache(membership.getShift(), membership.getStartDate(), membership.getEndDate());
+
         log.info("Seat changed for membership {} from {} to {}",
                 membershipId, membership.getSeatNumber(), req.getSeatNumber());
 
@@ -221,5 +232,23 @@ public class AdminMembershipService {
         membership.setEndDate(membership.getStartDate().plusDays(plan.getDurationDays()));
         membershipRepository.save(membership);
         log.info("Plan updated for membership {} to plan {}", membershipId, plan.getName());
+    }
+
+    // ── Seat Cache ────────────────────────────────────────────────────────────
+    // Mirrors seat-service's SeatService.invalidateCache() exactly. Needed here
+    // because admin-created bookings write seat_bookings directly instead of
+    // calling seat-service's HTTP API (see backend/CLAUDE.md: admin-service
+    // queries the DB directly rather than calling sibling services), so this
+    // is the only place that can bust seat-service's Redis cache for those writes.
+    private void invalidateSeatCache(String shift, LocalDate start, LocalDate end) {
+        LocalDate cursor = start;
+        while (!cursor.isAfter(end)) {
+            redisTemplate.delete("seats:availability:" + shift + ":" + cursor);
+            if ("FULL_DAY".equals(shift)) {
+                redisTemplate.delete("seats:availability:MORNING:" + cursor);
+                redisTemplate.delete("seats:availability:EVENING:" + cursor);
+            }
+            cursor = cursor.plusDays(1);
+        }
     }
 }
