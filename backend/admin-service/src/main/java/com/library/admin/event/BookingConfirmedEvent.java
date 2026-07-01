@@ -7,6 +7,9 @@ import java.math.BigDecimal;
 public class BookingConfirmedEvent {
     private String userId;
     private String membershipId;
+    private String userName;
+    private String userMobile;
+    private String userEmail;
     private String planName;
     private String planType;
     private String seatNumber;
