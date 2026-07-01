@@ -54,7 +54,7 @@ public class AdminMembershipService {
         }
 
         // 4. Check student has no active membership
-        Optional<Membership> existing = membershipRepository.findByUserIdAndStatus(
+        Optional<Membership> existing = membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(
                 student.getId(), Membership.Status.ACTIVE);
         if (existing.isPresent() && !existing.get().getEndDate().isBefore(LocalDate.now())) {
             throw new IllegalArgumentException("Student already has an active membership");

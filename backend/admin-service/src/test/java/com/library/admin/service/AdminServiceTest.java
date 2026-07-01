@@ -164,7 +164,7 @@ class AdminServiceTest {
         Membership mem = buildActiveMembership(uid, LocalDate.now().plusDays(10));
 
         stubEntityManagerForStudents(List.of(user), 1L);
-        when(membershipRepository.findByUserIdAndStatus(uid, Membership.Status.ACTIVE))
+        when(membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(uid, Membership.Status.ACTIVE))
                 .thenReturn(Optional.of(mem));
 
         StudentListDto result = adminService.getAllStudents(0, 20, null, null, null, "createdAt", "desc");
@@ -177,7 +177,7 @@ class AdminServiceTest {
     void getAllStudents_studentWithNoMembership_hasMembershipFieldsNull() {
         UUID uid = UUID.randomUUID();
         stubEntityManagerForStudents(List.of(buildUser(uid)), 1L);
-        when(membershipRepository.findByUserIdAndStatus(uid, Membership.Status.ACTIVE))
+        when(membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(uid, Membership.Status.ACTIVE))
                 .thenReturn(Optional.empty());
 
         StudentListDto result = adminService.getAllStudents(0, 20, null, null, null, "createdAt", "desc");
@@ -215,7 +215,7 @@ class AdminServiceTest {
         Membership mem = buildActiveMembership(uid, LocalDate.now().plusDays(5));
 
         when(userRepository.findById(uid)).thenReturn(Optional.of(user));
-        when(membershipRepository.findByUserIdAndStatus(uid, Membership.Status.ACTIVE))
+        when(membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(uid, Membership.Status.ACTIVE))
                 .thenReturn(Optional.of(mem));
 
         StudentDto dto = adminService.getStudentDetails(uid.toString());
@@ -228,7 +228,7 @@ class AdminServiceTest {
     void getStudentDetails_foundWithNoMembership() {
         UUID uid = UUID.randomUUID();
         when(userRepository.findById(uid)).thenReturn(Optional.of(buildUser(uid)));
-        when(membershipRepository.findByUserIdAndStatus(uid, Membership.Status.ACTIVE))
+        when(membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(uid, Membership.Status.ACTIVE))
                 .thenReturn(Optional.empty());
 
         StudentDto dto = adminService.getStudentDetails(uid.toString());
@@ -524,7 +524,7 @@ class AdminServiceTest {
         Membership mem = buildActiveMembership(uid, LocalDate.now().plusDays(3));
         User user = buildUser(uid);
 
-        when(membershipRepository.findByUserIdAndStatus(uid, Membership.Status.ACTIVE))
+        when(membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(uid, Membership.Status.ACTIVE))
                 .thenReturn(Optional.of(mem));
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of(user));
 
@@ -537,7 +537,7 @@ class AdminServiceTest {
     @Test
     void sendBulkReminders_membershipNotFoundForUserId_skipped() {
         UUID uid = UUID.randomUUID();
-        when(membershipRepository.findByUserIdAndStatus(uid, Membership.Status.ACTIVE))
+        when(membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(uid, Membership.Status.ACTIVE))
                 .thenReturn(Optional.empty());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 

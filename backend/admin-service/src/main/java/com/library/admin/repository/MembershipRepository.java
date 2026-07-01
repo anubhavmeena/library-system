@@ -15,8 +15,10 @@ import java.util.UUID;
 @Repository
 public interface MembershipRepository extends JpaRepository<Membership, UUID> {
 
-    // Used by getStudentDetails and getAllStudents to join active membership
-    Optional<Membership> findByUserIdAndStatus(UUID userId, Membership.Status status);
+    // Used by getStudentDetails and getAllStudents to join active membership.
+    // findFirst+OrderBy (not findBy) because a user can end up with more than
+    // one ACTIVE row (e.g. overlapping renewal); take the one ending latest.
+    Optional<Membership> findFirstByUserIdAndStatusOrderByEndDateDesc(UUID userId, Membership.Status status);
 
     // Used by getExpiringMemberships and sendBulkReminders
     // Returns ALL ACTIVE memberships expiring on or before the given date

@@ -42,32 +42,32 @@ class MembershipRepositoryTest {
                 .build());
     }
 
-    // ── findByUserIdAndStatus ────────────────────────────────────────────────
+    // ── findFirstByUserIdAndStatusOrderByEndDateDesc ────────────────────────────────────────────────
 
     @Test
-    void findByUserIdAndStatus_found() {
+    void findFirstByUserIdAndStatusOrderByEndDateDesc_found() {
         Membership m = save(userId1, Membership.Status.ACTIVE, LocalDate.now().plusDays(10), false);
 
-        Optional<Membership> result = membershipRepository.findByUserIdAndStatus(userId1, Membership.Status.ACTIVE);
+        Optional<Membership> result = membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(userId1, Membership.Status.ACTIVE);
 
         assertThat(result).isPresent()
                 .get().extracting(Membership::getId).isEqualTo(m.getId());
     }
 
     @Test
-    void findByUserIdAndStatus_notFound_wrongStatus() {
+    void findFirstByUserIdAndStatusOrderByEndDateDesc_notFound_wrongStatus() {
         save(userId1, Membership.Status.EXPIRED, LocalDate.now().minusDays(1), false);
 
-        Optional<Membership> result = membershipRepository.findByUserIdAndStatus(userId1, Membership.Status.ACTIVE);
+        Optional<Membership> result = membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(userId1, Membership.Status.ACTIVE);
 
         assertThat(result).isEmpty();
     }
 
     @Test
-    void findByUserIdAndStatus_notFound_wrongUser() {
+    void findFirstByUserIdAndStatusOrderByEndDateDesc_notFound_wrongUser() {
         save(userId1, Membership.Status.ACTIVE, LocalDate.now().plusDays(10), false);
 
-        Optional<Membership> result = membershipRepository.findByUserIdAndStatus(userId2, Membership.Status.ACTIVE);
+        Optional<Membership> result = membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(userId2, Membership.Status.ACTIVE);
 
         assertThat(result).isEmpty();
     }

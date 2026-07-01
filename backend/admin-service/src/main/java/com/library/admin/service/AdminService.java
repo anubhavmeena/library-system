@@ -133,7 +133,7 @@ public class AdminService {
 
         List<StudentDto> students = users.stream().map(user -> {
             Membership mem = membershipRepository
-                    .findByUserIdAndStatus(user.getId(), Membership.Status.ACTIVE)
+                    .findFirstByUserIdAndStatusOrderByEndDateDesc(user.getId(), Membership.Status.ACTIVE)
                     .filter(m -> !m.getEndDate().isBefore(LocalDate.now()))
                     .orElse(null);
             StudentDto dto = StudentDto.fromEntities(user, mem);
@@ -156,7 +156,7 @@ public class AdminService {
                         "Student not found: " + userId));
 
         Membership mem = membershipRepository
-                .findByUserIdAndStatus(user.getId(), Membership.Status.ACTIVE)
+                .findFirstByUserIdAndStatusOrderByEndDateDesc(user.getId(), Membership.Status.ACTIVE)
                 .filter(m -> !m.getEndDate().isBefore(LocalDate.now()))
                 .orElse(null);
 
@@ -301,7 +301,7 @@ public class AdminService {
             // Targeted send — resolve membership for each supplied userId
             targets = userIds.stream()
                     .map(id -> membershipRepository
-                            .findByUserIdAndStatus(
+                            .findFirstByUserIdAndStatusOrderByEndDateDesc(
                                     UUID.fromString(id), Membership.Status.ACTIVE)
                             .orElse(null))
                     .filter(Objects::nonNull)
@@ -521,7 +521,7 @@ public class AdminService {
         if (req.getJoinedAt() != null && !req.getJoinedAt().isBlank()) {
             LocalDate newStart = LocalDate.parse(req.getJoinedAt());
             user.setCreatedAt(newStart.atStartOfDay());
-            membershipRepository.findByUserIdAndStatus(user.getId(), Membership.Status.ACTIVE)
+            membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(user.getId(), Membership.Status.ACTIVE)
                 .filter(m -> !m.getEndDate().isBefore(LocalDate.now()))
                 .ifPresent(m -> planRepository.findById(m.getPlanId()).ifPresent(plan -> {
                     m.setStartDate(newStart);
