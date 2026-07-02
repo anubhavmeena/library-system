@@ -684,4 +684,99 @@ class AdminServiceTest {
         assertThat(dto.getDailyBreakdown()).hasSize(2);
     }
 
+    // ── getStudentPayments — ₹0 rows excluded ───────────────────────────────
+
+    private Payment buildPayment(UUID userId, UUID membershipId, BigDecimal amount) {
+        return Payment.builder()
+                .id(UUID.randomUUID())
+                .membershipId(membershipId)
+                .userId(userId)
+                .amount(amount)
+                .pendingAmount(BigDecimal.ZERO)
+                .paymentGateway("CASH")
+                .status(Payment.Status.SUCCESS)
+                .createdAt(LocalDateTime.now())
+                .build();
+    }
+
+    @Test
+    void getStudentPayments_excludesZeroAmountRows() {
+        UUID userId = UUID.randomUUID();
+        UUID membershipId = UUID.randomUUID();
+        Payment zeroPaid = buildPayment(userId, membershipId, BigDecimal.ZERO);
+        Payment realPaid = buildPayment(userId, membershipId, new BigDecimal("200.00"));
+        when(paymentRepository.findByUserIdOrderByCreatedAtDesc(userId))
+                .thenReturn(List.of(zeroPaid, realPaid));
+
+        List<PaymentHistoryDto> result = adminService.getStudentPayments(userId.toString());
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(realPaid.getId());
+    }
+
+    @Test
+    void getStudentPayments_allPositiveAmounts_returnsEachSeparately() {
+        UUID userId = UUID.randomUUID();
+        UUID membershipId = UUID.randomUUID();
+        Payment first  = buildPayment(userId, membershipId, new BigDecimal("200.00"));
+        Payment second = buildPayment(userId, membershipId, new BigDecimal("400.00"));
+        when(paymentRepository.findByUserIdOrderByCreatedAtDesc(userId))
+                .thenReturn(List.of(second, first));
+
+        List<PaymentHistoryDto> result = adminService.getStudentPayments(userId.toString());
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(PaymentHistoryDto::getAmount)
+                .containsExactlyInAnyOrder(new BigDecimal("200.00"), new BigDecimal("400.00"));
+    }
+
+    // ── clearPendingFees — new row per clearance, originals untouched ──────
+
+    @Test
+    void clearPendingFees_createsNewPaymentRow_leavesOriginalRowUntouched() {
+        UUID userId = UUID.randomUUID();
+        UUID membershipId = UUID.randomUUID();
+
+        Payment original = buildPayment(userId, membershipId, new BigDecimal("200.00"));
+        original.setPendingAmount(new BigDecimal("400.00"));
+
+        when(paymentRepository.findByUserIdAndPendingAmountGreaterThan(userId, BigDecimal.ZERO))
+                .thenReturn(List.of(original));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(buildUser(userId)));
+        when(membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(userId))
+                .thenReturn(Optional.empty());
+        when(membershipRepository.findFirstByUserIdOrderByEndDateDesc(userId))
+                .thenReturn(Optional.empty());
+
+        adminService.clearPendingFees(userId.toString());
+
+        // Original row's own `amount` field was never reassigned by this method —
+        // only the bulk UPDATE (mocked away here) would zero its pendingAmount.
+        assertThat(original.getAmount()).isEqualByComparingTo(new BigDecimal("200.00"));
+
+        ArgumentCaptor<Payment> cap = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(cap.capture());
+        Payment newRow = cap.getValue();
+        assertThat(newRow.getAmount()).isEqualByComparingTo(new BigDecimal("400.00"));
+        assertThat(newRow.getPendingAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(newRow.getStatus()).isEqualTo(Payment.Status.SUCCESS);
+        assertThat(newRow.getPaymentGateway()).isEqualTo("CASH");
+        assertThat(newRow.getInvoiceId()).isNotBlank();
+        assertThat(newRow.getMembershipId()).isEqualTo(membershipId);
+
+        verify(paymentRepository).clearPendingAmountByUserId(userId);
+    }
+
+    @Test
+    void clearPendingFees_nothingPending_doesNotCreateNewRow() {
+        UUID userId = UUID.randomUUID();
+        when(paymentRepository.findByUserIdAndPendingAmountGreaterThan(userId, BigDecimal.ZERO))
+                .thenReturn(List.of());
+
+        adminService.clearPendingFees(userId.toString());
+
+        verify(paymentRepository, never()).save(any());
+        verify(kafkaTemplate, never()).send(anyString(), anyString(), any());
+    }
+
 }

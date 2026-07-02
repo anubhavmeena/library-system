@@ -173,4 +173,18 @@ class MembershipServiceTest {
 
         verify(paymentRepository).findByUserIdOrderByCreatedAtDesc(UUID.fromString(userId));
     }
+
+    @Test
+    void getUserPayments_excludesZeroAmountRows() {
+        Payment zeroPaid = buildPayment();
+        zeroPaid.setAmount(BigDecimal.ZERO);
+        Payment realPaid = buildPayment();
+        when(paymentRepository.findByUserIdOrderByCreatedAtDesc(UUID.fromString(userId)))
+                .thenReturn(List.of(zeroPaid, realPaid));
+
+        List<PaymentDto> result = membershipService.getUserPayments(userId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(realPaid.getId().toString());
+    }
 }

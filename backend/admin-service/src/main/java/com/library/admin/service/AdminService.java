@@ -428,12 +428,15 @@ public class AdminService {
     public void clearPendingFees(String userId) {
         UUID uid = UUID.fromString(userId);
 
-        BigDecimal totalCleared = paymentRepository
-                .findByUserIdAndPendingAmountGreaterThan(uid, BigDecimal.ZERO)
-                .stream()
+        List<Payment> pendingPayments = paymentRepository
+                .findByUserIdAndPendingAmountGreaterThan(uid, BigDecimal.ZERO);
+        BigDecimal totalCleared = pendingPayments.stream()
                 .map(Payment::getPendingAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        // Zero out the pending balance on the original rows — their `amount`
+        // stays untouched, so each original payment still shows as its own
+        // separate, unaltered entry in payment history.
         paymentRepository.clearPendingAmountByUserId(uid);
         log.info("Pending fees cleared for user {}", userId);
 
@@ -442,8 +445,32 @@ public class AdminService {
         User user = userRepository.findById(uid).orElse(null);
         if (user == null) return;
 
-        String seatNumber = membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(uid)
-                .map(Membership::getSeatNumber).orElse(null);
+        Optional<Membership> currentOrLatest = membershipRepository
+                .findFirstByUserIdCurrentOrderByEndDateDesc(uid)
+                .or(() -> membershipRepository.findFirstByUserIdOrderByEndDateDesc(uid));
+        String seatNumber = currentOrLatest.map(Membership::getSeatNumber).orElse(null);
+        UUID membershipIdForClearance = currentOrLatest.map(Membership::getId)
+                .orElseGet(() -> pendingPayments.get(0).getMembershipId());
+
+        String invoiceId = "INV-" + LocalDate.now().toString().replace("-", "") + "-" +
+                UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+
+        // The cleared amount is a real, separate transaction that happened
+        // TODAY — persist it as its own new Payment row (not folded into an
+        // older row) so it shows up as its own payment-history entry and its
+        // `createdAt` (set by @PrePersist) correctly counts toward today's
+        // revenue instead of whatever day the original payment happened.
+        Payment clearancePayment = Payment.builder()
+                .membershipId(membershipIdForClearance)
+                .userId(uid)
+                .amount(totalCleared)
+                .pendingAmount(BigDecimal.ZERO)
+                .paymentGateway("CASH")
+                .gatewayOrderId("cash_dues_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8))
+                .status(Payment.Status.SUCCESS)
+                .invoiceId(invoiceId)
+                .build();
+        paymentRepository.save(clearancePayment);
 
         RenewalReminderEvent adminEvent = RenewalReminderEvent.builder()
                 .userId(uid.toString())
@@ -467,8 +494,6 @@ public class AdminService {
                 .build();
         kafkaTemplate.send("renewal-reminder", uid.toString(), studentEvent);
 
-        String invoiceId = "INV-" + LocalDate.now().toString().replace("-", "") + "-" +
-                UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
         PaymentReceiptEvent receiptEvent = PaymentReceiptEvent.builder()
                 .userId(uid.toString())
                 .userName(user.getName())
@@ -626,6 +651,9 @@ public class AdminService {
     public List<PaymentHistoryDto> getStudentPayments(String userId) {
         return paymentRepository.findByUserIdOrderByCreatedAtDesc(UUID.fromString(userId))
                 .stream()
+                // ₹0 rows are "fully on credit" cash bookings (nothing paid yet) —
+                // real pending-balance tracking, not an actual payment to show.
+                .filter(p -> p.getAmount() != null && p.getAmount().signum() > 0)
                 .map(p -> PaymentHistoryDto.builder()
                         .id(p.getId())
                         .membershipId(p.getMembershipId())

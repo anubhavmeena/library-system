@@ -78,6 +78,8 @@ public class MembershipService {
         return paymentRepository
                 .findByUserIdOrderByCreatedAtDesc(UUID.fromString(userId))
                 .stream()
+                // ₹0 rows aren't real payments — nothing to show the student.
+                .filter(p -> p.getAmount() != null && p.getAmount().signum() > 0)
                 .map(PaymentDto::fromEntity)
                 .collect(Collectors.toList());
     }

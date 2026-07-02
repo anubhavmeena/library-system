@@ -37,10 +37,13 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
             @Param("to")   LocalDateTime to
     );
 
-    // Transaction count for a time window — used by dashboard paymentsThisMonth
+    // Transaction count for a time window — used by dashboard paymentsThisMonth.
+    // amount > 0 excludes "fully on credit" cash bookings (paidAmount = 0 at
+    // creation time) — those aren't real payments, just a pending-balance record.
     @Query("""
         SELECT COUNT(p) FROM Payment p
         WHERE p.status = 'SUCCESS'
+          AND p.amount > 0
           AND p.createdAt >= :from
           AND p.createdAt <= :to
         """)
@@ -54,6 +57,7 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
         SELECT p.amount, COUNT(p)
         FROM Payment p
         WHERE p.status = 'SUCCESS'
+          AND p.amount > 0
           AND p.createdAt >= :from
           AND p.createdAt <= :to
         GROUP BY p.amount
@@ -72,16 +76,22 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     // before the balance is zeroed out.
     List<Payment> findByUserIdAndPendingAmountGreaterThan(UUID userId, java.math.BigDecimal amount);
 
-    // Fold pending balance into paid amount and zero it out (clear pending fees action)
+    // Zero out the pending balance on every row that still owes money for this
+    // user (clear pending fees action). Does NOT fold the cleared amount into
+    // `amount` — that would misattribute it to the ORIGINAL payment's date for
+    // revenue purposes and merge two distinct transactions into one row. The
+    // cleared amount is instead persisted as a brand-new Payment row (dated
+    // today) by AdminService.clearPendingFees(), right after this call.
     @Modifying(clearAutomatically = true)
     @Transactional
-    @Query("UPDATE Payment p SET p.amount = p.amount + p.pendingAmount, p.pendingAmount = 0 WHERE p.userId = :userId AND p.pendingAmount > 0")
+    @Query("UPDATE Payment p SET p.pendingAmount = 0 WHERE p.userId = :userId AND p.pendingAmount > 0")
     void clearPendingAmountByUserId(@Param("userId") UUID userId);
 
     // All successful payments within a single day — used for student drill-down
     @Query("""
         SELECT p FROM Payment p
         WHERE p.status = 'SUCCESS'
+          AND p.amount > 0
           AND p.createdAt >= :from
           AND p.createdAt <= :to
         ORDER BY p.createdAt DESC

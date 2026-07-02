@@ -158,21 +158,25 @@ class PaymentRepositoryTest {
     }
 
     // ── clearPendingAmountByUserId ───────────────────────────────────────────
+    // Only zeroes pendingAmount — does NOT fold it into `amount` anymore.
+    // AdminService.clearPendingFees() persists the cleared amount as its own
+    // new Payment row instead, so it's attributed to the day it was actually
+    // cleared rather than the original payment's date.
 
     @Test
-    void clearPendingAmount_foldsIntoAmountAndZerosPending() {
+    void clearPendingAmount_zerosPendingButLeavesAmountUntouched() {
         UUID uid = UUID.randomUUID();
         saveWithPending(uid, new BigDecimal("1500.00"), new BigDecimal("500.00"), BASE);
 
         paymentRepository.clearPendingAmountByUserId(uid);
 
         Payment updated = paymentRepository.findByUserIdOrderByCreatedAtDesc(uid).get(0);
-        assertThat(updated.getAmount()).isEqualByComparingTo("2000.00");
+        assertThat(updated.getAmount()).isEqualByComparingTo("1500.00");
         assertThat(updated.getPendingAmount()).isEqualByComparingTo("0.00");
     }
 
     @Test
-    void clearPendingAmount_clearedAmountAppearsInRevenueSums() {
+    void clearPendingAmount_doesNotChangeRevenueSums() {
         UUID uid = UUID.randomUUID();
         saveWithPending(uid, new BigDecimal("1000.00"), new BigDecimal("300.00"), BASE);
 
@@ -181,7 +185,48 @@ class PaymentRepositoryTest {
 
         paymentRepository.clearPendingAmountByUserId(uid);
 
+        // amount is untouched by this call — the cleared ₹300 is persisted as a
+        // separate new row by AdminService.clearPendingFees(), not tested here
+        // (that's a repository-layer test; the new-row logic lives in the service).
         BigDecimal after = paymentRepository.sumRevenueForPeriod(BASE.minusHours(1), BASE.plusHours(1));
-        assertThat(after).isEqualByComparingTo("1300.00");
+        assertThat(after).isEqualByComparingTo("1000.00");
+    }
+
+    @Test
+    void clearPendingAmount_onlyClearsMatchingUser() {
+        UUID uid1 = UUID.randomUUID();
+        UUID uid2 = UUID.randomUUID();
+        saveWithPending(uid1, new BigDecimal("100.00"), new BigDecimal("50.00"), BASE);
+        saveWithPending(uid2, new BigDecimal("200.00"), new BigDecimal("75.00"), BASE);
+
+        paymentRepository.clearPendingAmountByUserId(uid1);
+
+        assertThat(paymentRepository.findByUserIdOrderByCreatedAtDesc(uid1).get(0).getPendingAmount())
+                .isEqualByComparingTo("0.00");
+        assertThat(paymentRepository.findByUserIdOrderByCreatedAtDesc(uid2).get(0).getPendingAmount())
+                .isEqualByComparingTo("75.00");
+    }
+
+    // ── amount > 0 filtering on revenue/count queries ────────────────────────
+
+    @Test
+    void countSuccessfulPayments_excludesZeroAmountRows() {
+        save(Payment.Status.SUCCESS, BigDecimal.ZERO,          BASE); // fully on credit — excluded
+        save(Payment.Status.SUCCESS, new BigDecimal("100.00"), BASE.plusHours(1));
+
+        long count = paymentRepository.countSuccessfulPayments(BASE.minusHours(1), BASE.plusHours(3));
+
+        assertThat(count).isEqualTo(1L);
+    }
+
+    @Test
+    void findSuccessfulPaymentsForDay_excludesZeroAmountRows() {
+        save(Payment.Status.SUCCESS, BigDecimal.ZERO,          BASE);
+        save(Payment.Status.SUCCESS, new BigDecimal("250.00"), BASE.plusHours(1));
+
+        var result = paymentRepository.findSuccessfulPaymentsForDay(BASE.minusHours(1), BASE.plusHours(3));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getAmount()).isEqualByComparingTo("250.00");
     }
 }
