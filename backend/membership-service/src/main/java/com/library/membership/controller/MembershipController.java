@@ -101,4 +101,20 @@ public class MembershipController {
         return ResponseEntity.ok(
                 ApiResponse.success(paymentService.verifyAndActivateMembership(userId, request)));
     }
+
+    // ── Pay dues on a GRACE membership ──────────────────────────────────────────
+
+    @PostMapping("/api/payments/dues/create-order")
+    public ResponseEntity<ApiResponse<CreateOrderResponse>> createDuesOrder(
+            @RequestHeader("X-User-Id") String userId) {
+        return ResponseEntity.ok(ApiResponse.success(paymentService.createDuesOrder(userId)));
+    }
+
+    @PostMapping("/api/payments/dues/verify")
+    public ResponseEntity<ApiResponse<MembershipDto>> verifyDuesPayment(
+            @RequestHeader("X-User-Id") String userId,
+            @Valid @RequestBody PaymentVerifyRequest request) {
+        return ResponseEntity.ok(
+                ApiResponse.success(paymentService.verifyAndPayDues(userId, request)));
+    }
 }

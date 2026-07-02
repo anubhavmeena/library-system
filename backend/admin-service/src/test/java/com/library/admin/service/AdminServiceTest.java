@@ -164,7 +164,7 @@ class AdminServiceTest {
         Membership mem = buildActiveMembership(uid, LocalDate.now().plusDays(10));
 
         stubEntityManagerForStudents(List.of(user), 1L);
-        when(membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(uid, Membership.Status.ACTIVE))
+        when(membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(uid))
                 .thenReturn(Optional.of(mem));
 
         StudentListDto result = adminService.getAllStudents(0, 20, null, null, null, "createdAt", "desc");
@@ -177,7 +177,7 @@ class AdminServiceTest {
     void getAllStudents_studentWithNoMembership_hasMembershipFieldsNull() {
         UUID uid = UUID.randomUUID();
         stubEntityManagerForStudents(List.of(buildUser(uid)), 1L);
-        when(membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(uid, Membership.Status.ACTIVE))
+        when(membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(uid))
                 .thenReturn(Optional.empty());
 
         StudentListDto result = adminService.getAllStudents(0, 20, null, null, null, "createdAt", "desc");
@@ -215,7 +215,7 @@ class AdminServiceTest {
         Membership mem = buildActiveMembership(uid, LocalDate.now().plusDays(5));
 
         when(userRepository.findById(uid)).thenReturn(Optional.of(user));
-        when(membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(uid, Membership.Status.ACTIVE))
+        when(membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(uid))
                 .thenReturn(Optional.of(mem));
 
         StudentDto dto = adminService.getStudentDetails(uid.toString());
@@ -228,7 +228,7 @@ class AdminServiceTest {
     void getStudentDetails_foundWithNoMembership() {
         UUID uid = UUID.randomUUID();
         when(userRepository.findById(uid)).thenReturn(Optional.of(buildUser(uid)));
-        when(membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(uid, Membership.Status.ACTIVE))
+        when(membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(uid))
                 .thenReturn(Optional.empty());
 
         StudentDto dto = adminService.getStudentDetails(uid.toString());
@@ -252,7 +252,7 @@ class AdminServiceTest {
 
     @Test
     void getSeatMap_nullDate_defaultsToToday() {
-        when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of());
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -262,7 +262,7 @@ class AdminServiceTest {
 
     @Test
     void getSeatMap_specificDate_usedAsIs() {
-        when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of());
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", "2025-06-01");
@@ -272,7 +272,7 @@ class AdminServiceTest {
 
     @Test
     void getSeatMap_totalSeatsAlways110() {
-        when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of());
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -282,7 +282,7 @@ class AdminServiceTest {
 
     @Test
     void getSeatMap_rowStructure_correctSeatCounts() {
-        when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of());
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -301,7 +301,7 @@ class AdminServiceTest {
         mem.setSeatNumber("A1");
         User user = buildUser(uid);
 
-        when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of(mem));
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of(user));
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -318,7 +318,7 @@ class AdminServiceTest {
         mem.setShift("MORNING");
         User user = buildUser(uid);
 
-        when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of(mem));
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of(user));
 
         SeatMapDto dto = adminService.getSeatMap("MORNING", null);
@@ -334,7 +334,7 @@ class AdminServiceTest {
         mem.setShift("FULL_DAY"); // FULL_DAY occupies both sub-shifts
         User user = buildUser(uid);
 
-        when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of(mem));
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of(user));
 
         SeatMapDto dto = adminService.getSeatMap("MORNING", null);
@@ -349,7 +349,7 @@ class AdminServiceTest {
         mem.setSeatNumber("A1");
         mem.setShift("EVENING");
 
-        when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of(mem));
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("MORNING", null);
@@ -364,7 +364,7 @@ class AdminServiceTest {
         mem.setSeatNumber("A1");
         mem.setStartDate(LocalDate.now().plusDays(1)); // starts tomorrow
 
-        when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of(mem));
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -381,7 +381,7 @@ class AdminServiceTest {
         // Query for a date after end
         String futureDate = LocalDate.now().plusDays(10).toString();
 
-        when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of(mem));
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", futureDate);
@@ -402,7 +402,7 @@ class AdminServiceTest {
         User user1 = buildUser(uid1);
         User user2 = buildUser(uid2);
 
-        when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of(m1, m2));
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(m1, m2));
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of(user1, user2));
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -417,7 +417,7 @@ class AdminServiceTest {
         Membership mem = buildActiveMembership(uid, LocalDate.now().plusDays(5));
         mem.setSeatNumber("A1");
 
-        when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of(mem));
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of()); // user not found
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -433,7 +433,7 @@ class AdminServiceTest {
 
     @Test
     void getSeatMap_noBookings_allSeatsAvailable() {
-        when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of());
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);

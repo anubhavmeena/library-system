@@ -38,6 +38,7 @@ export default function AdminStudentsPage() {
 
     const [openDropdown, setOpenDropdown] = useState(null)
     const [clearingFees, setClearingFees] = useState(null)
+    const [releasingSeat, setReleasingSeat] = useState(null)
 
     const [studentPayments, setStudentPayments]               = useState([])
     const [studentPaymentsLoading, setStudentPaymentsLoading] = useState(false)
@@ -125,6 +126,20 @@ export default function AdminStudentsPage() {
         finally { setClearingFees(null) }
     }
 
+    const handleReleaseSeat = async (student) => {
+        if (!window.confirm(`Release seat ${student.seatNumber} for ${student.name}? Dues of ₹${student.duesAmount ?? 0} remain on record. This cannot be undone.`)) return
+        setReleasingSeat(student.id)
+        try {
+            await api.patch(`/admin/memberships/${student.membershipId}/release`)
+            toast.success(`Seat ${student.seatNumber} released`)
+            fetchStudents()
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Failed to release seat')
+        } finally {
+            setReleasingSeat(null)
+        }
+    }
+
     const shiftLabel = (shift) => {
         if (shift === 'MORNING')  return t('adminStudents.shifts.MORNING')
         if (shift === 'EVENING')  return t('adminStudents.shifts.EVENING')
@@ -194,6 +209,7 @@ export default function AdminStudentsPage() {
         { l: t('adminStudents.table.membership'), col: 'endDate' },
         { l: t('adminStudents.table.payment'),    col: 'paymentMode' },
         { l: 'Pending',                           col: 'pendingAmount' },
+        { l: 'Dues',                              col: null },
         { l: t('adminStudents.table.status'),     col: 'isActive' },
         { l: t('adminStudents.table.actions'),    col: null },
     ]
@@ -284,7 +300,14 @@ export default function AdminStudentsPage() {
                                         <p className="text-primary-500 text-xs">{shiftLabel(s.shift)}</p>
                                     </td>
                                     <td className="p-4">
-                                        {s.membershipEnd ? (
+                                        {s.membershipStatus === 'GRACE' ? (
+                                            <>
+                                                <p className="text-primary-300 text-xs">{t('adminStudents.expires')} {s.membershipEnd}</p>
+                                                <p className="text-xs font-semibold text-red-400 line-through">
+                                                    {Math.max(0, Math.ceil((new Date() - new Date(s.membershipEnd)) / 86400000))}d overdue — grace
+                                                </p>
+                                            </>
+                                        ) : s.membershipEnd ? (
                                             <>
                                                 <p className="text-primary-300 text-xs">{t('adminStudents.expires')} {s.membershipEnd}</p>
                                                 <p className={`text-xs font-semibold ${s.daysRemaining <= 3 ? 'text-red-400' : s.daysRemaining <= 7 ? 'text-amber-400' : 'text-emerald-400'}`}>
@@ -307,6 +330,13 @@ export default function AdminStudentsPage() {
                                     <td className="p-4">
                                         {s.pendingAmount > 0 ? (
                                             <span className="text-red-400 font-semibold text-sm">₹{s.pendingAmount}</span>
+                                        ) : (
+                                            <span className="text-primary-600 text-xs">—</span>
+                                        )}
+                                    </td>
+                                    <td className="p-4">
+                                        {s.duesAmount > 0 ? (
+                                            <span className="text-red-400 font-semibold text-sm">₹{s.duesAmount}</span>
                                         ) : (
                                             <span className="text-primary-600 text-xs">—</span>
                                         )}
@@ -335,11 +365,19 @@ export default function AdminStudentsPage() {
                                                 </button>
                                                 {openDropdown === s.id && (
                                                     <div className="absolute right-0 mt-1 w-36 bg-primary-800 border border-primary-700/60 rounded-xl shadow-xl z-20 overflow-hidden">
-                                                        {s.membershipId && (
+                                                        {s.membershipId && s.membershipStatus === 'ACTIVE' && (
                                                             <button
                                                                 onClick={() => { openChangeSeat(s); setOpenDropdown(null) }}
                                                                 className="w-full text-left text-xs px-3 py-2.5 text-indigo-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40">
                                                                 {t('adminStudents.changeSeat')}
+                                                            </button>
+                                                        )}
+                                                        {s.membershipStatus === 'GRACE' && (
+                                                            <button
+                                                                disabled={releasingSeat === s.id}
+                                                                onClick={() => { handleReleaseSeat(s); setOpenDropdown(null) }}
+                                                                className="w-full text-left text-xs px-3 py-2.5 text-red-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40 disabled:opacity-50">
+                                                                {releasingSeat === s.id ? 'Releasing…' : 'Release Seat'}
                                                             </button>
                                                         )}
                                                         <button

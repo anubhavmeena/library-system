@@ -55,12 +55,21 @@ public class AdminMembershipService {
             }
         }
 
-        // 4. Check student has no active membership
+        // 4. Check student has no active membership, and no unresolved GRACE
+        // membership (dues owed / seat held) that would need clearing or an
+        // explicit admin release first.
         Optional<Membership> existing = membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(
                 student.getId(), Membership.Status.ACTIVE);
         if (existing.isPresent() && !existing.get().getEndDate().isBefore(LocalDate.now())) {
             throw new IllegalArgumentException("Student already has an active membership");
         }
+        membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(student.getId())
+                .filter(m -> m.getStatus() == Membership.Status.GRACE)
+                .ifPresent(g -> {
+                    throw new IllegalArgumentException(
+                            "Student has an overdue membership with pending dues — clear the dues " +
+                            "or release the seat before creating a new membership");
+                });
 
         // 5. Parse start/end dates
         LocalDate startDate = (req.getStartDate() != null && !req.getStartDate().isBlank())
@@ -234,13 +243,46 @@ public class AdminMembershipService {
         log.info("Plan updated for membership {} to plan {}", membershipId, plan.getName());
     }
 
+    // Admin-only escape hatch: explicitly frees a seat that's been held in GRACE
+    // because the student never paid their dues. Finalizes the membership as
+    // EXPIRED (dues remain on record — not auto-waived) and releases the seat
+    // booking so it becomes bookable by other students again.
+    @Transactional
+    public void releaseSeat(String membershipId) {
+        Membership mem = membershipRepository.findById(UUID.fromString(membershipId))
+                .orElseThrow(() -> new ResourceNotFoundException("Membership not found: " + membershipId));
+
+        if (mem.getStatus() != Membership.Status.GRACE) {
+            throw new IllegalArgumentException("Only a membership in GRACE can be released");
+        }
+
+        mem.setStatus(Membership.Status.EXPIRED);
+        membershipRepository.save(mem);
+
+        seatBookingRepository.findFirstByMembershipIdAndStatus(mem.getId(), SeatBooking.Status.ACTIVE)
+                .ifPresent(booking -> {
+                    booking.setStatus(SeatBooking.Status.RELEASED);
+                    seatBookingRepository.save(booking);
+                    // Bounded — booking.endDate is the far-future hold sentinel, never use it as a loop bound.
+                    invalidateSeatCache(booking.getShift(), LocalDate.now(), LocalDate.now().plusDays(14));
+                });
+
+        log.info("Seat {} released by admin for membership {} (dues {} remain on record)",
+                mem.getSeatNumber(), membershipId, mem.getDuesAmount());
+    }
+
     // ── Seat Cache ────────────────────────────────────────────────────────────
     // Mirrors seat-service's SeatService.invalidateCache() exactly. Needed here
     // because admin-created bookings write seat_bookings directly instead of
     // calling seat-service's HTTP API (see backend/CLAUDE.md: admin-service
     // queries the DB directly rather than calling sibling services), so this
     // is the only place that can bust seat-service's Redis cache for those writes.
-    private void invalidateSeatCache(String shift, LocalDate start, LocalDate end) {
+    //
+    // Public (not private) so ExpiryReminderScheduler (different package) can
+    // reuse it too. Callers MUST pass a bounded range — this loops day-by-day
+    // between start and end, so it must never be called with SeatBooking's
+    // far-future hold sentinel as the end bound.
+    public void invalidateSeatCache(String shift, LocalDate start, LocalDate end) {
         LocalDate cursor = start;
         while (!cursor.isAfter(end)) {
             redisTemplate.delete("seats:availability:" + shift + ":" + cursor);

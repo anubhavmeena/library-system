@@ -70,6 +70,15 @@ public class PaymentService {
     @Transactional
     public CreateOrderResponse createOrder(String userId, CreateOrderRequest request) {
 
+        // 0. A membership in GRACE (lapsed, seat held, dues owed) must be paid off
+        // or released by an admin before a brand-new plan can be purchased —
+        // otherwise the student could end up with two seats.
+        membershipRepository.findGraceByUserId(UUID.fromString(userId)).ifPresent(g -> {
+            throw new IllegalArgumentException(
+                    "You have an overdue membership with pending dues of " + g.getDuesAmount() +
+                    ". Please clear your dues (or contact the library) before booking a new plan.");
+        });
+
         // 1. Resolve the plan
         Plan plan = planRepository.findById(UUID.fromString(request.getPlanId()))
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -127,10 +136,10 @@ public class PaymentService {
         String paymentSessionId = null;
 
         if ("RAZORPAY".equals(activeGateway)) {
-            gatewayOrderId = createRazorpayOrder(plan, membership);
+            gatewayOrderId = createRazorpayOrder(plan.getPrice(), membership);
         } else {
             // CASHFREE (default)
-            String[] cashfreeResult = createCashfreeOrder(plan, membership, userId);
+            String[] cashfreeResult = createCashfreeOrder(plan.getPrice(), membership, userId);
             gatewayOrderId   = cashfreeResult[0];
             paymentSessionId = cashfreeResult[1]; // null in dev mode
         }
@@ -164,24 +173,7 @@ public class PaymentService {
     public MembershipDto verifyAndActivateMembership(String userId,
                                                      PaymentVerifyRequest request) {
 
-        // 1. Gateway-specific verification (skipped in dev mode)
-        if ("RAZORPAY".equals(activeGateway)) {
-            if (!razorpayKeySecret.isBlank()
-                    && request.getSignature() != null
-                    && !request.getGatewayOrderId().startsWith("dev_")) {
-                verifyRazorpaySignature(
-                        request.getGatewayOrderId(),
-                        request.getGatewayPaymentId(),
-                        request.getSignature()
-                );
-            }
-        } else {
-            // CASHFREE: verify order status via API poll
-            if (!cashfreeSecretKey.isBlank()
-                    && !request.getGatewayOrderId().startsWith("dev_")) {
-                verifyCashfreeOrder(request.getGatewayOrderId());
-            }
-        }
+        verifyGatewayPayment(request);
 
         // 2. Update payment → SUCCESS
         Payment payment = paymentRepository
@@ -226,16 +218,118 @@ public class PaymentService {
         return MembershipDto.fromEntity(membership);
     }
 
+    // Gateway-specific signature/status verification, shared by the normal
+    // plan-purchase flow and the dues-payment flow below. Skipped in dev mode.
+    private void verifyGatewayPayment(PaymentVerifyRequest request) {
+        if ("RAZORPAY".equals(activeGateway)) {
+            if (!razorpayKeySecret.isBlank()
+                    && request.getSignature() != null
+                    && !request.getGatewayOrderId().startsWith("dev_")) {
+                verifyRazorpaySignature(
+                        request.getGatewayOrderId(),
+                        request.getGatewayPaymentId(),
+                        request.getSignature()
+                );
+            }
+        } else {
+            // CASHFREE: verify order status via API poll
+            if (!cashfreeSecretKey.isBlank()
+                    && !request.getGatewayOrderId().startsWith("dev_")) {
+                verifyCashfreeOrder(request.getGatewayOrderId());
+            }
+        }
+    }
+
+    // ── Pay Dues (clear a GRACE membership's outstanding amount) ───────────────
+    // The seat was never released — paying dues just extends the SAME membership
+    // row's endDate and resumes it, rather than creating a new membership.
+
+    @Transactional
+    public CreateOrderResponse createDuesOrder(String userId) {
+        Membership membership = membershipRepository.findGraceByUserId(UUID.fromString(userId))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No overdue membership found — nothing to pay."));
+
+        BigDecimal duesAmount = membership.getDuesAmount();
+        if (duesAmount == null || duesAmount.signum() <= 0) {
+            throw new IllegalArgumentException("No dues outstanding on this membership.");
+        }
+
+        String gatewayOrderId;
+        String paymentSessionId = null;
+
+        if ("RAZORPAY".equals(activeGateway)) {
+            gatewayOrderId = createRazorpayOrder(duesAmount, membership);
+        } else {
+            String[] cashfreeResult = createCashfreeOrder(duesAmount, membership, userId);
+            gatewayOrderId   = cashfreeResult[0];
+            paymentSessionId = cashfreeResult[1];
+        }
+
+        Payment payment = Payment.builder()
+                .membershipId(membership.getId())
+                .userId(UUID.fromString(userId))
+                .amount(duesAmount)
+                .paymentGateway(activeGateway)
+                .gatewayOrderId(gatewayOrderId)
+                .status(Payment.Status.PENDING)
+                .build();
+        paymentRepository.save(payment);
+
+        return CreateOrderResponse.builder()
+                .orderId(gatewayOrderId)
+                .membershipId(membership.getId().toString())
+                .amount(duesAmount)
+                .currency("INR")
+                .gateway(activeGateway)
+                .paymentSessionId(paymentSessionId)
+                .razorpayKeyId("RAZORPAY".equals(activeGateway) ? razorpayKeyId : null)
+                .build();
+    }
+
+    @Transactional
+    public MembershipDto verifyAndPayDues(String userId, PaymentVerifyRequest request) {
+        verifyGatewayPayment(request);
+
+        Payment payment = paymentRepository
+                .findByGatewayOrderId(request.getGatewayOrderId())
+                .orElseThrow(() -> new ResourceNotFoundException("Payment record not found"));
+
+        payment.setGatewayPaymentId(request.getGatewayPaymentId());
+        payment.setStatus(Payment.Status.SUCCESS);
+        paymentRepository.save(payment);
+
+        Membership membership = membershipRepository
+                .findById(payment.getMembershipId())
+                .orElseThrow(() -> new ResourceNotFoundException("Membership not found"));
+
+        // Defend against a race with an admin releasing this same seat in the meantime.
+        if (membership.getStatus() != Membership.Status.GRACE) {
+            throw new IllegalArgumentException(
+                    "This membership is no longer awaiting dues — it may already have been paid or released.");
+        }
+
+        membership.setEndDate(membership.getEndDate().plusDays(membership.getPlan().getDurationDays()));
+        membership.setStatus(Membership.Status.ACTIVE);
+        membership.setDuesAmount(BigDecimal.ZERO);
+        membership = membershipRepository.save(membership);
+
+        log.info("Dues cleared for user {} — membership {} resumed, new endDate {}",
+                userId, membership.getId(), membership.getEndDate());
+
+        return MembershipDto.fromEntity(membership);
+    }
+
     // ── Razorpay Helpers ──────────────────────────────────────────────────────
 
-    private String createRazorpayOrder(Plan plan, Membership membership) {
+    private String createRazorpayOrder(BigDecimal amount, Membership membership) {
         if (!razorpayKeyId.isBlank()) {
             try {
                 RazorpayClient client = new RazorpayClient(razorpayKeyId, razorpayKeySecret);
 
                 JSONObject options = new JSONObject();
                 options.put("amount",
-                        plan.getPrice().multiply(BigDecimal.valueOf(100)).intValue());
+                        amount.multiply(BigDecimal.valueOf(100)).intValue());
                 options.put("currency", "INR");
                 options.put("receipt",
                         "lib_" + membership.getId().toString().substring(0, 8));
@@ -282,7 +376,7 @@ public class PaymentService {
     // ── Cashfree Helpers ──────────────────────────────────────────────────────
 
     // Returns [gatewayOrderId, paymentSessionId] — paymentSessionId is null in dev mode
-    private String[] createCashfreeOrder(Plan plan, Membership membership, String userId) {
+    private String[] createCashfreeOrder(BigDecimal amount, Membership membership, String userId) {
         if (!cashfreeAppId.isBlank()) {
             try {
                 UserProfileDto user = fetchUserProfile(userId);
@@ -297,7 +391,7 @@ public class PaymentService {
 
                 Map<String, Object> body = Map.of(
                         "order_id",         "lib_" + membership.getId().toString().substring(0, 8),
-                        "order_amount",     plan.getPrice(),
+                        "order_amount",     amount,
                         "order_currency",   "INR",
                         "customer_details", customerDetails
                 );

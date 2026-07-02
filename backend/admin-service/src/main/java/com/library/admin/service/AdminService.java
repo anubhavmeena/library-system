@@ -100,7 +100,7 @@ public class AdminService {
         String where = """
                 FROM users u
                 LEFT JOIN memberships m ON m.user_id = u.id
-                    AND m.status = 'ACTIVE' AND m.end_date >= CURRENT_DATE
+                    AND (m.status = 'GRACE' OR (m.status = 'ACTIVE' AND m.end_date >= CURRENT_DATE))
                 LEFT JOIN payments p ON p.membership_id = m.id
                 WHERE u.role = 'STUDENT'
                   AND (CAST(:status AS VARCHAR) IS NULL
@@ -133,8 +133,9 @@ public class AdminService {
 
         List<StudentDto> students = users.stream().map(user -> {
             Membership mem = membershipRepository
-                    .findFirstByUserIdAndStatusOrderByEndDateDesc(user.getId(), Membership.Status.ACTIVE)
-                    .filter(m -> !m.getEndDate().isBefore(LocalDate.now()))
+                    .findFirstByUserIdCurrentOrderByEndDateDesc(user.getId())
+                    .filter(m -> m.getStatus() == Membership.Status.GRACE
+                            || !m.getEndDate().isBefore(LocalDate.now()))
                     .orElse(null);
             StudentDto dto = StudentDto.fromEntities(user, mem);
             if (mem != null) {
@@ -156,8 +157,9 @@ public class AdminService {
                         "Student not found: " + userId));
 
         Membership mem = membershipRepository
-                .findFirstByUserIdAndStatusOrderByEndDateDesc(user.getId(), Membership.Status.ACTIVE)
-                .filter(m -> !m.getEndDate().isBefore(LocalDate.now()))
+                .findFirstByUserIdCurrentOrderByEndDateDesc(user.getId())
+                .filter(m -> m.getStatus() == Membership.Status.GRACE
+                        || !m.getEndDate().isBefore(LocalDate.now()))
                 .orElse(null);
 
         StudentDto dto = StudentDto.fromEntities(user, mem);
@@ -186,14 +188,15 @@ public class AdminService {
                 ? LocalDate.parse(dateStr)
                 : LocalDate.now();
 
-        // Fetch all ACTIVE memberships with a seat assigned, filtered by shift + date
+        // Fetch ACTIVE (date-bound) and GRACE (held indefinitely) memberships with a
+        // seat assigned, filtered by shift + date. A GRACE seat has no upper date
+        // bound — it stays occupied on the map until an admin releases it.
         List<Membership> active = membershipRepository
-                .findMembershipsExpiringBefore(LocalDate.now().plusYears(1))
+                .findOccupyingSeatMemberships(LocalDate.now().plusYears(1))
                 .stream()
-                .filter(m -> m.getStatus() == Membership.Status.ACTIVE
-                        && m.getSeatNumber() != null)
-                .filter(m -> !m.getStartDate().isAfter(date)
-                        && !m.getEndDate().isBefore(date))
+                .filter(m -> m.getStatus() == Membership.Status.GRACE
+                        ? !m.getStartDate().isAfter(date)
+                        : (!m.getStartDate().isAfter(date) && !m.getEndDate().isBefore(date)))
                 .filter(m -> "FULL_DAY".equalsIgnoreCase(shift)
                         || shift.equalsIgnoreCase(m.getShift())
                         || "FULL_DAY".equalsIgnoreCase(m.getShift()))
@@ -230,7 +233,11 @@ public class AdminService {
                 Membership mem = seatMap.get(sn);
 
                 if (mem != null) {
-                    User student = userMap.get(mem.getUserId());
+                    User    student    = userMap.get(mem.getUserId());
+                    boolean isGrace    = mem.getStatus() == Membership.Status.GRACE;
+                    Integer daysOverdue = isGrace
+                            ? (int) ChronoUnit.DAYS.between(mem.getEndDate(), LocalDate.now())
+                            : null;
                     rowSeats.add(SeatMapDto.SeatInfoDto.builder()
                             .seatNumber(sn)
                             .isOccupied(true)
@@ -239,6 +246,9 @@ public class AdminService {
                             .studentGender(student != null ? student.getGender() : null)
                             .shift(mem.getShift())
                             .membershipEnd(mem.getEndDate().toString())
+                            .membershipId(mem.getId().toString())
+                            .membershipStatus(mem.getStatus().name())
+                            .daysOverdue(daysOverdue)
                             .build());
                 } else {
                     rowSeats.add(SeatMapDto.SeatInfoDto.builder()

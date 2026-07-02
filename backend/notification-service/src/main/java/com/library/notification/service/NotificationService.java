@@ -156,6 +156,14 @@ public class NotificationService {
             sendPendingFeeReminder(event);
             return;
         }
+        if ("MEMBERSHIP_GRACE_STARTED".equals(event.getEventType())) {
+            sendGraceStartedAdminAlert(event);
+            return;
+        }
+        if ("MEMBERSHIP_EXPIRED_GRACE".equals(event.getEventType())) {
+            sendMembershipExpiredGraceAlert(event);
+            return;
+        }
 
         // Escalate urgency label based on days remaining
         String urgency = event.getDaysRemaining() <= 3 ? "⚠️ URGENT" : "⏰ Reminder";
@@ -319,6 +327,84 @@ public class NotificationService {
 
         log.info("Seat expired alert sent to admin for seat {} (user: {})",
                 event.getSeatNumber(), event.getUserName());
+    }
+
+    // ── Membership Grace Period ──────────────────────────────────────────────
+    // Triggered when a membership's endDate passes with no queued renewal.
+    // Unlike sendSeatExpiredAlert, the seat is NOT free — it's held for the
+    // student during the grace period and only released by an explicit admin action.
+
+    private void sendGraceStartedAdminAlert(RenewalReminderEvent event) {
+        String dues = event.getPendingAmount() != null
+                ? "₹" + event.getPendingAmount().stripTrailingZeros().toPlainString()
+                : "an outstanding amount";
+
+        String msg = String.format(
+                "🔒 Seat Held — Grace Period Started\n\n"                              +
+                        "Seat   : %s\n"                                                        +
+                        "Student: %s\n"                                                        +
+                        "Expired: %s\n"                                                        +
+                        "Dues   : %s\n\n"                                                       +
+                        "The seat is NOT bookable — it stays assigned to this student "        +
+                        "until you release it (Admin → Students → Actions → Release Seat).",
+                event.getSeatNumber() != null ? event.getSeatNumber() : "N/A",
+                event.getUserName(), event.getExpiryDate(), dues
+        );
+
+        for (String number : adminWhatsappNumbers()) {
+            whatsAppService.send(number, msg, null, "MEMBERSHIP_GRACE_STARTED");
+        }
+
+        emailService.sendText(
+                adminEmail,
+                "Seat " + (event.getSeatNumber() != null ? event.getSeatNumber() : "N/A")
+                        + " held in grace — " + event.getUserName() + "'s membership expired",
+                msg,
+                null,
+                "MEMBERSHIP_GRACE_STARTED"
+        );
+
+        log.info("Grace-started alert sent to admin for seat {} (user: {})",
+                event.getSeatNumber(), event.getUserName());
+    }
+
+    private void sendMembershipExpiredGraceAlert(RenewalReminderEvent event) {
+        String dues = event.getPendingAmount() != null
+                ? "₹" + event.getPendingAmount().stripTrailingZeros().toPlainString()
+                : "the plan amount";
+
+        String msg = String.format(
+                "⚠️ Your Membership Has Expired\n\n"                                     +
+                        "Hi %s,\n\n"                                                             +
+                        "Your library membership expired on *%s*.\n\n"                          +
+                        "We're holding your seat *%s* for you, but a payment of *%s* is "       +
+                        "due to continue your plan. Please clear this amount soon — your "      +
+                        "seat may be released by the library if it remains unpaid.\n\n"         +
+                        "🔗 Pay now: https://targetzone.co.in/student/membership\n\n"           +
+                        "📚 Target Zone Library Team",
+                event.getUserName(), event.getExpiryDate(),
+                event.getSeatNumber() != null ? event.getSeatNumber() : "N/A", dues
+        );
+
+        String emailSubject = "Your membership has expired — seat " +
+                (event.getSeatNumber() != null ? event.getSeatNumber() : "") + " held for you";
+
+        if (hasValue(event.getUserMobile())) {
+            whatsAppService.send(
+                    event.getUserMobile(), msg,
+                    event.getUserId(), "MEMBERSHIP_EXPIRED_GRACE"
+            );
+        }
+
+        if (hasValue(event.getUserEmail())) {
+            emailService.sendText(
+                    event.getUserEmail(), emailSubject, msg,
+                    adminEmail,
+                    event.getUserId(), "MEMBERSHIP_EXPIRED_GRACE"
+            );
+        }
+
+        log.info("Membership-expired-grace alert sent to user: {}", event.getUserId());
     }
 
     // ── Message Builders ──────────────────────────────────────────────────────

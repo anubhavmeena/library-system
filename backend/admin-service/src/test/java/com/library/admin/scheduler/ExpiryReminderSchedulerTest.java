@@ -2,9 +2,14 @@ package com.library.admin.scheduler;
 
 import com.library.admin.dto.RenewalReminderEvent;
 import com.library.admin.entity.Membership;
+import com.library.admin.entity.Plan;
+import com.library.admin.entity.SeatBooking;
 import com.library.admin.entity.User;
 import com.library.admin.repository.MembershipRepository;
+import com.library.admin.repository.PlanRepository;
+import com.library.admin.repository.SeatBookingRepository;
 import com.library.admin.repository.UserRepository;
+import com.library.admin.service.AdminMembershipService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -13,6 +18,7 @@ import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -26,9 +32,16 @@ class ExpiryReminderSchedulerTest {
 
     @Mock MembershipRepository membershipRepository;
     @Mock UserRepository       userRepository;
+    @Mock PlanRepository       planRepository;
+    @Mock SeatBookingRepository seatBookingRepository;
+    @Mock AdminMembershipService adminMembershipService;
     @Mock KafkaTemplate<String, Object> kafkaTemplate;
 
     @InjectMocks ExpiryReminderScheduler scheduler;
+
+    private Plan plan(UUID id, BigDecimal price) {
+        return Plan.builder().id(id).name("Full Day").price(price).durationDays(30).build();
+    }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -239,59 +252,102 @@ class ExpiryReminderSchedulerTest {
         verify(membershipRepository, never()).save(any());
     }
 
-    // ── markExpiredAndNotifyAdmin ─────────────────────────────────────────────
+    // ── markExpiredAndStartGrace ───────────────────────────────────────────────
 
     @Test
-    void markExpiredAndNotifyAdmin_noExpiredMemberships_returnsEarly() {
+    void markExpiredAndStartGrace_noExpiredMemberships_returnsEarly() {
         when(membershipRepository.findExpiredActive(any())).thenReturn(List.of());
 
-        scheduler.markExpiredAndNotifyAdmin();
+        scheduler.markExpiredAndStartGrace();
 
         verify(kafkaTemplate, never()).send(any(), any(), any());
         verify(membershipRepository, never()).save(any());
     }
 
     @Test
-    void markExpiredAndNotifyAdmin_expiredMembership_markedExpiredAndKafkaSent() {
+    void markExpiredAndStartGrace_noQueuedRenewal_entersGraceWithDues() {
         UUID uid = UUID.randomUUID();
         Membership mem = membership(uid, -1); // expired yesterday
         User u = user(uid);
+        Plan p = plan(mem.getPlanId(), new BigDecimal("999"));
 
         when(membershipRepository.findExpiredActive(any())).thenReturn(List.of(mem));
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of(u));
         when(membershipRepository.findQueuedByUserId(uid)).thenReturn(Optional.empty());
+        when(planRepository.findById(mem.getPlanId())).thenReturn(Optional.of(p));
+        when(seatBookingRepository.findFirstByMembershipIdAndStatus(mem.getId(), SeatBooking.Status.ACTIVE))
+                .thenReturn(Optional.empty());
 
-        scheduler.markExpiredAndNotifyAdmin();
+        scheduler.markExpiredAndStartGrace();
 
         ArgumentCaptor<Membership> memCaptor = ArgumentCaptor.forClass(Membership.class);
         verify(membershipRepository, atLeastOnce()).save(memCaptor.capture());
-        assertThat(memCaptor.getAllValues()).anyMatch(m -> m.getStatus() == Membership.Status.EXPIRED);
-        verify(kafkaTemplate).send(eq("renewal-reminder"), eq(uid.toString()), any(RenewalReminderEvent.class));
+        assertThat(memCaptor.getAllValues()).anyMatch(m ->
+                m.getStatus() == Membership.Status.GRACE && new BigDecimal("999").compareTo(m.getDuesAmount()) == 0);
+        verify(kafkaTemplate, times(2)).send(eq("renewal-reminder"), eq(uid.toString()), any(RenewalReminderEvent.class));
     }
 
     @Test
-    void markExpiredAndNotifyAdmin_kafkaEvent_hasSeatExpiredTypeAndZeroDays() {
+    void markExpiredAndStartGrace_kafkaEvents_haveGraceTypesAndDues() {
         UUID uid = UUID.randomUUID();
         Membership mem = membership(uid, -1);
         User u = user(uid);
+        Plan p = plan(mem.getPlanId(), new BigDecimal("999"));
 
         when(membershipRepository.findExpiredActive(any())).thenReturn(List.of(mem));
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of(u));
         when(membershipRepository.findQueuedByUserId(uid)).thenReturn(Optional.empty());
+        when(planRepository.findById(mem.getPlanId())).thenReturn(Optional.of(p));
+        when(seatBookingRepository.findFirstByMembershipIdAndStatus(mem.getId(), SeatBooking.Status.ACTIVE))
+                .thenReturn(Optional.empty());
 
-        scheduler.markExpiredAndNotifyAdmin();
+        scheduler.markExpiredAndStartGrace();
 
         ArgumentCaptor<RenewalReminderEvent> captor = ArgumentCaptor.forClass(RenewalReminderEvent.class);
-        verify(kafkaTemplate).send(eq("renewal-reminder"), eq(uid.toString()), captor.capture());
-        RenewalReminderEvent event = captor.getValue();
-        assertThat(event.getEventType()).isEqualTo("SEAT_EXPIRED");
-        assertThat(event.getDaysRemaining()).isEqualTo(0);
-        assertThat(event.getSeatNumber()).isEqualTo("B7");
-        assertThat(event.getUserName()).isEqualTo("Bob");
+        verify(kafkaTemplate, times(2)).send(eq("renewal-reminder"), eq(uid.toString()), captor.capture());
+        List<RenewalReminderEvent> events = captor.getAllValues();
+
+        assertThat(events).anyMatch(e -> "MEMBERSHIP_GRACE_STARTED".equals(e.getEventType()));
+        assertThat(events).anyMatch(e -> "MEMBERSHIP_EXPIRED_GRACE".equals(e.getEventType()));
+        assertThat(events).allMatch(e -> e.getDaysRemaining() == 0);
+        assertThat(events).allMatch(e -> "B7".equals(e.getSeatNumber()));
+        assertThat(events).allMatch(e -> "Bob".equals(e.getUserName()));
+        assertThat(events).allMatch(e -> new BigDecimal("999").compareTo(e.getPendingAmount()) == 0);
     }
 
     @Test
-    void markExpiredAndNotifyAdmin_queuedPlanExists_getsActivated() {
+    void markExpiredAndStartGrace_seatBookingHeld_endDatePushedToSentinelAndCacheBusted() {
+        UUID uid = UUID.randomUUID();
+        Membership mem = membership(uid, -1);
+        User u = user(uid);
+        Plan p = plan(mem.getPlanId(), new BigDecimal("999"));
+        SeatBooking booking = SeatBooking.builder()
+                .id(UUID.randomUUID()).seatId(UUID.randomUUID()).userId(uid).membershipId(mem.getId())
+                .shift("MORNING").bookingDate(mem.getStartDate()).endDate(mem.getEndDate())
+                .status(SeatBooking.Status.ACTIVE).build();
+
+        when(membershipRepository.findExpiredActive(any())).thenReturn(List.of(mem));
+        when(userRepository.findAllById(anyIterable())).thenReturn(List.of(u));
+        when(membershipRepository.findQueuedByUserId(uid)).thenReturn(Optional.empty());
+        when(planRepository.findById(mem.getPlanId())).thenReturn(Optional.of(p));
+        when(seatBookingRepository.findFirstByMembershipIdAndStatus(mem.getId(), SeatBooking.Status.ACTIVE))
+                .thenReturn(Optional.of(booking));
+
+        scheduler.markExpiredAndStartGrace();
+
+        ArgumentCaptor<SeatBooking> bookingCaptor = ArgumentCaptor.forClass(SeatBooking.class);
+        verify(seatBookingRepository).save(bookingCaptor.capture());
+        assertThat(bookingCaptor.getValue().getEndDate()).isEqualTo(LocalDate.of(9999, 12, 31));
+
+        // Cache invalidation must be bounded — never span out to the sentinel date.
+        ArgumentCaptor<LocalDate> startCaptor = ArgumentCaptor.forClass(LocalDate.class);
+        ArgumentCaptor<LocalDate> endCaptor   = ArgumentCaptor.forClass(LocalDate.class);
+        verify(adminMembershipService).invalidateSeatCache(eq("MORNING"), startCaptor.capture(), endCaptor.capture());
+        assertThat(endCaptor.getValue()).isBefore(LocalDate.now().plusDays(30));
+    }
+
+    @Test
+    void markExpiredAndStartGrace_queuedPlanExists_getsActivatedWithoutGrace() {
         UUID uid = UUID.randomUUID();
         Membership expired = membership(uid, -1);
         Membership queued  = membership(uid, 30);
@@ -302,12 +358,15 @@ class ExpiryReminderSchedulerTest {
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of(u));
         when(membershipRepository.findQueuedByUserId(uid)).thenReturn(Optional.of(queued));
 
-        scheduler.markExpiredAndNotifyAdmin();
+        scheduler.markExpiredAndStartGrace();
 
         ArgumentCaptor<Membership> captor = ArgumentCaptor.forClass(Membership.class);
         verify(membershipRepository, times(2)).save(captor.capture());
         List<Membership> saved = captor.getAllValues();
         assertThat(saved).anyMatch(m -> m.getStatus() == Membership.Status.EXPIRED);
         assertThat(saved).anyMatch(m -> m.getStatus() == Membership.Status.ACTIVE);
+        // Happy path — no grace/dues machinery should be touched at all.
+        verifyNoInteractions(planRepository, seatBookingRepository, adminMembershipService);
+        verify(kafkaTemplate, never()).send(any(), any(), any());
     }
 }

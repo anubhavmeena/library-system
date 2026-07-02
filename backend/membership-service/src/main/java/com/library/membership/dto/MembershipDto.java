@@ -16,9 +16,10 @@ public class MembershipDto {
     private String shift;        // MORNING | EVENING | FULL_DAY
     private String startDate;    // yyyy-MM-dd
     private String endDate;      // yyyy-MM-dd
-    private String status;       // PENDING | ACTIVE | EXPIRED | CANCELLED
+    private String status;       // PENDING | ACTIVE | QUEUED | GRACE | EXPIRED | CANCELLED
     private String createdAt;
     private BigDecimal planPrice;
+    private BigDecimal duesAmount; // non-null while status == GRACE
 
     public static MembershipDto fromEntity(Membership m) {
         return MembershipDto.builder()
@@ -35,6 +36,7 @@ public class MembershipDto {
                 .status(m.getStatus().name())
                 .createdAt(m.getCreatedAt()  != null ? m.getCreatedAt().toString()  : null)
                 .planPrice(m.getPlan().getPrice())
+                .duesAmount(m.getDuesAmount())
                 .build();
     }
 }

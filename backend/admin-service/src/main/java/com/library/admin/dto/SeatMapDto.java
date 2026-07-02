@@ -24,5 +24,8 @@ public class SeatMapDto {
         private String  studentGender;  // null when seat is available
         private String  shift;          // the shift the seat is booked for
         private String  membershipEnd;  // yyyy-MM-dd
+        private String  membershipId;      // null when seat is available
+        private String  membershipStatus;  // ACTIVE | GRACE, null when seat is available
+        private Integer daysOverdue;       // today - membershipEnd; positive = overdue (GRACE), only set for GRACE seats
     }
 }

@@ -34,13 +34,17 @@ public class MembershipService {
     private String userServiceBaseUrl;
 
     /**
-     * Returns the student's current ACTIVE membership.
-     * Returns null (not an exception) if no active membership exists —
-     * the frontend checks for null and shows the "Get a plan" CTA.
+     * Returns the student's current ACTIVE membership, or their GRACE membership
+     * (lapsed, seat held, dues owed) if that's what they have instead — the
+     * frontend distinguishes the two via the `status` field and shows either the
+     * normal membership card or the "pay dues" banner.
+     * Returns null (not an exception) if neither exists — the frontend checks
+     * for null and shows the "Get a plan" CTA.
      */
     public MembershipDto getUserActiveMembership(String userId) {
-        return membershipRepository
-                .findActiveByUserId(UUID.fromString(userId))
+        UUID uid = UUID.fromString(userId);
+        return membershipRepository.findActiveByUserId(uid)
+                .or(() -> membershipRepository.findGraceByUserId(uid))
                 .map(MembershipDto::fromEntity)
                 .orElse(null);
     }

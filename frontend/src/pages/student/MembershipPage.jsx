@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
-import { fetchMyMembership, fetchQueuedMembership, fetchPlans, createPaymentOrder, verifyPayment } from '../../store/slices/membershipSlice'
+import { fetchMyMembership, fetchQueuedMembership, fetchPlans, createPaymentOrder, verifyPayment, createDuesOrder, verifyDuesPayment } from '../../store/slices/membershipSlice'
 import api from '../../services/api'
 
 function InfoRow({ label, value, highlight }) {
@@ -42,6 +42,7 @@ export default function MembershipPage() {
     const [queueFlow, setQueueFlow]             = useState(null) // null | 'select' | 'paying'
     const [selectedQueuePlan, setSelectedQueuePlan] = useState(null)
     const [queuePaying, setQueuePaying]         = useState(false)
+    const [payingDues, setPayingDues]           = useState(false)
 
     useEffect(() => {
         dispatch(fetchMyMembership())
@@ -159,6 +160,65 @@ export default function MembershipPage() {
         } finally { setQueuePaying(false) }
     }
 
+    const handlePayDues = async () => {
+        setPayingDues(true)
+        try {
+            const orderRes = await dispatch(createDuesOrder())
+            if (!createDuesOrder.fulfilled.match(orderRes)) throw new Error(orderRes.payload)
+            const order = orderRes.payload
+
+            const onSuccess = async () => {
+                toast.success('Dues cleared — your membership is active again!')
+                dispatch(fetchMyMembership())
+            }
+
+            if (order.orderId?.startsWith('dev_')) {
+                const verifyRes = await dispatch(verifyDuesPayment({
+                    gatewayOrderId: order.orderId, gatewayPaymentId: 'dev_pay_' + Date.now(),
+                    signature: 'dev_sig', membershipId: order.membershipId,
+                }))
+                if (verifyDuesPayment.fulfilled.match(verifyRes)) await onSuccess()
+                else toast.error('Payment verification failed')
+            } else if (order.gateway === 'CASHFREE') {
+                const { load } = await import('@cashfreepayments/cashfree-js')
+                const cashfree = await load({ mode: import.meta.env.VITE_CASHFREE_ENV || 'sandbox' })
+                const result = await cashfree.checkout({
+                    paymentSessionId: order.paymentSessionId,
+                    redirectTarget: '_modal',
+                    components: ['upi-qr', 'upi-collect', 'app', 'card', 'netbanking', 'paylater'],
+                })
+                if (result.error) throw new Error(result.error.message || 'Payment failed')
+                const verifyRes = await dispatch(verifyDuesPayment({
+                    gatewayOrderId: order.orderId, gatewayPaymentId: order.orderId,
+                    signature: null, membershipId: order.membershipId,
+                }))
+                if (verifyDuesPayment.fulfilled.match(verifyRes)) await onSuccess()
+                else toast.error('Payment verification failed')
+            } else {
+                const options = {
+                    key: order.razorpayKeyId, amount: order.amount * 100, currency: 'INR',
+                    name: 'Target Zone Library',
+                    description: 'Clear membership dues',
+                    order_id: order.orderId,
+                    handler: async (response) => {
+                        const verifyRes = await dispatch(verifyDuesPayment({
+                            gatewayOrderId: response.razorpay_order_id,
+                            gatewayPaymentId: response.razorpay_payment_id,
+                            signature: response.razorpay_signature,
+                            membershipId: order.membershipId,
+                        }))
+                        if (verifyDuesPayment.fulfilled.match(verifyRes)) await onSuccess()
+                        else toast.error('Payment verification failed')
+                    },
+                    theme: { color: '#f59e0b' },
+                }
+                new window.Razorpay(options).open()
+            }
+        } catch (e) {
+            toast.error(e.message || 'Payment failed')
+        } finally { setPayingDues(false) }
+    }
+
     return (
         <div>
             <div className="mb-8">
@@ -213,6 +273,31 @@ export default function MembershipPage() {
                             </button>
                         </div>
                     )}
+                </div>
+            ) : membership && membership.status === 'GRACE' ? (
+                <div className="card p-6 mb-6 border-red-500/30 bg-gradient-to-br from-red-500/5 to-transparent">
+                    <div className="flex items-start justify-between mb-4">
+                        <div>
+                            <h2 className="section-title">Membership Expired</h2>
+                            <p className="text-primary-400 text-sm mt-1">{membership.planName}</p>
+                        </div>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border bg-red-500/20 text-red-400 border-red-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-current" /> GRACE
+                        </span>
+                    </div>
+                    <InfoRow label={t('membership.seatNumber')} value={membership.seatNumber} highlight />
+                    <InfoRow label={t('membership.expiryDate')} value={membership.endDate} />
+                    <div className="mt-5 pt-5 border-t border-primary-700/30">
+                        <p className="text-primary-300 text-sm mb-1">
+                            Your plan expired, but we're holding seat <span className="text-white font-mono">{membership.seatNumber}</span> for you.
+                        </p>
+                        <p className="text-red-400 font-semibold text-sm mb-4">
+                            Pay ₹{membership.duesAmount ?? membership.planPrice} to continue your plan — your seat may be released by the library if it remains unpaid.
+                        </p>
+                        <button onClick={handlePayDues} disabled={payingDues} className="btn-primary text-sm px-6 py-2.5">
+                            {payingDues ? 'Processing...' : `Pay ₹${membership.duesAmount ?? membership.planPrice}`}
+                        </button>
+                    </div>
                 </div>
             ) : (
                 <div className="card p-8 text-center mb-6 border-amber-500/20 bg-amber-500/5">

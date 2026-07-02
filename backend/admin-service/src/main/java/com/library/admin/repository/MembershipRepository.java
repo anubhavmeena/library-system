@@ -58,6 +58,24 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     @Query("SELECT m FROM Membership m WHERE m.userId = :userId AND m.status = 'QUEUED'")
     Optional<Membership> findQueuedByUserId(@Param("userId") UUID userId);
 
+    // Used by getAllStudents/getStudentDetails — a student's currently-relevant
+    // membership is either ACTIVE or GRACE (lapsed, seat still held, dues owed).
+    @Query("""
+        SELECT m FROM Membership m
+        WHERE m.userId = :userId AND m.status IN ('ACTIVE', 'GRACE')
+        ORDER BY m.endDate DESC
+        """)
+    Optional<Membership> findFirstByUserIdCurrentOrderByEndDateDesc(@Param("userId") UUID userId);
+
+    // Used by getSeatMap — seats occupied by an ACTIVE membership (date-bound) or a
+    // GRACE membership (held indefinitely until an admin releases it).
+    @Query("""
+        SELECT m FROM Membership m
+        WHERE m.seatNumber IS NOT NULL
+          AND (m.status = 'GRACE' OR (m.status = 'ACTIVE' AND m.endDate <= :upTo))
+        """)
+    List<Membership> findOccupyingSeatMemberships(@Param("upTo") LocalDate upTo);
+
     @Query("SELECT COUNT(m) FROM Membership m WHERE m.status = 'ACTIVE'")
     long countActiveMemberships();
 

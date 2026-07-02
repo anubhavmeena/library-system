@@ -2,9 +2,14 @@ package com.library.admin.scheduler;
 
 import com.library.admin.dto.RenewalReminderEvent;
 import com.library.admin.entity.Membership;
+import com.library.admin.entity.Plan;
+import com.library.admin.entity.SeatBooking;
 import com.library.admin.entity.User;
 import com.library.admin.repository.MembershipRepository;
+import com.library.admin.repository.PlanRepository;
+import com.library.admin.repository.SeatBookingRepository;
 import com.library.admin.repository.UserRepository;
+import com.library.admin.service.AdminMembershipService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -12,6 +17,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -22,8 +28,18 @@ import java.util.stream.Collectors;
 @Slf4j
 public class ExpiryReminderScheduler {
 
+    // A membership held in GRACE never expires on its own — SeatBooking.endDate is
+    // pushed out to this sentinel so seat-service's date-range availability query
+    // keeps blocking the seat indefinitely. Only an explicit admin release (which
+    // sets SeatBooking.status = RELEASED) frees it. Never used as a cache-bust loop
+    // bound — see AdminMembershipService.invalidateSeatCache().
+    private static final LocalDate SEAT_HOLD_SENTINEL = LocalDate.of(9999, 12, 31);
+
     private final MembershipRepository          membershipRepository;
     private final UserRepository                userRepository;
+    private final PlanRepository                planRepository;
+    private final SeatBookingRepository         seatBookingRepository;
+    private final AdminMembershipService        adminMembershipService;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     /**
@@ -119,12 +135,21 @@ public class ExpiryReminderScheduler {
 
     /**
      * Runs every day at 10:00 AM (after the 9 AM reminder run).
-     * Finds memberships that are still ACTIVE but whose endDate has passed,
-     * marks them EXPIRED, and notifies admin that those seats are now free.
+     * Finds memberships that are still ACTIVE but whose endDate has passed.
+     *
+     * If the student already pre-paid a renewal (a QUEUED membership exists),
+     * this is the normal happy path: the old membership is finalized EXPIRED and
+     * the queued one takes over immediately — no grace period, no dues.
+     *
+     * Otherwise the membership enters a GRACE period: dues equal to the plan's
+     * current price are charged, the seat is held indefinitely (SeatBooking.endDate
+     * pushed to SEAT_HOLD_SENTINEL so it can never free itself via the normal
+     * date-range availability check), and both the student and admin are notified.
+     * The seat is only freed again by an explicit admin "Release Seat" action.
      */
     @Scheduled(cron = "0 0 10 * * *")
     @Transactional
-    public void markExpiredAndNotifyAdmin() {
+    public void markExpiredAndStartGrace() {
         LocalDate today = LocalDate.now();
         List<Membership> expired = membershipRepository.findExpiredActive(today);
 
@@ -140,24 +165,52 @@ public class ExpiryReminderScheduler {
         Map<UUID, User> userMap = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
 
-        for (Membership mem : expired) {
-            mem.setStatus(Membership.Status.EXPIRED);
-            membershipRepository.save(mem);
+        int graced = 0;
 
-            // Activate any queued plan for this user
-            membershipRepository.findQueuedByUserId(mem.getUserId()).ifPresent(queued -> {
+        for (Membership mem : expired) {
+            Optional<Membership> queuedOpt = membershipRepository.findQueuedByUserId(mem.getUserId());
+
+            if (queuedOpt.isPresent()) {
+                // Happy path — student already renewed in advance. Unchanged from
+                // the pre-grace-period behaviour.
+                mem.setStatus(Membership.Status.EXPIRED);
+                membershipRepository.save(mem);
+
+                Membership queued = queuedOpt.get();
                 queued.setStatus(Membership.Status.ACTIVE);
                 membershipRepository.save(queued);
                 log.info("Activated queued plan for user {} — seat {} from {}",
                         mem.getUserId(), queued.getSeatNumber(), queued.getStartDate());
-            });
+                continue;
+            }
 
             User user = userMap.get(mem.getUserId());
             String userName = user != null ? user.getName()   : "Unknown";
             String mobile   = user != null ? user.getMobile() : null;
             String email    = user != null ? user.getEmail()  : null;
 
-            RenewalReminderEvent event = RenewalReminderEvent.builder()
+            BigDecimal duesAmount = planRepository.findById(mem.getPlanId())
+                    .map(Plan::getPrice)
+                    .orElseGet(() -> {
+                        log.warn("Plan {} not found for membership {} — dues set to 0",
+                                mem.getPlanId(), mem.getId());
+                        return BigDecimal.ZERO;
+                    });
+
+            mem.setStatus(Membership.Status.GRACE);
+            mem.setDuesAmount(duesAmount);
+            membershipRepository.save(mem);
+
+            seatBookingRepository.findFirstByMembershipIdAndStatus(mem.getId(), SeatBooking.Status.ACTIVE)
+                    .ifPresent(booking -> {
+                        booking.setEndDate(SEAT_HOLD_SENTINEL);
+                        seatBookingRepository.save(booking);
+                    });
+
+            // Bounded — never invalidate all the way out to SEAT_HOLD_SENTINEL.
+            adminMembershipService.invalidateSeatCache(mem.getShift(), today, today.plusDays(14));
+
+            RenewalReminderEvent adminEvent = RenewalReminderEvent.builder()
                     .userId(mem.getUserId().toString())
                     .membershipId(mem.getId().toString())
                     .userName(userName)
@@ -166,13 +219,31 @@ public class ExpiryReminderScheduler {
                     .seatNumber(mem.getSeatNumber())
                     .expiryDate(mem.getEndDate().toString())
                     .daysRemaining(0)
-                    .eventType("SEAT_EXPIRED")
+                    .eventType("MEMBERSHIP_GRACE_STARTED")
+                    .pendingAmount(duesAmount)
                     .build();
+            kafkaTemplate.send("renewal-reminder", mem.getUserId().toString(), adminEvent);
 
-            kafkaTemplate.send("renewal-reminder", mem.getUserId().toString(), event);
-            log.info("Seat {} marked expired for user '{}' — admin notified", mem.getSeatNumber(), userName);
+            RenewalReminderEvent studentEvent = RenewalReminderEvent.builder()
+                    .userId(mem.getUserId().toString())
+                    .membershipId(mem.getId().toString())
+                    .userName(userName)
+                    .userMobile(mobile)
+                    .userEmail(email)
+                    .seatNumber(mem.getSeatNumber())
+                    .expiryDate(mem.getEndDate().toString())
+                    .daysRemaining(0)
+                    .eventType("MEMBERSHIP_EXPIRED_GRACE")
+                    .pendingAmount(duesAmount)
+                    .build();
+            kafkaTemplate.send("renewal-reminder", mem.getUserId().toString(), studentEvent);
+
+            graced++;
+            log.info("Seat {} held in GRACE for user '{}' — dues {} — student + admin notified",
+                    mem.getSeatNumber(), userName, duesAmount);
         }
 
-        log.info("SeatExpiredCheck: {} memberships marked EXPIRED", expired.size());
+        log.info("SeatExpiredCheck: {} memberships entered GRACE, {} total processed",
+                graced, expired.size());
     }
 }

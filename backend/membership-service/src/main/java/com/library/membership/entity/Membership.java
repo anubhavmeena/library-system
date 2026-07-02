@@ -3,6 +3,7 @@ package com.library.membership.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.GenericGenerator;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -30,8 +31,12 @@ public class Membership {
 
     @Column(name = "reminder_sent") private boolean reminderSent = false;
 
+    // Set when a membership enters GRACE (endDate passed, seat held, dues owed).
+    // Null for memberships that have never been in grace.
+    @Column(name = "dues_amount", precision = 10, scale = 2) private BigDecimal duesAmount;
+
     @Column(name = "created_at", updatable = false) private LocalDateTime createdAt;
     @PrePersist protected void onCreate() { createdAt = LocalDateTime.now(); }
 
-    public enum Status { PENDING, ACTIVE, QUEUED, EXPIRED, CANCELLED }
+    public enum Status { PENDING, ACTIVE, QUEUED, GRACE, EXPIRED, CANCELLED }
 }
