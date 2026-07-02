@@ -326,38 +326,21 @@ public class NotificationService {
     // ── Payment Receipt ───────────────────────────────────────────────────────
     // Triggered by membership-service (online payment) and admin-service (cash
     // payment / dues clearance) after a payment is confirmed. Generates a PDF,
-    // hosts it via user-service (so it can be linked from WhatsApp — Meta's Cloud
-    // API can't attach an arbitrary document to a plain text-template message
-    // outside an approved template or a live 24h customer session), and emails it
-    // as a real attachment to both the student and admin.
+    // hosts it via user-service (so it has a public URL Meta can fetch), sends
+    // it as a real WhatsApp document attachment via the approved "payment_receipt"
+    // template (to both student and admin), and emails it as a real attachment too.
 
     public void sendPaymentReceipt(PaymentReceiptEvent event) {
         byte[] pdf = receiptPdfService.buildReceipt(event);
         String attachmentName = (event.getInvoiceId() != null ? event.getInvoiceId() : "receipt") + ".pdf";
         String receiptLink = uploadReceiptPdf(event.getInvoiceId(), pdf, attachmentName);
 
-        String label = "DUES_CLEARED".equals(event.getReceiptType()) ? "Dues Payment" : "Booking Payment";
         String pending = event.getAmountPending() != null && event.getAmountPending().signum() > 0
                 ? "₹" + event.getAmountPending().stripTrailingZeros().toPlainString()
                 : "₹0";
         String paid = event.getAmountPaid() != null
                 ? "₹" + event.getAmountPaid().stripTrailingZeros().toPlainString()
                 : "₹0";
-
-        String whatsappMsg = String.format(
-                "🧾 Payment Receipt — %s\n\n" +
-                        "Invoice : %s\n"          +
-                        "Date    : %s\n"          +
-                        "Paid    : %s\n"          +
-                        "Pending : %s\n"          +
-                        "%s"                      +
-                        "📚 Target Zone Library",
-                label,
-                event.getInvoiceId(),
-                event.getPaymentDate(),
-                paid, pending,
-                receiptLink != null ? "\n🔗 Download: " + receiptLink + "\n\n" : "\n"
-        );
 
         String emailSubject = "Payment Receipt — Invoice " + event.getInvoiceId();
         String emailBody = String.format(
@@ -372,23 +355,64 @@ public class NotificationService {
                 event.getUserName(), event.getInvoiceId(), event.getPaymentDate(), paid, pending
         );
 
-        if (hasValue(event.getUserMobile())) {
-            whatsAppService.send(event.getUserMobile(), whatsappMsg, event.getUserId(), "PAYMENT_RECEIPT");
+        // "payment_receipt" template's {{1}}..{{5}} order: name, amount paid
+        // (numeric only — the template body already prints the ₹ symbol),
+        // invoice/receipt number, payment date (DD/MM/YYYY), pending amount.
+        List<String> bodyParams = List.of(
+                hasValue(event.getUserName()) ? event.getUserName() : "Student",
+                event.getAmountPaid() != null ? event.getAmountPaid().stripTrailingZeros().toPlainString() : "0",
+                event.getInvoiceId() != null ? event.getInvoiceId() : "",
+                formatDateDdMmYyyy(event.getPaymentDate()),
+                event.getAmountPending() != null ? event.getAmountPending().stripTrailingZeros().toPlainString() : "0"
+        );
+
+        if (receiptLink != null) {
+            if (hasValue(event.getUserMobile())) {
+                whatsAppService.sendDocumentTemplate(event.getUserMobile(), receiptLink, attachmentName,
+                        bodyParams, event.getUserId(), "PAYMENT_RECEIPT");
+            }
+            for (String number : adminWhatsappNumbers()) {
+                whatsAppService.sendDocumentTemplate(number, receiptLink, attachmentName,
+                        bodyParams, null, "PAYMENT_RECEIPT_ADMIN");
+            }
+        } else {
+            // Couldn't host the PDF — the document-header template requires a
+            // link, so fall back to the plain text template (no attachment).
+            String fallbackMsg = String.format(
+                    "🧾 Payment Receipt\n\nInvoice : %s\nDate    : %s\nPaid    : %s\nPending : %s\n\n📚 Target Zone Library",
+                    event.getInvoiceId(), event.getPaymentDate(), paid, pending
+            );
+            log.warn("Receipt PDF not hosted for invoice {} — WhatsApp falling back to text-only message", event.getInvoiceId());
+            if (hasValue(event.getUserMobile())) {
+                whatsAppService.send(event.getUserMobile(), fallbackMsg, event.getUserId(), "PAYMENT_RECEIPT");
+            }
+            for (String number : adminWhatsappNumbers()) {
+                whatsAppService.send(number, fallbackMsg, null, "PAYMENT_RECEIPT_ADMIN");
+            }
         }
+
         if (hasValue(event.getUserEmail())) {
             emailService.sendWithAttachment(
                     event.getUserEmail(), emailSubject, emailBody, pdf, attachmentName,
                     event.getUserId(), "PAYMENT_RECEIPT");
-        }
-
-        for (String number : adminWhatsappNumbers()) {
-            whatsAppService.send(number, whatsappMsg, null, "PAYMENT_RECEIPT_ADMIN");
         }
         emailService.sendWithAttachment(
                 adminEmail, emailSubject + " — " + event.getUserName(), emailBody, pdf, attachmentName,
                 null, "PAYMENT_RECEIPT_ADMIN");
 
         log.info("Payment receipt sent for user: {} invoice: {}", event.getUserId(), event.getInvoiceId());
+    }
+
+    // event.getPaymentDate() is yyyy-MM-dd (ISO); the approved template's sample
+    // uses DD/MM/YYYY, so reformat for display consistency with what Meta approved.
+    private String formatDateDdMmYyyy(String isoDate) {
+        if (!hasValue(isoDate)) return "";
+        try {
+            java.time.LocalDate d = java.time.LocalDate.parse(isoDate);
+            return d.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        } catch (Exception e) {
+            return isoDate;
+        }
     }
 
     private String uploadReceiptPdf(String invoiceId, byte[] pdf, String filename) {

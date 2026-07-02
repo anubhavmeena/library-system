@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
@@ -34,6 +35,7 @@ class WhatsAppServiceTest {
         ReflectionTestUtils.setField(whatsAppService, "metaPhoneNumberId", "");
         ReflectionTestUtils.setField(whatsAppService, "metaApiVersion", "v21.0");
         ReflectionTestUtils.setField(whatsAppService, "metaTemplateName", "library_notification");
+        ReflectionTestUtils.setField(whatsAppService, "receiptTemplateName", "payment_receipt");
         ReflectionTestUtils.setField(whatsAppService, "metaLanguage", "en_US");
         // metaEnabled starts false (field default)
     }
@@ -126,5 +128,49 @@ class WhatsAppServiceTest {
         verify(logRepository).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(DeliveryStatus.SENT);
         assertThat(captor.getValue().getErrorMessage()).isNull();
+    }
+
+    // ── sendDocumentTemplate() — dev mode (metaEnabled = false) ──────────────
+
+    @Test
+    void sendDocumentTemplate_devMode_savesLogWithSentStatus() {
+        ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
+        String userId = UUID.randomUUID().toString();
+
+        whatsAppService.sendDocumentTemplate(
+                "9876543210", "https://targetzone.co.in/uploads/receipts/INV-1.pdf", "INV-1.pdf",
+                List.of("Arjun", "300", "INV-1", "20/03/2026", "0"),
+                userId, "PAYMENT_RECEIPT");
+
+        verify(logRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(DeliveryStatus.SENT);
+        assertThat(captor.getValue().getChannel()).isEqualTo(Channel.WHATSAPP);
+        assertThat(captor.getValue().getRecipient()).isEqualTo("9876543210");
+        assertThat(captor.getValue().getEvent()).isEqualTo("PAYMENT_RECEIPT");
+        assertThat(captor.getValue().getUserId()).isEqualTo(UUID.fromString(userId));
+    }
+
+    @Test
+    void sendDocumentTemplate_devMode_nullUserId_savedWithNullUserId() {
+        ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
+
+        whatsAppService.sendDocumentTemplate(
+                "9876543210", "https://targetzone.co.in/uploads/receipts/INV-1.pdf", "INV-1.pdf",
+                List.of("Arjun", "300", "INV-1", "20/03/2026", "0"),
+                null, "PAYMENT_RECEIPT_ADMIN");
+
+        verify(logRepository).save(captor.capture());
+        assertThat(captor.getValue().getUserId()).isNull();
+    }
+
+    @Test
+    void sendDocumentTemplate_dbFailure_swallowed() {
+        doThrow(new RuntimeException("DB down")).when(logRepository).save(any());
+
+        assertThatCode(() -> whatsAppService.sendDocumentTemplate(
+                "9876543210", "https://targetzone.co.in/uploads/receipts/INV-1.pdf", "INV-1.pdf",
+                List.of("Arjun", "300", "INV-1", "20/03/2026", "0"),
+                null, "PAYMENT_RECEIPT"))
+                .doesNotThrowAnyException();
     }
 }

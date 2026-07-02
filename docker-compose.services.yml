@@ -272,9 +272,12 @@ services:
       FROM_NAME:                     ${FROM_NAME:-Target Zone Library}
       ADMIN_EMAIL:                   ${ADMIN_EMAIL:-admin@targetzone.co.in}
       ADMIN_WHATSAPP:                ${ADMIN_WHATSAPP:-}
+      USER_SERVICE_URL:              http://user-service:8082
+      FRONTEND_URL:                  ${FRONTEND_URL:-https://targetzone.co.in}
       META_WHATSAPP_TOKEN:           ${META_WHATSAPP_TOKEN:-}
       META_WHATSAPP_PHONE_NUMBER_ID: ${META_WHATSAPP_PHONE_NUMBER_ID:-}
       META_NOTIFICATION_TEMPLATE_NAME: ${META_NOTIFICATION_TEMPLATE_NAME:-library_notification}
+      META_RECEIPT_TEMPLATE_NAME:    ${META_RECEIPT_TEMPLATE_NAME:-payment_receipt}
       META_WHATSAPP_API_VERSION:     ${META_WHATSAPP_API_VERSION:-v21.0}
       META_WHATSAPP_LANGUAGE:        ${META_WHATSAPP_LANGUAGE:-en_US}
     networks:

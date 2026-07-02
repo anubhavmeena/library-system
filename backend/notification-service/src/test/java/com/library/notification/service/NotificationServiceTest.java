@@ -1,6 +1,7 @@
 package com.library.notification.service;
 
 import com.library.notification.dto.BookingConfirmedEvent;
+import com.library.notification.dto.PaymentReceiptEvent;
 import com.library.notification.dto.RenewalReminderEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,9 +10,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -26,6 +31,12 @@ class NotificationServiceTest {
     @Mock
     EmailService emailService;
 
+    @Mock
+    ReceiptPdfService receiptPdfService;
+
+    @Mock
+    RestTemplate restTemplate;
+
     @InjectMocks
     NotificationService notificationService;
 
@@ -33,6 +44,23 @@ class NotificationServiceTest {
     void setup() {
         ReflectionTestUtils.setField(notificationService, "adminEmail", "admin@test.com");
         ReflectionTestUtils.setField(notificationService, "adminWhatsapp", "");
+        ReflectionTestUtils.setField(notificationService, "userServiceBaseUrl", "http://localhost:8082");
+        ReflectionTestUtils.setField(notificationService, "frontendUrl", "https://targetzone.co.in");
+    }
+
+    private PaymentReceiptEvent receiptEvent(String mobile, String email) {
+        PaymentReceiptEvent e = new PaymentReceiptEvent();
+        e.setUserId("user-123");
+        e.setUserName("Arjun");
+        e.setUserMobile(mobile);
+        e.setUserEmail(email);
+        e.setInvoiceId("INV-20260320-ABC123");
+        e.setPaymentDate("2026-03-20");
+        e.setAmountPaid(new BigDecimal("300"));
+        e.setAmountPending(BigDecimal.ZERO);
+        e.setPaymentMethod("CASH");
+        e.setReceiptType("NEW_BOOKING");
+        return e;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -331,5 +359,84 @@ class NotificationServiceTest {
 
         verify(whatsAppService).send(anyString(), anyString(), eq("user-r1"), eq("RENEWAL_REMINDER"));
         verify(emailService).sendText(anyString(), anyString(), anyString(), anyString(), eq("user-r1"), eq("RENEWAL_REMINDER"));
+    }
+
+    // ── sendPaymentReceipt ───────────────────────────────────────────────────
+
+    @SuppressWarnings("unchecked")
+    private void stubSuccessfulUpload(String url) {
+        Map<String, Object> data = Map.of("receiptUrl", url);
+        Map<String, Object> envelope = Map.of("data", data);
+        when(restTemplate.exchange(anyString(), any(), any(), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(envelope));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void sendPaymentReceipt_hostedSuccessfully_sendsDocumentTemplateWithCorrectParamOrder() {
+        when(receiptPdfService.buildReceipt(any())).thenReturn(new byte[]{1, 2, 3});
+        stubSuccessfulUpload("/uploads/receipts/INV-20260320-ABC123.pdf");
+
+        notificationService.sendPaymentReceipt(receiptEvent("9876543210", "arjun@test.com"));
+
+        ArgumentCaptor<List<String>> paramsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(whatsAppService).sendDocumentTemplate(
+                eq("9876543210"),
+                eq("https://targetzone.co.in/uploads/receipts/INV-20260320-ABC123.pdf"),
+                eq("INV-20260320-ABC123.pdf"),
+                paramsCaptor.capture(),
+                eq("user-123"), eq("PAYMENT_RECEIPT"));
+
+        // Must match "payment_receipt" template's {{1}}..{{5}} order exactly:
+        // name, amountPaid, invoiceId, date (DD/MM/YYYY), pendingAmount.
+        assertThat(paramsCaptor.getValue()).containsExactly("Arjun", "300", "INV-20260320-ABC123", "20/03/2026", "0");
+    }
+
+    @Test
+    void sendPaymentReceipt_adminWhatsappConfigured_sendsDocumentTemplateToAdmin() {
+        ReflectionTestUtils.setField(notificationService, "adminWhatsapp", "+911234567890");
+        when(receiptPdfService.buildReceipt(any())).thenReturn(new byte[]{1, 2, 3});
+        stubSuccessfulUpload("/uploads/receipts/INV-20260320-ABC123.pdf");
+
+        notificationService.sendPaymentReceipt(receiptEvent("9876543210", "arjun@test.com"));
+
+        verify(whatsAppService).sendDocumentTemplate(
+                eq("+911234567890"), anyString(), anyString(), anyList(), isNull(), eq("PAYMENT_RECEIPT_ADMIN"));
+    }
+
+    @Test
+    void sendPaymentReceipt_uploadFails_fallsBackToPlainTextSend() {
+        when(receiptPdfService.buildReceipt(any())).thenReturn(new byte[]{1, 2, 3});
+        when(restTemplate.exchange(anyString(), any(), any(), eq(Map.class)))
+                .thenThrow(new RuntimeException("connection refused"));
+
+        notificationService.sendPaymentReceipt(receiptEvent("9876543210", "arjun@test.com"));
+
+        verify(whatsAppService, never()).sendDocumentTemplate(any(), any(), any(), any(), any(), any());
+        verify(whatsAppService).send(eq("9876543210"), anyString(), eq("user-123"), eq("PAYMENT_RECEIPT"));
+    }
+
+    @Test
+    void sendPaymentReceipt_alwaysEmailsAttachmentToStudentAndAdmin() {
+        byte[] pdf = new byte[]{1, 2, 3};
+        when(receiptPdfService.buildReceipt(any())).thenReturn(pdf);
+        stubSuccessfulUpload("/uploads/receipts/INV-20260320-ABC123.pdf");
+
+        notificationService.sendPaymentReceipt(receiptEvent("9876543210", "arjun@test.com"));
+
+        verify(emailService).sendWithAttachment(eq("arjun@test.com"), anyString(), anyString(),
+                eq(pdf), eq("INV-20260320-ABC123.pdf"), eq("user-123"), eq("PAYMENT_RECEIPT"));
+        verify(emailService).sendWithAttachment(eq("admin@test.com"), anyString(), anyString(),
+                eq(pdf), eq("INV-20260320-ABC123.pdf"), isNull(), eq("PAYMENT_RECEIPT_ADMIN"));
+    }
+
+    @Test
+    void sendPaymentReceipt_nullMobile_noWhatsAppToStudent() {
+        when(receiptPdfService.buildReceipt(any())).thenReturn(new byte[]{1, 2, 3});
+        stubSuccessfulUpload("/uploads/receipts/INV-20260320-ABC123.pdf");
+
+        notificationService.sendPaymentReceipt(receiptEvent(null, "arjun@test.com"));
+
+        verify(whatsAppService, never()).sendDocumentTemplate(any(), any(), any(), any(), any(), any());
     }
 }
