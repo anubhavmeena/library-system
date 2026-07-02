@@ -587,7 +587,8 @@
     "modal": {
       "seat": "सीट {{seatNumber}}",
       "student": "छात्र", "mobile": "मोबाइल", "shift": "शिफ्ट", "expires": "समाप्ति",
-      "daysLeft": "बचे दिन", "daysLeftValue": "{{days}} दिन"
+      "daysLeft": "बचे दिन", "daysLeftValue": "{{days}} दिन",
+      "seatHistory": "सीट इतिहास", "noHistory": "इस सीट के लिए कोई बुकिंग इतिहास नहीं है।", "current": "वर्तमान"
     },
     "loadFailed": "सीट मैप लोड करने में विफल"
   },

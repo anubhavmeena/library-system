@@ -591,7 +591,8 @@
     "modal": {
       "seat": "Seat {{seatNumber}}",
       "student": "Student", "mobile": "Mobile", "shift": "Shift", "expires": "Expires",
-      "daysLeft": "Days Left", "daysLeftValue": "{{days}} days"
+      "daysLeft": "Days Left", "daysLeftValue": "{{days}} days",
+      "seatHistory": "Seat History", "noHistory": "No booking history for this seat.", "current": "Current"
     },
     "loadFailed": "Failed to load seat map"
   },

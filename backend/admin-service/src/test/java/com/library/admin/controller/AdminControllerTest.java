@@ -160,6 +160,38 @@ class AdminControllerTest {
         verify(adminService).getSeatMap("MORNING", "2025-06-01");
     }
 
+    // ── GET /api/admin/seats/{seatNumber}/history ─────────────────────────────
+
+    @Test
+    void getSeatHistory_forwardsSeatNumber_returnsList() throws Exception {
+        SeatHistoryEntryDto entry = SeatHistoryEntryDto.builder()
+                .membershipId(UUID.randomUUID().toString())
+                .studentName("Alice")
+                .shift("MORNING")
+                .startDate("2025-01-01")
+                .endDate("2025-01-31")
+                .status("EXPIRED")
+                .build();
+
+        when(adminService.getSeatHistory("A1")).thenReturn(List.of(entry));
+
+        mockMvc.perform(get("/api/admin/seats/{seatNumber}/history", "A1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].studentName").value("Alice"));
+
+        verify(adminService).getSeatHistory("A1");
+    }
+
+    @Test
+    void getSeatHistory_noBookings_returnsEmptyList() throws Exception {
+        when(adminService.getSeatHistory("D26")).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/seats/{seatNumber}/history", "D26"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
     // ── GET /api/admin/memberships/expiring ──────────────────────────────────
 
     @Test

@@ -248,4 +248,39 @@ class MembershipRepositoryTest {
     void countExpiredMemberships_zeroWhenEmpty() {
         assertThat(membershipRepository.countExpiredMemberships()).isZero();
     }
+
+    // ── findBySeatNumberOrderByStartDateDesc ─────────────────────────────────
+
+    private Membership saveWithSeat(String seatNumber, LocalDate startDate, LocalDate endDate, Membership.Status status) {
+        return membershipRepository.save(Membership.builder()
+                .id(UUID.randomUUID())
+                .userId(UUID.randomUUID())
+                .planId(UUID.randomUUID())
+                .seatNumber(seatNumber)
+                .shift("MORNING")
+                .startDate(startDate)
+                .endDate(endDate)
+                .status(status)
+                .build());
+    }
+
+    @Test
+    void findBySeatNumberOrderByStartDateDesc_returnsNewestFirst() {
+        Membership oldest = saveWithSeat("A1", LocalDate.now().minusDays(60), LocalDate.now().minusDays(30), Membership.Status.EXPIRED);
+        Membership newest = saveWithSeat("A1", LocalDate.now().minusDays(5), LocalDate.now().plusDays(25), Membership.Status.ACTIVE);
+        saveWithSeat("B1", LocalDate.now().minusDays(10), LocalDate.now().plusDays(20), Membership.Status.ACTIVE); // different seat
+
+        List<Membership> result = membershipRepository.findBySeatNumberOrderByStartDateDesc("A1");
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getId()).isEqualTo(newest.getId());
+        assertThat(result.get(1).getId()).isEqualTo(oldest.getId());
+    }
+
+    @Test
+    void findBySeatNumberOrderByStartDateDesc_noBookings_returnsEmpty() {
+        List<Membership> result = membershipRepository.findBySeatNumberOrderByStartDateDesc("D26");
+
+        assertThat(result).isEmpty();
+    }
 }

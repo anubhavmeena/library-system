@@ -301,6 +301,40 @@ public class AdminService {
                 .build();
     }
 
+    // Every booking ever made against a seat, newest first — PENDING (checkout
+    // abandoned before payment) and CANCELLED rows are excluded since they were
+    // never a real occupancy. Known gap: AdminMembershipService.changeSeat()
+    // mutates a Membership's seatNumber in place rather than creating a new row,
+    // so a student moved off this seat via an explicit seat change won't appear
+    // here — accepted limitation, not fixed by this method.
+    public List<SeatHistoryEntryDto> getSeatHistory(String seatNumber) {
+        List<Membership> rows = membershipRepository
+                .findBySeatNumberOrderByStartDateDesc(seatNumber)
+                .stream()
+                .filter(m -> m.getStatus() != Membership.Status.PENDING
+                          && m.getStatus() != Membership.Status.CANCELLED)
+                .collect(Collectors.toList());
+
+        Set<UUID> userIds = rows.stream().map(Membership::getUserId).collect(Collectors.toSet());
+        Map<UUID, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        return rows.stream()
+                .map(m -> {
+                    User u = userMap.get(m.getUserId());
+                    return SeatHistoryEntryDto.builder()
+                            .membershipId(m.getId().toString())
+                            .studentName(u != null ? u.getName() : "Unknown")
+                            .studentMobile(u != null ? u.getMobile() : null)
+                            .shift(m.getShift())
+                            .startDate(m.getStartDate().toString())
+                            .endDate(m.getEndDate().toString())
+                            .status(m.getStatus().name())
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
     // ── Expiring Memberships ──────────────────────────────────────────────────
 
     public List<StudentDto> getExpiringMemberships(int withinDays) {

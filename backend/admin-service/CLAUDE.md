@@ -31,6 +31,7 @@ All routes require `X-User-Role: ADMIN` (enforced upstream by the gateway).
 | `GET` | `/api/admin/students/{userId}` | Single student with active membership details |
 | `PATCH` | `/api/admin/students/{userId}/status` | Enable/disable a student account |
 | `GET` | `/api/admin/seats/map?shift=&date=` | 110-seat grid with occupant details |
+| `GET` | `/api/admin/seats/{seatNumber}/history` | Every booking ever made against a seat, newest first |
 | `GET` | `/api/admin/memberships/expiring?withinDays=7` | Students whose membership expires within N days |
 | `POST` | `/api/admin/reminders/send` | Publish renewal reminder Kafka events (bulk or targeted) |
 | `GET` | `/api/admin/reports/revenue?from=&to=` | Revenue totals + daily breakdown between two dates |

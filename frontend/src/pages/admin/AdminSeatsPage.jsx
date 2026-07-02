@@ -60,6 +60,9 @@ export default function AdminSeatsPage() {
     const [date, setDate]           = useState(new Date().toISOString().split('T')[0])
     const [selected, setSelected]   = useState(null)
     const [viewMode, setViewMode]   = useState('default') // 'default' | 'expiry'
+    const [historyOpen, setHistoryOpen]       = useState(false)
+    const [seatHistory, setSeatHistory]       = useState([])
+    const [historyLoading, setHistoryLoading] = useState(false)
     const { t } = useTranslation()
 
     const fetchMap = async () => {
@@ -70,6 +73,26 @@ export default function AdminSeatsPage() {
     }
 
     useEffect(() => { fetchMap() }, [shift, date])
+
+    // Seat History always starts collapsed — resets whenever the modal is
+    // closed or a different seat is opened, so the next expand re-fetches
+    // fresh data rather than showing the previous seat's history.
+    useEffect(() => {
+        setHistoryOpen(false)
+        setSeatHistory([])
+    }, [selected?.seatNumber])
+
+    const toggleSeatHistory = () => {
+        const opening = !historyOpen
+        setHistoryOpen(opening)
+        if (opening && seatHistory.length === 0 && !historyLoading) {
+            setHistoryLoading(true)
+            api.get(`/admin/seats/${selected.seatNumber}/history`)
+                .then(r => setSeatHistory(r.data.data || []))
+                .catch(() => setSeatHistory([]))
+                .finally(() => setHistoryLoading(false))
+        }
+    }
 
     const occupied = seatMap?.occupiedSeats ?? 0
     const total    = seatMap?.totalSeats ?? 110
@@ -261,6 +284,44 @@ export default function AdminSeatsPage() {
                                     <span className="text-white">{v}</span>
                                 </div>
                             ))}
+                        </div>
+
+                        <div className="mt-5 pt-5 border-t border-primary-700/30">
+                            <button onClick={toggleSeatHistory}
+                                    className="w-full flex items-center justify-between text-white font-semibold text-sm">
+                                {t('adminSeats.modal.seatHistory')}
+                                <span className={`transition-transform ${historyOpen ? 'rotate-180' : ''}`}>▾</span>
+                            </button>
+                            {historyOpen && (
+                                <div className="mt-3">
+                                    {historyLoading ? (
+                                        <div className="shimmer h-16 rounded-xl" />
+                                    ) : seatHistory.length === 0 ? (
+                                        <p className="text-primary-500 text-xs text-center py-3">{t('adminSeats.modal.noHistory')}</p>
+                                    ) : (
+                                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                                            {seatHistory.map(h => (
+                                                <div key={h.membershipId}
+                                                     className={`rounded-lg bg-primary-800/40 border px-3 py-2.5 text-xs ${
+                                                         h.membershipId === selected.membershipId ? 'border-amber-400/50' : 'border-primary-700/30'}`}>
+                                                    <div className="flex items-center justify-between mb-1.5">
+                                                        <span className="text-white font-semibold">{h.studentName}</span>
+                                                        {h.membershipId === selected.membershipId && (
+                                                            <span className="px-2 py-0.5 rounded-full font-medium border bg-amber-500/20 text-amber-400 border-amber-500/30">
+                                                                {t('adminSeats.modal.current')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-primary-400 space-y-0.5">
+                                                        <p>{h.startDate} → {h.endDate} · {shiftLabel(h.shift)}</p>
+                                                        <p className="font-mono">{h.status}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

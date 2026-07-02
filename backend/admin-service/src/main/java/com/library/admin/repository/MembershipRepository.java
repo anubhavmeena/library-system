@@ -112,6 +112,10 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
 
     Optional<Membership> findFirstByUserIdOrderByEndDateDesc(UUID userId);
 
+    // Used by getSeatHistory — every membership ever booked against this seat,
+    // newest first. Includes PENDING/CANCELLED rows; caller filters those out.
+    List<Membership> findBySeatNumberOrderByStartDateDesc(String seatNumber);
+
     @Modifying
     @Transactional
     @Query("DELETE FROM Membership m WHERE m.userId = :userId")

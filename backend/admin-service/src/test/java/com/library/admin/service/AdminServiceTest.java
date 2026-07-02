@@ -445,6 +445,99 @@ class AdminServiceTest {
     }
 
     // ================================================================
+    //  getSeatHistory
+    // ================================================================
+
+    @Test
+    void getSeatHistory_returnsNewestFirst_asProvidedByRepository() {
+        UUID uid1 = UUID.randomUUID();
+        UUID uid2 = UUID.randomUUID();
+        Membership newest = buildActiveMembership(uid1, LocalDate.now().plusDays(10));
+        Membership oldest = buildActiveMembership(uid2, LocalDate.now().minusDays(40));
+        oldest.setStatus(Membership.Status.EXPIRED);
+
+        when(membershipRepository.findBySeatNumberOrderByStartDateDesc("B5"))
+                .thenReturn(List.of(newest, oldest)); // repository already orders desc
+        when(userRepository.findAllById(anyIterable()))
+                .thenReturn(List.of(buildUser(uid1), buildUser(uid2)));
+
+        List<SeatHistoryEntryDto> result = adminService.getSeatHistory("B5");
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getMembershipId()).isEqualTo(newest.getId().toString());
+        assertThat(result.get(1).getMembershipId()).isEqualTo(oldest.getId().toString());
+    }
+
+    @Test
+    void getSeatHistory_excludesPendingAndCancelled() {
+        UUID uid1 = UUID.randomUUID();
+        UUID uid2 = UUID.randomUUID();
+        UUID uid3 = UUID.randomUUID();
+        Membership active    = buildActiveMembership(uid1, LocalDate.now().plusDays(10));
+        Membership pending   = buildActiveMembership(uid2, LocalDate.now().plusDays(10));
+        pending.setStatus(Membership.Status.PENDING);
+        Membership cancelled = buildActiveMembership(uid3, LocalDate.now().plusDays(10));
+        cancelled.setStatus(Membership.Status.CANCELLED);
+
+        when(membershipRepository.findBySeatNumberOrderByStartDateDesc("B5"))
+                .thenReturn(List.of(active, pending, cancelled));
+        when(userRepository.findAllById(anyIterable())).thenReturn(List.of(buildUser(uid1)));
+
+        List<SeatHistoryEntryDto> result = adminService.getSeatHistory("B5");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getMembershipId()).isEqualTo(active.getId().toString());
+    }
+
+    @Test
+    void getSeatHistory_includesGraceExpiredAndQueued() {
+        UUID uid1 = UUID.randomUUID();
+        UUID uid2 = UUID.randomUUID();
+        UUID uid3 = UUID.randomUUID();
+        Membership grace   = buildActiveMembership(uid1, LocalDate.now().minusDays(2));
+        grace.setStatus(Membership.Status.GRACE);
+        Membership expired = buildActiveMembership(uid2, LocalDate.now().minusDays(30));
+        expired.setStatus(Membership.Status.EXPIRED);
+        Membership queued  = buildActiveMembership(uid3, LocalDate.now().plusDays(30));
+        queued.setStatus(Membership.Status.QUEUED);
+
+        when(membershipRepository.findBySeatNumberOrderByStartDateDesc("B5"))
+                .thenReturn(List.of(queued, grace, expired));
+        when(userRepository.findAllById(anyIterable()))
+                .thenReturn(List.of(buildUser(uid1), buildUser(uid2), buildUser(uid3)));
+
+        List<SeatHistoryEntryDto> result = adminService.getSeatHistory("B5");
+
+        assertThat(result).hasSize(3);
+        assertThat(result).extracting(SeatHistoryEntryDto::getStatus)
+                .containsExactlyInAnyOrder("GRACE", "EXPIRED", "QUEUED");
+    }
+
+    @Test
+    void getSeatHistory_userNotFound_studentNameUnknown() {
+        UUID uid = UUID.randomUUID();
+        Membership mem = buildActiveMembership(uid, LocalDate.now().plusDays(10));
+
+        when(membershipRepository.findBySeatNumberOrderByStartDateDesc("B5")).thenReturn(List.of(mem));
+        when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
+
+        List<SeatHistoryEntryDto> result = adminService.getSeatHistory("B5");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getStudentName()).isEqualTo("Unknown");
+        assertThat(result.get(0).getStudentMobile()).isNull();
+    }
+
+    @Test
+    void getSeatHistory_noBookings_returnsEmptyList() {
+        when(membershipRepository.findBySeatNumberOrderByStartDateDesc("D26")).thenReturn(List.of());
+
+        List<SeatHistoryEntryDto> result = adminService.getSeatHistory("D26");
+
+        assertThat(result).isEmpty();
+    }
+
+    // ================================================================
     //  getExpiringMemberships
     // ================================================================
 

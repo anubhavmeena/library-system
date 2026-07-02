@@ -100,6 +100,14 @@ public class AdminController {
                 adminService.getSeatMap(shift, date)));
     }
 
+    // Every booking ever made against a seat, newest first — powers the "Seat
+    // History" section in the seat-map modal.
+    @GetMapping("/seats/{seatNumber}/history")
+    public ResponseEntity<ApiResponse<List<SeatHistoryEntryDto>>> getSeatHistory(
+            @PathVariable String seatNumber) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getSeatHistory(seatNumber)));
+    }
+
     // ── Expiring Memberships ──────────────────────────────────────────────────
     // Used by AdminRemindersPage to show who is expiring within N days
 
