@@ -164,6 +164,14 @@ public class NotificationService {
             sendMembershipExpiredGraceAlert(event);
             return;
         }
+        if ("PENDING_FEE_CLEARED".equals(event.getEventType())) {
+            sendPendingFeeClearedStudentAlert(event);
+            return;
+        }
+        if ("PENDING_FEE_CLEARED_ADMIN".equals(event.getEventType())) {
+            sendPendingFeeClearedAdminAlert(event);
+            return;
+        }
 
         // Escalate urgency label based on days remaining
         String urgency = event.getDaysRemaining() <= 3 ? "⚠️ URGENT" : "⏰ Reminder";
@@ -235,6 +243,66 @@ public class NotificationService {
             );
         }
         log.info("Pending fee reminder sent for user: {} ({})", event.getUserId(), amount);
+    }
+
+    // ── Pending Fee Cleared ───────────────────────────────────────────────────
+    // Triggered by AdminService.clearPendingFees() — sent to both the student
+    // (confirmation) and admin (audit trail), unlike the reminder above which is
+    // student-facing only.
+
+    private void sendPendingFeeClearedStudentAlert(RenewalReminderEvent event) {
+        String amount = event.getPendingAmount() != null
+                ? "₹" + event.getPendingAmount().stripTrailingZeros().toPlainString()
+                : "your outstanding amount";
+
+        String msg = String.format(
+                "✅ Pending Fee Cleared\n\n"                                          +
+                        "Hi %s,\n\n"                                                         +
+                        "Your pending library fee of *%s* has been cleared. Thank you!\n\n"  +
+                        "📚 Target Zone Library Team",
+                event.getUserName(), amount
+        );
+
+        if (hasValue(event.getUserMobile())) {
+            whatsAppService.send(event.getUserMobile(), msg, event.getUserId(), "PENDING_FEE_CLEARED");
+        }
+        if (hasValue(event.getUserEmail())) {
+            emailService.sendText(
+                    event.getUserEmail(),
+                    "Pending Fee Cleared — " + amount,
+                    msg,
+                    adminEmail,
+                    event.getUserId(), "PENDING_FEE_CLEARED"
+            );
+        }
+        log.info("Pending fee cleared confirmation sent to user: {} ({})", event.getUserId(), amount);
+    }
+
+    private void sendPendingFeeClearedAdminAlert(RenewalReminderEvent event) {
+        String amount = event.getPendingAmount() != null
+                ? "₹" + event.getPendingAmount().stripTrailingZeros().toPlainString()
+                : "an outstanding amount";
+
+        String msg = String.format(
+                "✅ Pending Fee Cleared\n\nStudent: %s\nSeat   : %s\nAmount : %s",
+                event.getUserName(),
+                event.getSeatNumber() != null ? event.getSeatNumber() : "N/A",
+                amount
+        );
+
+        for (String number : adminWhatsappNumbers()) {
+            whatsAppService.send(number, msg, null, "PENDING_FEE_CLEARED_ADMIN");
+        }
+
+        emailService.sendText(
+                adminEmail,
+                "Pending Fee Cleared — " + event.getUserName() + " (" + amount + ")",
+                msg,
+                null,
+                "PENDING_FEE_CLEARED_ADMIN"
+        );
+
+        log.info("Pending fee cleared alert sent to admin for user: {} ({})", event.getUserName(), amount);
     }
 
     // ── Broadcast (admin → all active members) ────────────────────────────────

@@ -452,7 +452,6 @@
     "revenue": "राजस्व",
     "stats": {
       "totalStudents": "कुल छात्र",
-      "activeStudents": "सक्रिय छात्र",
       "activeMemberships": "सक्रिय सदस्यताएं",
       "expiringThisWeek": "इस सप्ताह समाप्त",
       "needsAttention": "ध्यान चाहिए",
@@ -494,14 +493,16 @@
     "refresh": "रिफ्रेश",
     "searchPlaceholder": "🔍 नाम, मोबाइल, ईमेल खोजें...",
     "filters": {
-      "all": "सभी",
-      "active": "सक्षम",
-      "inactive": "अक्षम",
-      "accountLabel": "खाता:",
-      "membershipLabel": "सदस्यता:",
-      "membershipAll": "सभी",
-      "membershipActive": "सक्रिय",
-      "membershipInactive": "निष्क्रिय"
+      "membershipLabel": "स्थिति:",
+      "membershipAll": "सभी"
+    },
+    "statusLabels": {
+      "NEW": "नया",
+      "PAID": "भुगतान हुआ",
+      "PENDING": "लंबित",
+      "GRACE": "छूट अवधि",
+      "EXPIRED": "समाप्त",
+      "RELEASED": "रिलीज़ हुई"
     },
     "table": {
       "student": "छात्र",
@@ -519,14 +520,10 @@
     "daysLeft": "{{count}}दि बचे",
     "noPlan": "कोई प्लान नहीं",
     "expired": "समाप्त",
-    "active": "सक्षम",
-    "inactive": "अक्षम",
     "cash": "नकद",
     "online": "ऑनलाइन",
     "view": "देखें",
     "changeSeat": "सीट बदलें",
-    "enable": "सक्रिय करें",
-    "disable": "निष्क्रिय करें",
     "changeSeatModal": {
       "title": "सीट बदलें",
       "current": "वर्तमान सीट",
@@ -561,10 +558,7 @@
       "cancel": "रद्द करें"
     },
     "toasts": {
-      "activated": "{{name}} सक्रिय किया गया",
-      "deactivated": "{{name}} निष्क्रिय किया गया",
       "loadFailed": "छात्र लोड करने में विफल",
-      "updateFailed": "स्थिति अपडेट करने में विफल",
       "seatChanged": "सीट {{seat}} पर बदल दी गई",
       "seatChangeFailed": "सीट बदलने में विफल"
     }

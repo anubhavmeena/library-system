@@ -5,8 +5,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 
 import java.util.UUID;
 
@@ -52,82 +50,6 @@ class UserRepositoryTest {
                 .role(User.Role.ADMIN)
                 .isActive(true)
                 .build());
-    }
-
-    // ── findStudentsByStatus ─────────────────────────────────────────────────
-
-    @Test
-    void findStudentsByStatus_nullStatus_returnsAllStudents() {
-        Page<User> page = userRepository.findStudentsByStatus(null, null, null, PageRequest.of(0, 10));
-
-        assertThat(page.getContent())
-                .hasSize(2)
-                .extracting(User::getName)
-                .containsExactlyInAnyOrder("Active Student", "Inactive Student");
-    }
-
-    @Test
-    void findStudentsByStatus_active_returnsOnlyActiveStudents() {
-        Page<User> page = userRepository.findStudentsByStatus("ACTIVE", null, null, PageRequest.of(0, 10));
-
-        assertThat(page.getContent())
-                .hasSize(1)
-                .first()
-                .extracting(User::getName).isEqualTo("Active Student");
-    }
-
-    @Test
-    void findStudentsByStatus_inactive_returnsOnlyInactiveStudents() {
-        Page<User> page = userRepository.findStudentsByStatus("INACTIVE", null, null, PageRequest.of(0, 10));
-
-        assertThat(page.getContent())
-                .hasSize(1)
-                .first()
-                .extracting(User::getName).isEqualTo("Inactive Student");
-    }
-
-    @Test
-    void findStudentsByStatus_doesNotReturnAdminUsers() {
-        Page<User> page = userRepository.findStudentsByStatus(null, null, null, PageRequest.of(0, 10));
-
-        assertThat(page.getContent())
-                .extracting(User::getName)
-                .doesNotContain("Admin User");
-    }
-
-    @Test
-    void findStudentsByStatus_pagination_respectsPageSize() {
-        Page<User> page = userRepository.findStudentsByStatus(null, null, null, PageRequest.of(0, 1));
-
-        assertThat(page.getContent()).hasSize(1);
-        assertThat(page.getTotalElements()).isEqualTo(2);
-    }
-
-    @Test
-    void findStudentsByStatus_emptyTable_returnsEmptyPage() {
-        userRepository.deleteAll();
-        Page<User> page = userRepository.findStudentsByStatus(null, null, null, PageRequest.of(0, 10));
-
-        assertThat(page.getContent()).isEmpty();
-    }
-
-    // ── countActiveStudents ──────────────────────────────────────────────────
-
-    @Test
-    void countActiveStudents_returnsOnlyActiveStudents() {
-        assertThat(userRepository.countActiveStudents()).isEqualTo(1L);
-    }
-
-    @Test
-    void countActiveStudents_excludesAdmin() {
-        // adminUser is active but role=ADMIN — should NOT be counted
-        assertThat(userRepository.countActiveStudents()).isEqualTo(1L);
-    }
-
-    @Test
-    void countActiveStudents_zeroWhenNoneActive() {
-        userRepository.deleteAll();
-        assertThat(userRepository.countActiveStudents()).isZero();
     }
 
     // ── countAllStudents ─────────────────────────────────────────────────────

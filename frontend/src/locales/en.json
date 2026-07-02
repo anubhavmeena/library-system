@@ -456,7 +456,6 @@
     "revenue": "Revenue",
     "stats": {
       "totalStudents": "Total Students",
-      "activeStudents": "Active Students",
       "activeMemberships": "Active Memberships",
       "expiringThisWeek": "Expiring This Week",
       "needsAttention": "Needs attention",
@@ -498,14 +497,16 @@
     "refresh": "Refresh",
     "searchPlaceholder": "🔍 Search name, mobile, email...",
     "filters": {
-      "all": "All",
-      "active": "Enabled",
-      "inactive": "Disabled",
-      "accountLabel": "Account:",
-      "membershipLabel": "Membership:",
-      "membershipAll": "All",
-      "membershipActive": "Active",
-      "membershipInactive": "Inactive"
+      "membershipLabel": "Status:",
+      "membershipAll": "All"
+    },
+    "statusLabels": {
+      "NEW": "New",
+      "PAID": "Paid",
+      "PENDING": "Pending",
+      "GRACE": "Grace",
+      "EXPIRED": "Expired",
+      "RELEASED": "Released"
     },
     "table": {
       "student": "Student",
@@ -523,14 +524,10 @@
     "daysLeft": "{{count}}d left",
     "noPlan": "No plan",
     "expired": "Expired",
-    "active": "Enabled",
-    "inactive": "Disabled",
     "cash": "Cash",
     "online": "Online",
     "view": "View",
     "changeSeat": "Change Seat",
-    "enable": "Enable",
-    "disable": "Disable",
     "changeSeatModal": {
       "title": "Change Seat",
       "current": "Current Seat",
@@ -565,10 +562,7 @@
       "cancel": "Cancel"
     },
     "toasts": {
-      "activated": "{{name}} activated",
-      "deactivated": "{{name}} deactivated",
       "loadFailed": "Failed to load students",
-      "updateFailed": "Failed to update status",
       "seatChanged": "Seat changed to {{seat}}",
       "seatChangeFailed": "Failed to change seat"
     }

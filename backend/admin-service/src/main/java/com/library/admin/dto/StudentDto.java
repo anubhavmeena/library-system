@@ -20,7 +20,6 @@ public class StudentDto {
     private String  dateOfBirth;
     private String  photoUrl;
     private String  aadhaarUrl;
-    private Boolean isActive;
     private String  joinedAt;
 
     // ── Active membership (all nullable if student has no plan) ────────────
@@ -37,6 +36,7 @@ public class StudentDto {
     private String     paymentMode;    // CASH | ONLINE | null
     private BigDecimal pendingAmount; // outstanding cash balance, 0 if fully paid
     private BigDecimal duesAmount;    // overdue grace-period dues, distinct from pendingAmount above
+    private String displayStatus;     // NEW | PAID | PENDING | GRACE | EXPIRED | RELEASED — see StudentStatusResolver
 
     public static StudentDto fromEntities(User user, Membership membership) {
         StudentDtoBuilder b = StudentDto.builder()
@@ -51,7 +51,6 @@ public class StudentDto {
                                 ? user.getDateOfBirth().toString() : null)
                 .photoUrl(user.getPhotoUrl())
                 .aadhaarUrl(user.getAadhaarUrl())
-                .isActive(Boolean.TRUE.equals(user.getIsActive()))
                 .joinedAt(
                         user.getCreatedAt() != null
                                 ? user.getCreatedAt().toString() : null);

@@ -22,7 +22,7 @@ public class AdminController {
     private final ImportService importService;
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
-    // Returns: totalStudents, activeStudents, activeMemberships, expiringThisWeek,
+    // Returns: totalStudents, activeMemberships, expiringThisWeek,
     //          totalSeats, occupiedSeats, availableSeats, revenueToday, revenueThisMonth
 
     @GetMapping("/dashboard")
@@ -36,13 +36,12 @@ public class AdminController {
     public ResponseEntity<ApiResponse<StudentListDto>> getAllStudents(
             @RequestParam(defaultValue = "0")           int page,
             @RequestParam(defaultValue = "20")          int size,
-            @RequestParam(required = false)             String status,
             @RequestParam(required = false)             String membershipStatus,
             @RequestParam(required = false)             String search,
             @RequestParam(defaultValue = "createdAt")   String sortBy,
             @RequestParam(defaultValue = "desc")        String sortDir) {
         return ResponseEntity.ok(ApiResponse.success(
-                adminService.getAllStudents(page, size, status, membershipStatus, search, sortBy, sortDir)));
+                adminService.getAllStudents(page, size, membershipStatus, search, sortBy, sortDir)));
     }
 
     @GetMapping("/students/{userId}")
@@ -50,14 +49,6 @@ public class AdminController {
             @PathVariable String userId) {
         return ResponseEntity.ok(ApiResponse.success(
                 adminService.getStudentDetails(userId)));
-    }
-
-    @PatchMapping("/students/{userId}/status")
-    public ResponseEntity<ApiResponse<String>> updateStudentStatus(
-            @PathVariable String userId,
-            @RequestBody UpdateStatusRequest request) {
-        adminService.updateStudentStatus(userId, request.isActive());
-        return ResponseEntity.ok(ApiResponse.success("Status updated successfully"));
     }
 
     @PatchMapping("/students/{userId}")

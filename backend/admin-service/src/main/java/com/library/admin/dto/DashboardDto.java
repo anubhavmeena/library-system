@@ -8,7 +8,6 @@ public class DashboardDto {
 
     // ── Student stats ──────────────────────────────────────────────────────
     private long totalStudents;
-    private long activeStudents;
 
     // ── Membership stats ───────────────────────────────────────────────────
     private long activeMemberships;

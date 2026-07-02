@@ -55,7 +55,6 @@ class StudentDtoTest {
         assertThat(dto.getAddress()).isEqualTo("123 Main St");
         assertThat(dto.getGender()).isEqualTo("F");
         assertThat(dto.getPhotoUrl()).isEqualTo("/java-uploads/photos/alice.jpg");
-        assertThat(dto.getIsActive()).isTrue();
         assertThat(dto.getDateOfBirth()).isEqualTo("1995-05-20");
         assertThat(dto.getJoinedAt()).isEqualTo("2024-01-10T09:00");
     }
@@ -113,25 +112,6 @@ class StudentDtoTest {
         StudentDto dto = StudentDto.fromEntities(buildUser(), buildMembership(endDate));
 
         assertThat(dto.getDaysRemaining()).isZero(); // not negative
-    }
-
-    @Test
-    void fromEntities_isActive_falseWhenUserInactive() {
-        User user = buildUser();
-        user.setIsActive(false);
-        StudentDto dto = StudentDto.fromEntities(user, null);
-
-        assertThat(dto.getIsActive()).isFalse();
-    }
-
-    @Test
-    void fromEntities_isActive_falseWhenIsActiveNull() {
-        User user = buildUser();
-        user.setIsActive(null);
-        StudentDto dto = StudentDto.fromEntities(user, null);
-
-        // Boolean.TRUE.equals(null) == false
-        assertThat(dto.getIsActive()).isFalse();
     }
 
     @Test

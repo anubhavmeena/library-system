@@ -83,7 +83,6 @@ class AdminServiceTest {
     @Test
     void getDashboardStats_happyPath() {
         when(userRepository.countAllStudents()).thenReturn(50L);
-        when(userRepository.countActiveStudents()).thenReturn(45L);
         when(membershipRepository.countActiveMemberships()).thenReturn(40L);
         when(membershipRepository.countExpiredMemberships()).thenReturn(10L);
         when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of(
@@ -95,7 +94,6 @@ class AdminServiceTest {
         DashboardDto dto = adminService.getDashboardStats();
 
         assertThat(dto.getTotalStudents()).isEqualTo(50L);
-        assertThat(dto.getActiveStudents()).isEqualTo(45L);
         assertThat(dto.getActiveMemberships()).isEqualTo(40L);
         assertThat(dto.getExpiredMemberships()).isEqualTo(10L);
         assertThat(dto.getExpiringThisWeek()).isEqualTo(1L);
@@ -110,7 +108,6 @@ class AdminServiceTest {
     @Test
     void getDashboardStats_nullRevenue_defaultsToZero() {
         when(userRepository.countAllStudents()).thenReturn(0L);
-        when(userRepository.countActiveStudents()).thenReturn(0L);
         when(membershipRepository.countActiveMemberships()).thenReturn(0L);
         when(membershipRepository.countExpiredMemberships()).thenReturn(0L);
         when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of());
@@ -127,7 +124,6 @@ class AdminServiceTest {
     void getDashboardStats_activeMembershipsExceedsSeats_availableIsZero() {
         when(membershipRepository.countActiveMemberships()).thenReturn(120L); // > 110
         when(userRepository.countAllStudents()).thenReturn(0L);
-        when(userRepository.countActiveStudents()).thenReturn(0L);
         when(membershipRepository.countExpiredMemberships()).thenReturn(0L);
         when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of());
         when(paymentRepository.sumRevenueForPeriod(any(), any())).thenReturn(BigDecimal.ZERO);
@@ -142,7 +138,6 @@ class AdminServiceTest {
     void getDashboardStats_noExpiringMemberships_expiringThisWeekIsZero() {
         when(membershipRepository.findMembershipsExpiringBefore(any())).thenReturn(List.of());
         when(userRepository.countAllStudents()).thenReturn(0L);
-        when(userRepository.countActiveStudents()).thenReturn(0L);
         when(membershipRepository.countActiveMemberships()).thenReturn(0L);
         when(membershipRepository.countExpiredMemberships()).thenReturn(0L);
         when(paymentRepository.sumRevenueForPeriod(any(), any())).thenReturn(BigDecimal.ZERO);
@@ -167,10 +162,11 @@ class AdminServiceTest {
         when(membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(uid))
                 .thenReturn(Optional.of(mem));
 
-        StudentListDto result = adminService.getAllStudents(0, 20, null, null, null, "createdAt", "desc");
+        StudentListDto result = adminService.getAllStudents(0, 20, null, null, "createdAt", "desc");
 
         assertThat(result.getStudents()).hasSize(1);
         assertThat(result.getStudents().get(0).getMembershipId()).isEqualTo(mem.getId().toString());
+        assertThat(result.getStudents().get(0).getDisplayStatus()).isEqualTo("PAID");
     }
 
     @Test
@@ -180,26 +176,27 @@ class AdminServiceTest {
         when(membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(uid))
                 .thenReturn(Optional.empty());
 
-        StudentListDto result = adminService.getAllStudents(0, 20, null, null, null, "createdAt", "desc");
+        StudentListDto result = adminService.getAllStudents(0, 20, null, null, "createdAt", "desc");
 
         assertThat(result.getStudents().get(0).getMembershipId()).isNull();
         assertThat(result.getStudents().get(0).getDaysRemaining()).isZero();
+        assertThat(result.getStudents().get(0).getDisplayStatus()).isEqualTo("NEW");
     }
 
     @Test
-    void getAllStudents_forwardsStatusParamToQuery() {
+    void getAllStudents_forwardsMembershipStatusParamToQuery() {
         stubEntityManagerForStudents(List.of(), 0L);
 
-        adminService.getAllStudents(0, 10, "ACTIVE", null, null, "createdAt", "desc");
+        adminService.getAllStudents(0, 10, "PAID", null, "createdAt", "desc");
 
-        verify(dataQuery).setParameter("status", "ACTIVE");
+        verify(dataQuery).setParameter("membershipStatus", "PAID");
     }
 
     @Test
     void getAllStudents_emptyPage_returnsEmptyList() {
         stubEntityManagerForStudents(List.of(), 0L);
 
-        StudentListDto result = adminService.getAllStudents(0, 20, null, null, null, "createdAt", "desc");
+        StudentListDto result = adminService.getAllStudents(0, 20, null, null, "createdAt", "desc");
 
         assertThat(result.getStudents()).isEmpty();
     }
@@ -222,6 +219,7 @@ class AdminServiceTest {
 
         assertThat(dto.getId()).isEqualTo(uid.toString());
         assertThat(dto.getMembershipId()).isEqualTo(mem.getId().toString());
+        assertThat(dto.getDisplayStatus()).isEqualTo("PAID");
     }
 
     @Test
@@ -234,6 +232,7 @@ class AdminServiceTest {
         StudentDto dto = adminService.getStudentDetails(uid.toString());
 
         assertThat(dto.getMembershipId()).isNull();
+        assertThat(dto.getDisplayStatus()).isEqualTo("NEW");
     }
 
     @Test
@@ -684,48 +683,4 @@ class AdminServiceTest {
         assertThat(dto.getDailyBreakdown()).hasSize(2);
     }
 
-    // ================================================================
-    //  updateStudentStatus
-    // ================================================================
-
-    @Test
-    void updateStudentStatus_activeToInactive() {
-        UUID uid = UUID.randomUUID();
-        User user = buildUser(uid);
-        when(userRepository.findById(uid)).thenReturn(Optional.of(user));
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        adminService.updateStudentStatus(uid.toString(), false);
-
-        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(captor.capture());
-        assertThat(captor.getValue().getIsActive()).isFalse();
-    }
-
-    @Test
-    void updateStudentStatus_inactiveToActive() {
-        UUID uid = UUID.randomUUID();
-        User user = buildUser(uid);
-        user.setIsActive(false);
-        when(userRepository.findById(uid)).thenReturn(Optional.of(user));
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        adminService.updateStudentStatus(uid.toString(), true);
-
-        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(captor.capture());
-        assertThat(captor.getValue().getIsActive()).isTrue();
-    }
-
-    @Test
-    void updateStudentStatus_notFound_throwsResourceNotFoundException() {
-        UUID uid = UUID.randomUUID();
-        when(userRepository.findById(uid)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> adminService.updateStudentStatus(uid.toString(), true))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining(uid.toString());
-
-        verify(userRepository, never()).save(any());
-    }
 }

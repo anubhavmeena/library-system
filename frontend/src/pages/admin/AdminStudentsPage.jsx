@@ -10,6 +10,15 @@ const L_BOTTOM = [14, 12, 10, 8, 6, 4, 2]
 const R_TOP    = [15, 17, 19, 21, 23, 25, 27]
 const R_BOTTOM = [16, 18, 20, 22, 24, 26, 28]
 
+const STATUS_BADGE_CLASSES = {
+    NEW:      'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    PAID:     'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    PENDING:  'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    GRACE:    'bg-orange-500/20 text-orange-400 border-orange-500/30',
+    EXPIRED:  'bg-red-500/20 text-red-400 border-red-500/30',
+    RELEASED: 'bg-red-950/70 text-red-300 border-red-900',
+}
+
 export default function AdminStudentsPage() {
     const [students, setStudents] = useState([])
     const [total, setTotal]       = useState(0)
@@ -18,7 +27,6 @@ export default function AdminStudentsPage() {
     const [pageSize, setPageSize]     = useState(20)
     const [sortBy,  setSortBy]        = useState('createdAt')
     const [sortDir, setSortDir]       = useState('desc')
-    const [status, setStatus]         = useState('')
     const [membershipFilter, setMembershipFilter] = useState('')
     const [search, setSearch]         = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -54,7 +62,7 @@ export default function AdminStudentsPage() {
     const fetchStudents = async () => {
         setLoading(true)
         try {
-            const res = await api.get(`/admin/students?page=${page}&size=${pageSize}&sortBy=${sortBy}&sortDir=${sortDir}${status ? `&status=${status}` : ''}${membershipFilter ? `&membershipStatus=${membershipFilter}` : ''}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`)
+            const res = await api.get(`/admin/students?page=${page}&size=${pageSize}&sortBy=${sortBy}&sortDir=${sortDir}${membershipFilter ? `&membershipStatus=${membershipFilter}` : ''}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`)
             setStudents(res.data.data.students || [])
             setTotal(res.data.data.total || 0)
         } catch { toast.error(t('adminStudents.toasts.loadFailed')) }
@@ -69,7 +77,7 @@ export default function AdminStudentsPage() {
         return () => clearTimeout(t)
     }, [search])
 
-    useEffect(() => { fetchStudents() }, [page, status, membershipFilter, debouncedSearch, pageSize, sortBy, sortDir])
+    useEffect(() => { fetchStudents() }, [page, membershipFilter, debouncedSearch, pageSize, sortBy, sortDir])
 
     useEffect(() => {
         const close = () => setOpenDropdown(null)
@@ -89,17 +97,6 @@ export default function AdminStudentsPage() {
             .catch(() => setStudentPayments([]))
             .finally(() => setStudentPaymentsLoading(false))
     }, [detail])
-
-    const handleToggleStatus = async (student) => {
-        try {
-            await api.patch(`/admin/students/${student.id}/status`, { active: !student.isActive })
-            const action = !student.isActive
-                ? t('adminStudents.toasts.activated', { name: student.name })
-                : t('adminStudents.toasts.deactivated', { name: student.name })
-            toast.success(action)
-            fetchStudents()
-        } catch { toast.error(t('adminStudents.toasts.updateFailed')) }
-    }
 
     const handleDeleteStudent = async () => {
         if (!deleteTarget) return
@@ -190,16 +187,14 @@ export default function AdminStudentsPage() {
         return <span className="ml-1 text-amber-400">{sortDir === 'asc' ? '↑' : '↓'}</span>
     }
 
-    const filters = [
-        { v: '',         l: t('adminStudents.filters.all') },
-        { v: 'ACTIVE',   l: t('adminStudents.filters.active') },
-        { v: 'INACTIVE', l: t('adminStudents.filters.inactive') },
-    ]
-
     const membershipFilters = [
-        { v: '',         l: t('adminStudents.filters.membershipAll') },
-        { v: 'ACTIVE',   l: t('adminStudents.filters.membershipActive') },
-        { v: 'INACTIVE', l: t('adminStudents.filters.membershipInactive') },
+        { v: '',          l: t('adminStudents.filters.membershipAll') },
+        { v: 'NEW',       l: t('adminStudents.statusLabels.NEW') },
+        { v: 'PAID',      l: t('adminStudents.statusLabels.PAID') },
+        { v: 'PENDING',   l: t('adminStudents.statusLabels.PENDING') },
+        { v: 'GRACE',     l: t('adminStudents.statusLabels.GRACE') },
+        { v: 'EXPIRED',   l: t('adminStudents.statusLabels.EXPIRED') },
+        { v: 'RELEASED',  l: t('adminStudents.statusLabels.RELEASED') },
     ]
 
     const headerCols = [
@@ -210,7 +205,7 @@ export default function AdminStudentsPage() {
         { l: t('adminStudents.table.payment'),    col: 'paymentMode' },
         { l: 'Pending',                           col: 'pendingAmount' },
         { l: 'Dues',                              col: null },
-        { l: t('adminStudents.table.status'),     col: 'isActive' },
+        { l: t('adminStudents.table.status'),     col: null },
         { l: t('adminStudents.table.actions'),    col: null },
     ]
 
@@ -227,16 +222,6 @@ export default function AdminStudentsPage() {
             <div className="flex flex-wrap gap-3 mb-3">
                 <input className="input w-64 text-sm py-2" placeholder={t('adminStudents.searchPlaceholder')}
                        value={search} onChange={e => setSearch(e.target.value)} />
-                <div className="flex items-center gap-2">
-                    <span className="text-primary-500 text-xs">{t('adminStudents.filters.accountLabel')}</span>
-                    {filters.map(({ v, l }) => (
-                        <button key={v} onClick={() => { setStatus(v); setPage(0) }}
-                                className={`px-3 py-2 rounded-xl text-sm font-medium border transition-all
-                ${status === v ? 'bg-red-500/20 border-red-400/60 text-red-400' : 'border-primary-700/40 text-primary-400 hover:text-white'}`}>
-                            {l}
-                        </button>
-                    ))}
-                </div>
             </div>
             <div className="flex flex-wrap gap-2 mb-6">
                 <div className="flex items-center gap-2">
@@ -304,7 +289,7 @@ export default function AdminStudentsPage() {
                                             <>
                                                 <p className="text-primary-300 text-xs">{t('adminStudents.expires')} {s.membershipEnd}</p>
                                                 <p className="text-xs font-semibold text-red-400 line-through">
-                                                    {Math.max(0, Math.ceil((new Date() - new Date(s.membershipEnd)) / 86400000))}d overdue — grace
+                                                    {Math.max(0, Math.ceil((new Date() - new Date(s.membershipEnd)) / 86400000))}d overdue — {s.displayStatus === 'EXPIRED' ? 'expired' : 'grace'}
                                                 </p>
                                             </>
                                         ) : s.membershipEnd ? (
@@ -342,9 +327,8 @@ export default function AdminStudentsPage() {
                                         )}
                                     </td>
                                     <td className="p-4">
-                                        <span className={`badge border text-xs px-2 py-1 rounded-full
-                        ${s.isActive ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
-                                            {s.isActive ? t('adminStudents.active') : t('adminStudents.inactive')}
+                                        <span className={`badge border text-xs px-2 py-1 rounded-full ${STATUS_BADGE_CLASSES[s.displayStatus] || 'bg-primary-700/30 text-primary-400 border-primary-700/40'}`}>
+                                            {t(`adminStudents.statusLabels.${s.displayStatus}`)}
                                         </span>
                                     </td>
                                     <td className="p-4">
@@ -380,11 +364,6 @@ export default function AdminStudentsPage() {
                                                                 {releasingSeat === s.id ? 'Releasing…' : 'Release Seat'}
                                                             </button>
                                                         )}
-                                                        <button
-                                                            onClick={() => { handleToggleStatus(s); setOpenDropdown(null) }}
-                                                            className={`w-full text-left text-xs px-3 py-2.5 transition-colors border-b border-primary-700/40 hover:bg-primary-700/60 ${s.isActive ? 'text-red-400' : 'text-emerald-400'}`}>
-                                                            {s.isActive ? t('adminStudents.disable') : t('adminStudents.enable')}
-                                                        </button>
                                                         {s.pendingAmount > 0 && (
                                                             <button
                                                                 disabled={clearingFees === s.id}

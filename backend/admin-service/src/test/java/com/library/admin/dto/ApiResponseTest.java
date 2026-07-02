@@ -57,7 +57,6 @@ class ApiResponseTest {
     void success_withComplexData_preservesObject() {
         DashboardDto dto = DashboardDto.builder()
                 .totalStudents(10L)
-                .activeStudents(8L)
                 .totalSeats(110L)
                 .build();
 

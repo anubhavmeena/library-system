@@ -67,6 +67,11 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     // Students with outstanding cash balance
     List<Payment> findByPendingAmountGreaterThan(java.math.BigDecimal amount);
 
+    // A single student's outstanding cash balance rows — used by clearPendingFees
+    // to know the total being cleared (and whether there's anything to notify about)
+    // before the balance is zeroed out.
+    List<Payment> findByUserIdAndPendingAmountGreaterThan(UUID userId, java.math.BigDecimal amount);
+
     // Fold pending balance into paid amount and zero it out (clear pending fees action)
     @Modifying(clearAutomatically = true)
     @Transactional

@@ -41,7 +41,6 @@ public class AdminService {
         "seatNumber",    "m.seat_number",
         "endDate",       "m.end_date",
         "paymentMode",   "p.payment_gateway",
-        "isActive",      "u.is_active",
         "createdAt",     "u.created_at",
         "pendingAmount", "p.pending_amount"
     );
@@ -50,7 +49,6 @@ public class AdminService {
 
     public DashboardDto getDashboardStats() {
         long totalStudents  = userRepository.countAllStudents();
-        long activeStudents = userRepository.countActiveStudents();
         long activeMem      = membershipRepository.countActiveMemberships();
         long expiredMem     = membershipRepository.countExpiredMemberships();
         long expiringWeek   = membershipRepository
@@ -75,7 +73,6 @@ public class AdminService {
 
         return DashboardDto.builder()
                 .totalStudents(totalStudents)
-                .activeStudents(activeStudents)
                 .activeMemberships(activeMem)
                 .expiredMemberships(expiredMem)
                 .expiringThisWeek(expiringWeek)
@@ -92,23 +89,43 @@ public class AdminService {
 
     // ── Students ──────────────────────────────────────────────────────────────
 
-    public StudentListDto getAllStudents(int page, int size, String status, String membershipStatus,
+    public StudentListDto getAllStudents(int page, int size, String membershipStatus,
                                          String search, String sortBy, String sortDir) {
         String safeSortCol = SORT_COLUMNS.getOrDefault(sortBy, "u.created_at");
         String safeSortDir = "asc".equalsIgnoreCase(sortDir) ? "ASC" : "DESC";
 
+        // membershipStatus mirrors StudentStatusResolver's 6-value display status
+        // (NEW/PAID/PENDING/GRACE/EXPIRED/RELEASED) — the filtering MUST happen here
+        // in SQL (not after fetching a page in Java) or pagination breaks. `le` is
+        // the student's latest-ever membership row (any status), needed to detect
+        // NEW/RELEASED since the `m` join above only ever matches a current
+        // (ACTIVE-not-expired or GRACE) row.
         String where = """
                 FROM users u
                 LEFT JOIN memberships m ON m.user_id = u.id
                     AND (m.status = 'GRACE' OR (m.status = 'ACTIVE' AND m.end_date >= CURRENT_DATE))
                 LEFT JOIN payments p ON p.membership_id = m.id
+                LEFT JOIN memberships le ON le.id = (
+                    SELECT m2.id FROM memberships m2
+                    WHERE m2.user_id = u.id
+                    ORDER BY m2.end_date DESC
+                    LIMIT 1
+                )
                 WHERE u.role = 'STUDENT'
-                  AND (CAST(:status AS VARCHAR) IS NULL
-                       OR (CAST(:status AS VARCHAR) = 'ACTIVE'   AND u.is_active = true)
-                       OR (CAST(:status AS VARCHAR) = 'INACTIVE' AND u.is_active = false))
                   AND (CAST(:membershipStatus AS VARCHAR) IS NULL
-                       OR (CAST(:membershipStatus AS VARCHAR) = 'ACTIVE'   AND m.id IS NOT NULL)
-                       OR (CAST(:membershipStatus AS VARCHAR) = 'INACTIVE' AND m.id IS NULL))
+                       -- keep the "10" below in sync with StudentStatusResolver.GRACE_DISPLAY_DAYS
+                       OR (CAST(:membershipStatus AS VARCHAR) = 'GRACE'
+                           AND m.status = 'GRACE' AND (CURRENT_DATE - m.end_date) <= 10)
+                       OR (CAST(:membershipStatus AS VARCHAR) = 'EXPIRED'
+                           AND m.status = 'GRACE' AND (CURRENT_DATE - m.end_date) > 10)
+                       OR (CAST(:membershipStatus AS VARCHAR) = 'PAID'
+                           AND m.status = 'ACTIVE' AND (p.pending_amount IS NULL OR p.pending_amount <= 0))
+                       OR (CAST(:membershipStatus AS VARCHAR) = 'PENDING'
+                           AND m.status = 'ACTIVE' AND p.pending_amount > 0)
+                       OR (CAST(:membershipStatus AS VARCHAR) = 'RELEASED'
+                           AND m.id IS NULL AND le.status IN ('EXPIRED', 'CANCELLED'))
+                       OR (CAST(:membershipStatus AS VARCHAR) = 'NEW'
+                           AND m.id IS NULL AND (le.id IS NULL OR le.status NOT IN ('EXPIRED', 'CANCELLED'))))
                   AND (CAST(:search AS VARCHAR) IS NULL
                        OR LOWER(u.name)  LIKE LOWER(CONCAT('%', CAST(:search AS VARCHAR), '%'))
                        OR u.mobile       LIKE CONCAT('%', CAST(:search AS VARCHAR), '%'))
@@ -117,7 +134,6 @@ public class AdminService {
         @SuppressWarnings("unchecked")
         List<User> users = entityManager
                 .createNativeQuery("SELECT u.* " + where + " ORDER BY " + safeSortCol + " " + safeSortDir, User.class)
-                .setParameter("status", status)
                 .setParameter("membershipStatus", membershipStatus)
                 .setParameter("search", search)
                 .setFirstResult(page * size)
@@ -126,7 +142,6 @@ public class AdminService {
 
         long total = ((Number) entityManager
                 .createNativeQuery("SELECT COUNT(DISTINCT u.id) " + where)
-                .setParameter("status", status)
                 .setParameter("membershipStatus", membershipStatus)
                 .setParameter("search", search)
                 .getSingleResult()).longValue();
@@ -138,14 +153,21 @@ public class AdminService {
                             || !m.getEndDate().isBefore(LocalDate.now()))
                     .orElse(null);
             StudentDto dto = StudentDto.fromEntities(user, mem);
+            Payment currentPayment = null;
+            Membership latestEver = null;
             if (mem != null) {
-                paymentRepository.findFirstByMembershipId(mem.getId()).ifPresent(p -> {
-                    dto.setPaymentMode("CASH".equalsIgnoreCase(p.getPaymentGateway()) ? "CASH" : "ONLINE");
-                    dto.setPendingAmount(p.getPendingAmount() != null ? p.getPendingAmount() : BigDecimal.ZERO);
-                });
-            } else if (membershipRepository.existsByUserId(user.getId())) {
-                dto.setMembershipStatus("EXPIRED");
+                currentPayment = paymentRepository.findFirstByMembershipId(mem.getId()).orElse(null);
+                if (currentPayment != null) {
+                    dto.setPaymentMode("CASH".equalsIgnoreCase(currentPayment.getPaymentGateway()) ? "CASH" : "ONLINE");
+                    dto.setPendingAmount(currentPayment.getPendingAmount() != null ? currentPayment.getPendingAmount() : BigDecimal.ZERO);
+                }
+            } else {
+                latestEver = membershipRepository.findFirstByUserIdOrderByEndDateDesc(user.getId()).orElse(null);
+                if (latestEver != null) {
+                    dto.setMembershipStatus("EXPIRED");
+                }
             }
+            dto.setDisplayStatus(StudentStatusResolver.resolve(mem, currentPayment, latestEver).name());
             return dto;
         }).collect(Collectors.toList());
         return new StudentListDto(students, total);
@@ -163,21 +185,27 @@ public class AdminService {
                 .orElse(null);
 
         StudentDto dto = StudentDto.fromEntities(user, mem);
+        Payment currentPayment = null;
+        Membership latestEver = null;
         if (mem != null) {
             planRepository.findById(mem.getPlanId()).ifPresent(plan -> {
                 dto.setMembershipPlanId(plan.getId().toString());
                 dto.setPlanName(plan.getName());
                 dto.setPlanType(plan.getPlanType().name());
             });
-            paymentRepository.findFirstByMembershipId(mem.getId()).ifPresent(p -> {
-                dto.setPaymentMode("CASH".equalsIgnoreCase(p.getPaymentGateway()) ? "CASH" : "ONLINE");
-                dto.setPendingAmount(p.getPendingAmount() != null ? p.getPendingAmount() : BigDecimal.ZERO);
-            });
-        } else if (membershipRepository.existsByUserId(user.getId())) {
-            dto.setMembershipStatus("EXPIRED");
-            membershipRepository.findFirstByUserIdOrderByEndDateDesc(user.getId())
-                    .ifPresent(last -> dto.setMembershipEnd(last.getEndDate().toString()));
+            currentPayment = paymentRepository.findFirstByMembershipId(mem.getId()).orElse(null);
+            if (currentPayment != null) {
+                dto.setPaymentMode("CASH".equalsIgnoreCase(currentPayment.getPaymentGateway()) ? "CASH" : "ONLINE");
+                dto.setPendingAmount(currentPayment.getPendingAmount() != null ? currentPayment.getPendingAmount() : BigDecimal.ZERO);
+            }
+        } else {
+            latestEver = membershipRepository.findFirstByUserIdOrderByEndDateDesc(user.getId()).orElse(null);
+            if (latestEver != null) {
+                dto.setMembershipStatus("EXPIRED");
+                dto.setMembershipEnd(latestEver.getEndDate().toString());
+            }
         }
+        dto.setDisplayStatus(StudentStatusResolver.resolve(mem, currentPayment, latestEver).name());
         return dto;
     }
 
@@ -384,6 +412,7 @@ public class AdminService {
                         dto.setPaymentMode("CASH".equalsIgnoreCase(pay.getPaymentGateway()) ? "CASH" : "ONLINE");
                         dto.setPendingAmount(pay.getPendingAmount());
                     }
+                    dto.setDisplayStatus(StudentStatusResolver.resolve(m, pay, null).name());
                     return dto;
                 })
                 .sorted(Comparator.comparing(StudentDto::getPendingAmount,
@@ -393,8 +422,48 @@ public class AdminService {
 
     @Transactional
     public void clearPendingFees(String userId) {
-        paymentRepository.clearPendingAmountByUserId(UUID.fromString(userId));
+        UUID uid = UUID.fromString(userId);
+
+        BigDecimal totalCleared = paymentRepository
+                .findByUserIdAndPendingAmountGreaterThan(uid, BigDecimal.ZERO)
+                .stream()
+                .map(Payment::getPendingAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        paymentRepository.clearPendingAmountByUserId(uid);
         log.info("Pending fees cleared for user {}", userId);
+
+        if (totalCleared.compareTo(BigDecimal.ZERO) <= 0) return; // nothing was actually pending
+
+        User user = userRepository.findById(uid).orElse(null);
+        if (user == null) return;
+
+        String seatNumber = membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(uid)
+                .map(Membership::getSeatNumber).orElse(null);
+
+        RenewalReminderEvent adminEvent = RenewalReminderEvent.builder()
+                .userId(uid.toString())
+                .userName(user.getName())
+                .userMobile(user.getMobile())
+                .userEmail(user.getEmail())
+                .seatNumber(seatNumber)
+                .pendingAmount(totalCleared)
+                .eventType("PENDING_FEE_CLEARED_ADMIN")
+                .build();
+        kafkaTemplate.send("renewal-reminder", uid.toString(), adminEvent);
+
+        RenewalReminderEvent studentEvent = RenewalReminderEvent.builder()
+                .userId(uid.toString())
+                .userName(user.getName())
+                .userMobile(user.getMobile())
+                .userEmail(user.getEmail())
+                .seatNumber(seatNumber)
+                .pendingAmount(totalCleared)
+                .eventType("PENDING_FEE_CLEARED")
+                .build();
+        kafkaTemplate.send("renewal-reminder", uid.toString(), studentEvent);
+
+        log.info("Pending fee cleared notifications queued for user '{}' (₹{})", user.getName(), totalCleared);
     }
 
     @Transactional
@@ -501,18 +570,6 @@ public class AdminService {
                 .totalTransactions(count)
                 .dailyBreakdown(daily)
                 .build();
-    }
-
-    // ── Update Student Status ─────────────────────────────────────────────────
-
-    @Transactional
-    public void updateStudentStatus(String userId, boolean active) {
-        User user = userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Student not found: " + userId));
-        user.setIsActive(active);
-        userRepository.save(user);
-        log.info("Student {} set to {}", userId, active ? "ACTIVE" : "INACTIVE");
     }
 
     // ── Update Student Profile ────────────────────────────────────────────────

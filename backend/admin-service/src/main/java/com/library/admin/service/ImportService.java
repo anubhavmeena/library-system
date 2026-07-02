@@ -56,7 +56,6 @@ public class ImportService {
                     .name(req.getName().trim())
                     .mobile(phone)
                     .role(User.Role.STUDENT)
-                    .isActive(true)
                     .createdAt(LocalDateTime.now())
                     .build();
             return userRepository.save(u);
@@ -134,7 +133,6 @@ public class ImportService {
                     .name(name)
                     .mobile(phone)
                     .role(User.Role.STUDENT)
-                    .isActive(true)
                     .createdAt(LocalDateTime.now())
                     .build();
             return userRepository.save(u);

@@ -36,7 +36,7 @@ class AdminControllerTest {
     @Test
     void getDashboard_returns200WithDashboardDto() throws Exception {
         DashboardDto dto = DashboardDto.builder()
-                .totalStudents(50L).activeStudents(45L)
+                .totalStudents(50L)
                 .activeMemberships(40L).expiredMemberships(5L)
                 .expiringThisWeek(3L).totalSeats(110L)
                 .occupiedSeats(40L).availableSeats(70L)
@@ -61,27 +61,27 @@ class AdminControllerTest {
 
     @Test
     void getAllStudents_defaultParams_forwardsPageZeroSize20() throws Exception {
-        when(adminService.getAllStudents(eq(0), eq(20), isNull(), isNull(), isNull(), eq("createdAt"), eq("desc"))).thenReturn(new StudentListDto(List.of(), 0));
+        when(adminService.getAllStudents(eq(0), eq(20), isNull(), isNull(), eq("createdAt"), eq("desc"))).thenReturn(new StudentListDto(List.of(), 0));
 
         mockMvc.perform(get("/api/admin/students"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.students").isArray());
 
-        verify(adminService).getAllStudents(0, 20, null, null, null, "createdAt", "desc");
+        verify(adminService).getAllStudents(0, 20, null, null, "createdAt", "desc");
     }
 
     @Test
     void getAllStudents_customParams_forwarded() throws Exception {
-        when(adminService.getAllStudents(eq(2), eq(5), eq("ACTIVE"), isNull(), isNull(), eq("createdAt"), eq("desc"))).thenReturn(new StudentListDto(List.of(), 0));
+        when(adminService.getAllStudents(eq(2), eq(5), eq("PAID"), isNull(), eq("createdAt"), eq("desc"))).thenReturn(new StudentListDto(List.of(), 0));
 
         mockMvc.perform(get("/api/admin/students")
                         .param("page", "2")
                         .param("size", "5")
-                        .param("status", "ACTIVE"))
+                        .param("membershipStatus", "PAID"))
                 .andExpect(status().isOk());
 
-        verify(adminService).getAllStudents(2, 5, "ACTIVE", null, null, "createdAt", "desc");
+        verify(adminService).getAllStudents(2, 5, "PAID", null, "createdAt", "desc");
     }
 
     @Test
@@ -89,10 +89,10 @@ class AdminControllerTest {
         StudentDto student = StudentDto.builder()
                 .id(UUID.randomUUID().toString())
                 .name("Alice")
-                .isActive(true)
+                .displayStatus("PAID")
                 .build();
 
-        when(adminService.getAllStudents(anyInt(), anyInt(), any(), any(), any(), any(), any())).thenReturn(new StudentListDto(List.of(student), 1));
+        when(adminService.getAllStudents(anyInt(), anyInt(), any(), any(), any(), any())).thenReturn(new StudentListDto(List.of(student), 1));
 
         mockMvc.perform(get("/api/admin/students"))
                 .andExpect(jsonPath("$.data.students", hasSize(1)))
@@ -124,56 +124,6 @@ class AdminControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Student not found: " + uid));
-    }
-
-    // ── PATCH /api/admin/students/{userId}/status ────────────────────────────
-
-    @Test
-    void updateStudentStatus_activate_returns200() throws Exception {
-        String uid = UUID.randomUUID().toString();
-        UpdateStatusRequest req = new UpdateStatusRequest();
-        req.setActive(true);
-
-        doNothing().when(adminService).updateStudentStatus(eq(uid), eq(true));
-
-        mockMvc.perform(patch("/api/admin/students/{userId}/status", uid)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data", containsString("Status updated")));
-    }
-
-    @Test
-    void updateStudentStatus_deactivate_returns200() throws Exception {
-        String uid = UUID.randomUUID().toString();
-        UpdateStatusRequest req = new UpdateStatusRequest();
-        req.setActive(false);
-
-        doNothing().when(adminService).updateStudentStatus(eq(uid), eq(false));
-
-        mockMvc.perform(patch("/api/admin/students/{userId}/status", uid)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isOk());
-
-        verify(adminService).updateStudentStatus(uid, false);
-    }
-
-    @Test
-    void updateStudentStatus_notFound_returns404() throws Exception {
-        String uid = UUID.randomUUID().toString();
-        UpdateStatusRequest req = new UpdateStatusRequest();
-        req.setActive(true);
-
-        doThrow(new ResourceNotFoundException("Student not found: " + uid))
-                .when(adminService).updateStudentStatus(uid, true);
-
-        mockMvc.perform(patch("/api/admin/students/{userId}/status", uid)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.success").value(false));
     }
 
     // ── GET /api/admin/seats/map ─────────────────────────────────────────────
