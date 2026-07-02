@@ -72,6 +72,48 @@ class MembershipRepositoryTest {
         assertThat(result).isEmpty();
     }
 
+    // ── findFirstByUserIdCurrentOrderByEndDateDesc ──────────────────────────────
+    // Regression coverage: this hit production as NonUniqueResultException when a
+    // user ended up with 2 simultaneously ACTIVE memberships — a plain @Query +
+    // Optional<T> silently assumes uniqueness Spring Data doesn't actually enforce.
+
+    @Test
+    void findFirstByUserIdCurrentOrderByEndDateDesc_singleActive_found() {
+        Membership m = save(userId1, Membership.Status.ACTIVE, LocalDate.now().plusDays(10), false);
+
+        Optional<Membership> result = membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(userId1);
+
+        assertThat(result).isPresent()
+                .get().extracting(Membership::getId).isEqualTo(m.getId());
+    }
+
+    @Test
+    void findFirstByUserIdCurrentOrderByEndDateDesc_twoSimultaneousActive_doesNotThrowAndReturnsLatestEndDate() {
+        save(userId1, Membership.Status.ACTIVE, LocalDate.now().plusDays(5), false);
+        Membership later = save(userId1, Membership.Status.ACTIVE, LocalDate.now().plusDays(20), false);
+
+        Optional<Membership> result = membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(userId1);
+
+        assertThat(result).isPresent()
+                .get().extracting(Membership::getId).isEqualTo(later.getId());
+    }
+
+    @Test
+    void findFirstByUserIdCurrentOrderByEndDateDesc_activeAndGraceBothMatch_doesNotThrow() {
+        save(userId1, Membership.Status.ACTIVE, LocalDate.now().plusDays(5), false);
+        save(userId1, Membership.Status.GRACE, LocalDate.now().minusDays(2), false);
+
+        assertThatCode(() -> membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(userId1))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void findFirstByUserIdCurrentOrderByEndDateDesc_notFound_returnsEmpty() {
+        Optional<Membership> result = membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(userId1);
+
+        assertThat(result).isEmpty();
+    }
+
     // ── findMembershipsExpiringBefore ────────────────────────────────────────
     // Returns ACTIVE memberships where endDate >= CURRENT_DATE AND endDate <= upTo
 

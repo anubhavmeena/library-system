@@ -1,6 +1,8 @@
 package com.library.admin.repository;
 
 import com.library.admin.entity.Membership;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -55,17 +57,41 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
         """)
     List<Membership> findExpiredActive(@Param("today") LocalDate today);
 
+    // Same @Query-without-limit hazard as findFirstByUserIdCurrentOrderByEndDateDesc
+    // below — kept safe the same way even though a second QUEUED row shouldn't
+    // normally occur (application logic guards against it at creation time).
     @Query("SELECT m FROM Membership m WHERE m.userId = :userId AND m.status = 'QUEUED'")
-    Optional<Membership> findQueuedByUserId(@Param("userId") UUID userId);
+    List<Membership> findQueuedByUserId(@Param("userId") UUID userId, Pageable pageable);
+
+    default Optional<Membership> findQueuedByUserId(UUID userId) {
+        List<Membership> results = findQueuedByUserId(userId, PageRequest.of(0, 1));
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
 
     // Used by getAllStudents/getStudentDetails — a student's currently-relevant
     // membership is either ACTIVE or GRACE (lapsed, seat still held, dues owed).
+    //
+    // NOTE: unlike findFirstByUserIdAndStatusOrderByEndDateDesc/
+    // findFirstByUserIdOrderByEndDateDesc below (pure Spring-Data-derived
+    // queries, which Spring Data auto-limits to 1 row because it recognizes the
+    // "findFirst" keyword), this is a custom @Query method — Spring Data does
+    // NOT apply that same auto-limiting to @Query-annotated queries. A student
+    // with 2+ simultaneously ACTIVE/GRACE memberships (e.g. a duplicate
+    // admin-created booking) previously caused Hibernate to throw
+    // NonUniqueResultException here and take down the whole students list.
+    // Backed by a Pageable-limited query instead so it's safe regardless of
+    // how many rows actually match.
     @Query("""
         SELECT m FROM Membership m
         WHERE m.userId = :userId AND m.status IN ('ACTIVE', 'GRACE')
         ORDER BY m.endDate DESC
         """)
-    Optional<Membership> findFirstByUserIdCurrentOrderByEndDateDesc(@Param("userId") UUID userId);
+    List<Membership> findCurrentByUserIdOrderByEndDateDesc(@Param("userId") UUID userId, Pageable pageable);
+
+    default Optional<Membership> findFirstByUserIdCurrentOrderByEndDateDesc(UUID userId) {
+        List<Membership> results = findCurrentByUserIdOrderByEndDateDesc(userId, PageRequest.of(0, 1));
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
 
     // Used by getSeatMap — seats occupied by an ACTIVE membership (date-bound) or a
     // GRACE membership (held indefinitely until an admin releases it).
