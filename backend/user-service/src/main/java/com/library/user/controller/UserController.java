@@ -74,4 +74,14 @@ public class UserController {
         userService.deleteAadhaar(userId);
         return ResponseEntity.ok(ApiResponse.success("Aadhaar removed successfully"));
     }
+
+    // Called directly pod-to-pod by notification-service (bypasses the gateway,
+    // same pattern as membership-service's IdCardService fetching photo bytes) to
+    // host a generated payment-receipt PDF so it can be linked from WhatsApp.
+    @PostMapping(value = "/internal/receipts", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<ReceiptUploadResponse>> uploadReceipt(
+            @RequestParam("invoiceId") String invoiceId,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(ApiResponse.success(userService.uploadReceipt(invoiceId, file)));
+    }
 }

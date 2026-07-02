@@ -3,6 +3,7 @@ package com.library.admin.service;
 import com.library.admin.dto.*;
 import com.library.admin.entity.*;
 import com.library.admin.event.BroadcastNotificationEvent;
+import com.library.admin.event.PaymentReceiptEvent;
 import com.library.admin.exception.ResourceNotFoundException;
 import com.library.admin.repository.*;
 import jakarta.persistence.EntityManager;
@@ -465,6 +466,23 @@ public class AdminService {
                 .eventType("PENDING_FEE_CLEARED")
                 .build();
         kafkaTemplate.send("renewal-reminder", uid.toString(), studentEvent);
+
+        String invoiceId = "INV-" + LocalDate.now().toString().replace("-", "") + "-" +
+                UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+        PaymentReceiptEvent receiptEvent = PaymentReceiptEvent.builder()
+                .userId(uid.toString())
+                .userName(user.getName())
+                .userMobile(user.getMobile())
+                .userEmail(user.getEmail())
+                .invoiceId(invoiceId)
+                .paymentDate(LocalDate.now().toString())
+                .amountPaid(totalCleared)
+                .amountPending(BigDecimal.ZERO)
+                .seatNumber(seatNumber)
+                .paymentMethod("CASH")
+                .receiptType("DUES_CLEARED")
+                .build();
+        kafkaTemplate.send("payment-receipt", uid.toString(), receiptEvent);
 
         log.info("Pending fee cleared notifications queued for user '{}' (₹{})", user.getName(), totalCleared);
     }

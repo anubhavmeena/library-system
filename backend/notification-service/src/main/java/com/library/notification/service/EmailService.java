@@ -10,11 +10,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.Base64;
 import java.util.UUID;
 
 import com.library.notification.enums.Channel;
@@ -60,6 +62,87 @@ public class EmailService {
     public void sendHtml(String to, String subject, String htmlBody, String bcc,
                          String userId, String event) {
         send(to, subject, null, htmlBody, bcc, userId, event);
+    }
+
+    public void sendWithAttachment(String to, String subject, String body,
+                                   byte[] attachmentBytes, String attachmentFilename,
+                                   String userId, String event) {
+        String logBody = body;
+
+        // Dev mode: nothing configured → log to console only, no attachment sent
+        if (smtpHost.isBlank() && sendgridApiKey.isBlank()) {
+            log.info("[DEV] Email → {} | Subject: {} | Attachment: {} | Body:\n{}",
+                    to, subject, attachmentFilename, logBody);
+            saveLog(userId, to, logBody, event, DeliveryStatus.SENT, null);
+            return;
+        }
+
+        // 1. Try local SMTP (Postfix)
+        if (!smtpHost.isBlank() && mailSender != null) {
+            try {
+                MimeMessage msg = mailSender.createMimeMessage();
+                MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
+                helper.setFrom(fromEmail, fromName);
+                helper.setTo(to);
+                helper.setSubject(subject);
+                helper.setText(body, false);
+                helper.addAttachment(attachmentFilename, new ByteArrayResource(attachmentBytes));
+                mailSender.send(msg);
+                log.info("Email with attachment sent via SMTP to {} | Subject: {}", to, subject);
+                saveLog(userId, to, logBody, event, DeliveryStatus.SENT, null);
+                return;
+            } catch (Exception e) {
+                log.warn("SMTP send (with attachment) failed to {}, falling back to SendGrid: {}", to, e.getMessage());
+            }
+        }
+
+        // 2. Fallback: SendGrid REST API
+        if (sendgridApiKey.isBlank()) {
+            log.info("[DEV] Email (no SendGrid key) → {} | Subject: {} | Attachment: {}", to, subject, attachmentFilename);
+            saveLog(userId, to, logBody, event, DeliveryStatus.SENT, null);
+            return;
+        }
+
+        DeliveryStatus status = DeliveryStatus.SENT;
+        String errorMessage = null;
+
+        try {
+            Email   from    = new Email(fromEmail, fromName);
+            Email   toEmail = new Email(to);
+            Content content = new Content("text/plain", body);
+
+            Mail mail = new Mail(from, subject, toEmail, content);
+
+            Attachments attachment = new Attachments();
+            attachment.setContent(Base64.getEncoder().encodeToString(attachmentBytes));
+            attachment.setType("application/pdf");
+            attachment.setFilename(attachmentFilename);
+            attachment.setDisposition("attachment");
+            mail.addAttachments(attachment);
+
+            SendGrid sg  = new SendGrid(sendgridApiKey);
+            Request  req = new Request();
+            req.setMethod(Method.POST);
+            req.setEndpoint("mail/send");
+            req.setBody(mail.build());
+
+            Response response = sg.api(req);
+
+            if (response.getStatusCode() >= 400) {
+                status       = DeliveryStatus.FAILED;
+                errorMessage = "SendGrid HTTP " + response.getStatusCode() + ": " + response.getBody();
+                log.error("Email with attachment send failed to {}: {}", to, errorMessage);
+            } else {
+                log.info("Email with attachment sent via SendGrid to {} | Subject: {}", to, subject);
+            }
+
+        } catch (IOException e) {
+            status       = DeliveryStatus.FAILED;
+            errorMessage = e.getMessage();
+            log.error("Email with attachment send exception to {}: {}", to, e.getMessage());
+        }
+
+        saveLog(userId, to, logBody, event, status, errorMessage);
     }
 
     // ── Internal send ─────────────────────────────────────────────────────────

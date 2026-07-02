@@ -26,6 +26,7 @@ public class Payment {
     @Column(name = "payment_gateway")    private String paymentGateway;
     @Column(name = "gateway_order_id")   private String gatewayOrderId;
     @Column(name = "gateway_payment_id") private String gatewayPaymentId;
+    @Column(name = "invoice_id") private String invoiceId;
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)

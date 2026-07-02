@@ -146,6 +146,26 @@ public class UserService {
         return PhotoUploadResponse.builder().photoUrl(aadhaarUrl).message("Aadhaar uploaded successfully").build();
     }
 
+    // Internal, service-to-service only — called directly by notification-service
+    // (bypassing the gateway, same pattern as membership-service's IdCardService
+    // fetching photos) to host a generated payment-receipt PDF so it can be linked
+    // from a WhatsApp message. Not tied to a User entity field — each invoice gets
+    // its own file, nothing to overwrite or delete.
+    public ReceiptUploadResponse uploadReceipt(String invoiceId, MultipartFile file) throws IOException {
+        String safeInvoiceId = invoiceId.replaceAll("[^A-Za-z0-9\\-]", "");
+        if (safeInvoiceId.isBlank()) throw new IllegalArgumentException("Invalid invoice id.");
+
+        Path uploadPath = Paths.get(uploadDir, "receipts");
+        Files.createDirectories(uploadPath);
+
+        String fileName = safeInvoiceId + ".pdf";
+        Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+
+        String receiptUrl = "/uploads/receipts/" + fileName;
+        log.info("Receipt uploaded: {}", receiptUrl);
+        return ReceiptUploadResponse.builder().receiptUrl(receiptUrl).message("Receipt uploaded successfully").build();
+    }
+
     @Transactional
     public void deleteAadhaar(String userId) throws IOException {
         User user = findUser(userId);

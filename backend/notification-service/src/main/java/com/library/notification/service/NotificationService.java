@@ -2,15 +2,25 @@ package com.library.notification.service;
 
 import com.library.notification.dto.BookingConfirmedEvent;
 import com.library.notification.dto.BroadcastNotificationEvent;
+import com.library.notification.dto.PaymentReceiptEvent;
 import com.library.notification.dto.RenewalReminderEvent;
 import com.library.notification.dto.SeatAssistanceEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -19,12 +29,20 @@ public class NotificationService {
 
     private final WhatsAppService whatsAppService;
     private final EmailService    emailService;
+    private final ReceiptPdfService receiptPdfService;
+    private final RestTemplate    restTemplate;
 
     @Value("${notification.admin-email:admin@targetzone.co.in}")
     private String adminEmail;
 
     @Value("${notification.admin-whatsapp:}")
     private String adminWhatsapp;
+
+    @Value("${app.user-service.base-url}")
+    private String userServiceBaseUrl;
+
+    @Value("${app.frontend-url:https://targetzone.co.in}")
+    private String frontendUrl;
 
     private List<String> adminWhatsappNumbers() {
         if (!hasValue(adminWhatsapp)) return List.of();
@@ -303,6 +321,104 @@ public class NotificationService {
         );
 
         log.info("Pending fee cleared alert sent to admin for user: {} ({})", event.getUserName(), amount);
+    }
+
+    // ── Payment Receipt ───────────────────────────────────────────────────────
+    // Triggered by membership-service (online payment) and admin-service (cash
+    // payment / dues clearance) after a payment is confirmed. Generates a PDF,
+    // hosts it via user-service (so it can be linked from WhatsApp — Meta's Cloud
+    // API can't attach an arbitrary document to a plain text-template message
+    // outside an approved template or a live 24h customer session), and emails it
+    // as a real attachment to both the student and admin.
+
+    public void sendPaymentReceipt(PaymentReceiptEvent event) {
+        byte[] pdf = receiptPdfService.buildReceipt(event);
+        String attachmentName = (event.getInvoiceId() != null ? event.getInvoiceId() : "receipt") + ".pdf";
+        String receiptLink = uploadReceiptPdf(event.getInvoiceId(), pdf, attachmentName);
+
+        String label = "DUES_CLEARED".equals(event.getReceiptType()) ? "Dues Payment" : "Booking Payment";
+        String pending = event.getAmountPending() != null && event.getAmountPending().signum() > 0
+                ? "₹" + event.getAmountPending().stripTrailingZeros().toPlainString()
+                : "₹0";
+        String paid = event.getAmountPaid() != null
+                ? "₹" + event.getAmountPaid().stripTrailingZeros().toPlainString()
+                : "₹0";
+
+        String whatsappMsg = String.format(
+                "🧾 Payment Receipt — %s\n\n" +
+                        "Invoice : %s\n"          +
+                        "Date    : %s\n"          +
+                        "Paid    : %s\n"          +
+                        "Pending : %s\n"          +
+                        "%s"                      +
+                        "📚 Target Zone Library",
+                label,
+                event.getInvoiceId(),
+                event.getPaymentDate(),
+                paid, pending,
+                receiptLink != null ? "\n🔗 Download: " + receiptLink + "\n\n" : "\n"
+        );
+
+        String emailSubject = "Payment Receipt — Invoice " + event.getInvoiceId();
+        String emailBody = String.format(
+                "Dear %s,\n\n"                                        +
+                        "Please find attached your payment receipt.\n\n"     +
+                        "Invoice No.  : %s\n"                                 +
+                        "Date         : %s\n"                                 +
+                        "Amount Paid  : %s\n"                                 +
+                        "Amount Pending: %s\n\n"                              +
+                        "Best regards,\n"                                     +
+                        "Target Zone Library Team",
+                event.getUserName(), event.getInvoiceId(), event.getPaymentDate(), paid, pending
+        );
+
+        if (hasValue(event.getUserMobile())) {
+            whatsAppService.send(event.getUserMobile(), whatsappMsg, event.getUserId(), "PAYMENT_RECEIPT");
+        }
+        if (hasValue(event.getUserEmail())) {
+            emailService.sendWithAttachment(
+                    event.getUserEmail(), emailSubject, emailBody, pdf, attachmentName,
+                    event.getUserId(), "PAYMENT_RECEIPT");
+        }
+
+        for (String number : adminWhatsappNumbers()) {
+            whatsAppService.send(number, whatsappMsg, null, "PAYMENT_RECEIPT_ADMIN");
+        }
+        emailService.sendWithAttachment(
+                adminEmail, emailSubject + " — " + event.getUserName(), emailBody, pdf, attachmentName,
+                null, "PAYMENT_RECEIPT_ADMIN");
+
+        log.info("Payment receipt sent for user: {} invoice: {}", event.getUserId(), event.getInvoiceId());
+    }
+
+    private String uploadReceiptPdf(String invoiceId, byte[] pdf, String filename) {
+        try {
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add("invoiceId", invoiceId);
+            body.add("file", new ByteArrayResource(pdf) {
+                @Override
+                public String getFilename() {
+                    return filename;
+                }
+            });
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);
+
+            var resp = restTemplate.exchange(
+                    userServiceBaseUrl + "/api/users/internal/receipts",
+                    HttpMethod.POST, request, Map.class);
+
+            if (resp.getBody() != null && resp.getBody().get("data") instanceof Map<?, ?> data) {
+                Object url = data.get("receiptUrl");
+                if (url != null) return frontendUrl + url;
+            }
+        } catch (Exception e) {
+            log.warn("Could not host receipt PDF for invoice {} — WhatsApp message will omit the link: {}",
+                    invoiceId, e.getMessage());
+        }
+        return null;
     }
 
     // ── Broadcast (admin → all active members) ────────────────────────────────

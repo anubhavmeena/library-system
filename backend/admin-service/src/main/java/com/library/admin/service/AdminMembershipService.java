@@ -5,6 +5,7 @@ import com.library.admin.dto.CreateCashMembershipRequest;
 import com.library.admin.dto.MembershipDto;
 import com.library.admin.entity.*;
 import com.library.admin.event.BookingConfirmedEvent;
+import com.library.admin.event.PaymentReceiptEvent;
 import com.library.admin.exception.ResourceNotFoundException;
 import com.library.admin.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -125,6 +126,7 @@ public class AdminMembershipService {
                 .paymentGateway("CASH")
                 .gatewayOrderId(cashOrderId)
                 .status(Payment.Status.SUCCESS)
+                .invoiceId(generateInvoiceId())
                 .build();
         paymentRepository.save(payment);
 
@@ -160,7 +162,7 @@ public class AdminMembershipService {
                     .shift(resolvedShift)
                     .startDate(startDate.toString())
                     .endDate(endDate.toString())
-                    .amountPaid(plan.getPrice())
+                    .amountPaid(paidAmount)
                     .wifiName(settings != null ? settings.getWifiName() : null)
                     .wifiPassword(settings != null ? settings.getWifiPassword() : null)
                     .build();
@@ -170,7 +172,35 @@ public class AdminMembershipService {
                     membership.getId(), e.getMessage());
         }
 
+        try {
+            PaymentReceiptEvent receiptEvent = PaymentReceiptEvent.builder()
+                    .userId(student.getId().toString())
+                    .membershipId(membership.getId().toString())
+                    .userName(student.getName())
+                    .userMobile(student.getMobile())
+                    .userEmail(student.getEmail())
+                    .invoiceId(payment.getInvoiceId())
+                    .paymentDate(LocalDate.now().toString())
+                    .amountPaid(paidAmount)
+                    .amountPending(pendingAmount)
+                    .planName(plan.getName())
+                    .seatNumber(seat.getSeatNumber())
+                    .paymentMethod("CASH")
+                    .receiptType("NEW_BOOKING")
+                    .build();
+            kafkaTemplate.send("payment-receipt", student.getId().toString(), receiptEvent);
+        } catch (Exception e) {
+            log.warn("Failed to publish payment-receipt event for membership {}: {}",
+                    membership.getId(), e.getMessage());
+        }
+
         return MembershipDto.fromEntity(membership, plan.getName());
+    }
+
+    private String generateInvoiceId() {
+        String datePart = LocalDate.now().toString().replace("-", "");
+        String randPart = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+        return "INV-" + datePart + "-" + randPart;
     }
 
     @Transactional

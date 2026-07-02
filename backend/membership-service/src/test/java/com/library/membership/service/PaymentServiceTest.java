@@ -10,6 +10,7 @@ import com.library.membership.entity.Membership;
 import com.library.membership.entity.Payment;
 import com.library.membership.entity.Plan;
 import com.library.membership.event.BookingConfirmedEvent;
+import com.library.membership.event.PaymentReceiptEvent;
 import com.library.membership.exception.ResourceNotFoundException;
 import com.library.membership.repository.AppSettingsRepository;
 import com.library.membership.repository.MembershipRepository;
@@ -660,7 +661,7 @@ class PaymentServiceTest {
         paymentService.verifyAndActivateMembership(userId, req);
 
         ArgumentCaptor<BookingConfirmedEvent> cap = ArgumentCaptor.forClass(BookingConfirmedEvent.class);
-        verify(kafkaTemplate).send(anyString(), anyString(), cap.capture());
+        verify(kafkaTemplate).send(eq("booking-confirmed"), anyString(), cap.capture());
 
         BookingConfirmedEvent event = cap.getValue();
         assertThat(event.getUserId()).isEqualTo(userId);
@@ -674,6 +675,121 @@ class PaymentServiceTest {
         assertThat(event.getShift()).isEqualTo("FULL_DAY");
         assertThat(event.getAmountPaid()).isEqualByComparingTo(BigDecimal.valueOf(600));
         assertThat(event.getEventType()).isEqualTo("BOOKING_CONFIRMED");
+    }
+
+    @Test
+    void verify_success_publishesPaymentReceiptEvent() {
+        String orderId = "dev_order_receipt";
+        UUID memId = UUID.randomUUID();
+
+        Payment payment = buildSavedPayment(memId);
+        payment.setGatewayOrderId(orderId);
+        payment.setAmount(BigDecimal.valueOf(600));
+        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
+
+        Plan plan = buildFullDayPlan();
+        Membership membership = buildSavedMembership(memId, plan);
+        membership.setSeatNumber("B12");
+        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.save(any())).thenReturn(membership);
+
+        UserProfileDto userProfile = new UserProfileDto();
+        userProfile.setName("Ravi Kumar");
+        userProfile.setMobile("9876543210");
+        userProfile.setEmail("ravi@example.com");
+        UserApiResponse userApiResponse = new UserApiResponse();
+        userApiResponse.setData(userProfile);
+        when(restTemplate.exchange(anyString(), any(), any(), eq(UserApiResponse.class)))
+                .thenReturn(ResponseEntity.ok(userApiResponse));
+
+        PaymentVerifyRequest req = new PaymentVerifyRequest();
+        req.setGatewayOrderId(orderId);
+        req.setGatewayPaymentId("pay_receipt");
+
+        paymentService.verifyAndActivateMembership(userId, req);
+
+        ArgumentCaptor<PaymentReceiptEvent> cap = ArgumentCaptor.forClass(PaymentReceiptEvent.class);
+        verify(kafkaTemplate).send(eq("payment-receipt"), eq(userId), cap.capture());
+
+        PaymentReceiptEvent event = cap.getValue();
+        assertThat(event.getUserId()).isEqualTo(userId);
+        assertThat(event.getInvoiceId()).startsWith("INV-");
+        assertThat(event.getAmountPaid()).isEqualByComparingTo(BigDecimal.valueOf(600));
+        assertThat(event.getAmountPending()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(event.getReceiptType()).isEqualTo("NEW_BOOKING");
+        assertThat(payment.getInvoiceId()).isEqualTo(event.getInvoiceId());
+    }
+
+    // ── verifyAndPayDues ───────────────────────────────────────────────────────
+
+    @Test
+    void verifyAndPayDues_success_resumesGraceMembershipAndPublishesReceipt() {
+        String orderId = "dev_order_dues";
+        UUID memId = UUID.randomUUID();
+
+        Plan plan = buildFullDayPlan();
+        Membership membership = buildSavedMembership(memId, plan);
+        membership.setStatus(Membership.Status.GRACE);
+        membership.setDuesAmount(BigDecimal.valueOf(600));
+        membership.setEndDate(LocalDate.now().minusDays(5));
+        LocalDate originalEndDate = membership.getEndDate();
+
+        Payment payment = buildSavedPayment(memId);
+        payment.setGatewayOrderId(orderId);
+        payment.setAmount(BigDecimal.valueOf(600));
+        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
+        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UserProfileDto userProfile = new UserProfileDto();
+        userProfile.setName("Ravi Kumar");
+        userProfile.setMobile("9876543210");
+        userProfile.setEmail("ravi@example.com");
+        UserApiResponse userApiResponse = new UserApiResponse();
+        userApiResponse.setData(userProfile);
+        when(restTemplate.exchange(anyString(), any(), any(), eq(UserApiResponse.class)))
+                .thenReturn(ResponseEntity.ok(userApiResponse));
+
+        PaymentVerifyRequest req = new PaymentVerifyRequest();
+        req.setGatewayOrderId(orderId);
+        req.setGatewayPaymentId("pay_dues");
+
+        MembershipDto result = paymentService.verifyAndPayDues(userId, req);
+
+        assertThat(result.getStatus()).isEqualTo(Membership.Status.ACTIVE.name());
+        assertThat(membership.getDuesAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(membership.getEndDate()).isEqualTo(originalEndDate.plusDays(plan.getDurationDays()));
+        assertThat(payment.getInvoiceId()).startsWith("INV-");
+
+        ArgumentCaptor<PaymentReceiptEvent> cap = ArgumentCaptor.forClass(PaymentReceiptEvent.class);
+        verify(kafkaTemplate).send(eq("payment-receipt"), eq(userId), cap.capture());
+        PaymentReceiptEvent event = cap.getValue();
+        assertThat(event.getReceiptType()).isEqualTo("DUES_CLEARED");
+        assertThat(event.getAmountPaid()).isEqualByComparingTo(BigDecimal.valueOf(600));
+        assertThat(event.getAmountPending()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void verifyAndPayDues_membershipNotGrace_throwsIllegalArgument() {
+        String orderId = "dev_order_dues2";
+        UUID memId = UUID.randomUUID();
+
+        Plan plan = buildFullDayPlan();
+        Membership membership = buildSavedMembership(memId, plan);
+        membership.setStatus(Membership.Status.ACTIVE);
+
+        Payment payment = buildSavedPayment(memId);
+        payment.setGatewayOrderId(orderId);
+        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
+        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+
+        PaymentVerifyRequest req = new PaymentVerifyRequest();
+        req.setGatewayOrderId(orderId);
+        req.setGatewayPaymentId("pay_dues2");
+
+        assertThatThrownBy(() -> paymentService.verifyAndPayDues(userId, req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no longer awaiting dues");
     }
 
     @Test

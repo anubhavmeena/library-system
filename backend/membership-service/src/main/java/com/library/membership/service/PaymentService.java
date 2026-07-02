@@ -6,6 +6,7 @@ import com.library.membership.entity.Membership;
 import com.library.membership.entity.Payment;
 import com.library.membership.entity.Plan;
 import com.library.membership.event.BookingConfirmedEvent;
+import com.library.membership.event.PaymentReceiptEvent;
 import com.library.membership.exception.ResourceNotFoundException;
 import com.library.membership.repository.AppSettingsRepository;
 import com.library.membership.repository.MembershipRepository;
@@ -194,6 +195,7 @@ public class PaymentService {
 
         payment.setGatewayPaymentId(request.getGatewayPaymentId());
         payment.setStatus(Payment.Status.SUCCESS);
+        payment.setInvoiceId(generateInvoiceId());
         paymentRepository.save(payment);
 
         // 3. Activate or queue the membership depending on its start date
@@ -229,6 +231,9 @@ public class PaymentService {
         kafkaTemplate.send("booking-confirmed", userId, event);
         log.info("Published booking-confirmed Kafka event for user: {} membership: {}",
                 userId, membership.getId());
+
+        publishPaymentReceipt(userId, membership.getId().toString(), user, payment,
+                membership.getPlan().getName(), membership.getSeatNumber(), "NEW_BOOKING");
 
         return MembershipDto.fromEntity(membership);
     }
@@ -312,6 +317,7 @@ public class PaymentService {
 
         payment.setGatewayPaymentId(request.getGatewayPaymentId());
         payment.setStatus(Payment.Status.SUCCESS);
+        payment.setInvoiceId(generateInvoiceId());
         paymentRepository.save(payment);
 
         Membership membership = membershipRepository
@@ -331,6 +337,10 @@ public class PaymentService {
 
         log.info("Dues cleared for user {} — membership {} resumed, new endDate {}",
                 userId, membership.getId(), membership.getEndDate());
+
+        UserProfileDto user = fetchUserProfile(userId);
+        publishPaymentReceipt(userId, membership.getId().toString(), user, payment,
+                membership.getPlan().getName(), membership.getSeatNumber(), "DUES_CLEARED");
 
         return MembershipDto.fromEntity(membership);
     }
@@ -490,5 +500,36 @@ public class PaymentService {
                     userId, e.getMessage(), e);
         }
         return new UserProfileDto();
+    }
+
+    // ── Payment Receipt ───────────────────────────────────────────────────────
+
+    private String generateInvoiceId() {
+        String datePart = LocalDate.now().toString().replace("-", "");
+        String randPart = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+        return "INV-" + datePart + "-" + randPart;
+    }
+
+    private void publishPaymentReceipt(String userId, String membershipId, UserProfileDto user,
+                                        Payment payment, String planName, String seatNumber,
+                                        String receiptType) {
+        PaymentReceiptEvent event = PaymentReceiptEvent.builder()
+                .userId(userId)
+                .membershipId(membershipId)
+                .userName(user.getName())
+                .userMobile(user.getMobile())
+                .userEmail(user.getEmail())
+                .invoiceId(payment.getInvoiceId())
+                .paymentDate(LocalDate.now().toString())
+                .amountPaid(payment.getAmount())
+                .amountPending(BigDecimal.ZERO)
+                .planName(planName)
+                .seatNumber(seatNumber)
+                .paymentMethod(payment.getPaymentGateway())
+                .receiptType(receiptType)
+                .build();
+
+        kafkaTemplate.send("payment-receipt", userId, event);
+        log.info("Published payment-receipt Kafka event for user: {} invoice: {}", userId, payment.getInvoiceId());
     }
 }

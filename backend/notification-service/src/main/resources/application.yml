@@ -35,6 +35,11 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
 
+app:
+  user-service:
+    base-url: ${USER_SERVICE_URL:http://localhost:8082}
+  frontend-url: ${FRONTEND_URL:https://targetzone.co.in}
+
 meta:
   whatsapp:
     token:           ${META_WHATSAPP_TOKEN:}

@@ -2,6 +2,7 @@ package com.library.notification.consumer;
 
 import com.library.notification.dto.BookingConfirmedEvent;
 import com.library.notification.dto.BroadcastNotificationEvent;
+import com.library.notification.dto.PaymentReceiptEvent;
 import com.library.notification.dto.RenewalReminderEvent;
 import com.library.notification.dto.SeatAssistanceEvent;
 import com.library.notification.service.NotificationService;
@@ -135,6 +136,30 @@ public class NotificationConsumer {
             notificationService.sendRenewalReminder(event);
         } catch (Exception e) {
             log.error("Failed to process renewal-reminder for user {}: {}",
+                    event.getUserId(), e.getMessage(), e);
+        }
+    }
+
+    // ── payment-receipt → PDF receipt to student + admin ───────────────────────
+    // Published by membership-service (online payment) and admin-service (cash
+    // payment / dues clearance) after a payment is confirmed
+
+    @KafkaListener(
+            topics = "payment-receipt",
+            groupId = "notification-receipt-group",
+            containerFactory = "receiptKafkaListenerContainerFactory"
+    )
+    public void handlePaymentReceipt(
+            @Payload PaymentReceiptEvent event,
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(KafkaHeaders.OFFSET) long offset) {
+
+        log.info("Consumed [{}] offset={} userId={} invoiceId={}",
+                topic, offset, event.getUserId(), event.getInvoiceId());
+        try {
+            notificationService.sendPaymentReceipt(event);
+        } catch (Exception e) {
+            log.error("Failed to process payment-receipt for user {}: {}",
                     event.getUserId(), e.getMessage(), e);
         }
     }
