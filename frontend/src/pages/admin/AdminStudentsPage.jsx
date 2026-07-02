@@ -144,6 +144,20 @@ export default function AdminStudentsPage() {
         return '—'
     }
 
+    // Fetches fresh details (not the list row, which lacks plan info — see
+    // AdminService.getAllStudents vs getStudentDetails) before opening the modal.
+    const openStudentDetail = async (student) => {
+        setEditMode(false)
+        try {
+            const res = await api.get(`/admin/students/${student.id}`)
+            const full = res.data.data
+            setDetail(full)
+            setEditForm({ name: full.name||'', mobile: full.mobile||'', email: full.email||'', address: full.address||'', gender: full.gender||'', dateOfBirth: full.dateOfBirth||'', joinedAt: full.joinedAt?.split('T')[0]||'', seatNumber: full.seatNumber||'', planId: full.membershipPlanId||'' })
+        } catch {
+            toast.error('Failed to load student details')
+        }
+    }
+
     const openChangeSeat = async (student) => {
         setChangeSeatFor(student)
         setNewSeat(null)
@@ -333,11 +347,7 @@ export default function AdminStudentsPage() {
                                     </td>
                                     <td className="p-4">
                                         <div className="flex items-center gap-2">
-                                            <button onClick={() => {
-                                                setDetail(s)
-                                                setEditMode(false)
-                                                setEditForm({ name: s.name||'', mobile: s.mobile||'', email: s.email||'', address: s.address||'', gender: s.gender||'', dateOfBirth: s.dateOfBirth||'', joinedAt: s.joinedAt?.split('T')[0]||'', seatNumber: s.seatNumber||'', planId: s.membershipPlanId||'' })
-                                            }}
+                                            <button onClick={() => openStudentDetail(s)}
                                                     className="text-xs px-3 py-1.5 rounded-lg bg-primary-700/50 text-primary-300 hover:text-white border border-primary-700/40 transition-all">
                                                 {t('adminStudents.view')}
                                             </button>
