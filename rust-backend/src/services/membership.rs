@@ -11,6 +11,9 @@ use rust_decimal::Decimal;
 use std::sync::Arc;
 use uuid::Uuid;
 
+/// Flat convenience fee (in rupees) charged on top of the plan price at checkout.
+const CONVENIENCE_FEE: Decimal = Decimal::from_parts(15, 0, 0, false, 0);
+
 pub async fn list_active_plans(
     state: &Arc<AppState>,
 ) -> crate::error::Result<Vec<MembershipPlan>> {
@@ -201,6 +204,8 @@ pub async fn create_order(
     .fetch_one(&state.db)
     .await?;
 
+    let charge_amount = plan.price + CONVENIENCE_FEE;
+
     let order = payment::create_order(
         state,
         membership.id,
@@ -208,7 +213,7 @@ pub async fn create_order(
         user.mobile.as_deref(),
         user.email.as_deref(),
         &user.name,
-        plan.price,
+        charge_amount,
     )
     .await?;
 
@@ -218,7 +223,7 @@ pub async fn create_order(
     )
     .bind(membership.id)
     .bind(user_id)
-    .bind(plan.price)
+    .bind(charge_amount)
     .bind(&order.gateway)
     .bind(&order.order_id)
     .execute(&state.db)
