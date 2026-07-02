@@ -326,13 +326,9 @@ public class NotificationService {
     // ── Payment Receipt ───────────────────────────────────────────────────────
     // Triggered by membership-service (online payment) and admin-service (cash
     // payment / dues clearance) after a payment is confirmed. Generates a PDF,
-    // hosts it via user-service (so a link is available if ever needed), sends a
-    // WhatsApp notification via the approved "payment_receipt" template to both
-    // student and admin, and emails the PDF as a real attachment. NOTE: the
-    // WhatsApp copy is text-only, NOT a real document attachment — the
-    // "payment_receipt" template's actual approved header is static TEXT, not a
-    // Document-media header (see WhatsAppService.sendDocumentTemplate's comment
-    // for the full story) — only the email carries the actual PDF file.
+    // hosts it via user-service (so it has a public URL Meta can fetch), sends
+    // it as a real WhatsApp document attachment via the approved "payment_receipt"
+    // template (to both student and admin), and emails it as a real attachment too.
 
     public void sendPaymentReceipt(PaymentReceiptEvent event) {
         byte[] pdf = receiptPdfService.buildReceipt(event);
