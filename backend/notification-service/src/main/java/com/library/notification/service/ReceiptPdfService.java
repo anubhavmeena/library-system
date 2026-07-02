@@ -10,17 +10,33 @@ import org.springframework.stereotype.Service;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.math.BigDecimal;
 
 @Slf4j
 @Service
 public class ReceiptPdfService {
 
-    private static final Color HEADER_BG = new Color(0x0d, 0x1b, 0x4b);
-    private static final Font TITLE_FONT  = new Font(Font.HELVETICA, 18, Font.BOLD, Color.WHITE);
+    private static final Color HEADER_BG   = new Color(0x0d, 0x1b, 0x4b);
+    private static final Color BORDER_GRAY = new Color(0xd0, 0xd0, 0xd0);
+    private static final Font TITLE_FONT  = new Font(Font.HELVETICA, 16, Font.BOLD, Color.WHITE);
     private static final Font LABEL_FONT  = new Font(Font.HELVETICA, 10, Font.BOLD, Color.DARK_GRAY);
     private static final Font VALUE_FONT  = new Font(Font.HELVETICA, 10, Font.NORMAL, Color.BLACK);
     private static final Font FOOTER_FONT = new Font(Font.HELVETICA, 8, Font.ITALIC, Color.GRAY);
+
+    private static final float LOGO_SIZE = 32f;
+
+    // Loaded once at class-init time — immutable byte[], safe to reuse across
+    // requests (a fresh Image wrapper is built per-PDF in buildReceipt()).
+    private static final byte[] LOGO_BYTES = loadLogoBytes();
+
+    private static byte[] loadLogoBytes() {
+        try (InputStream in = ReceiptPdfService.class.getResourceAsStream("/tz-logo.png")) {
+            return in != null ? in.readAllBytes() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
     public byte[] buildReceipt(PaymentReceiptEvent event) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
@@ -28,21 +44,13 @@ public class ReceiptPdfService {
             PdfWriter.getInstance(doc, baos);
             doc.open();
 
-            Paragraph header = new Paragraph("TARGET ZONE LIBRARY\nPayment Receipt", TITLE_FONT);
-            header.setAlignment(Element.ALIGN_CENTER);
-            PdfPTable headerTable = new PdfPTable(1);
-            headerTable.setWidthPercentage(100);
-            PdfPCell headerCell = new PdfPCell(header);
-            headerCell.setBackgroundColor(HEADER_BG);
-            headerCell.setPadding(14);
-            headerCell.setBorder(Rectangle.NO_BORDER);
-            headerTable.addCell(headerCell);
-            doc.add(headerTable);
+            doc.add(buildHeader());
             doc.add(new Paragraph(" "));
 
             addRow(doc, "Invoice No.", nvl(event.getInvoiceId()));
             addRow(doc, "Date", nvl(event.getPaymentDate()));
             addRow(doc, "Student Name", nvl(event.getUserName()));
+            addRow(doc, "Phone", nvl(event.getUserMobile()));
             if (hasValue(event.getPlanName()))   addRow(doc, "Plan", event.getPlanName());
             if (hasValue(event.getSeatNumber())) addRow(doc, "Seat", event.getSeatNumber());
             addRow(doc, "Payment Method", nvl(event.getPaymentMethod()));
@@ -72,12 +80,42 @@ public class ReceiptPdfService {
         }
     }
 
+    private PdfPTable buildHeader() throws Exception {
+        Image logo = (LOGO_BYTES != null) ? Image.getInstance(LOGO_BYTES) : null;
+
+        PdfPTable headerTable = new PdfPTable(logo != null ? 2 : 1);
+        headerTable.setWidthPercentage(100);
+        if (logo != null) headerTable.setWidths(new float[]{1f, 6f});
+
+        if (logo != null) {
+            logo.scaleToFit(LOGO_SIZE, LOGO_SIZE);
+            PdfPCell logoCell = new PdfPCell(logo, false);
+            logoCell.setBackgroundColor(HEADER_BG);
+            logoCell.setBorder(Rectangle.NO_BORDER);
+            logoCell.setPadding(10);
+            logoCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            logoCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            headerTable.addCell(logoCell);
+        }
+
+        Paragraph title = new Paragraph("TARGET ZONE LIBRARY\nPayment Receipt", TITLE_FONT);
+        title.setAlignment(logo != null ? Element.ALIGN_LEFT : Element.ALIGN_CENTER);
+        PdfPCell titleCell = new PdfPCell(title);
+        titleCell.setBackgroundColor(HEADER_BG);
+        titleCell.setBorder(Rectangle.NO_BORDER);
+        titleCell.setPadding(14);
+        titleCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        headerTable.addCell(titleCell);
+
+        return headerTable;
+    }
+
     private void addRow(Document doc, String label, String value) throws DocumentException {
         PdfPTable row = new PdfPTable(2);
         row.setWidthPercentage(100);
         row.setWidths(new float[]{1f, 2f});
-        row.addCell(borderless(label, LABEL_FONT));
-        row.addCell(borderless(value, VALUE_FONT));
+        row.addCell(bordered(label, LABEL_FONT));
+        row.addCell(bordered(value, VALUE_FONT));
         doc.add(row);
     }
 
@@ -85,16 +123,18 @@ public class ReceiptPdfService {
         // "Rs." not the rupee glyph — the default Helvetica/WinAnsi font used here
         // (same as IdCardService's formatPaid()) can't render the ₹ symbol.
         String display = "Rs. " + (amount != null ? amount.stripTrailingZeros().toPlainString() : "0");
-        table.addCell(borderless(label, LABEL_FONT));
-        PdfPCell valueCell = borderless(display, VALUE_FONT);
+        table.addCell(bordered(label, LABEL_FONT));
+        PdfPCell valueCell = bordered(display, VALUE_FONT);
         valueCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
         table.addCell(valueCell);
     }
 
-    private PdfPCell borderless(String text, Font font) {
+    private PdfPCell bordered(String text, Font font) {
         PdfPCell cell = new PdfPCell(new Phrase(text, font));
-        cell.setBorder(Rectangle.NO_BORDER);
-        cell.setPadding(4);
+        cell.setBorder(Rectangle.BOX);
+        cell.setBorderColor(BORDER_GRAY);
+        cell.setBorderWidth(0.5f);
+        cell.setPadding(5);
         return cell;
     }
 
