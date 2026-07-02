@@ -71,7 +71,10 @@ const authSlice = createSlice({
             .addCase(verifyOtp.pending,   (state) => { state.isLoading = true; state.error = null })
             .addCase(verifyOtp.fulfilled, (state, a) => {
                 state.isLoading = false; state.otpVerified = true
-                state.sessionToken = a.payload.sessionToken; state.isNewUser = a.payload.isNewUser
+                // Backend field is `isNewUser` (boolean) but Lombok's getter for an
+                // "is"-prefixed boolean is isNewUser(), which Jackson serializes by
+                // stripping the "is" prefix — so the JSON key is actually "newUser".
+                state.sessionToken = a.payload.sessionToken; state.isNewUser = a.payload.newUser
             })
             .addCase(verifyOtp.rejected,  (state, a) => { state.isLoading = false; state.error = a.payload })
 

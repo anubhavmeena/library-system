@@ -74,7 +74,9 @@ export default function LoginPage() {
         const verifyRes = await dispatch(verifyOtp({ contact: contact.trim(), otp }))
         if (!verifyOtp.fulfilled.match(verifyRes)) return toast.error(verifyRes.payload || 'Invalid OTP')
 
-        if (verifyRes.payload.isNewUser) {
+        // API returns this as "newUser" (Jackson strips the "is" prefix off the
+        // Lombok-generated isNewUser() getter) — see authSlice.js's verifyOtp case.
+        if (verifyRes.payload.newUser) {
             setStep(3)
         } else {
             const loginRes = await dispatch(loginUser({ sessionToken: verifyRes.payload.sessionToken }))
