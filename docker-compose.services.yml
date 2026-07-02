@@ -280,6 +280,7 @@ services:
       META_RECEIPT_TEMPLATE_NAME:    ${META_RECEIPT_TEMPLATE_NAME:-payment_receipt}
       META_WHATSAPP_API_VERSION:     ${META_WHATSAPP_API_VERSION:-v21.0}
       META_WHATSAPP_LANGUAGE:        ${META_WHATSAPP_LANGUAGE:-en_US}
+      META_RECEIPT_LANGUAGE:         ${META_RECEIPT_LANGUAGE:-en}
     networks:
       - library-network
     healthcheck:

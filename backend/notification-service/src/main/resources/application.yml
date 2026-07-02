@@ -48,6 +48,7 @@ meta:
     template-name:          ${META_NOTIFICATION_TEMPLATE_NAME:library_notification}
     receipt-template-name:  ${META_RECEIPT_TEMPLATE_NAME:payment_receipt}
     language:               ${META_WHATSAPP_LANGUAGE:en_US}
+    receipt-language:       ${META_RECEIPT_LANGUAGE:en}
 
 twilio:
   account-sid:   ${TWILIO_ACCOUNT_SID:}

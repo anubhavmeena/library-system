@@ -45,6 +45,13 @@ public class WhatsAppService {
     @Value("${meta.whatsapp.receipt-template-name:payment_receipt}")
     private String receiptTemplateName;
 
+    // "payment_receipt" was created under plain English ("en"), not English (US)
+    // ("en_US") like the other template — Meta requires an exact language-code
+    // match per template or the send fails with a template-not-found error, so
+    // this is intentionally a separate property from metaLanguage above.
+    @Value("${meta.whatsapp.receipt-language:en}")
+    private String receiptLanguage;
+
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     private boolean metaEnabled = false;
@@ -146,7 +153,7 @@ public class WhatsAppService {
                         "type", "template",
                         "template", Map.of(
                                 "name", receiptTemplateName,
-                                "language", Map.of("code", metaLanguage),
+                                "language", Map.of("code", receiptLanguage),
                                 "components", List.of(
                                         Map.of("type", "header",
                                                "parameters", List.of(

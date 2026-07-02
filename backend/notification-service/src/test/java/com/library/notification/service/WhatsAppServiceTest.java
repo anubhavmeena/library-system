@@ -37,6 +37,7 @@ class WhatsAppServiceTest {
         ReflectionTestUtils.setField(whatsAppService, "metaTemplateName", "library_notification");
         ReflectionTestUtils.setField(whatsAppService, "receiptTemplateName", "payment_receipt");
         ReflectionTestUtils.setField(whatsAppService, "metaLanguage", "en_US");
+        ReflectionTestUtils.setField(whatsAppService, "receiptLanguage", "en");
         // metaEnabled starts false (field default)
     }
 
