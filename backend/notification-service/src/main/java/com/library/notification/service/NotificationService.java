@@ -489,6 +489,7 @@ public class NotificationService {
                         "📅 From   : %s\n"                            +
                         "📅 To     : %s\n"                            +
                         "💰 Paid   : ₹%.0f\n"                         +
+                        "%s"                                          +
                         "━━━━━━━━━━━━━━━━━━━━\n\n"                    +
                         "Please carry a valid ID on your first visit.\n\n" +
                         "📍 Happy studying! — Target Zone Library",
@@ -498,7 +499,8 @@ public class NotificationService {
                 formatShift(e.getShift()),
                 e.getStartDate(),
                 e.getEndDate(),
-                e.getAmountPaid()
+                e.getAmountPaid(),
+                wifiWhatsAppBlock(e)
         );
     }
 
@@ -514,6 +516,7 @@ public class NotificationService {
                         "Start Date  : %s\n"                                      +
                         "End Date    : %s\n"                                      +
                         "Amount Paid : ₹%.0f\n\n"                                 +
+                        "%s"                                                      +
                         "Library Timings:\n"                                      +
                         "  Morning Shift : 6:00 AM – 2:00 PM\n"                  +
                         "  Evening Shift : 2:00 PM – 10:00 PM\n\n"               +
@@ -527,8 +530,25 @@ public class NotificationService {
                 formatShift(e.getShift()),
                 e.getStartDate(),
                 e.getEndDate(),
-                e.getAmountPaid()
+                e.getAmountPaid(),
+                wifiEmailBlock(e)
         );
+    }
+
+    // Both blank → admin hasn't configured WiFi yet, omit the block entirely
+    // rather than printing an empty "WiFi Name: / Password:" line.
+    private String wifiWhatsAppBlock(BookingConfirmedEvent e) {
+        if (!hasValue(e.getWifiName()) && !hasValue(e.getWifiPassword())) return "";
+        return String.format("📶 WiFi   : %s\n🔑 Password: %s\n",
+                hasValue(e.getWifiName())     ? e.getWifiName()     : "N/A",
+                hasValue(e.getWifiPassword()) ? e.getWifiPassword() : "N/A");
+    }
+
+    private String wifiEmailBlock(BookingConfirmedEvent e) {
+        if (!hasValue(e.getWifiName()) && !hasValue(e.getWifiPassword())) return "";
+        return String.format("WiFi Name     : %s\nWiFi Password : %s\n\n",
+                hasValue(e.getWifiName())     ? e.getWifiName()     : "N/A",
+                hasValue(e.getWifiPassword()) ? e.getWifiPassword() : "N/A");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

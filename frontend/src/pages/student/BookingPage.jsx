@@ -344,7 +344,7 @@ export default function BookingPage() {
                             ))}
                             <div className="flex justify-between items-center pt-2">
                                 <span className="text-white font-semibold">{t('booking.summary.totalAmount')}</span>
-                                <span className="text-2xl font-bold text-amber-400">₹{selectedPlan.price}</span>
+                                <span className="text-2xl font-bold text-amber-400">₹{selectedPlan.price + (selectedPlan.convenienceFee || 0)}</span>
                             </div>
                         </div>
                     </div>
@@ -352,7 +352,7 @@ export default function BookingPage() {
                         {t('booking.summary.disclaimer')}
                     </div>
                     <button onClick={handlePayment} disabled={paying} className="btn-primary w-full py-4 text-base mb-3">
-                        {paying ? t('booking.summary.processing') : t('booking.summary.payBtn', { amount: selectedPlan.price })}
+                        {paying ? t('booking.summary.processing') : t('booking.summary.payBtn', { amount: selectedPlan.price + (selectedPlan.convenienceFee || 0) })}
                     </button>
                     <button onClick={()=>setStep(2)} className="w-full text-primary-400 text-sm hover:text-white transition-colors">{t('booking.summary.changeSeat')}</button>
                 </div>

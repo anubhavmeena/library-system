@@ -17,13 +17,6 @@ import java.time.temporal.ChronoUnit;
  */
 public final class StudentStatusResolver {
 
-    // Display-only threshold splitting GRACE into "Grace" vs "Expired" labels.
-    // No DB enum change and no scheduler enforcement — GRACE stays open-ended
-    // in the DB until an admin calls AdminMembershipService.releaseSeat().
-    // Keep the native SQL predicate in AdminService.getAllStudents() in sync
-    // with this value.
-    public static final long GRACE_DISPLAY_DAYS = 10;
-
     public enum Status { NEW, PAID, PENDING, GRACE, EXPIRED, RELEASED }
 
     private StudentStatusResolver() {}
@@ -33,12 +26,16 @@ public final class StudentStatusResolver {
      * @param currentPayment the Payment linked to {@code current}, or null — ignored when current is null
      * @param latestEver     the student's latest membership row of any status — only consulted when
      *                       current is null; pass null when current is non-null
+     * @param graceDays      the admin-configured grace-period length (AppSettings.graceDays) — the
+     *                       display-only threshold splitting GRACE into "Grace" vs "Expired" labels.
+     *                       No DB enum change and no scheduler enforcement — GRACE stays open-ended
+     *                       in the DB until an admin calls AdminMembershipService.releaseSeat().
      */
-    public static Status resolve(Membership current, Payment currentPayment, Membership latestEver) {
+    public static Status resolve(Membership current, Payment currentPayment, Membership latestEver, long graceDays) {
         if (current != null) {
             if (current.getStatus() == Membership.Status.GRACE) {
                 long daysOverdue = ChronoUnit.DAYS.between(current.getEndDate(), LocalDate.now());
-                return daysOverdue > GRACE_DISPLAY_DAYS ? Status.EXPIRED : Status.GRACE;
+                return daysOverdue > graceDays ? Status.EXPIRED : Status.GRACE;
             }
             boolean hasPendingBalance = currentPayment != null
                     && currentPayment.getPendingAmount() != null

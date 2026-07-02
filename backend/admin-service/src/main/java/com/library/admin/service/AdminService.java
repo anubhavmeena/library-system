@@ -32,6 +32,7 @@ public class AdminService {
     private final PlanRepository              planRepository;
     private final BroadcastMessageRepository  broadcastMessageRepository;
     private final VisitorEventRepository       visitorEventRepository;
+    private final AppSettingsRepository       appSettingsRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final EntityManager entityManager;
 
@@ -93,6 +94,7 @@ public class AdminService {
                                          String search, String sortBy, String sortDir) {
         String safeSortCol = SORT_COLUMNS.getOrDefault(sortBy, "u.created_at");
         String safeSortDir = "asc".equalsIgnoreCase(sortDir) ? "ASC" : "DESC";
+        int graceDays = currentGraceDays();
 
         // membershipStatus mirrors StudentStatusResolver's 6-value display status
         // (NEW/PAID/PENDING/GRACE/EXPIRED/RELEASED) — the filtering MUST happen here
@@ -113,11 +115,11 @@ public class AdminService {
                 )
                 WHERE u.role = 'STUDENT'
                   AND (CAST(:membershipStatus AS VARCHAR) IS NULL
-                       -- keep the "10" below in sync with StudentStatusResolver.GRACE_DISPLAY_DAYS
+                       -- graceDays comes from AppSettings, fetched once above via currentGraceDays()
                        OR (CAST(:membershipStatus AS VARCHAR) = 'GRACE'
-                           AND m.status = 'GRACE' AND (CURRENT_DATE - m.end_date) <= 10)
+                           AND m.status = 'GRACE' AND (CURRENT_DATE - m.end_date) <= %1$d)
                        OR (CAST(:membershipStatus AS VARCHAR) = 'EXPIRED'
-                           AND m.status = 'GRACE' AND (CURRENT_DATE - m.end_date) > 10)
+                           AND m.status = 'GRACE' AND (CURRENT_DATE - m.end_date) > %1$d)
                        OR (CAST(:membershipStatus AS VARCHAR) = 'PAID'
                            AND m.status = 'ACTIVE' AND (p.pending_amount IS NULL OR p.pending_amount <= 0))
                        OR (CAST(:membershipStatus AS VARCHAR) = 'PENDING'
@@ -127,9 +129,9 @@ public class AdminService {
                        OR (CAST(:membershipStatus AS VARCHAR) = 'NEW'
                            AND m.id IS NULL AND (le.id IS NULL OR le.status NOT IN ('EXPIRED', 'CANCELLED'))))
                   AND (CAST(:search AS VARCHAR) IS NULL
-                       OR LOWER(u.name)  LIKE LOWER(CONCAT('%', CAST(:search AS VARCHAR), '%'))
-                       OR u.mobile       LIKE CONCAT('%', CAST(:search AS VARCHAR), '%'))
-                """;
+                       OR LOWER(u.name)  LIKE LOWER(CONCAT('%%', CAST(:search AS VARCHAR), '%%'))
+                       OR u.mobile       LIKE CONCAT('%%', CAST(:search AS VARCHAR), '%%'))
+                """.formatted(graceDays);
 
         @SuppressWarnings("unchecked")
         List<User> users = entityManager
@@ -167,7 +169,7 @@ public class AdminService {
                     dto.setMembershipStatus("EXPIRED");
                 }
             }
-            dto.setDisplayStatus(StudentStatusResolver.resolve(mem, currentPayment, latestEver).name());
+            dto.setDisplayStatus(StudentStatusResolver.resolve(mem, currentPayment, latestEver, graceDays).name());
             return dto;
         }).collect(Collectors.toList());
         return new StudentListDto(students, total);
@@ -205,7 +207,7 @@ public class AdminService {
                 dto.setMembershipEnd(latestEver.getEndDate().toString());
             }
         }
-        dto.setDisplayStatus(StudentStatusResolver.resolve(mem, currentPayment, latestEver).name());
+        dto.setDisplayStatus(StudentStatusResolver.resolve(mem, currentPayment, latestEver, currentGraceDays()).name());
         return dto;
     }
 
@@ -388,6 +390,7 @@ public class AdminService {
     // ── Pending Fees ──────────────────────────────────────────────────────────
 
     public List<StudentDto> getStudentsWithPendingFees() {
+        int graceDays = currentGraceDays();
         List<Payment> pending = paymentRepository.findByPendingAmountGreaterThan(BigDecimal.ZERO);
         Set<UUID> membershipIds = pending.stream().map(Payment::getMembershipId).collect(Collectors.toSet());
         if (membershipIds.isEmpty()) return List.of();
@@ -412,7 +415,7 @@ public class AdminService {
                         dto.setPaymentMode("CASH".equalsIgnoreCase(pay.getPaymentGateway()) ? "CASH" : "ONLINE");
                         dto.setPendingAmount(pay.getPendingAmount());
                     }
-                    dto.setDisplayStatus(StudentStatusResolver.resolve(m, pay, null).name());
+                    dto.setDisplayStatus(StudentStatusResolver.resolve(m, pay, null, graceDays).name());
                     return dto;
                 })
                 .sorted(Comparator.comparing(StudentDto::getPendingAmount,
@@ -681,5 +684,13 @@ public class AdminService {
                 .stream()
                 .map(BroadcastHistoryDto::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    // ── Settings-backed values ────────────────────────────────────────────────
+
+    private int currentGraceDays() {
+        return appSettingsRepository.findById(1L)
+                .map(AppSettings::getGraceDays)
+                .orElse(AppSettingsService.DEFAULT_GRACE_DAYS);
     }
 }

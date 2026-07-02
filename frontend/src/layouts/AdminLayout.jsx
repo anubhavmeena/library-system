@@ -34,6 +34,7 @@ export default function AdminLayout() {
         { to: '/admin/import',          icon: '⬆', label: t('admin.sidebar.nav.importStudents') },
         { to: '/admin/gallery',         icon: '◼', label: t('admin.sidebar.nav.gallery') },
         { to: '/admin/inbox',           icon: '✉', label: t('admin.sidebar.nav.inbox'), badge: inboxUnread },
+        { to: '/admin/settings',        icon: '⚙', label: t('admin.sidebar.nav.settings') },
     ]
 
     return (

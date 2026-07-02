@@ -358,7 +358,7 @@ export default function MembershipPage() {
                             </div>
                             <button onClick={handleQueuePayment} disabled={queuePaying}
                                     className="btn-primary text-sm px-6 py-2.5">
-                                {queuePaying ? 'Processing...' : `Pay ₹${selectedQueuePlan.price}`}
+                                {queuePaying ? 'Processing...' : `Pay ₹${selectedQueuePlan.price + (selectedQueuePlan.convenienceFee || 0)}`}
                             </button>
                         </div>
                     )}

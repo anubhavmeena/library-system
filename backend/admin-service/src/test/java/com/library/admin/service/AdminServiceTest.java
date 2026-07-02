@@ -29,6 +29,7 @@ class AdminServiceTest {
     @Mock PaymentRepository        paymentRepository;
     @Mock PlanRepository           planRepository;
     @Mock VisitorEventRepository   visitorEventRepository;
+    @Mock AppSettingsRepository    appSettingsRepository;
     @Mock KafkaTemplate<String, Object> kafkaTemplate;
     @Mock EntityManager            entityManager;
     @Mock Query                    dataQuery;

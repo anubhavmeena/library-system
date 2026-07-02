@@ -2,6 +2,7 @@ package com.library.membership.service;
 
 import com.library.membership.dto.PlanDto;
 import com.library.membership.entity.Plan;
+import com.library.membership.repository.AppSettingsRepository;
 import com.library.membership.repository.PlanRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +21,7 @@ import static org.mockito.Mockito.*;
 class PlanServiceTest {
 
     @Mock  PlanRepository planRepository;
+    @Mock  AppSettingsRepository appSettingsRepository;
     @InjectMocks PlanService planService;
 
     private Plan buildPlan(String name, Plan.PlanType type) {

@@ -183,7 +183,8 @@
         "revenue": "Revenue",
         "importStudents": "Import Students",
         "gallery": "Photo Gallery",
-        "inbox": "Inbox"
+        "inbox": "Inbox",
+        "settings": "Settings"
       },
       "logout": "Logout"
     }
@@ -847,6 +848,24 @@
     "saved": "Expenses saved successfully",
     "loadFailed": "Failed to load expenses",
     "saveFailed": "Failed to save expenses"
+  },
+  "adminSettings": {
+    "title": "Settings",
+    "subtitle": "Global configuration for the library",
+    "wifiSection": "WiFi",
+    "wifiName": "WiFi Name",
+    "wifiPassword": "WiFi Password",
+    "gracePeriodSection": "Grace Period",
+    "graceDays": "Grace Period (days)",
+    "convenienceFeeSection": "Convenience Fee",
+    "convenienceFee": "Convenience Fee (₹)",
+    "waterTankerSection": "Water Tanker",
+    "waterTankerRate": "Water Tanker Rate (₹)",
+    "save": "Save Settings",
+    "saving": "Saving…",
+    "saved": "Settings saved successfully",
+    "loadFailed": "Failed to load settings",
+    "saveFailed": "Failed to save settings"
   },
   "adminRevenue": {
     "title": "Revenue Report",

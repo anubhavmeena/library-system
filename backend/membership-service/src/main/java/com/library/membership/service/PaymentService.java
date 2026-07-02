@@ -1,11 +1,13 @@
 package com.library.membership.service;
 
 import com.library.membership.dto.*;
+import com.library.membership.entity.AppSettings;
 import com.library.membership.entity.Membership;
 import com.library.membership.entity.Payment;
 import com.library.membership.entity.Plan;
 import com.library.membership.event.BookingConfirmedEvent;
 import com.library.membership.exception.ResourceNotFoundException;
+import com.library.membership.repository.AppSettingsRepository;
 import com.library.membership.repository.MembershipRepository;
 import com.library.membership.repository.PaymentRepository;
 import com.library.membership.repository.PlanRepository;
@@ -39,6 +41,7 @@ public class PaymentService {
     private final MembershipRepository          membershipRepository;
     private final PaymentRepository             paymentRepository;
     private final PlanRepository                planRepository;
+    private final AppSettingsRepository         appSettingsRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final RestTemplate                  restTemplate;
 
@@ -131,15 +134,24 @@ public class PaymentService {
 
         membership = membershipRepository.save(membership);
 
+        // 4b. Add the admin-configured convenience fee on top of the plan price —
+        // only for a fresh plan purchase/renewal via the payment gateway, not for
+        // dues payment (see createDuesOrder/verifyAndPayDues below, which charge
+        // the raw dues amount — that's debt clearance, not a "plan fee").
+        BigDecimal convenienceFee = appSettingsRepository.findById(1L)
+                .map(AppSettings::getConvenienceFee)
+                .orElse(BigDecimal.ZERO);
+        BigDecimal chargeAmount = plan.getPrice().add(convenienceFee);
+
         // 5. Create gateway order — or generate a dev mock if credentials absent
         String gatewayOrderId;
         String paymentSessionId = null;
 
         if ("RAZORPAY".equals(activeGateway)) {
-            gatewayOrderId = createRazorpayOrder(plan.getPrice(), membership);
+            gatewayOrderId = createRazorpayOrder(chargeAmount, membership);
         } else {
             // CASHFREE (default)
-            String[] cashfreeResult = createCashfreeOrder(plan.getPrice(), membership, userId);
+            String[] cashfreeResult = createCashfreeOrder(chargeAmount, membership, userId);
             gatewayOrderId   = cashfreeResult[0];
             paymentSessionId = cashfreeResult[1]; // null in dev mode
         }
@@ -148,7 +160,7 @@ public class PaymentService {
         Payment payment = Payment.builder()
                 .membershipId(membership.getId())
                 .userId(UUID.fromString(userId))
-                .amount(plan.getPrice())
+                .amount(chargeAmount)
                 .paymentGateway(activeGateway)
                 .gatewayOrderId(gatewayOrderId)
                 .status(Payment.Status.PENDING)
@@ -159,7 +171,7 @@ public class PaymentService {
         return CreateOrderResponse.builder()
                 .orderId(gatewayOrderId)
                 .membershipId(membership.getId().toString())
-                .amount(plan.getPrice())
+                .amount(chargeAmount)
                 .currency("INR")
                 .gateway(activeGateway)
                 .paymentSessionId(paymentSessionId)
@@ -195,6 +207,7 @@ public class PaymentService {
 
         // 4. Publish Kafka event → notification-service sends WhatsApp + email
         UserProfileDto user = fetchUserProfile(userId);
+        AppSettings settings = appSettingsRepository.findById(1L).orElse(null);
         BookingConfirmedEvent event = BookingConfirmedEvent.builder()
                 .userId(userId)
                 .membershipId(membership.getId().toString())
@@ -208,6 +221,8 @@ public class PaymentService {
                 .startDate(membership.getStartDate().toString())
                 .endDate(membership.getEndDate().toString())
                 .amountPaid(payment.getAmount())
+                .wifiName(settings != null ? settings.getWifiName() : null)
+                .wifiPassword(settings != null ? settings.getWifiPassword() : null)
                 .eventType("BOOKING_CONFIRMED")
                 .build();
 

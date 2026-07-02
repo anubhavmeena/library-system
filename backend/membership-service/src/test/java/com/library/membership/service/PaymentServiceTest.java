@@ -11,6 +11,7 @@ import com.library.membership.entity.Payment;
 import com.library.membership.entity.Plan;
 import com.library.membership.event.BookingConfirmedEvent;
 import com.library.membership.exception.ResourceNotFoundException;
+import com.library.membership.repository.AppSettingsRepository;
 import com.library.membership.repository.MembershipRepository;
 import com.library.membership.repository.PaymentRepository;
 import com.library.membership.repository.PlanRepository;
@@ -50,6 +51,7 @@ class PaymentServiceTest {
     @Mock MembershipRepository membershipRepository;
     @Mock PaymentRepository    paymentRepository;
     @Mock PlanRepository       planRepository;
+    @Mock AppSettingsRepository appSettingsRepository;
     @Mock KafkaTemplate<String, Object> kafkaTemplate;
     @Mock RestTemplate restTemplate;
     @InjectMocks PaymentService paymentService;

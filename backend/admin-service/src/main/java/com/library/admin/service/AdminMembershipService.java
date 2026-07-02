@@ -31,6 +31,7 @@ public class AdminMembershipService {
     private final PlanRepository         planRepository;
     private final SeatRepository         seatRepository;
     private final SeatBookingRepository  seatBookingRepository;
+    private final AppSettingsRepository  appSettingsRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final RedisTemplate<String, Object> redisTemplate;
 
@@ -146,6 +147,7 @@ public class AdminMembershipService {
 
         // 11. Publish booking-confirmed Kafka event (best-effort)
         try {
+            AppSettings settings = appSettingsRepository.findById(1L).orElse(null);
             BookingConfirmedEvent event = BookingConfirmedEvent.builder()
                     .userId(student.getId().toString())
                     .membershipId(membership.getId().toString())
@@ -159,6 +161,8 @@ public class AdminMembershipService {
                     .startDate(startDate.toString())
                     .endDate(endDate.toString())
                     .amountPaid(plan.getPrice())
+                    .wifiName(settings != null ? settings.getWifiName() : null)
+                    .wifiPassword(settings != null ? settings.getWifiPassword() : null)
                     .build();
             kafkaTemplate.send("booking-confirmed", student.getId().toString(), event);
         } catch (Exception e) {

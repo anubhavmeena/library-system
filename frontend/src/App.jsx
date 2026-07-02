@@ -35,6 +35,7 @@ import AdminImportPage    from './pages/admin/AdminImportPage'
 import AdminGalleryPage   from './pages/admin/AdminGalleryPage'
 import AdminRevenuePage   from './pages/admin/AdminRevenuePage'
 import AdminMailboxPage   from './pages/admin/AdminMailboxPage'
+import AdminSettingsPage  from './pages/admin/AdminSettingsPage'
 
 import FeedbackPage       from './pages/student/FeedbackPage'
 import StudentGalleryPage from './pages/student/StudentGalleryPage'
@@ -106,6 +107,7 @@ export default function App() {
                 <Route path="gallery"         element={<AdminGalleryPage />} />
                 <Route path="revenue"         element={<AdminRevenuePage />} />
                 <Route path="inbox"           element={<AdminMailboxPage />} />
+                <Route path="settings"        element={<AdminSettingsPage />} />
             </Route>
 
             <Route path="*" element={<NotFoundPage />} />

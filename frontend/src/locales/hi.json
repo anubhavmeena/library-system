@@ -179,7 +179,8 @@
         "revenue": "राजस्व",
         "importStudents": "छात्र आयात",
         "gallery": "फोटो गैलरी",
-        "inbox": "इनबॉक्स"
+        "inbox": "इनबॉक्स",
+        "settings": "सेटिंग्स"
       },
       "logout": "लॉग आउट"
     }
@@ -826,6 +827,24 @@
     "saved": "खर्च सफलतापूर्वक सहेजा गया",
     "loadFailed": "खर्च लोड करने में विफल",
     "saveFailed": "खर्च सहेजने में विफल"
+  },
+  "adminSettings": {
+    "title": "सेटिंग्स",
+    "subtitle": "लाइब्रेरी के लिए वैश्विक कॉन्फ़िगरेशन",
+    "wifiSection": "वाईफ़ाई",
+    "wifiName": "वाईफ़ाई नाम",
+    "wifiPassword": "वाईफ़ाई पासवर्ड",
+    "gracePeriodSection": "छूट अवधि",
+    "graceDays": "छूट अवधि (दिन)",
+    "convenienceFeeSection": "सुविधा शुल्क",
+    "convenienceFee": "सुविधा शुल्क (₹)",
+    "waterTankerSection": "पानी का टैंकर",
+    "waterTankerRate": "पानी टैंकर दर (₹)",
+    "save": "सेटिंग्स सहेजें",
+    "saving": "सहेज रहे हैं…",
+    "saved": "सेटिंग्स सफलतापूर्वक सहेजी गईं",
+    "loadFailed": "सेटिंग्स लोड करने में विफल",
+    "saveFailed": "सेटिंग्स सहेजने में विफल"
   },
   "adminRevenue": {
     "title": "राजस्व रिपोर्ट",

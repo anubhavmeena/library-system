@@ -13,6 +13,7 @@ public class PlanDto {
     private Integer    durationDays;
     private String     description;
     private boolean    isActive;
+    private BigDecimal convenienceFee; // added on top of price when paying via gateway; set separately by PlanService
 
     public static PlanDto fromEntity(Plan plan) {
         return PlanDto.builder()
