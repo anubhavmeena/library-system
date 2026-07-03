@@ -491,6 +491,7 @@ class AdminMembershipServiceTest {
     void markMembershipGrace_activeMembership_setsGraceDuesToPlanPriceAndDeletesPayment() {
         UUID id = UUID.randomUUID();
         Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        mem.setEndDate(LocalDate.now().plusDays(10)); // still time-valid — the exact bug being corrected
         Plan plan = Plan.builder().id(mem.getPlanId()).name("Full Day")
                 .planType(Plan.PlanType.FULL_DAY).price(new BigDecimal("600.00")).build();
         Payment oldPayment = Payment.builder().id(UUID.randomUUID()).membershipId(id)
@@ -508,6 +509,7 @@ class AdminMembershipServiceTest {
         verify(paymentRepository, never()).save(any());
         assertThat(mem.getStatus()).isEqualTo(Membership.Status.GRACE);
         assertThat(mem.getDuesAmount()).isEqualByComparingTo("600.00");
+        assertThat(mem.getEndDate()).isEqualTo(LocalDate.now());
         verify(membershipRepository).save(mem);
     }
 

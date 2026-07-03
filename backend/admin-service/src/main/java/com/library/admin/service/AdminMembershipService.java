@@ -401,12 +401,18 @@ public class AdminMembershipService {
 
         deleteLatestPayment(membership.getId());
 
+        // The membership's original endDate is often still in the future (that's
+        // exactly the bug being corrected — a student who hasn't actually run out
+        // of time yet was wrongly marked fully paid). Reset it to today so "days
+        // overdue" (StudentStatusResolver, the seat map, etc. all derive this from
+        // endDate) counts from the moment of correction instead of going negative.
+        membership.setEndDate(LocalDate.now());
         membership.setStatus(Membership.Status.GRACE);
         membership.setDuesAmount(plan.getPrice());
         membershipRepository.save(membership);
 
-        log.info("Membership {} corrected to Grace by admin — dues ₹{} (was wrongly marked fully paid)",
-                membershipId, plan.getPrice());
+        log.info("Membership {} corrected to Grace by admin — dues ₹{}, expiry reset to {} (was wrongly marked fully paid)",
+                membershipId, plan.getPrice(), membership.getEndDate());
     }
 
     private void deleteLatestPayment(UUID membershipId) {
