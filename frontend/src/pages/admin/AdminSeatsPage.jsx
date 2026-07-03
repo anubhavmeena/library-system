@@ -46,7 +46,7 @@ const daysToExpiry = (membershipEnd, today) => {
 }
 
 const expiryClasses = (days) => {
-    if (days < 0)   return 'bg-red-950/90 border-red-800 text-red-400 line-through hover:bg-red-950'
+    if (days < 0)   return 'bg-red-950/90 border-red-800 text-red-400 hover:bg-red-950'
     if (days <= 3)  return 'bg-red-500/60 border-red-400/80 text-red-100 hover:bg-red-500/80'
     if (days <= 7)  return 'bg-orange-500/50 border-orange-400/70 text-orange-100 hover:bg-orange-500/70'
     if (days <= 15) return 'bg-yellow-500/40 border-yellow-400/60 text-yellow-100 hover:bg-yellow-500/60'
