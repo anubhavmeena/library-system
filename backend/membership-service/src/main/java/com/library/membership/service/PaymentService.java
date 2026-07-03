@@ -223,6 +223,7 @@ public class PaymentService {
                 .startDate(membership.getStartDate().toString())
                 .endDate(membership.getEndDate().toString())
                 .amountPaid(payment.getAmount())
+                .pendingAmount(BigDecimal.ZERO)
                 .wifiName(settings != null ? settings.getWifiName() : null)
                 .wifiPassword(settings != null ? settings.getWifiPassword() : null)
                 .eventType("BOOKING_CONFIRMED")

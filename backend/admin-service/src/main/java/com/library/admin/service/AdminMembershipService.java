@@ -174,6 +174,7 @@ public class AdminMembershipService {
                     .startDate(startDate.toString())
                     .endDate(endDate.toString())
                     .amountPaid(paidAmount)
+                    .pendingAmount(pendingAmount)
                     .wifiName(settings != null ? settings.getWifiName() : null)
                     .wifiPassword(settings != null ? settings.getWifiPassword() : null)
                     .build();

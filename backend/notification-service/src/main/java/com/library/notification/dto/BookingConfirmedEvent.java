@@ -11,6 +11,7 @@ public class BookingConfirmedEvent {
     private String seatNumber, shift;
     private String startDate, endDate;
     private BigDecimal amountPaid;
+    private BigDecimal pendingAmount;
     private String wifiName, wifiPassword;
     private String eventType;
 }

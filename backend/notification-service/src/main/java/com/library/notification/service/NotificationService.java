@@ -18,6 +18,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -80,16 +81,18 @@ public class NotificationService {
         // Alert admin via WhatsApp (if configured)
         String adminMsg = String.format(
                 "📚 New Booking!\n\n" +
-                        "Student : %s\n"     +
-                        "Seat    : %s\n"     +
-                        "Plan    : %s\n"     +
-                        "Shift   : %s\n"     +
-                        "Amount  : ₹%.0f",
+                        "Student        : %s\n" +
+                        "Seat           : %s\n" +
+                        "Plan           : %s\n" +
+                        "Shift          : %s\n" +
+                        "Amount Paid    : ₹%.0f\n" +
+                        "Amount Pending : ₹%.0f",
                 name,
                 event.getSeatNumber(),
                 event.getPlanName(),
                 formatShift(event.getShift()),
-                event.getAmountPaid()
+                event.getAmountPaid(),
+                pendingOrZero(event)
         );
 
         for (String number : adminWhatsappNumbers()) {
@@ -623,12 +626,13 @@ public class NotificationService {
                         "Hi *%s*,\n\n"                                +
                         "📚 *Target Zone Library — Membership Details*\n"   +
                         "━━━━━━━━━━━━━━━━━━━━\n"                      +
-                        "📋 Plan   : %s\n"                            +
-                        "💺 Seat   : %s\n"                            +
-                        "⏰ Shift  : %s\n"                            +
-                        "📅 From   : %s\n"                            +
-                        "📅 To     : %s\n"                            +
-                        "💰 Paid   : ₹%.0f\n"                         +
+                        "📋 Plan    : %s\n"                           +
+                        "💺 Seat    : %s\n"                           +
+                        "⏰ Shift   : %s\n"                           +
+                        "📅 From    : %s\n"                           +
+                        "📅 To      : %s\n"                           +
+                        "💰 Paid    : ₹%.0f\n"                        +
+                        "⏳ Pending : ₹%.0f\n"                        +
                         "%s"                                          +
                         "━━━━━━━━━━━━━━━━━━━━\n\n"                    +
                         "Please carry a valid ID on your first visit.\n\n" +
@@ -640,6 +644,7 @@ public class NotificationService {
                 e.getStartDate(),
                 e.getEndDate(),
                 e.getAmountPaid(),
+                pendingOrZero(e),
                 wifiWhatsAppBlock(e)
         );
     }
@@ -650,12 +655,13 @@ public class NotificationService {
                         "Your library membership has been confirmed!\n\n"         +
                         "MEMBERSHIP DETAILS\n"                                    +
                         "------------------\n"                                    +
-                        "Plan        : %s\n"                                      +
-                        "Seat Number : %s\n"                                      +
-                        "Shift       : %s\n"                                      +
-                        "Start Date  : %s\n"                                      +
-                        "End Date    : %s\n"                                      +
-                        "Amount Paid : ₹%.0f\n\n"                                 +
+                        "Plan           : %s\n"                                   +
+                        "Seat Number    : %s\n"                                   +
+                        "Shift          : %s\n"                                   +
+                        "Start Date     : %s\n"                                   +
+                        "End Date       : %s\n"                                   +
+                        "Amount Paid    : ₹%.0f\n"                                +
+                        "Amount Pending : ₹%.0f\n\n"                              +
                         "%s"                                                      +
                         "Library Timings:\n"                                      +
                         "  Morning Shift : 6:00 AM – 2:00 PM\n"                  +
@@ -671,8 +677,13 @@ public class NotificationService {
                 e.getStartDate(),
                 e.getEndDate(),
                 e.getAmountPaid(),
+                pendingOrZero(e),
                 wifiEmailBlock(e)
         );
+    }
+
+    private BigDecimal pendingOrZero(BookingConfirmedEvent e) {
+        return e.getPendingAmount() != null ? e.getPendingAmount() : BigDecimal.ZERO;
     }
 
     // Both blank → admin hasn't configured WiFi yet, omit the block entirely

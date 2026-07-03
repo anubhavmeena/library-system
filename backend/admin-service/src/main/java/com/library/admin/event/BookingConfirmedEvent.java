@@ -17,6 +17,7 @@ public class BookingConfirmedEvent {
     private String startDate;
     private String endDate;
     private BigDecimal amountPaid;
+    private BigDecimal pendingAmount;
     private String wifiName;
     private String wifiPassword;
 }
