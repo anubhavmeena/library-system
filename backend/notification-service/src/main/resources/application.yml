@@ -47,8 +47,10 @@ meta:
     api-version:            ${META_WHATSAPP_API_VERSION:v21.0}
     template-name:          ${META_NOTIFICATION_TEMPLATE_NAME:library_notification}
     receipt-template-name:  ${META_RECEIPT_TEMPLATE_NAME:payment_receipt}
+    id-card-template-name:  ${META_ID_CARD_TEMPLATE_NAME:student_id_card}
     language:               ${META_WHATSAPP_LANGUAGE:en_US}
     receipt-language:       ${META_RECEIPT_LANGUAGE:en}
+    id-card-language:       ${META_ID_CARD_LANGUAGE:en}
 
 twilio:
   account-sid:   ${TWILIO_ACCOUNT_SID:}
