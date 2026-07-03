@@ -314,7 +314,7 @@ export default function AdminStudentsPage() {
                                     </td>
                                     <td className="p-4">
                                         {s.paymentMode === 'CASH' ? (
-                                            <span className="text-xs px-2 py-1 rounded-full border bg-amber-500/20 text-amber-400 border-amber-500/30">💵 {t('adminStudents.cash')}</span>
+                                            <span className="text-xs px-2 py-1 rounded-full border bg-indigo-500/20 text-indigo-400 border-indigo-500/30">💵 {t('adminStudents.cash')}</span>
                                         ) : s.paymentMode === 'ONLINE' ? (
                                             <span className="text-xs px-2 py-1 rounded-full border bg-indigo-500/20 text-indigo-400 border-indigo-500/30">💳 {t('adminStudents.online')}</span>
                                         ) : (
