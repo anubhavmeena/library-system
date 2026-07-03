@@ -415,6 +415,51 @@ public class AdminMembershipService {
                 membershipId, plan.getPrice(), membership.getEndDate());
     }
 
+    // Admin action for a student in Grace/Expired (the same underlying
+    // Membership.Status.GRACE — "Expired" is just StudentStatusResolver's label
+    // for grace overdue beyond the configured grace period, not a separate DB
+    // status) who has paid off their outstanding dues in person. Records the
+    // payment, reactivates the membership for a fresh plan-duration period
+    // starting today (not extended from the old, possibly long-lapsed endDate —
+    // that could still land in the past for a student who was overdue a long
+    // time), and clears dues so the student reads as PAID afterward.
+    @Transactional
+    public void clearDues(String membershipId) {
+        Membership membership = membershipRepository.findById(UUID.fromString(membershipId))
+                .orElseThrow(() -> new ResourceNotFoundException("Membership not found: " + membershipId));
+        if (membership.getStatus() != Membership.Status.GRACE) {
+            throw new IllegalArgumentException("Only a Grace/Expired membership can have dues cleared");
+        }
+
+        Plan plan = planRepository.findById(membership.getPlanId())
+                .orElseThrow(() -> new ResourceNotFoundException("Plan not found for membership: " + membershipId));
+
+        BigDecimal duesCleared = membership.getDuesAmount() != null ? membership.getDuesAmount() : plan.getPrice();
+
+        String duesOrderId = "dues_cleared_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        Payment payment = Payment.builder()
+                .membershipId(membership.getId())
+                .userId(membership.getUserId())
+                .amount(duesCleared)
+                .pendingAmount(BigDecimal.ZERO)
+                .paymentGateway("CASH")
+                .gatewayOrderId(duesOrderId)
+                .status(Payment.Status.SUCCESS)
+                .invoiceId(generateInvoiceId())
+                .build();
+        paymentRepository.save(payment);
+
+        membership.setEndDate(LocalDate.now().plusDays(plan.getDurationDays()));
+        membership.setStatus(Membership.Status.ACTIVE);
+        membership.setDuesAmount(BigDecimal.ZERO);
+        membershipRepository.save(membership);
+
+        invalidateSeatCache(membership.getShift(), LocalDate.now(), membership.getEndDate());
+
+        log.info("Dues cleared by admin for membership {} — ₹{} recorded, reactivated through {}",
+                membershipId, duesCleared, membership.getEndDate());
+    }
+
     private void deleteLatestPayment(UUID membershipId) {
         paymentRepository.findFirstByMembershipIdOrderByCreatedAtDesc(membershipId)
                 .ifPresent(paymentRepository::delete);

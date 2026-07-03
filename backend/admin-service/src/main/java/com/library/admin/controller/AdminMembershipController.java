@@ -68,4 +68,12 @@ public class AdminMembershipController {
         adminMembershipService.markMembershipGrace(membershipId);
         return ResponseEntity.ok(ApiResponse.success("Marked as Grace"));
     }
+
+    // For a Grace/Expired student who has paid off their dues in person —
+    // records the payment and reactivates the membership as Paid.
+    @PatchMapping("/{membershipId}/clear-dues")
+    public ResponseEntity<ApiResponse<String>> clearDues(@PathVariable String membershipId) {
+        adminMembershipService.clearDues(membershipId);
+        return ResponseEntity.ok(ApiResponse.success("Dues cleared"));
+    }
 }

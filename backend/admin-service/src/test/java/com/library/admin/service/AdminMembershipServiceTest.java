@@ -525,4 +525,63 @@ class AdminMembershipServiceTest {
 
         verifyNoInteractions(paymentRepository);
     }
+
+    // ── clearDues ────────────────────────────────────────────────────────────
+    // Admin action for a Grace/Expired student who paid off their dues in
+    // person — records the payment and reactivates the membership as Paid.
+
+    @Test
+    void clearDues_graceMembership_recordsPaymentAndReactivatesAsPaid() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.GRACE); // duesAmount = 500.00
+        Plan plan = Plan.builder().id(mem.getPlanId()).name("Full Day")
+                .planType(Plan.PlanType.FULL_DAY).price(new BigDecimal("500.00")).durationDays(30).build();
+
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+        when(planRepository.findById(mem.getPlanId())).thenReturn(Optional.of(plan));
+
+        adminMembershipService.clearDues(id.toString());
+
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(captor.capture());
+        assertThat(captor.getValue().getAmount()).isEqualByComparingTo("500.00");
+        assertThat(captor.getValue().getPendingAmount()).isEqualByComparingTo("0");
+        assertThat(captor.getValue().getMembershipId()).isEqualTo(id);
+
+        assertThat(mem.getStatus()).isEqualTo(Membership.Status.ACTIVE);
+        assertThat(mem.getDuesAmount()).isEqualByComparingTo("0");
+        assertThat(mem.getEndDate()).isEqualTo(LocalDate.now().plusDays(30));
+        verify(membershipRepository).save(mem);
+    }
+
+    @Test
+    void clearDues_nullDuesAmount_fallsBackToPlanPrice() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.GRACE);
+        mem.setDuesAmount(null);
+        Plan plan = Plan.builder().id(mem.getPlanId()).name("Full Day")
+                .planType(Plan.PlanType.FULL_DAY).price(new BigDecimal("600.00")).durationDays(30).build();
+
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+        when(planRepository.findById(mem.getPlanId())).thenReturn(Optional.of(plan));
+
+        adminMembershipService.clearDues(id.toString());
+
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(captor.capture());
+        assertThat(captor.getValue().getAmount()).isEqualByComparingTo("600.00");
+    }
+
+    @Test
+    void clearDues_nonGraceMembership_throws() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+
+        assertThatThrownBy(() -> adminMembershipService.clearDues(id.toString()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Grace/Expired");
+
+        verifyNoInteractions(paymentRepository);
+    }
 }
