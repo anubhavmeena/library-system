@@ -221,11 +221,16 @@ public class AdminService {
 
         // Fetch ACTIVE (date-bound) and GRACE (held indefinitely) memberships with a
         // seat assigned, filtered by shift + date. A GRACE seat has no upper date
-        // bound — it stays occupied on the map until an admin releases it.
+        // bound — it stays occupied on the map until an admin releases it. A
+        // membership that is still ACTIVE in the DB but whose endDate has already
+        // passed as of the real "today" is treated the same way: the seat is
+        // still physically held (nobody renewed, nobody released it) even though
+        // ExpiryReminderScheduler hasn't run yet today to flip status -> GRACE.
+        // See isHeldIndefinitely().
         List<Membership> active = membershipRepository
                 .findOccupyingSeatMemberships(LocalDate.now().plusYears(1))
                 .stream()
-                .filter(m -> m.getStatus() == Membership.Status.GRACE
+                .filter(m -> isHeldIndefinitely(m)
                         ? !m.getStartDate().isAfter(date)
                         : (!m.getStartDate().isAfter(date) && !m.getEndDate().isBefore(date)))
                 .filter(m -> "FULL_DAY".equalsIgnoreCase(shift)
@@ -264,9 +269,9 @@ public class AdminService {
                 Membership mem = seatMap.get(sn);
 
                 if (mem != null) {
-                    User    student    = userMap.get(mem.getUserId());
-                    boolean isGrace    = mem.getStatus() == Membership.Status.GRACE;
-                    Integer daysOverdue = isGrace
+                    User    student          = userMap.get(mem.getUserId());
+                    boolean heldIndefinitely = isHeldIndefinitely(mem);
+                    Integer daysOverdue = heldIndefinitely
                             ? (int) ChronoUnit.DAYS.between(mem.getEndDate(), LocalDate.now())
                             : null;
                     rowSeats.add(SeatMapDto.SeatInfoDto.builder()
@@ -299,6 +304,23 @@ public class AdminService {
                 .availableSeats(110 - seatMap.size())
                 .seatsByRow(seatsByRow)
                 .build();
+    }
+
+    // True for a GRACE membership (held indefinitely by definition, until an
+    // admin explicitly releases the seat) and also for an ACTIVE membership
+    // whose endDate has already passed as of the real current date. The latter
+    // covers the daily window between midnight — when "today" rolls past
+    // endDate — and ExpiryReminderScheduler's run, during which the DB row
+    // hasn't been flipped ACTIVE -> GRACE yet even though the seat is still
+    // physically held (the student hasn't renewed and no admin has released
+    // it). Deliberately keyed off LocalDate.now() (the real "today"), NOT the
+    // viewed `date` param: this must NOT affect memberships that are legitimately
+    // still on schedule when a future/past `date` is queried — those keep going
+    // through the strict endDate >= date bound in getSeatMap().
+    private boolean isHeldIndefinitely(Membership m) {
+        return m.getStatus() == Membership.Status.GRACE
+                || (m.getStatus() == Membership.Status.ACTIVE
+                        && m.getEndDate().isBefore(LocalDate.now()));
     }
 
     // Every booking ever made against a seat, newest first — PENDING (checkout

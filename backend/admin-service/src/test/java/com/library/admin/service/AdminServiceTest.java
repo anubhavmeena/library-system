@@ -390,6 +390,52 @@ class AdminServiceTest {
     }
 
     @Test
+    void getSeatMap_activeMembershipPastEndDate_beforeGraceCron_treatedAsOccupied() {
+        UUID uid = UUID.randomUUID();
+        // Status is still ACTIVE (the daily grace-transition cron hasn't run yet
+        // today) but endDate is yesterday — mirrors the production timing-gap bug.
+        Membership mem = buildActiveMembership(uid, LocalDate.now().minusDays(1));
+        mem.setSeatNumber("C13");
+        User user = buildUser(uid);
+
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
+        when(userRepository.findAllById(anyIterable())).thenReturn(List.of(user));
+
+        SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
+
+        assertThat(dto.getOccupiedSeats()).isEqualTo(1);
+        SeatMapDto.SeatInfoDto seat = dto.getSeatsByRow().get("C").stream()
+                .filter(s -> "C13".equals(s.getSeatNumber()))
+                .findFirst().orElseThrow();
+        assertThat(seat.getIsOccupied()).isTrue();
+        assertThat(seat.getMembershipEnd()).isEqualTo(LocalDate.now().minusDays(1).toString());
+        assertThat(seat.getDaysOverdue()).isEqualTo(1);
+        assertThat(seat.getMembershipStatus()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void getSeatMap_graceMembership_treatedAsOccupiedWithDaysOverdue() {
+        UUID uid = UUID.randomUUID();
+        Membership mem = buildActiveMembership(uid, LocalDate.now().minusDays(3));
+        mem.setSeatNumber("A1");
+        mem.setStatus(Membership.Status.GRACE);
+        User user = buildUser(uid);
+
+        when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
+        when(userRepository.findAllById(anyIterable())).thenReturn(List.of(user));
+
+        SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
+
+        assertThat(dto.getOccupiedSeats()).isEqualTo(1);
+        SeatMapDto.SeatInfoDto seat = dto.getSeatsByRow().get("A").stream()
+                .filter(s -> "A1".equals(s.getSeatNumber()))
+                .findFirst().orElseThrow();
+        assertThat(seat.getIsOccupied()).isTrue();
+        assertThat(seat.getDaysOverdue()).isEqualTo(3);
+        assertThat(seat.getMembershipStatus()).isEqualTo("GRACE");
+    }
+
+    @Test
     void getSeatMap_twoBookingsForSameSeat_firstWins() {
         UUID uid1 = UUID.randomUUID();
         UUID uid2 = UUID.randomUUID();
