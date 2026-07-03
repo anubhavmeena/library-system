@@ -229,4 +229,55 @@ class PaymentRepositoryTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getAmount()).isEqualByComparingTo("250.00");
     }
+
+    // ── findFirstByMembershipIdOrderByCreatedAtDesc ──────────────────────────
+    // Regression coverage: a membership can carry more than one Payment row
+    // (e.g. two separate cash installments). Before this method was given an
+    // explicit order, "findFirst" on a plain derived query had no guaranteed
+    // row — this must deterministically resolve to the most recent one, matching
+    // AdminService.getAllStudents' native SQL (a correlated subquery ordered the
+    // same way) so the list and single-student views never disagree.
+
+    private Payment saveForMembership(UUID membershipId, BigDecimal pendingAmount, LocalDateTime createdAt) {
+        return paymentRepository.save(Payment.builder()
+                .id(UUID.randomUUID())
+                .membershipId(membershipId)
+                .userId(UUID.randomUUID())
+                .amount(new BigDecimal("100.00"))
+                .pendingAmount(pendingAmount)
+                .status(Payment.Status.SUCCESS)
+                .createdAt(createdAt)
+                .build());
+    }
+
+    @Test
+    void findFirstByMembershipIdOrderByCreatedAtDesc_twoPayments_returnsMostRecent() {
+        UUID membershipId = UUID.randomUUID();
+        saveForMembership(membershipId, BigDecimal.ZERO, BASE);
+        Payment newest = saveForMembership(membershipId, new BigDecimal("150.00"), BASE.plusDays(2));
+
+        var result = paymentRepository.findFirstByMembershipIdOrderByCreatedAtDesc(membershipId);
+
+        assertThat(result).isPresent()
+                .get().extracting(Payment::getId).isEqualTo(newest.getId());
+        assertThat(result.get().getPendingAmount()).isEqualByComparingTo("150.00");
+    }
+
+    @Test
+    void findFirstByMembershipIdOrderByCreatedAtDesc_singlePayment_found() {
+        UUID membershipId = UUID.randomUUID();
+        Payment payment = saveForMembership(membershipId, BigDecimal.ZERO, BASE);
+
+        var result = paymentRepository.findFirstByMembershipIdOrderByCreatedAtDesc(membershipId);
+
+        assertThat(result).isPresent()
+                .get().extracting(Payment::getId).isEqualTo(payment.getId());
+    }
+
+    @Test
+    void findFirstByMembershipIdOrderByCreatedAtDesc_noPayments_returnsEmpty() {
+        var result = paymentRepository.findFirstByMembershipIdOrderByCreatedAtDesc(UUID.randomUUID());
+
+        assertThat(result).isEmpty();
+    }
 }

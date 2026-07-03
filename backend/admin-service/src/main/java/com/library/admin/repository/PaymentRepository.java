@@ -16,7 +16,12 @@ import java.util.UUID;
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, UUID> {
 
-    Optional<Payment> findFirstByMembershipId(UUID membershipId);
+    // A membership can carry more than one Payment row (e.g. two separate cash
+    // installments) — must be deterministically ordered so this always resolves
+    // the same "current" payment as AdminService.getAllStudents' native SQL
+    // query (see the correlated subquery joining `payments p` there). Without an
+    // explicit order, "findFirst" on a plain derived query has no guaranteed row.
+    Optional<Payment> findFirstByMembershipIdOrderByCreatedAtDesc(UUID membershipId);
 
     List<Payment> findByUserIdOrderByCreatedAtDesc(UUID userId);
 

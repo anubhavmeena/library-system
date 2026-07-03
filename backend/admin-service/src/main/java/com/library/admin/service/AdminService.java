@@ -106,11 +106,27 @@ public class AdminService {
         // the student's latest-ever membership row (any status), needed to detect
         // NEW/RELEASED since the `m` join above only ever matches a current
         // (ACTIVE-not-expired or GRACE) row.
+        //
+        // `p` is restricted to a single row (the most recent payment) via a
+        // correlated subquery, same pattern as `le` below — a membership can have
+        // more than one Payment row (e.g. two separate cash installments), and an
+        // unrestricted `ON p.membership_id = m.id` join fans out into one result
+        // row per payment. With no DISTINCT on the paginated SELECT, that made the
+        // same student appear more than once in the list (and could even split
+        // one student across both the PAID and PENDING tabs, since each joined
+        // row carries a different p.pending_amount). Must match
+        // PaymentRepository.findFirstByMembershipIdOrderByCreatedAtDesc, which the
+        // per-row Java enrichment below uses to resolve "the" current payment.
         String where = """
                 FROM users u
                 LEFT JOIN memberships m ON m.user_id = u.id
                     AND (m.status = 'GRACE' OR (m.status = 'ACTIVE' AND m.end_date >= CURRENT_DATE))
-                LEFT JOIN payments p ON p.membership_id = m.id
+                LEFT JOIN payments p ON p.id = (
+                    SELECT p2.id FROM payments p2
+                    WHERE p2.membership_id = m.id
+                    ORDER BY p2.created_at DESC
+                    LIMIT 1
+                )
                 LEFT JOIN memberships le ON le.id = (
                     SELECT m2.id FROM memberships m2
                     WHERE m2.user_id = u.id
@@ -162,7 +178,7 @@ public class AdminService {
             Payment currentPayment = null;
             Membership latestEver = null;
             if (mem != null) {
-                currentPayment = paymentRepository.findFirstByMembershipId(mem.getId()).orElse(null);
+                currentPayment = paymentRepository.findFirstByMembershipIdOrderByCreatedAtDesc(mem.getId()).orElse(null);
                 if (currentPayment != null) {
                     dto.setPaymentMode("CASH".equalsIgnoreCase(currentPayment.getPaymentGateway()) ? "CASH" : "ONLINE");
                     dto.setPendingAmount(currentPayment.getPendingAmount() != null ? currentPayment.getPendingAmount() : BigDecimal.ZERO);
@@ -199,7 +215,7 @@ public class AdminService {
                 dto.setPlanName(plan.getName());
                 dto.setPlanType(plan.getPlanType().name());
             });
-            currentPayment = paymentRepository.findFirstByMembershipId(mem.getId()).orElse(null);
+            currentPayment = paymentRepository.findFirstByMembershipIdOrderByCreatedAtDesc(mem.getId()).orElse(null);
             if (currentPayment != null) {
                 dto.setPaymentMode("CASH".equalsIgnoreCase(currentPayment.getPaymentGateway()) ? "CASH" : "ONLINE");
                 dto.setPendingAmount(currentPayment.getPendingAmount() != null ? currentPayment.getPendingAmount() : BigDecimal.ZERO);
