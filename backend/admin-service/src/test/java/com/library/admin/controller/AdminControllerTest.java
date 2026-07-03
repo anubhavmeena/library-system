@@ -3,6 +3,7 @@ package com.library.admin.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.library.admin.dto.*;
 import com.library.admin.exception.ResourceNotFoundException;
+import com.library.admin.scheduler.ExpiryReminderScheduler;
 import com.library.admin.service.AdminService;
 import com.library.admin.service.ImportService;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ class AdminControllerTest {
     @Autowired ObjectMapper objectMapper;
     @MockBean  AdminService adminService;
     @MockBean  ImportService importService;
+    @MockBean  ExpiryReminderScheduler expiryReminderScheduler;
 
     // ── GET /api/admin/dashboard ─────────────────────────────────────────────
 
@@ -246,6 +248,28 @@ class AdminControllerTest {
                 .andExpect(jsonPath("$.data", containsString("1")));
 
         verify(adminService).sendBulkReminders(List.of(uid));
+    }
+
+    // ── POST /api/admin/memberships/run-expiry-check ─────────────────────────
+
+    @Test
+    void runExpiryCheck_returns200WithGracedCount() throws Exception {
+        when(expiryReminderScheduler.markExpiredAndStartGrace()).thenReturn(3);
+
+        mockMvc.perform(post("/api/admin/memberships/run-expiry-check"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", containsString("3")));
+
+        verify(expiryReminderScheduler).markExpiredAndStartGrace();
+    }
+
+    @Test
+    void runExpiryCheck_noneExpired_returns200WithZeroCount() throws Exception {
+        when(expiryReminderScheduler.markExpiredAndStartGrace()).thenReturn(0);
+
+        mockMvc.perform(post("/api/admin/memberships/run-expiry-check"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", containsString("0")));
     }
 
     // ── GET /api/admin/reports/revenue ───────────────────────────────────────

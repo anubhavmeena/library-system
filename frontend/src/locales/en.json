@@ -184,7 +184,8 @@
         "importStudents": "Import Students",
         "gallery": "Photo Gallery",
         "inbox": "Inbox",
-        "settings": "Settings"
+        "settings": "Settings",
+        "cronJobs": "Cron Jobs"
       },
       "logout": "Logout"
     }
@@ -726,6 +727,19 @@
       "sent": "Message queued for {{count}} members",
       "failed": "Failed to send broadcast",
       "tooShort": "Message must be at least 5 characters"
+    }
+  },
+  "adminCronJobs": {
+    "title": "Cron Jobs",
+    "subtitle": "Manually trigger scheduled background jobs on demand",
+    "expiryCheck": {
+      "title": "Expiry Check (Grace Period)",
+      "desc": "Normally runs daily at 5:00 AM IST. Finds memberships that are still ACTIVE but past their end date and moves them into a GRACE period, charging dues and notifying the student and admin. Run this now instead of waiting for the next scheduled run."
+    },
+    "runNow": "Run Now",
+    "running": "Running...",
+    "toasts": {
+      "failed": "Failed to run expiry check"
     }
   },
   "adminNewMembership": {

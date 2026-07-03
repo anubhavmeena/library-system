@@ -1,6 +1,7 @@
 package com.library.admin.controller;
 
 import com.library.admin.dto.*;
+import com.library.admin.scheduler.ExpiryReminderScheduler;
 import com.library.admin.service.AdminService;
 import com.library.admin.service.ImportService;
 import com.library.common.dto.ApiResponse;
@@ -18,8 +19,9 @@ import java.util.List;
 @CrossOrigin(origins = "*")
 public class AdminController {
 
-    private final AdminService  adminService;
-    private final ImportService importService;
+    private final AdminService             adminService;
+    private final ImportService            importService;
+    private final ExpiryReminderScheduler  expiryReminderScheduler;
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
     // Returns: totalStudents, activeMemberships, expiringThisWeek,
@@ -128,6 +130,16 @@ public class AdminController {
         int count = adminService.sendBulkReminders(request.getUserIds());
         return ResponseEntity.ok(ApiResponse.success(
                 "Reminders queued for " + count + " students"));
+    }
+
+    // Manually runs the daily 5 AM IST grace-transition job (ExpiryReminderScheduler
+    // .markExpiredAndStartGrace) on demand — e.g. to pick up newly-expired
+    // memberships immediately instead of waiting for the next scheduled run.
+    @PostMapping("/memberships/run-expiry-check")
+    public ResponseEntity<ApiResponse<String>> runExpiryCheck() {
+        int graced = expiryReminderScheduler.markExpiredAndStartGrace();
+        return ResponseEntity.ok(ApiResponse.success(
+                graced + " membership(s) entered grace period"));
     }
 
     @PostMapping("/reminders/pending-fees")

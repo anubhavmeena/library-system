@@ -134,8 +134,9 @@ public class ExpiryReminderScheduler {
     }
 
     /**
-     * Runs every day at 10:00 AM (after the 9 AM reminder run).
+     * Runs every day at 5:00 AM IST (before the 9 AM UTC reminder run above).
      * Finds memberships that are still ACTIVE but whose endDate has passed.
+     * Also callable on demand via AdminController's manual-trigger endpoint.
      *
      * If the student already pre-paid a renewal (a QUEUED membership exists),
      * this is the normal happy path: the old membership is finalized EXPIRED and
@@ -147,15 +148,15 @@ public class ExpiryReminderScheduler {
      * date-range availability check), and both the student and admin are notified.
      * The seat is only freed again by an explicit admin "Release Seat" action.
      */
-    @Scheduled(cron = "0 0 10 * * *")
+    @Scheduled(cron = "0 0 5 * * *", zone = "Asia/Kolkata")
     @Transactional
-    public void markExpiredAndStartGrace() {
+    public int markExpiredAndStartGrace() {
         LocalDate today = LocalDate.now();
         List<Membership> expired = membershipRepository.findExpiredActive(today);
 
         if (expired.isEmpty()) {
             log.info("SeatExpiredCheck: no newly expired memberships.");
-            return;
+            return 0;
         }
 
         Set<UUID> userIds = expired.stream()
@@ -245,5 +246,6 @@ public class ExpiryReminderScheduler {
 
         log.info("SeatExpiredCheck: {} memberships entered GRACE, {} total processed",
                 graced, expired.size());
+        return graced;
     }
 }
