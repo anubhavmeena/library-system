@@ -56,7 +56,7 @@ Owns: `seats` (full availability array for a shift/date), `selectedSeat` (the se
 `BookingPage`, `DashboardPage`, `ProfilePage` read from and dispatch to Redux slices. `BookingPage` coordinates `seatSlice` and `membershipSlice` simultaneously across a 3-step wizard (local `step` state) but keeps the seat selection in Redux.
 
 ### Direct-API pages (admin + some student)
-All four admin pages (`AdminDashboardPage`, `AdminStudentsPage`, `AdminSeatsPage`, `AdminRemindersPage`) and `MembershipPage`'s history/payment sections use `api.get/post` directly into local `useState`. These are display-only views that don't share data between pages, so Redux is intentionally bypassed.
+Every admin page (`AdminDashboardPage`, `AdminStudentsPage`, `AdminSeatsPage`, `AdminRemindersPage`, `AdminBroadcastPage`, `AdminCronJobsPage`, etc. — see the `/admin/*` routes in `App.jsx`) and `MembershipPage`'s history/payment sections use `api.get/post` directly into local `useState`. These are display-only views that don't share data between pages, so Redux is intentionally bypassed.
 
 ### Dev mode payment bypass
 `BookingPage` detects `order.orderId.startsWith('dev_')` and skips the Razorpay widget entirely, calling `verifyPayment` directly with dummy IDs. This mirrors the backend's `dev_order_*` logic.
