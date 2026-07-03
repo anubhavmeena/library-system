@@ -25,6 +25,7 @@ import PaymentSuccessPage from './pages/student/PaymentSuccessPage'
 import AdminLayout        from './layouts/AdminLayout'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import AdminStudentsPage  from './pages/admin/AdminStudentsPage'
+import AdminStudentDetailPage from './pages/admin/AdminStudentDetailPage'
 import AdminSeatsPage     from './pages/admin/AdminSeatsPage'
 import AdminRemindersPage from './pages/admin/AdminRemindersPage'
 import AdminFeedbackPage  from './pages/admin/AdminFeedbackPage'
@@ -98,6 +99,7 @@ export default function App() {
                 <Route index             element={<Navigate to="/admin/dashboard" replace />} />
                 <Route path="dashboard"  element={<AdminDashboardPage />} />
                 <Route path="students"   element={<AdminStudentsPage />} />
+                <Route path="students/:userId" element={<AdminStudentDetailPage />} />
                 <Route path="seats"      element={<AdminSeatsPage />} />
                 <Route path="reminders"  element={<AdminRemindersPage />} />
                 <Route path="feedback"         element={<AdminFeedbackPage />} />

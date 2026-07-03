@@ -66,6 +66,12 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(adminService.getStudentPayments(userId)));
     }
 
+    @GetMapping("/students/{userId}/seat-history")
+    public ResponseEntity<ApiResponse<List<SeatHistoryEntryDto>>> getStudentSeatHistory(
+            @PathVariable String userId) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getStudentSeatHistory(userId)));
+    }
+
     @DeleteMapping("/students/{userId}")
     public ResponseEntity<ApiResponse<String>> deleteStudent(@PathVariable String userId) {
         adminService.deleteStudent(userId);

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
@@ -31,9 +32,6 @@ export default function AdminStudentsPage() {
     const [search, setSearch]         = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')
     const [detail, setDetail]     = useState(null)
-    const [editMode, setEditMode] = useState(false)
-    const [editForm, setEditForm] = useState({})
-    const [saving, setSaving]     = useState(false)
 
     const [changeSeatFor, setChangeSeatFor]               = useState(null)
     const [changeSeatGrid, setChangeSeatGrid]             = useState(null)
@@ -54,8 +52,6 @@ export default function AdminStudentsPage() {
     const [msgTarget,  setMsgTarget]  = useState(null)
     const [msgText,    setMsgText]    = useState('')
     const [msgSending, setMsgSending] = useState(false)
-
-    const [plans, setPlans] = useState([])
 
     const { t } = useTranslation()
 
@@ -83,10 +79,6 @@ export default function AdminStudentsPage() {
         const close = () => setOpenDropdown(null)
         document.addEventListener('click', close)
         return () => document.removeEventListener('click', close)
-    }, [])
-
-    useEffect(() => {
-        api.get('/plans').then(r => setPlans(r.data.data ?? [])).catch(() => {})
     }, [])
 
     useEffect(() => {
@@ -150,12 +142,9 @@ export default function AdminStudentsPage() {
     // Fetches fresh details (not the list row, which lacks plan info — see
     // AdminService.getAllStudents vs getStudentDetails) before opening the modal.
     const openStudentDetail = async (student) => {
-        setEditMode(false)
         try {
             const res = await api.get(`/admin/students/${student.id}`)
-            const full = res.data.data
-            setDetail(full)
-            setEditForm({ name: full.name||'', mobile: full.mobile||'', email: full.email||'', address: full.address||'', gender: full.gender||'', dateOfBirth: full.dateOfBirth||'', joinedAt: full.joinedAt?.split('T')[0]||'', seatNumber: full.seatNumber||'', planId: full.membershipPlanId||'' })
+            setDetail(res.data.data)
         } catch {
             toast.error('Failed to load student details')
         }
@@ -288,7 +277,10 @@ export default function AdminStudentsPage() {
                                                 </div>
                                             }
                                             <div>
-                                                <p className="text-white font-medium">{s.name}</p>
+                                                <Link to={`/admin/students/${s.id}`}
+                                                    className="block text-white font-medium hover:text-amber-400 hover:underline transition-colors">
+                                                    {s.name}
+                                                </Link>
                                                 <p className="text-primary-500 text-xs">{t('adminStudents.joined')} {s.joinedAt?.split('T')[0]}</p>
                                             </div>
                                         </div>
@@ -537,59 +529,12 @@ export default function AdminStudentsPage() {
             )}
 
             {detail && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => { setDetail(null); setEditMode(false) }}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setDetail(null)}>
                     <div className="card p-6 w-full max-w-md border-primary-700/30 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         {/* Header */}
                         <div className="flex items-center justify-between mb-5">
                             <h3 className="section-title">{t('adminStudents.modal.title')}</h3>
-                            <div className="flex items-center gap-2">
-                                {!editMode ? (
-                                    <button onClick={() => setEditMode(true)}
-                                        className="text-xs px-3 py-1 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 transition-all">
-                                        Edit
-                                    </button>
-                                ) : (
-                                    <>
-                                        <button onClick={() => { setEditMode(false); setEditForm({ name: detail.name||'', mobile: detail.mobile||'', email: detail.email||'', address: detail.address||'', gender: detail.gender||'', dateOfBirth: detail.dateOfBirth||'', joinedAt: detail.joinedAt?.split('T')[0]||'', seatNumber: detail.seatNumber||'', planId: detail.membershipPlanId||'' }) }}
-                                            className="text-xs px-3 py-1 rounded-lg bg-primary-700/50 text-primary-300 hover:text-white border border-primary-700/40 transition-all">
-                                            Cancel
-                                        </button>
-                                        <button
-                                            disabled={saving}
-                                            onClick={async () => {
-                                                setSaving(true)
-                                                try {
-                                                    const res = await api.patch(`/admin/students/${detail.id}`, editForm)
-                                                    const updated = res.data.data
-                                                    const membershipPatches = []
-                                                    if (detail.membershipId) {
-                                                        if (editForm.seatNumber && editForm.seatNumber !== detail.seatNumber)
-                                                            membershipPatches.push(api.patch(`/admin/memberships/${detail.membershipId}/seat`, { seatNumber: editForm.seatNumber }))
-                                                        if (editForm.planId && editForm.planId !== detail.membershipPlanId)
-                                                            membershipPatches.push(api.patch(`/admin/memberships/${detail.membershipId}/plan`, { planId: editForm.planId }))
-                                                    }
-                                                    await Promise.all(membershipPatches)
-                                                    const latest = membershipPatches.length > 0
-                                                        ? (await api.get(`/admin/students/${detail.id}`)).data.data
-                                                        : updated
-                                                    setDetail(latest)
-                                                    setEditForm({ name: latest.name||'', mobile: latest.mobile||'', email: latest.email||'', address: latest.address||'', gender: latest.gender||'', dateOfBirth: latest.dateOfBirth||'', joinedAt: latest.joinedAt?.split('T')[0]||'', seatNumber: latest.seatNumber||'', planId: latest.membershipPlanId||'' })
-                                                    setEditMode(false)
-                                                    fetchStudents()
-                                                    toast.success('Student profile updated')
-                                                } catch (e) {
-                                                    toast.error(e.response?.data?.message || 'Save failed')
-                                                } finally {
-                                                    setSaving(false)
-                                                }
-                                            }}
-                                            className="text-xs px-3 py-1 rounded-lg bg-amber-500 text-navy-deep font-semibold hover:bg-amber-400 disabled:opacity-50 transition-all">
-                                            {saving ? 'Saving…' : 'Save'}
-                                        </button>
-                                    </>
-                                )}
-                                <button onClick={() => { setDetail(null); setEditMode(false) }} className="text-primary-400 hover:text-white ml-1">✕</button>
-                            </div>
+                            <button onClick={() => setDetail(null)} className="text-primary-400 hover:text-white ml-1">✕</button>
                         </div>
 
                         {/* Avatar + name */}
@@ -597,80 +542,42 @@ export default function AdminStudentsPage() {
                             {detail.photoUrl
                                 ? <img src={detail.photoUrl} alt={detail.name} className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
                                 : <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-400 to-primary-600 flex items-center justify-center text-xl font-bold text-white flex-shrink-0">
-                                    {(editMode ? editForm.name : detail.name)?.[0]?.toUpperCase()}
+                                    {detail.name?.[0]?.toUpperCase()}
                                 </div>
                             }
                             <div className="min-w-0">
-                                {editMode
-                                    ? <input className="input text-sm py-1 w-full font-bold" value={editForm.name}
-                                        onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} placeholder="Name" />
-                                    : <p className="text-white font-bold text-lg truncate">{detail.name}</p>
-                                }
+                                <p className="text-white font-bold text-lg truncate">{detail.name}</p>
                                 <p className="text-primary-400 text-sm">{detail.mobile}</p>
                             </div>
                         </div>
 
-                        {/* Fields */}
+                        {/* Fields (read-only — edit via the student detail page) */}
                         <div className="space-y-2">
-                            {/* Editable fields */}
                             {[
-                                { key: 'mobile',      label: t('adminStudents.modal.mobile'),  type: 'text',  placeholder: 'Mobile' },
-                                { key: 'email',       label: t('adminStudents.modal.email'),   type: 'text',  placeholder: 'Email' },
-                                { key: 'address',     label: t('adminStudents.modal.address'), type: 'text',  placeholder: 'Address' },
-                                { key: 'dateOfBirth', label: 'Date of Birth',                  type: 'date',  placeholder: '' },
-                            ].map(({ key, label, type, placeholder }) => (
+                                { key: 'mobile',      label: t('adminStudents.modal.mobile') },
+                                { key: 'email',       label: t('adminStudents.modal.email') },
+                                { key: 'address',     label: t('adminStudents.modal.address') },
+                                { key: 'dateOfBirth', label: 'Date of Birth' },
+                            ].map(({ key, label }) => (
                                 <div key={key} className="flex justify-between items-center py-1.5 border-b border-primary-700/20 text-sm gap-4">
                                     <span className="text-primary-400 shrink-0">{label}</span>
-                                    {editMode
-                                        ? <input type={type} className="input text-sm py-0.5 text-right w-44"
-                                            value={editForm[key]} placeholder={placeholder}
-                                            onChange={e => setEditForm(f => ({ ...f, [key]: e.target.value }))} />
-                                        : <span className="text-white text-right max-w-[55%] truncate">{detail[key] || '—'}</span>
-                                    }
+                                    <span className="text-white text-right max-w-[55%] truncate">{detail[key] || '—'}</span>
                                 </div>
                             ))}
 
-                            {/* Gender — dropdown in edit mode */}
                             <div className="flex justify-between items-center py-1.5 border-b border-primary-700/20 text-sm gap-4">
                                 <span className="text-primary-400 shrink-0">{t('adminStudents.modal.gender')}</span>
-                                {editMode
-                                    ? <select className="input text-sm py-0.5 w-44 text-right"
-                                        value={editForm.gender}
-                                        onChange={e => setEditForm(f => ({ ...f, gender: e.target.value }))}>
-                                        <option value="">—</option>
-                                        <option value="Male">Male</option>
-                                        <option value="Female">Female</option>
-                                        <option value="Other">Other</option>
-                                    </select>
-                                    : <span className="text-white">{detail.gender || '—'}</span>
-                                }
+                                <span className="text-white">{detail.gender || '—'}</span>
                             </div>
 
-                            {/* Seat — editable when membership exists */}
                             <div className="flex justify-between items-center py-1.5 border-b border-primary-700/20 text-sm gap-4">
                                 <span className="text-primary-400 shrink-0">{t('adminStudents.modal.seat')}</span>
-                                {editMode && detail.membershipId
-                                    ? <input type="text" className="input text-sm py-0.5 text-right w-32 font-mono"
-                                        value={editForm.seatNumber} placeholder="e.g. A12"
-                                        onChange={e => setEditForm(f => ({ ...f, seatNumber: e.target.value.toUpperCase() }))} />
-                                    : <span className="text-white font-mono">{detail.seatNumber || t('adminStudents.modal.noSeat')}</span>
-                                }
+                                <span className="text-white font-mono">{detail.seatNumber || t('adminStudents.modal.noSeat')}</span>
                             </div>
 
-                            {/* Plan — dropdown in edit mode */}
                             <div className="flex justify-between items-center py-1.5 border-b border-primary-700/20 text-sm gap-4">
                                 <span className="text-primary-400 shrink-0">{t('adminStudents.modal.plan')}</span>
-                                {editMode && detail.membershipId
-                                    ? <select className="input text-sm py-0.5 w-44 text-right"
-                                        value={editForm.planId}
-                                        onChange={e => setEditForm(f => ({ ...f, planId: e.target.value }))}>
-                                        <option value="">— no change —</option>
-                                        {plans.filter(p => p.isActive).map(p => (
-                                            <option key={p.id} value={p.id}>{p.name}</option>
-                                        ))}
-                                    </select>
-                                    : <span className="text-white">{detail.planName || t('adminStudents.modal.noPlan')}</span>
-                                }
+                                <span className="text-white">{detail.planName || t('adminStudents.modal.noPlan')}</span>
                             </div>
 
                             {/* Expires (always read-only) */}
@@ -691,15 +598,9 @@ export default function AdminStudentsPage() {
                                 <span className="text-white">{detail.paymentMode === 'CASH' ? `💵 ${t('adminStudents.cash')}` : detail.paymentMode === 'ONLINE' ? `💳 ${t('adminStudents.online')}` : '—'}</span>
                             </div>
 
-                            {/* Joined — editable */}
                             <div className="flex justify-between items-center py-1.5 border-b border-primary-700/20 text-sm gap-4">
                                 <span className="text-primary-400 shrink-0">{t('adminStudents.modal.joined')}</span>
-                                {editMode
-                                    ? <input type="date" className="input text-sm py-0.5 w-44 text-right"
-                                        value={editForm.joinedAt}
-                                        onChange={e => setEditForm(f => ({ ...f, joinedAt: e.target.value }))} />
-                                    : <span className="text-white">{detail.joinedAt?.split('T')[0] || '—'}</span>
-                                }
+                                <span className="text-white">{detail.joinedAt?.split('T')[0] || '—'}</span>
                             </div>
 
                             <div className="flex justify-between py-1.5 text-sm">

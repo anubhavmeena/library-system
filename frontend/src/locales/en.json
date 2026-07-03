@@ -569,6 +569,26 @@
       "seatChangeFailed": "Failed to change seat"
     }
   },
+  "adminStudentDetail": {
+    "back": "Back to Students",
+    "notFound": "Student not found",
+    "detailsTitle": "Details",
+    "fields": { "name": "Name", "dateOfBirth": "Date of Birth" },
+    "save": "Save",
+    "saving": "Saving...",
+    "membershipTitle": "Current Membership",
+    "paymentHistory": "Payment History",
+    "noPayments": "No payments found.",
+    "seatHistory": {
+      "title": "Seat History",
+      "empty": "No seat history found."
+    },
+    "toasts": {
+      "loadFailed": "Failed to load student details",
+      "saved": "Student details saved",
+      "saveFailed": "Failed to save student details"
+    }
+  },
   "adminSeats": {
     "title": "Seat Occupancy Map",
     "subtitle": "Live view of all 110 seats",

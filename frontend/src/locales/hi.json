@@ -565,6 +565,26 @@
       "seatChangeFailed": "सीट बदलने में विफल"
     }
   },
+  "adminStudentDetail": {
+    "back": "छात्रों की सूची पर वापस जाएं",
+    "notFound": "छात्र नहीं मिला",
+    "detailsTitle": "विवरण",
+    "fields": { "name": "नाम", "dateOfBirth": "जन्म तिथि" },
+    "save": "सहेजें",
+    "saving": "सहेजा जा रहा है...",
+    "membershipTitle": "वर्तमान सदस्यता",
+    "paymentHistory": "भुगतान इतिहास",
+    "noPayments": "कोई भुगतान नहीं मिला।",
+    "seatHistory": {
+      "title": "सीट इतिहास",
+      "empty": "कोई सीट इतिहास नहीं मिला।"
+    },
+    "toasts": {
+      "loadFailed": "छात्र विवरण लोड करने में विफल",
+      "saved": "छात्र विवरण सहेजा गया",
+      "saveFailed": "छात्र विवरण सहेजने में विफल"
+    }
+  },
   "adminSeats": {
     "title": "सीट अधिभोग मैप",
     "subtitle": "सभी 110 सीटों का लाइव दृश्य",

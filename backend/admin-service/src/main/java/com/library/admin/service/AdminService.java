@@ -357,6 +357,41 @@ public class AdminService {
                 .collect(Collectors.toList());
     }
 
+    // Every membership this student has ever had, newest first — same
+    // PENDING/CANCELLED exclusion and the same known gap as getSeatHistory:
+    // an in-place seat change (AdminMembershipService.changeSeat) mutates the
+    // existing membership's seatNumber rather than creating a new row, so it
+    // won't show as two separate seats here, only the membership's current one.
+    public List<SeatHistoryEntryDto> getStudentSeatHistory(String userId) {
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + userId));
+
+        List<Membership> rows = membershipRepository
+                .findByUserIdOrderByStartDateDesc(user.getId())
+                .stream()
+                .filter(m -> m.getStatus() != Membership.Status.PENDING
+                          && m.getStatus() != Membership.Status.CANCELLED)
+                .collect(Collectors.toList());
+
+        Set<UUID> planIds = rows.stream().map(Membership::getPlanId).collect(Collectors.toSet());
+        Map<UUID, Plan> planMap = planRepository.findAllById(planIds).stream()
+                .collect(Collectors.toMap(Plan::getId, p -> p));
+
+        return rows.stream()
+                .map(m -> SeatHistoryEntryDto.builder()
+                        .membershipId(m.getId().toString())
+                        .studentName(user.getName())
+                        .studentMobile(user.getMobile())
+                        .shift(m.getShift())
+                        .startDate(m.getStartDate().toString())
+                        .endDate(m.getEndDate().toString())
+                        .status(m.getStatus().name())
+                        .seatNumber(m.getSeatNumber())
+                        .planName(Optional.ofNullable(planMap.get(m.getPlanId())).map(Plan::getName).orElse(null))
+                        .build())
+                .collect(Collectors.toList());
+    }
+
     // ── Expiring Memberships ──────────────────────────────────────────────────
 
     public List<StudentDto> getExpiringMemberships(int withinDays) {

@@ -194,6 +194,54 @@ class AdminControllerTest {
                 .andExpect(jsonPath("$.data").isEmpty());
     }
 
+    // ── GET /api/admin/students/{userId}/seat-history ─────────────────────────
+
+    @Test
+    void getStudentSeatHistory_forwardsUserId_returnsList() throws Exception {
+        String uid = UUID.randomUUID().toString();
+        SeatHistoryEntryDto entry = SeatHistoryEntryDto.builder()
+                .membershipId(UUID.randomUUID().toString())
+                .studentName("Alice")
+                .shift("MORNING")
+                .startDate("2025-01-01")
+                .endDate("2025-01-31")
+                .status("EXPIRED")
+                .seatNumber("A1")
+                .planName("Full Day Plan")
+                .build();
+
+        when(adminService.getStudentSeatHistory(uid)).thenReturn(List.of(entry));
+
+        mockMvc.perform(get("/api/admin/students/{userId}/seat-history", uid))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].seatNumber").value("A1"))
+                .andExpect(jsonPath("$.data[0].planName").value("Full Day Plan"));
+
+        verify(adminService).getStudentSeatHistory(uid);
+    }
+
+    @Test
+    void getStudentSeatHistory_noBookings_returnsEmptyList() throws Exception {
+        String uid = UUID.randomUUID().toString();
+        when(adminService.getStudentSeatHistory(uid)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/students/{userId}/seat-history", uid))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    void getStudentSeatHistory_studentNotFound_returns404() throws Exception {
+        String uid = UUID.randomUUID().toString();
+        when(adminService.getStudentSeatHistory(uid))
+                .thenThrow(new ResourceNotFoundException("Student not found: " + uid));
+
+        mockMvc.perform(get("/api/admin/students/{userId}/seat-history", uid))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
     // ── GET /api/admin/memberships/expiring ──────────────────────────────────
 
     @Test
