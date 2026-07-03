@@ -235,7 +235,8 @@ public class PaymentService {
                 userId, membership.getId());
 
         publishPaymentReceipt(userId, membership.getId().toString(), user, payment,
-                membership.getPlan().getName(), membership.getSeatNumber(), "NEW_BOOKING");
+                membership.getPlan().getName(), membership.getSeatNumber(),
+                membership.getEndDate().toString(), "NEW_BOOKING");
 
         return MembershipDto.fromEntity(membership);
     }
@@ -342,7 +343,8 @@ public class PaymentService {
 
         UserProfileDto user = fetchUserProfile(userId);
         publishPaymentReceipt(userId, membership.getId().toString(), user, payment,
-                membership.getPlan().getName(), membership.getSeatNumber(), "DUES_CLEARED");
+                membership.getPlan().getName(), membership.getSeatNumber(),
+                membership.getEndDate().toString(), "DUES_CLEARED");
 
         return MembershipDto.fromEntity(membership);
     }
@@ -514,7 +516,7 @@ public class PaymentService {
 
     private void publishPaymentReceipt(String userId, String membershipId, UserProfileDto user,
                                         Payment payment, String planName, String seatNumber,
-                                        String receiptType) {
+                                        String validUpto, String receiptType) {
         PaymentReceiptEvent event = PaymentReceiptEvent.builder()
                 .userId(userId)
                 .membershipId(membershipId)
@@ -527,6 +529,7 @@ public class PaymentService {
                 .amountPending(BigDecimal.ZERO)
                 .planName(planName)
                 .seatNumber(seatNumber)
+                .validUpto(validUpto)
                 .paymentMethod(payment.getPaymentGateway())
                 .receiptType(receiptType)
                 .build();

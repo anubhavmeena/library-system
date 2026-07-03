@@ -464,6 +464,10 @@ public class NotificationService {
                 ? "₹" + event.getAmountPaid().stripTrailingZeros().toPlainString()
                 : "₹0";
 
+        String validUptoLine = hasValue(event.getValidUpto())
+                ? "Valid Upto  : " + event.getValidUpto() + "\n"
+                : "";
+
         String emailSubject = "Payment Receipt — Invoice " + event.getInvoiceId();
         String emailBody = String.format(
                 "Dear %s,\n\n"                                        +
@@ -471,10 +475,11 @@ public class NotificationService {
                         "Invoice No.  : %s\n"                                 +
                         "Date         : %s\n"                                 +
                         "Amount Paid  : %s\n"                                 +
-                        "Amount Pending: %s\n\n"                              +
+                        "Amount Pending: %s\n"                                +
+                        "%s\n"                                               +
                         "Best regards,\n"                                     +
                         "Target Zone Library Team",
-                event.getUserName(), event.getInvoiceId(), event.getPaymentDate(), paid, pending
+                event.getUserName(), event.getInvoiceId(), event.getPaymentDate(), paid, pending, validUptoLine
         );
 
         // "payment_receipt" template's {{1}}..{{5}} order: name, amount paid
@@ -500,9 +505,12 @@ public class NotificationService {
         } else {
             // Couldn't host the PDF — the document-header template requires a
             // link, so fall back to the plain text template (no attachment).
+            String validUptoFallbackLine = hasValue(event.getValidUpto())
+                    ? "\nValid Upto : " + event.getValidUpto()
+                    : "";
             String fallbackMsg = String.format(
-                    "🧾 Payment Receipt\n\nInvoice : %s\nDate    : %s\nPaid    : %s\nPending : %s\n\n📚 Target Zone Library",
-                    event.getInvoiceId(), event.getPaymentDate(), paid, pending
+                    "🧾 Payment Receipt\n\nInvoice : %s\nDate    : %s\nPaid    : %s\nPending : %s%s\n\n📚 Target Zone Library",
+                    event.getInvoiceId(), event.getPaymentDate(), paid, pending, validUptoFallbackLine
             );
             log.warn("Receipt PDF not hosted for invoice {} — WhatsApp falling back to text-only message", event.getInvoiceId());
             if (hasValue(event.getUserMobile())) {

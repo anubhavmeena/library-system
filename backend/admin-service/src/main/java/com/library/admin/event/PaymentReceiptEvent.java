@@ -20,6 +20,7 @@ public class PaymentReceiptEvent {
     private BigDecimal amountPending;
     private String planName;       // nullable
     private String seatNumber;     // nullable
+    private String validUpto;      // yyyy-MM-dd, the membership's end date — nullable
     private String paymentMethod;  // RAZORPAY | CASHFREE | CASH
     private String receiptType;    // NEW_BOOKING | DUES_CLEARED
 }

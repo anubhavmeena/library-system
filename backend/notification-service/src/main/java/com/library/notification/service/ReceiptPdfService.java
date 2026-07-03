@@ -53,6 +53,7 @@ public class ReceiptPdfService {
             addRow(doc, "Phone", nvl(event.getUserMobile()));
             if (hasValue(event.getPlanName()))   addRow(doc, "Plan", event.getPlanName());
             if (hasValue(event.getSeatNumber())) addRow(doc, "Seat", event.getSeatNumber());
+            if (hasValue(event.getValidUpto()))  addRow(doc, "Valid Upto", event.getValidUpto());
             addRow(doc, "Payment Method", nvl(event.getPaymentMethod()));
 
             doc.add(new Paragraph(" "));

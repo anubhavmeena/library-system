@@ -22,6 +22,7 @@ class ReceiptPdfServiceTest {
         e.setPaymentMethod("CASH");
         e.setAmountPaid(new BigDecimal("600"));
         e.setAmountPending(BigDecimal.ZERO);
+        e.setValidUpto("2026-08-02");
         return e;
     }
 
@@ -41,10 +42,22 @@ class ReceiptPdfServiceTest {
         e.setPlanName(null);
         e.setSeatNumber(null);
         e.setUserMobile(null);
+        e.setValidUpto(null);
 
         byte[] pdf = service.buildReceipt(e);
 
         assertThat(pdf).isNotEmpty();
+    }
+
+    @Test
+    void buildReceipt_nullValidUpto_doesNotThrow() {
+        PaymentReceiptEvent e = buildEvent();
+        e.setValidUpto(null);
+
+        byte[] pdf = service.buildReceipt(e);
+
+        assertThat(pdf).isNotEmpty();
+        assertThat(new String(pdf, 0, 4)).isEqualTo("%PDF");
     }
 
     @Test

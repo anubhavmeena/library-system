@@ -14,6 +14,7 @@ public class PaymentReceiptEvent {
     private BigDecimal amountPending;
     private String planName;
     private String seatNumber;
+    private String validUpto;
     private String paymentMethod;
     private String receiptType;
 }

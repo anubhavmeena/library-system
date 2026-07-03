@@ -607,6 +607,7 @@ public class AdminService {
                 .findFirstByUserIdCurrentOrderByEndDateDesc(uid)
                 .or(() -> membershipRepository.findFirstByUserIdOrderByEndDateDesc(uid));
         String seatNumber = currentOrLatest.map(Membership::getSeatNumber).orElse(null);
+        String validUpto = currentOrLatest.map(Membership::getEndDate).map(Object::toString).orElse(null);
         UUID membershipIdForClearance = currentOrLatest.map(Membership::getId)
                 .orElseGet(() -> pendingPayments.get(0).getMembershipId());
 
@@ -662,6 +663,7 @@ public class AdminService {
                 .amountPaid(totalCleared)
                 .amountPending(BigDecimal.ZERO)
                 .seatNumber(seatNumber)
+                .validUpto(validUpto)
                 .paymentMethod("CASH")
                 .receiptType("DUES_CLEARED")
                 .build();

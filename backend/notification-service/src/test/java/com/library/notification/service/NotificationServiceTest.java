@@ -68,6 +68,7 @@ class NotificationServiceTest {
         e.setAmountPending(BigDecimal.ZERO);
         e.setPaymentMethod("CASH");
         e.setReceiptType("NEW_BOOKING");
+        e.setValidUpto("2026-04-19");
         return e;
     }
 
@@ -497,7 +498,9 @@ class NotificationServiceTest {
         notificationService.sendPaymentReceipt(receiptEvent("9876543210", "arjun@test.com"));
 
         verify(whatsAppService, never()).sendDocumentTemplate(any(), any(), any(), any(), any(), any(), any(), any());
-        verify(whatsAppService).send(eq("9876543210"), anyString(), eq("user-123"), eq("PAYMENT_RECEIPT"));
+        ArgumentCaptor<String> msgCaptor = ArgumentCaptor.forClass(String.class);
+        verify(whatsAppService).send(eq("9876543210"), msgCaptor.capture(), eq("user-123"), eq("PAYMENT_RECEIPT"));
+        assertThat(msgCaptor.getValue()).contains("Valid Upto").contains("2026-04-19");
     }
 
     @Test
@@ -508,10 +511,28 @@ class NotificationServiceTest {
 
         notificationService.sendPaymentReceipt(receiptEvent("9876543210", "arjun@test.com"));
 
-        verify(emailService).sendWithAttachment(eq("arjun@test.com"), anyString(), anyString(),
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendWithAttachment(eq("arjun@test.com"), anyString(), bodyCaptor.capture(),
                 eq(pdf), eq("INV-20260320-ABC123.pdf"), eq("user-123"), eq("PAYMENT_RECEIPT"));
         verify(emailService).sendWithAttachment(eq("admin@test.com"), anyString(), anyString(),
                 eq(pdf), eq("INV-20260320-ABC123.pdf"), isNull(), eq("PAYMENT_RECEIPT_ADMIN"));
+        assertThat(bodyCaptor.getValue()).contains("Valid Upto").contains("2026-04-19");
+    }
+
+    @Test
+    void sendPaymentReceipt_nullValidUpto_emailBodyOmitsValidUptoLine() {
+        byte[] pdf = new byte[]{1, 2, 3};
+        when(receiptPdfService.buildReceipt(any())).thenReturn(pdf);
+        stubSuccessfulUpload("/uploads/receipts/INV-20260320-ABC123.pdf");
+        PaymentReceiptEvent event = receiptEvent("9876543210", "arjun@test.com");
+        event.setValidUpto(null);
+
+        notificationService.sendPaymentReceipt(event);
+
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendWithAttachment(eq("arjun@test.com"), anyString(), bodyCaptor.capture(),
+                eq(pdf), eq("INV-20260320-ABC123.pdf"), eq("user-123"), eq("PAYMENT_RECEIPT"));
+        assertThat(bodyCaptor.getValue()).doesNotContain("Valid Upto");
     }
 
     @Test
