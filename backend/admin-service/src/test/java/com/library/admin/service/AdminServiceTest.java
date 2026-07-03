@@ -715,6 +715,52 @@ class AdminServiceTest {
     }
 
     // ================================================================
+    //  getStudentsWithOrphanedSeats
+    // ================================================================
+
+    @Test
+    void getStudentsWithOrphanedSeats_returnsStudentsForFlaggedMemberships() {
+        UUID uid = UUID.randomUUID();
+        User user = buildUser(uid);
+        Membership mem = buildActiveMembership(uid, LocalDate.now().plusDays(10));
+        Plan plan = buildPlan(mem.getPlanId(), "Full Day Plan");
+
+        when(membershipRepository.findActiveMembershipsWithoutSeatBooking()).thenReturn(List.of(mem));
+        when(userRepository.findAllById(anyIterable())).thenReturn(List.of(user));
+        when(planRepository.findAllById(anyIterable())).thenReturn(List.of(plan));
+
+        List<StudentDto> result = adminService.getStudentsWithOrphanedSeats();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(uid.toString());
+        assertThat(result.get(0).getMembershipId()).isEqualTo(mem.getId().toString());
+        assertThat(result.get(0).getPlanName()).isEqualTo("Full Day Plan");
+    }
+
+    @Test
+    void getStudentsWithOrphanedSeats_noneFlagged_returnsEmptyList() {
+        when(membershipRepository.findActiveMembershipsWithoutSeatBooking()).thenReturn(List.of());
+
+        List<StudentDto> result = adminService.getStudentsWithOrphanedSeats();
+
+        assertThat(result).isEmpty();
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void getStudentsWithOrphanedSeats_userNotFound_excludedFromResults() {
+        UUID uid = UUID.randomUUID();
+        Membership mem = buildActiveMembership(uid, LocalDate.now().plusDays(10));
+
+        when(membershipRepository.findActiveMembershipsWithoutSeatBooking()).thenReturn(List.of(mem));
+        when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
+
+        List<StudentDto> result = adminService.getStudentsWithOrphanedSeats();
+
+        assertThat(result).isEmpty();
+    }
+
+    // ================================================================
     //  getExpiringMemberships
     // ================================================================
 

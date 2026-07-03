@@ -1,6 +1,8 @@
 package com.library.admin.service;
 
+import com.library.admin.dto.ChangeSeatRequest;
 import com.library.admin.entity.Membership;
+import com.library.admin.entity.Seat;
 import com.library.admin.entity.SeatBooking;
 import com.library.admin.exception.ResourceNotFoundException;
 import com.library.admin.repository.*;
@@ -13,6 +15,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,10 +23,11 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-// Scoped to AdminMembershipService.releaseSeat() — the method changed to allow
-// releasing an ACTIVE (not just GRACE) membership's seat. Other methods on this
-// service (createCashMembership, changeSeat, updateMembershipPlan) are untouched
-// by that change and are not covered here.
+// Covers AdminMembershipService.releaseSeat() (changed to allow releasing an
+// ACTIVE, not just GRACE, membership's seat) and changeSeat() (changed to
+// create a SeatBooking when the membership never had one, instead of silently
+// no-oping). createCashMembership/updateMembershipPlan are untouched by either
+// change and are not covered here.
 @ExtendWith(MockitoExtension.class)
 class AdminMembershipServiceTest {
 
@@ -64,6 +68,11 @@ class AdminMembershipServiceTest {
                 .endDate(LocalDate.of(9999, 12, 31))
                 .status(SeatBooking.Status.ACTIVE)
                 .build();
+    }
+
+    private Seat buildSeat(UUID id, String seatNumber) {
+        return new Seat(id, seatNumber, seatNumber.substring(0, 1),
+                Integer.parseInt(seatNumber.substring(1)), true);
     }
 
     // ── releaseSeat ──────────────────────────────────────────────────────────
@@ -173,5 +182,83 @@ class AdminMembershipServiceTest {
         // invalidateSeatCache walks LocalDate.now()..+14 inclusive (15 days) and,
         // for FULL_DAY, deletes 3 keys per day (FULL_DAY + MORNING + EVENING).
         verify(redisTemplate, times(15 * 3)).delete(anyString());
+    }
+
+    // ── changeSeat ───────────────────────────────────────────────────────────
+
+    @Test
+    void changeSeat_existingBooking_updatesSeatIdInPlace() {
+        UUID membershipId = UUID.randomUUID();
+        Membership mem = buildMembership(membershipId, Membership.Status.ACTIVE);
+        SeatBooking existingBooking = buildActiveBooking(membershipId);
+        UUID newSeatId = UUID.randomUUID();
+        Seat newSeat = buildSeat(newSeatId, "D5");
+        ChangeSeatRequest req = new ChangeSeatRequest();
+        req.setSeatNumber("D5");
+
+        when(membershipRepository.findById(membershipId)).thenReturn(Optional.of(mem));
+        when(seatRepository.findBySeatNumber("D5")).thenReturn(Optional.of(newSeat));
+        when(seatBookingRepository.findActiveBookingsForSeat(eq(newSeatId), any(), any()))
+                .thenReturn(List.of());
+        when(seatBookingRepository.findFirstByMembershipIdAndStatus(membershipId, SeatBooking.Status.ACTIVE))
+                .thenReturn(Optional.of(existingBooking));
+
+        adminMembershipService.changeSeat(membershipId.toString(), req);
+
+        assertThat(existingBooking.getSeatId()).isEqualTo(newSeatId);
+        verify(seatBookingRepository).save(existingBooking);
+        verify(seatBookingRepository, times(1)).save(any());
+    }
+
+    @Test
+    void changeSeat_noExistingBooking_createsNewSeatBooking() {
+        // Regression for a production bug: a membership can reach changeSeat()
+        // having never had a SeatBooking row at all (e.g. the student booking
+        // flow activated the membership but the separate seat-reservation call
+        // never completed). Silently doing nothing here — the old behavior —
+        // left the membership pointing at a seat with no booking record behind
+        // it. It must create one instead.
+        UUID membershipId = UUID.randomUUID();
+        Membership mem = buildMembership(membershipId, Membership.Status.ACTIVE);
+        UUID newSeatId = UUID.randomUUID();
+        Seat newSeat = buildSeat(newSeatId, "D5");
+        ChangeSeatRequest req = new ChangeSeatRequest();
+        req.setSeatNumber("D5");
+
+        when(membershipRepository.findById(membershipId)).thenReturn(Optional.of(mem));
+        when(seatRepository.findBySeatNumber("D5")).thenReturn(Optional.of(newSeat));
+        when(seatBookingRepository.findActiveBookingsForSeat(eq(newSeatId), any(), any()))
+                .thenReturn(List.of());
+        when(seatBookingRepository.findFirstByMembershipIdAndStatus(membershipId, SeatBooking.Status.ACTIVE))
+                .thenReturn(Optional.empty());
+
+        adminMembershipService.changeSeat(membershipId.toString(), req);
+
+        ArgumentCaptor<SeatBooking> captor = ArgumentCaptor.forClass(SeatBooking.class);
+        verify(seatBookingRepository).save(captor.capture());
+        SeatBooking created = captor.getValue();
+        assertThat(created.getSeatId()).isEqualTo(newSeatId);
+        assertThat(created.getUserId()).isEqualTo(mem.getUserId());
+        assertThat(created.getMembershipId()).isEqualTo(membershipId);
+        assertThat(created.getShift()).isEqualTo(mem.getShift());
+        assertThat(created.getBookingDate()).isEqualTo(mem.getStartDate());
+        assertThat(created.getEndDate()).isEqualTo(mem.getEndDate());
+        assertThat(created.getStatus()).isEqualTo(SeatBooking.Status.ACTIVE);
+    }
+
+    @Test
+    void changeSeat_notActiveMembership_throwsIllegalArgumentException() {
+        UUID membershipId = UUID.randomUUID();
+        Membership mem = buildMembership(membershipId, Membership.Status.GRACE);
+        ChangeSeatRequest req = new ChangeSeatRequest();
+        req.setSeatNumber("D5");
+
+        when(membershipRepository.findById(membershipId)).thenReturn(Optional.of(mem));
+
+        assertThatThrownBy(() -> adminMembershipService.changeSeat(membershipId.toString(), req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ACTIVE");
+
+        verifyNoInteractions(seatBookingRepository);
     }
 }

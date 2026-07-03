@@ -291,7 +291,14 @@
       "selectSeat": "Please select a seat",
       "paymentFailed": "Payment failed",
       "verifyFailed": "Payment verification failed",
-      "confirmed": "Booking confirmed! 🎉"
+      "confirmed": "Booking confirmed! 🎉",
+      "seatBookingFailed": "Payment succeeded, but we couldn't reserve your seat"
+    },
+    "seatFailed": {
+      "title": "Payment received — seat reservation failed",
+      "desc": "Your payment went through and your membership is active, but we couldn't reserve your seat (it may have just been taken by another student). Please retry — you won't be charged again.",
+      "retry": "Retry Seat Reservation",
+      "retrying": "Retrying..."
     }
   },
   "membership": {
@@ -460,6 +467,7 @@
       "totalStudents": "Total Students",
       "activeMemberships": "Active Memberships",
       "expiringThisWeek": "Expiring This Week",
+      "orphanedSeats": "Paid, No Seat",
       "needsAttention": "Needs attention",
       "totalSeats": "Total Seats",
       "occupied": "Occupied",

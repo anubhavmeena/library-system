@@ -242,6 +242,28 @@ class AdminControllerTest {
                 .andExpect(jsonPath("$.success").value(false));
     }
 
+    // ── GET /api/admin/students/orphaned-seats ────────────────────────────────
+
+    @Test
+    void getStudentsWithOrphanedSeats_returnsList() throws Exception {
+        StudentDto dto = StudentDto.builder().id(UUID.randomUUID().toString()).name("Alice").build();
+        when(adminService.getStudentsWithOrphanedSeats()).thenReturn(List.of(dto));
+
+        mockMvc.perform(get("/api/admin/students/orphaned-seats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].name").value("Alice"));
+    }
+
+    @Test
+    void getStudentsWithOrphanedSeats_noneFlagged_returnsEmptyList() throws Exception {
+        when(adminService.getStudentsWithOrphanedSeats()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/students/orphaned-seats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
     // ── GET /api/admin/memberships/expiring ──────────────────────────────────
 
     @Test

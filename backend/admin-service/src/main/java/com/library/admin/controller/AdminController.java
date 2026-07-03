@@ -83,6 +83,11 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(adminService.getStudentsWithPendingFees()));
     }
 
+    @GetMapping("/students/orphaned-seats")
+    public ResponseEntity<ApiResponse<List<StudentDto>>> getStudentsWithOrphanedSeats() {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getStudentsWithOrphanedSeats()));
+    }
+
     @PatchMapping("/students/{userId}/clear-pending-fees")
     public ResponseEntity<ApiResponse<String>> clearPendingFees(@PathVariable String userId) {
         adminService.clearPendingFees(userId);

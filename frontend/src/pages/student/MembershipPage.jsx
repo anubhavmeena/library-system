@@ -80,6 +80,24 @@ export default function MembershipPage() {
         }
     }
 
+    // Payment activates/queues the membership before the seat is actually
+    // reserved (a separate call to seat-service) — if that second call fails,
+    // onSuccess() must not fire, or the student is told their plan is queued
+    // with a seat that was never actually reserved.
+    const bookQueuedSeat = async (m) => {
+        if (!m.seatNumber) return true
+        try {
+            await api.post('/seats/book', {
+                seatNumber: m.seatNumber, membershipId: m.id,
+                shift: m.shift, startDate: m.startDate, endDate: m.endDate,
+            })
+            return true
+        } catch {
+            toast.error('Payment succeeded, but seat reservation failed — please contact support to finalize your seat.')
+            return false
+        }
+    }
+
     const handleQueuePayment = async () => {
         if (!selectedQueuePlan) return
         setQueuePaying(true)
@@ -102,11 +120,7 @@ export default function MembershipPage() {
                 }))
                 if (verifyPayment.fulfilled.match(verifyRes)) {
                     const m = verifyRes.payload
-                    if (m.seatNumber) await api.post('/seats/book', {
-                        seatNumber: m.seatNumber, membershipId: m.id,
-                        shift: m.shift, startDate: m.startDate, endDate: m.endDate,
-                    }).catch(() => {})
-                    await onSuccess()
+                    if (await bookQueuedSeat(m)) await onSuccess()
                 }
             } else if (order.gateway === 'CASHFREE') {
                 const { load } = await import('@cashfreepayments/cashfree-js')
@@ -123,11 +137,7 @@ export default function MembershipPage() {
                 }))
                 if (verifyPayment.fulfilled.match(verifyRes)) {
                     const m = verifyRes.payload
-                    if (m.seatNumber) await api.post('/seats/book', {
-                        seatNumber: m.seatNumber, membershipId: m.id,
-                        shift: m.shift, startDate: m.startDate, endDate: m.endDate,
-                    }).catch(() => {})
-                    await onSuccess()
+                    if (await bookQueuedSeat(m)) await onSuccess()
                 } else toast.error('Payment verification failed')
             } else {
                 const options = {
@@ -144,11 +154,7 @@ export default function MembershipPage() {
                         }))
                         if (verifyPayment.fulfilled.match(verifyRes)) {
                             const m = verifyRes.payload
-                            if (m.seatNumber) await api.post('/seats/book', {
-                                seatNumber: m.seatNumber, membershipId: m.id,
-                                shift: m.shift, startDate: m.startDate, endDate: m.endDate,
-                            }).catch(() => {})
-                            await onSuccess()
+                            if (await bookQueuedSeat(m)) await onSuccess()
                         } else toast.error('Payment verification failed')
                     },
                     theme: { color: '#f59e0b' },

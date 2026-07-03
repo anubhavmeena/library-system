@@ -78,6 +78,7 @@ export default function AdminDashboardPage() {
                 <StatCard icon="👥" label={t('adminDashboard.stats.totalStudents')}     value={fmt(stats?.totalStudents)}    color="blue"    to="/admin/students" />
                 <StatCard icon="📋" label={t('adminDashboard.stats.activeMemberships')} value={fmt(stats?.activeMemberships)} color="amber" />
                 <StatCard icon="⚠️" label={t('adminDashboard.stats.expiringThisWeek')} value={fmt(stats?.expiringThisWeek)} color="red" to="/admin/reminders" sub={t('adminDashboard.stats.needsAttention')} />
+                <StatCard icon="🪑" label={t('adminDashboard.stats.orphanedSeats')} value={fmt(stats?.orphanedSeatMemberships)} color="red" to="/admin/reminders" sub={t('adminDashboard.stats.needsAttention')} />
             </div>
 
             <p className="text-primary-500 text-xs uppercase tracking-widest mb-3">{t('adminDashboard.seats')}</p>

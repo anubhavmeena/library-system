@@ -1,6 +1,7 @@
 package com.library.admin.repository;
 
 import com.library.admin.entity.Membership;
+import com.library.admin.entity.SeatBooking;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,11 +20,15 @@ class MembershipRepositoryTest {
     @Autowired
     MembershipRepository membershipRepository;
 
+    @Autowired
+    SeatBookingRepository seatBookingRepository;
+
     private final UUID userId1 = UUID.randomUUID();
     private final UUID userId2 = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
+        seatBookingRepository.deleteAll();
         membershipRepository.deleteAll();
     }
 
@@ -287,6 +292,65 @@ class MembershipRepositoryTest {
     @Test
     void findBySeatNumberOrderByStartDateDesc_noBookings_returnsEmpty() {
         List<Membership> result = membershipRepository.findBySeatNumberOrderByStartDateDesc("D26");
+
+        assertThat(result).isEmpty();
+    }
+
+    // ── findActiveMembershipsWithoutSeatBooking ──────────────────────────────
+
+    private SeatBooking saveBooking(UUID membershipId, SeatBooking.Status status) {
+        return seatBookingRepository.save(SeatBooking.builder()
+                .id(UUID.randomUUID())
+                .seatId(UUID.randomUUID())
+                .userId(UUID.randomUUID())
+                .membershipId(membershipId)
+                .shift("MORNING")
+                .bookingDate(LocalDate.now().minusDays(5))
+                .endDate(LocalDate.now().plusDays(25))
+                .status(status)
+                .build());
+    }
+
+    @Test
+    void findActiveMembershipsWithoutSeatBooking_flagsActiveMembershipWithNoBooking() {
+        Membership orphaned = save(userId1, Membership.Status.ACTIVE, LocalDate.now().plusDays(10), false);
+        // control: an ACTIVE membership WITH a matching booking must not be flagged
+        Membership backed = save(userId2, Membership.Status.ACTIVE, LocalDate.now().plusDays(10), false);
+        saveBooking(backed.getId(), SeatBooking.Status.ACTIVE);
+
+        List<Membership> result = membershipRepository.findActiveMembershipsWithoutSeatBooking();
+
+        assertThat(result).extracting(Membership::getId).containsExactly(orphaned.getId());
+    }
+
+    @Test
+    void findActiveMembershipsWithoutSeatBooking_bookingExistsButReleased_stillFlagged() {
+        // A RELEASED (not ACTIVE) booking doesn't count as "backing" the
+        // membership — matches how the rest of the app treats booking status.
+        Membership mem = save(userId1, Membership.Status.ACTIVE, LocalDate.now().plusDays(10), false);
+        saveBooking(mem.getId(), SeatBooking.Status.RELEASED);
+
+        List<Membership> result = membershipRepository.findActiveMembershipsWithoutSeatBooking();
+
+        assertThat(result).extracting(Membership::getId).containsExactly(mem.getId());
+    }
+
+    @Test
+    void findActiveMembershipsWithoutSeatBooking_ignoresNonActiveMemberships() {
+        Membership grace = save(userId1, Membership.Status.GRACE, LocalDate.now().minusDays(2), false);
+        Membership pending = save(userId2, Membership.Status.PENDING, LocalDate.now().plusDays(10), false);
+
+        List<Membership> result = membershipRepository.findActiveMembershipsWithoutSeatBooking();
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void findActiveMembershipsWithoutSeatBooking_noneOrphaned_returnsEmpty() {
+        Membership mem = save(userId1, Membership.Status.ACTIVE, LocalDate.now().plusDays(10), false);
+        saveBooking(mem.getId(), SeatBooking.Status.ACTIVE);
+
+        List<Membership> result = membershipRepository.findActiveMembershipsWithoutSeatBooking();
 
         assertThat(result).isEmpty();
     }

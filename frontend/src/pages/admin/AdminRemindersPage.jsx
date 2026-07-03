@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
@@ -14,6 +15,9 @@ export default function AdminRemindersPage() {
     const [pendingLoading, setPendingLoading]     = useState(true)
     const [pendingSending, setPendingSending]     = useState(false)
     const [pendingSelected, setPendingSelected]   = useState(new Set())
+
+    const [orphanedStudents, setOrphanedStudents] = useState([])
+    const [orphanedLoading, setOrphanedLoading]   = useState(true)
 
     const { t } = useTranslation()
 
@@ -31,8 +35,16 @@ export default function AdminRemindersPage() {
         finally { setPendingLoading(false) }
     }
 
+    const fetchOrphanedSeats = async () => {
+        setOrphanedLoading(true)
+        try { const res = await api.get('/admin/students/orphaned-seats'); setOrphanedStudents(res.data.data || []) }
+        catch { toast.error('Failed to load students with unassigned seats') }
+        finally { setOrphanedLoading(false) }
+    }
+
     useEffect(() => { fetchExpiring() }, [withinDays])
     useEffect(() => { fetchPendingFees() }, [])
+    useEffect(() => { fetchOrphanedSeats() }, [])
 
     const toggleAll = () => {
         if (selected.size === students.length) setSelected(new Set())
@@ -267,6 +279,79 @@ export default function AdminRemindersPage() {
                                         <td className="p-4 text-primary-300">{s.membershipEnd || '—'}</td>
                                         <td className="p-4">
                                             <span className="text-red-400 font-bold text-sm">₹{s.pendingAmount}</span>
+                                        </td>
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* ── Section 3: Students Needing a Seat ── */}
+            <div>
+                <div className="mb-6">
+                    <h2 className="section-title">Students Needing a Seat</h2>
+                    <p className="text-primary-400 text-sm mt-1">
+                        Paid, active memberships with no seat actually reserved — usually because the seat-reservation
+                        step failed right after payment. Assign a seat via the student's detail page.
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-2 mb-4">
+                    <span className="text-sm text-primary-400">
+                        {orphanedStudents.length} student{orphanedStudents.length !== 1 ? 's' : ''} without a reserved seat
+                    </span>
+                    <button onClick={fetchOrphanedSeats} disabled={orphanedLoading}
+                            className="text-xs text-primary-500 hover:text-primary-300 border border-primary-700/40 px-2 py-1 rounded-lg transition-colors">
+                        ↻ Refresh
+                    </button>
+                </div>
+
+                {orphanedLoading ? (
+                    <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="shimmer h-16 rounded-xl" />)}</div>
+                ) : orphanedStudents.length === 0 ? (
+                    <div className="card p-12 text-center">
+                        <div className="text-4xl mb-3">✅</div>
+                        <p className="text-white font-semibold">Everyone has a seat</p>
+                        <p className="text-primary-400 text-sm mt-1">No paid memberships are missing a seat reservation.</p>
+                    </div>
+                ) : (
+                    <div className="card overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                <tr className="border-b border-primary-700/40">
+                                    <th className="p-4 text-left text-primary-400 font-medium">Student</th>
+                                    <th className="p-4 text-left text-primary-400 font-medium">Contact</th>
+                                    <th className="p-4 text-left text-primary-400 font-medium">Plan</th>
+                                    <th className="p-4 text-left text-primary-400 font-medium">Membership Ends</th>
+                                    <th className="p-4 text-left text-primary-400 font-medium"></th>
+                                </tr>
+                                </thead>
+                                <tbody className="divide-y divide-primary-700/20">
+                                {orphanedStudents.map(s => (
+                                    <tr key={s.id} className="hover:bg-primary-800/30 transition-colors">
+                                        <td className="p-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-400 to-primary-600 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+                                                    {s.name?.[0]?.toUpperCase()}
+                                                </div>
+                                                <span className="text-white font-medium">{s.name}</span>
+                                            </div>
+                                        </td>
+                                        <td className="p-4">
+                                            <p className="text-primary-300">{s.mobile || '—'}</p>
+                                            <p className="text-primary-500 text-xs">{s.email || '—'}</p>
+                                        </td>
+                                        <td className="p-4 text-primary-300">{s.planName || '—'}</td>
+                                        <td className="p-4 text-primary-300">{s.membershipEnd || '—'}</td>
+                                        <td className="p-4 text-right">
+                                            <Link to={`/admin/students/${s.id}`}
+                                                  className="text-xs px-3 py-1.5 rounded-lg bg-primary-700/50 text-primary-300 hover:text-white border border-primary-700/40 transition-all">
+                                                Assign Seat →
+                                            </Link>
                                         </td>
                                     </tr>
                                 ))}

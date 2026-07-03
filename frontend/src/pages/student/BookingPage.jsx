@@ -109,6 +109,13 @@ export default function BookingPage() {
     const [selectedShift, setSelectedShift] = useState('MORNING')
     const [paying, setPaying] = useState(false)
     const [membershipChecked, setMembershipChecked] = useState(false)
+    // Payment succeeds and activates the membership before the seat is actually
+    // reserved (a separate call to seat-service) — if that second call fails
+    // (seat-conflict race, transient error), we must not tell the student their
+    // booking is confirmed. Holds the activated membership so "Retry" can
+    // re-attempt just the seat reservation without re-charging anything.
+    const [bookingFailed, setBookingFailed] = useState(null)
+    const [retryingBooking, setRetryingBooking] = useState(false)
 
     const steps = t('booking.steps', { returnObjects: true })
 
@@ -132,6 +139,36 @@ export default function BookingPage() {
         return shift === 'MORNING' ? t('booking.summary.shiftMorning') : t('booking.summary.shiftEvening')
     }
 
+    // Attempts to reserve the seat for an already-activated (paid) membership.
+    // Only navigates to the success page once the seat is actually reserved —
+    // on failure, surfaces a real error and keeps `activated` around so the
+    // "Retry" banner can call this again without re-running payment.
+    const attemptSeatBooking = async (activated) => {
+        const res = await dispatch(bookSeat({
+            seatNumber: activated.seatNumber,
+            membershipId: activated.id,
+            shift: activated.shift,
+            startDate: activated.startDate,
+            endDate: activated.endDate,
+        }))
+        if (bookSeat.fulfilled.match(res)) {
+            setBookingFailed(null)
+            toast.success(t('booking.toasts.confirmed'))
+            navigate('/student/payment-success')
+            return true
+        }
+        setBookingFailed(activated)
+        toast.error(t('booking.toasts.seatBookingFailed'))
+        return false
+    }
+
+    const handleRetryBooking = async () => {
+        if (!bookingFailed) return
+        setRetryingBooking(true)
+        try { await attemptSeatBooking(bookingFailed) }
+        finally { setRetryingBooking(false) }
+    }
+
     const handlePayment = async () => {
         if (!selectedSeat) return toast.error(t('booking.toasts.selectSeat'))
         setPaying(true)
@@ -145,17 +182,7 @@ export default function BookingPage() {
             if (!createPaymentOrder.fulfilled.match(orderRes)) throw new Error(orderRes.payload)
 
             const order = orderRes.payload
-            const confirmBooking = async (activated) => {
-                await dispatch(bookSeat({
-                    seatNumber: activated.seatNumber,
-                    membershipId: activated.id,
-                    shift: activated.shift,
-                    startDate: activated.startDate,
-                    endDate: activated.endDate,
-                }))
-                toast.success(t('booking.toasts.confirmed'))
-                navigate('/student/payment-success')
-            }
+            const confirmBooking = attemptSeatBooking
 
             if (order.orderId?.startsWith('dev_')) {
                 // Dev mode — no gateway credentials configured, skip checkout
@@ -229,6 +256,29 @@ export default function BookingPage() {
             <div className="shimmer h-48 rounded-2xl" />
         </div>
     )
+
+    // Payment already succeeded and the membership is already ACTIVE at this
+    // point (verifyPayment.fulfilled already updated `current`) — only the
+    // seat reservation itself failed. Show that specifically, not the generic
+    // "you already have a plan" screen below, and offer a safe retry.
+    if (bookingFailed) {
+        return (
+            <div>
+                <div className="mb-6">
+                    <h1 className="page-header">{t('booking.title')}</h1>
+                    <p className="text-primary-400">{t('booking.subtitle')}</p>
+                </div>
+                <div className="card p-8 max-w-lg border-red-500/30 bg-red-500/5">
+                    <div className="text-4xl mb-4">⚠️</div>
+                    <h2 className="font-display text-xl font-bold text-white mb-2">{t('booking.seatFailed.title')}</h2>
+                    <p className="text-primary-300 mb-6">{t('booking.seatFailed.desc')}</p>
+                    <button onClick={handleRetryBooking} disabled={retryingBooking} className="btn-primary w-full py-3">
+                        {retryingBooking ? t('booking.seatFailed.retrying') : t('booking.seatFailed.retry')}
+                    </button>
+                </div>
+            </div>
+        )
+    }
 
     if (current?.status === 'ACTIVE') {
         const expiry = new Date(current.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })

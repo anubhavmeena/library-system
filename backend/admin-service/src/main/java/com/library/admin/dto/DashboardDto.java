@@ -13,6 +13,7 @@ public class DashboardDto {
     private long activeMemberships;
     private long expiredMemberships;
     private long expiringThisWeek;     // ACTIVE memberships expiring within 7 days
+    private long orphanedSeatMemberships; // ACTIVE, paid, but no matching SeatBooking — see MembershipRepository.findActiveMembershipsWithoutSeatBooking
 
     // ── Seat stats ─────────────────────────────────────────────────────────
     private long totalSeats;           // Always 110

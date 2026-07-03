@@ -239,13 +239,30 @@ public class AdminMembershipService {
         membership.setSeatNumber(newSeat.getSeatNumber());
         membershipRepository.save(membership);
 
-        // 5. Update SeatBooking
-        seatBookingRepository
-                .findFirstByMembershipIdAndStatus(membership.getId(), SeatBooking.Status.ACTIVE)
-                .ifPresent(b -> {
-                    b.setSeatId(newSeat.getId());
-                    seatBookingRepository.save(b);
-                });
+        // 5. Update SeatBooking — or create one if this membership never had one
+        // to begin with (e.g. the student-facing booking flow activated the
+        // membership but the separate /seats/book call never completed; see
+        // AdminService.getStudentsWithOrphanedSeats). Silently doing nothing
+        // here would leave the membership pointing at a seat with no booking
+        // record backing it, same class of bug.
+        Optional<SeatBooking> existingBooking = seatBookingRepository
+                .findFirstByMembershipIdAndStatus(membership.getId(), SeatBooking.Status.ACTIVE);
+        if (existingBooking.isPresent()) {
+            SeatBooking b = existingBooking.get();
+            b.setSeatId(newSeat.getId());
+            seatBookingRepository.save(b);
+        } else {
+            SeatBooking booking = SeatBooking.builder()
+                    .seatId(newSeat.getId())
+                    .userId(membership.getUserId())
+                    .membershipId(membership.getId())
+                    .shift(membership.getShift())
+                    .bookingDate(membership.getStartDate())
+                    .endDate(membership.getEndDate())
+                    .status(SeatBooking.Status.ACTIVE)
+                    .build();
+            seatBookingRepository.save(booking);
+        }
 
         // Bust seat-service's Redis cache — both the old and new seat's occupancy
         // for this shift/date range changed

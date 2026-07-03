@@ -111,6 +111,21 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
         """)
     List<Membership> findOccupyingSeatMemberships(@Param("upTo") LocalDate upTo);
 
+    // Detects the "paid but no seat" drift: the student booking flow activates
+    // a membership (POST /payments/verify) and reserves the seat
+    // (POST /seats/book) as two separate, non-atomic calls — if the second one
+    // fails or never fires, the membership ends up ACTIVE with no matching
+    // SeatBooking row. See AdminService.getStudentsWithOrphanedSeats().
+    @Query("""
+        SELECT m FROM Membership m
+        WHERE m.status = 'ACTIVE'
+          AND NOT EXISTS (
+              SELECT 1 FROM SeatBooking sb
+              WHERE sb.membershipId = m.id AND sb.status = 'ACTIVE'
+          )
+        """)
+    List<Membership> findActiveMembershipsWithoutSeatBooking();
+
     @Query("SELECT COUNT(m) FROM Membership m WHERE m.status = 'ACTIVE'")
     long countActiveMemberships();
 

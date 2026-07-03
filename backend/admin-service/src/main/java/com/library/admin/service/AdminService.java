@@ -55,6 +55,8 @@ public class AdminService {
         long expiredMem     = membershipRepository.countExpiredMemberships();
         long expiringWeek   = membershipRepository
                 .findMembershipsExpiringBefore(LocalDate.now().plusDays(7)).size();
+        long orphanedSeats  = membershipRepository
+                .findActiveMembershipsWithoutSeatBooking().size();
 
         long totalSeats     = 110L;
         long occupiedSeats  = activeMem;
@@ -78,6 +80,7 @@ public class AdminService {
                 .activeMemberships(activeMem)
                 .expiredMemberships(expiredMem)
                 .expiringThisWeek(expiringWeek)
+                .orphanedSeatMemberships(orphanedSeats)
                 .totalSeats(totalSeats)
                 .occupiedSeats(occupiedSeats)
                 .availableSeats(availableSeats)
@@ -512,6 +515,36 @@ public class AdminService {
                 })
                 .sorted(Comparator.comparing(StudentDto::getPendingAmount,
                         Comparator.nullsLast(Comparator.reverseOrder())))
+                .collect(Collectors.toList());
+    }
+
+    // ── Orphaned Seats ────────────────────────────────────────────────────────
+    // Students with an ACTIVE, paid membership but no matching SeatBooking —
+    // see MembershipRepository.findActiveMembershipsWithoutSeatBooking() for
+    // why this happens. Deliberately detection-only, no auto-repair: an admin
+    // resolves each one manually via the existing Change Seat action, since an
+    // automated fix could double-book a seat if it ever raced a genuine conflict.
+
+    public List<StudentDto> getStudentsWithOrphanedSeats() {
+        List<Membership> memberships = membershipRepository.findActiveMembershipsWithoutSeatBooking();
+        if (memberships.isEmpty()) return List.of();
+
+        Set<UUID> userIds = memberships.stream().map(Membership::getUserId).collect(Collectors.toSet());
+        Map<UUID, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        Set<UUID> planIds = memberships.stream().map(Membership::getPlanId).collect(Collectors.toSet());
+        Map<UUID, Plan> planMap = planRepository.findAllById(planIds).stream()
+                .collect(Collectors.toMap(Plan::getId, p -> p));
+
+        return memberships.stream()
+                .filter(m -> userMap.containsKey(m.getUserId()))
+                .map(m -> {
+                    StudentDto dto = StudentDto.fromEntities(userMap.get(m.getUserId()), m);
+                    Plan plan = planMap.get(m.getPlanId());
+                    if (plan != null) dto.setPlanName(plan.getName());
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
