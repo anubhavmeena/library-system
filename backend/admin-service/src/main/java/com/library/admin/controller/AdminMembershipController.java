@@ -2,6 +2,7 @@ package com.library.admin.controller;
 
 import com.library.admin.dto.ChangeSeatRequest;
 import com.library.admin.dto.CreateCashMembershipRequest;
+import com.library.admin.dto.MarkPendingRequest;
 import com.library.admin.dto.MembershipDto;
 import com.library.admin.dto.UpdateMembershipPlanRequest;
 import com.library.admin.service.AdminMembershipService;
@@ -49,5 +50,22 @@ public class AdminMembershipController {
     public ResponseEntity<ApiResponse<String>> releaseSeat(@PathVariable String membershipId) {
         adminMembershipService.releaseSeat(membershipId);
         return ResponseEntity.ok(ApiResponse.success("Seat released"));
+    }
+
+    // Admin correction for a membership wrongly marked fully paid — see
+    // AdminMembershipService.markMembershipPending/markMembershipGrace for the
+    // full rationale (deletes the erroneous Payment row and replaces/adjusts it).
+    @PatchMapping("/{membershipId}/mark-pending")
+    public ResponseEntity<ApiResponse<String>> markPending(
+            @PathVariable String membershipId,
+            @Valid @RequestBody MarkPendingRequest req) {
+        adminMembershipService.markMembershipPending(membershipId, req);
+        return ResponseEntity.ok(ApiResponse.success("Marked as Pending"));
+    }
+
+    @PatchMapping("/{membershipId}/mark-grace")
+    public ResponseEntity<ApiResponse<String>> markGrace(@PathVariable String membershipId) {
+        adminMembershipService.markMembershipGrace(membershipId);
+        return ResponseEntity.ok(ApiResponse.success("Marked as Grace"));
     }
 }

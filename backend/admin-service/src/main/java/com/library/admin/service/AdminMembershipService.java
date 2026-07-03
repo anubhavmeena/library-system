@@ -2,6 +2,7 @@ package com.library.admin.service;
 
 import com.library.admin.dto.ChangeSeatRequest;
 import com.library.admin.dto.CreateCashMembershipRequest;
+import com.library.admin.dto.MarkPendingRequest;
 import com.library.admin.dto.MembershipDto;
 import com.library.admin.entity.*;
 import com.library.admin.event.BookingConfirmedEvent;
@@ -336,6 +337,81 @@ public class AdminMembershipService {
 
         log.info("Seat {} released by admin for membership {} (dues {} remain on record)",
                 mem.getSeatNumber(), membershipId, mem.getDuesAmount());
+    }
+
+    // Admin correction: a membership was wrongly marked fully paid (the same
+    // class of error createCashMembership's paid+pending=planPrice validation
+    // guards against at creation time — this is the fix for when it already
+    // slipped through). The erroneous "fully paid" Payment row is deleted and
+    // replaced with a corrected one so Payment History reflects reality
+    // instead of leaving a factually-wrong paid-in-full entry behind.
+    @Transactional
+    public void markMembershipPending(String membershipId, MarkPendingRequest req) {
+        Membership membership = membershipRepository.findById(UUID.fromString(membershipId))
+                .orElseThrow(() -> new ResourceNotFoundException("Membership not found: " + membershipId));
+        if (membership.getStatus() != Membership.Status.ACTIVE) {
+            throw new IllegalArgumentException("Only an ACTIVE membership can be marked Pending");
+        }
+
+        Plan plan = planRepository.findById(membership.getPlanId())
+                .orElseThrow(() -> new ResourceNotFoundException("Plan not found for membership: " + membershipId));
+
+        BigDecimal pendingAmount = req.getPendingAmount();
+        if (pendingAmount.compareTo(plan.getPrice()) > 0) {
+            throw new IllegalArgumentException(
+                    "Pending amount (₹" + pendingAmount + ") cannot exceed the plan price (₹" + plan.getPrice() + ")");
+        }
+
+        deleteLatestPayment(membership.getId());
+
+        BigDecimal paidAmount = plan.getPrice().subtract(pendingAmount);
+        String correctionOrderId = "correction_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        Payment payment = Payment.builder()
+                .membershipId(membership.getId())
+                .userId(membership.getUserId())
+                .amount(paidAmount)
+                .pendingAmount(pendingAmount)
+                .paymentGateway("CASH")
+                .gatewayOrderId(correctionOrderId)
+                .status(Payment.Status.SUCCESS)
+                .invoiceId(generateInvoiceId())
+                .build();
+        paymentRepository.save(payment);
+
+        log.info("Membership {} corrected to Pending by admin — paid ₹{}, pending ₹{} (was wrongly marked fully paid)",
+                membershipId, paidAmount, pendingAmount);
+    }
+
+    // Same correction rationale as markMembershipPending above, but for moving
+    // straight to GRACE. Dues are set to the full plan price, mirroring exactly
+    // what ExpiryReminderScheduler.markExpiredAndStartGrace() does whenever a
+    // membership naturally lapses into GRACE — no separate admin-entered dues
+    // figure, so a manually-corrected GRACE membership looks identical to one
+    // the scheduler produced.
+    @Transactional
+    public void markMembershipGrace(String membershipId) {
+        Membership membership = membershipRepository.findById(UUID.fromString(membershipId))
+                .orElseThrow(() -> new ResourceNotFoundException("Membership not found: " + membershipId));
+        if (membership.getStatus() != Membership.Status.ACTIVE) {
+            throw new IllegalArgumentException("Only an ACTIVE membership can be marked Grace");
+        }
+
+        Plan plan = planRepository.findById(membership.getPlanId())
+                .orElseThrow(() -> new ResourceNotFoundException("Plan not found for membership: " + membershipId));
+
+        deleteLatestPayment(membership.getId());
+
+        membership.setStatus(Membership.Status.GRACE);
+        membership.setDuesAmount(plan.getPrice());
+        membershipRepository.save(membership);
+
+        log.info("Membership {} corrected to Grace by admin — dues ₹{} (was wrongly marked fully paid)",
+                membershipId, plan.getPrice());
+    }
+
+    private void deleteLatestPayment(UUID membershipId) {
+        paymentRepository.findFirstByMembershipIdOrderByCreatedAtDesc(membershipId)
+                .ifPresent(paymentRepository::delete);
     }
 
     // ── Seat Cache ────────────────────────────────────────────────────────────

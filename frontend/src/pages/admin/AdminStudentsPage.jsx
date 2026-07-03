@@ -45,6 +45,11 @@ export default function AdminStudentsPage() {
     const [openDropdown, setOpenDropdown] = useState(null)
     const [clearingFees, setClearingFees] = useState(null)
     const [releasingSeat, setReleasingSeat] = useState(null)
+    const [markingGrace, setMarkingGrace] = useState(null)
+
+    const [markPendingFor, setMarkPendingFor]           = useState(null)
+    const [pendingAmountInput, setPendingAmountInput]   = useState('')
+    const [markPendingSubmitting, setMarkPendingSubmitting] = useState(false)
 
     const [studentPayments, setStudentPayments]               = useState([])
     const [studentPaymentsLoading, setStudentPaymentsLoading] = useState(false)
@@ -129,6 +134,43 @@ export default function AdminStudentsPage() {
             toast.error(e.response?.data?.message || 'Failed to release seat')
         } finally {
             setReleasingSeat(null)
+        }
+    }
+
+    const handleMarkGrace = async (student) => {
+        if (!window.confirm(
+            `Mark ${student.name} as Grace? This deletes their last payment record and sets dues to the full plan price. Use this to correct a membership that was wrongly marked as paid. This cannot be undone.`
+        )) return
+        setMarkingGrace(student.id)
+        try {
+            await api.patch(`/admin/memberships/${student.membershipId}/mark-grace`)
+            toast.success(`${student.name} marked as Grace`)
+            fetchStudents()
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Failed to mark as Grace')
+        } finally {
+            setMarkingGrace(null)
+        }
+    }
+
+    const handleMarkPending = async () => {
+        if (!markPendingFor) return
+        const amount = Number(pendingAmountInput)
+        if (!amount || amount <= 0) {
+            toast.error('Enter a valid pending amount')
+            return
+        }
+        setMarkPendingSubmitting(true)
+        try {
+            await api.patch(`/admin/memberships/${markPendingFor.membershipId}/mark-pending`, { pendingAmount: amount })
+            toast.success(`${markPendingFor.name} marked as Pending`)
+            setMarkPendingFor(null)
+            setPendingAmountInput('')
+            fetchStudents()
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Failed to mark as Pending')
+        } finally {
+            setMarkPendingSubmitting(false)
         }
     }
 
@@ -375,6 +417,21 @@ export default function AdminStudentsPage() {
                                                                 onClick={() => { handleClearPendingFees(s); setOpenDropdown(null) }}
                                                                 className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40 disabled:opacity-50">
                                                                 {clearingFees === s.id ? 'Clearing…' : 'Clear Pending Fees'}
+                                                            </button>
+                                                        )}
+                                                        {s.membershipId && s.membershipStatus === 'ACTIVE' && (
+                                                            <button
+                                                                onClick={() => { setMarkPendingFor(s); setPendingAmountInput(''); setOpenDropdown(null) }}
+                                                                className="w-full text-left text-xs px-3 py-2.5 text-yellow-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40">
+                                                                Mark Pending
+                                                            </button>
+                                                        )}
+                                                        {s.membershipId && s.membershipStatus === 'ACTIVE' && (
+                                                            <button
+                                                                disabled={markingGrace === s.id}
+                                                                onClick={() => { handleMarkGrace(s); setOpenDropdown(null) }}
+                                                                className="w-full text-left text-xs px-3 py-2.5 text-orange-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40 disabled:opacity-50">
+                                                                {markingGrace === s.id ? 'Marking…' : 'Mark Grace'}
                                                             </button>
                                                         )}
                                                         <button
@@ -713,6 +770,36 @@ export default function AdminStudentsPage() {
                                 }}
                                 className="text-sm px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 transition-colors">
                                 {msgSending ? 'Sending…' : 'Send via WhatsApp'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {markPendingFor && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => { setMarkPendingFor(null); setPendingAmountInput('') }}>
+                    <div className="card p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-semibold text-white mb-1">Mark as Pending</h3>
+                        <p className="text-sm text-primary-400 mb-4">
+                            Correct <span className="text-white">{markPendingFor.name}</span>'s wrongly-marked-Paid membership. This deletes their last payment record and replaces it with a corrected one.
+                        </p>
+                        <label className="label">Pending Amount (₹)</label>
+                        <input
+                            type="number" min="0" step="1"
+                            autoFocus
+                            value={pendingAmountInput}
+                            onChange={e => setPendingAmountInput(e.target.value)}
+                            placeholder="e.g. 200"
+                            className="input w-full text-sm mb-3"
+                        />
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => { setMarkPendingFor(null); setPendingAmountInput('') }} className="btn-outline text-sm px-4 py-2">
+                                Cancel
+                            </button>
+                            <button
+                                disabled={markPendingSubmitting || !pendingAmountInput || Number(pendingAmountInput) <= 0}
+                                onClick={handleMarkPending}
+                                className="text-sm px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white disabled:opacity-40 transition-colors">
+                                {markPendingSubmitting ? 'Saving…' : 'Mark Pending'}
                             </button>
                         </div>
                     </div>

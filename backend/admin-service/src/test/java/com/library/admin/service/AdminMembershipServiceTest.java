@@ -2,6 +2,7 @@ package com.library.admin.service;
 
 import com.library.admin.dto.ChangeSeatRequest;
 import com.library.admin.dto.CreateCashMembershipRequest;
+import com.library.admin.dto.MarkPendingRequest;
 import com.library.admin.event.BookingConfirmedEvent;
 import com.library.admin.entity.Membership;
 import com.library.admin.entity.Payment;
@@ -388,5 +389,138 @@ class AdminMembershipServiceTest {
         ArgumentCaptor<BookingConfirmedEvent> cap = ArgumentCaptor.forClass(BookingConfirmedEvent.class);
         verify(kafkaTemplate).send(eq("booking-confirmed"), eq(studentId.toString()), cap.capture());
         assertThat(cap.getValue().getPhotoUrl()).isEqualTo("/uploads/photos/user_sunil.jpg");
+    }
+    // ── markMembershipPending / markMembershipGrace ─────────────────────────────
+    // Admin correction for a membership wrongly marked fully paid — deletes the
+    // erroneous Payment row and either replaces it with a corrected one (Pending)
+    // or moves the membership to GRACE with dues = full plan price (no payment
+    // row needed for GRACE, since GRACE dues live on Membership.duesAmount).
+
+    @Test
+    void markMembershipPending_activeMembership_deletesOldPaymentAndCreatesCorrectedOne() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        Plan plan = Plan.builder().id(mem.getPlanId()).name("Full Day")
+                .planType(Plan.PlanType.FULL_DAY).price(new BigDecimal("600.00")).build();
+        Payment oldPayment = Payment.builder().id(UUID.randomUUID()).membershipId(id)
+                .userId(mem.getUserId()).amount(new BigDecimal("600.00"))
+                .pendingAmount(BigDecimal.ZERO).status(Payment.Status.SUCCESS).build();
+
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+        when(planRepository.findById(mem.getPlanId())).thenReturn(Optional.of(plan));
+        when(paymentRepository.findFirstByMembershipIdOrderByCreatedAtDesc(id))
+                .thenReturn(Optional.of(oldPayment));
+
+        MarkPendingRequest req = new MarkPendingRequest();
+        req.setPendingAmount(new BigDecimal("200.00"));
+
+        adminMembershipService.markMembershipPending(id.toString(), req);
+
+        verify(paymentRepository).delete(oldPayment);
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(captor.capture());
+        assertThat(captor.getValue().getAmount()).isEqualByComparingTo("400.00");
+        assertThat(captor.getValue().getPendingAmount()).isEqualByComparingTo("200.00");
+        assertThat(captor.getValue().getMembershipId()).isEqualTo(id);
+        assertThat(mem.getStatus()).isEqualTo(Membership.Status.ACTIVE);
+    }
+
+    @Test
+    void markMembershipPending_noExistingPayment_stillCreatesNewOne() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        Plan plan = Plan.builder().id(mem.getPlanId()).name("Full Day")
+                .planType(Plan.PlanType.FULL_DAY).price(new BigDecimal("600.00")).build();
+
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+        when(planRepository.findById(mem.getPlanId())).thenReturn(Optional.of(plan));
+        when(paymentRepository.findFirstByMembershipIdOrderByCreatedAtDesc(id))
+                .thenReturn(Optional.empty());
+
+        MarkPendingRequest req = new MarkPendingRequest();
+        req.setPendingAmount(new BigDecimal("600.00"));
+
+        assertThatCode(() -> adminMembershipService.markMembershipPending(id.toString(), req))
+                .doesNotThrowAnyException();
+
+        verify(paymentRepository, never()).delete(any());
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(captor.capture());
+        assertThat(captor.getValue().getAmount()).isEqualByComparingTo("0.00");
+        assertThat(captor.getValue().getPendingAmount()).isEqualByComparingTo("600.00");
+    }
+
+    @Test
+    void markMembershipPending_nonActiveMembership_throws() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.GRACE);
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+
+        MarkPendingRequest req = new MarkPendingRequest();
+        req.setPendingAmount(new BigDecimal("200.00"));
+
+        assertThatThrownBy(() -> adminMembershipService.markMembershipPending(id.toString(), req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ACTIVE");
+
+        verifyNoInteractions(paymentRepository);
+    }
+
+    @Test
+    void markMembershipPending_amountExceedsPlanPrice_throws() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        Plan plan = Plan.builder().id(mem.getPlanId()).name("Full Day")
+                .planType(Plan.PlanType.FULL_DAY).price(new BigDecimal("600.00")).build();
+
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+        when(planRepository.findById(mem.getPlanId())).thenReturn(Optional.of(plan));
+
+        MarkPendingRequest req = new MarkPendingRequest();
+        req.setPendingAmount(new BigDecimal("700.00"));
+
+        assertThatThrownBy(() -> adminMembershipService.markMembershipPending(id.toString(), req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot exceed the plan price");
+
+        verify(paymentRepository, never()).save(any());
+        verify(paymentRepository, never()).delete(any());
+    }
+
+    @Test
+    void markMembershipGrace_activeMembership_setsGraceDuesToPlanPriceAndDeletesPayment() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        Plan plan = Plan.builder().id(mem.getPlanId()).name("Full Day")
+                .planType(Plan.PlanType.FULL_DAY).price(new BigDecimal("600.00")).build();
+        Payment oldPayment = Payment.builder().id(UUID.randomUUID()).membershipId(id)
+                .userId(mem.getUserId()).amount(new BigDecimal("600.00"))
+                .pendingAmount(BigDecimal.ZERO).status(Payment.Status.SUCCESS).build();
+
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+        when(planRepository.findById(mem.getPlanId())).thenReturn(Optional.of(plan));
+        when(paymentRepository.findFirstByMembershipIdOrderByCreatedAtDesc(id))
+                .thenReturn(Optional.of(oldPayment));
+
+        adminMembershipService.markMembershipGrace(id.toString());
+
+        verify(paymentRepository).delete(oldPayment);
+        verify(paymentRepository, never()).save(any());
+        assertThat(mem.getStatus()).isEqualTo(Membership.Status.GRACE);
+        assertThat(mem.getDuesAmount()).isEqualByComparingTo("600.00");
+        verify(membershipRepository).save(mem);
+    }
+
+    @Test
+    void markMembershipGrace_nonActiveMembership_throws() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.GRACE);
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+
+        assertThatThrownBy(() -> adminMembershipService.markMembershipGrace(id.toString()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ACTIVE");
+
+        verifyNoInteractions(paymentRepository);
     }
 }
