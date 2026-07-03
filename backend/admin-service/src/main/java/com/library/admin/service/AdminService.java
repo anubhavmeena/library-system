@@ -107,6 +107,19 @@ public class AdminService {
         // NEW/RELEASED since the `m` join above only ever matches a current
         // (ACTIVE-not-expired or GRACE) row.
         //
+        // `m` is restricted to a single row (the student's "current" membership)
+        // via a correlated subquery, GRACE-prioritized over ACTIVE regardless of
+        // endDate — same ordering as
+        // MembershipRepository.findCurrentByUserIdOrderByEndDateDesc. A student
+        // can simultaneously have an old unresolved GRACE membership (dues owed)
+        // and a newer genuinely-current ACTIVE one (e.g. they self-booked a fresh
+        // membership instead of paying off the old one) — an unrestricted
+        // `ON m.user_id = u.id AND (...)` join matched BOTH rows, so this student
+        // could appear in the PAID tab (via the ACTIVE row satisfying that
+        // branch) while the per-row Java enrichment below independently resolved
+        // to the GRACE row via findFirstByUserIdCurrentOrderByEndDateDesc,
+        // producing a GRACE/EXPIRED status badge on a row filtered into "Paid".
+        //
         // `p` is restricted to a single row (the most recent payment) via a
         // correlated subquery, same pattern as `le` below — a membership can have
         // more than one Payment row (e.g. two separate cash installments), and an
@@ -119,8 +132,13 @@ public class AdminService {
         // per-row Java enrichment below uses to resolve "the" current payment.
         String where = """
                 FROM users u
-                LEFT JOIN memberships m ON m.user_id = u.id
-                    AND (m.status = 'GRACE' OR (m.status = 'ACTIVE' AND m.end_date >= CURRENT_DATE))
+                LEFT JOIN memberships m ON m.id = (
+                    SELECT m1.id FROM memberships m1
+                    WHERE m1.user_id = u.id
+                      AND (m1.status = 'GRACE' OR (m1.status = 'ACTIVE' AND m1.end_date >= CURRENT_DATE))
+                    ORDER BY CASE WHEN m1.status = 'GRACE' THEN 0 ELSE 1 END, m1.end_date DESC
+                    LIMIT 1
+                )
                 LEFT JOIN payments p ON p.id = (
                     SELECT p2.id FROM payments p2
                     WHERE p2.membership_id = m.id
