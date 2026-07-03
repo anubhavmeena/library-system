@@ -368,7 +368,6 @@ export default function AdminCreateMembershipPage() {
                                     <DatePicker
                                         value={startDate ? parseISO(startDate) : null}
                                         onChange={d => d && setStartDate(format(d, 'yyyy-MM-dd'))}
-                                        minDate={parseISO(TODAY)}
                                         sx={{ width: 200, ...DATE_PICKER_SX }}
                                         slotProps={{ textField: { size: 'small' }, popper: { sx: DATE_PICKER_POPPER_SX } }}
                                     />
