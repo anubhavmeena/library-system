@@ -2,6 +2,7 @@ package com.library.admin.service;
 
 import com.library.admin.dto.ChangeSeatRequest;
 import com.library.admin.dto.CreateCashMembershipRequest;
+import com.library.admin.event.BookingConfirmedEvent;
 import com.library.admin.entity.Membership;
 import com.library.admin.entity.Payment;
 import com.library.admin.entity.Plan;
@@ -348,5 +349,44 @@ class AdminMembershipServiceTest {
         verify(paymentRepository).save(captor.capture());
         assertThat(captor.getValue().getAmount()).isEqualByComparingTo("0");
         assertThat(captor.getValue().getPendingAmount()).isEqualByComparingTo("600.00");
+    }
+
+    @Test
+    void createCashMembership_publishesBookingConfirmedEventWithPhotoUrl() {
+        UUID studentId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        User student = User.builder().id(studentId).name("Sunil Meena").mobile("9990000000")
+                .photoUrl("/uploads/photos/user_sunil.jpg").role(User.Role.STUDENT).build();
+        Plan plan = Plan.builder().id(planId).name("Full Day").planType(Plan.PlanType.FULL_DAY)
+                .price(new BigDecimal("600.00")).durationDays(30).isActive(true).build();
+        Seat seat = new Seat(UUID.randomUUID(), "B14", "B", 14, true);
+
+        CreateCashMembershipRequest req = new CreateCashMembershipRequest();
+        req.setStudentId(studentId.toString());
+        req.setPlanId(planId.toString());
+        req.setSeatNumber("B14");
+        req.setPaidAmount(new BigDecimal("600.00"));
+        req.setPendingAmount(BigDecimal.ZERO);
+
+        when(userRepository.findById(studentId)).thenReturn(Optional.of(student));
+        when(planRepository.findById(planId)).thenReturn(Optional.of(plan));
+        when(membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(studentId, Membership.Status.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(studentId))
+                .thenReturn(Optional.empty());
+        when(seatRepository.findBySeatNumber("B14")).thenReturn(Optional.of(seat));
+        when(seatBookingRepository.findActiveBookingsForSeat(eq(seat.getId()), any(), any()))
+                .thenReturn(List.of());
+        when(membershipRepository.save(any())).thenAnswer(inv -> {
+            Membership m = inv.getArgument(0);
+            if (m.getId() == null) m.setId(UUID.randomUUID());
+            return m;
+        });
+
+        adminMembershipService.createCashMembership(req);
+
+        ArgumentCaptor<BookingConfirmedEvent> cap = ArgumentCaptor.forClass(BookingConfirmedEvent.class);
+        verify(kafkaTemplate).send(eq("booking-confirmed"), eq(studentId.toString()), cap.capture());
+        assertThat(cap.getValue().getPhotoUrl()).isEqualTo("/uploads/photos/user_sunil.jpg");
     }
 }

@@ -177,6 +177,7 @@ public class AdminMembershipService {
                     .pendingAmount(pendingAmount)
                     .wifiName(settings != null ? settings.getWifiName() : null)
                     .wifiPassword(settings != null ? settings.getWifiPassword() : null)
+                    .photoUrl(student.getPhotoUrl())
                     .build();
             kafkaTemplate.send("booking-confirmed", student.getId().toString(), event);
         } catch (Exception e) {

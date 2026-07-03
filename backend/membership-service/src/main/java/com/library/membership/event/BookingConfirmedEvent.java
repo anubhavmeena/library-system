@@ -32,6 +32,7 @@ public class BookingConfirmedEvent {
     private BigDecimal pendingAmount;
     private String wifiName;
     private String wifiPassword;
+    private String photoUrl;
 
     // ── Event metadata ────────────────────────────────────────────────────────
     private String eventType;      // BOOKING_CONFIRMED

@@ -226,6 +226,7 @@ public class PaymentService {
                 .pendingAmount(BigDecimal.ZERO)
                 .wifiName(settings != null ? settings.getWifiName() : null)
                 .wifiPassword(settings != null ? settings.getWifiPassword() : null)
+                .photoUrl(user.getPhotoUrl())
                 .eventType("BOOKING_CONFIRMED")
                 .build();
 

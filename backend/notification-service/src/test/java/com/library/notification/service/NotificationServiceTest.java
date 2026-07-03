@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -35,6 +36,9 @@ class NotificationServiceTest {
     ReceiptPdfService receiptPdfService;
 
     @Mock
+    StudentIdCardPdfService studentIdCardPdfService;
+
+    @Mock
     RestTemplate restTemplate;
 
     @InjectMocks
@@ -46,6 +50,10 @@ class NotificationServiceTest {
         ReflectionTestUtils.setField(notificationService, "adminWhatsapp", "");
         ReflectionTestUtils.setField(notificationService, "userServiceBaseUrl", "http://localhost:8082");
         ReflectionTestUtils.setField(notificationService, "frontendUrl", "https://targetzone.co.in");
+        ReflectionTestUtils.setField(notificationService, "receiptTemplateName", "payment_receipt");
+        ReflectionTestUtils.setField(notificationService, "receiptLanguage", "en");
+        ReflectionTestUtils.setField(notificationService, "idCardTemplateName", "student_id_card");
+        ReflectionTestUtils.setField(notificationService, "idCardLanguage", "en");
     }
 
     private PaymentReceiptEvent receiptEvent(String mobile, String email) {
@@ -68,6 +76,7 @@ class NotificationServiceTest {
     private BookingConfirmedEvent bookingEvent(String mobile, String email) {
         BookingConfirmedEvent e = new BookingConfirmedEvent();
         e.setUserId("user-123");
+        e.setMembershipId("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
         e.setUserName("Alice");
         e.setUserMobile(mobile);
         e.setUserEmail(email);
@@ -78,6 +87,13 @@ class NotificationServiceTest {
         e.setEndDate("2025-01-31");
         e.setAmountPaid(new BigDecimal("600"));
         return e;
+    }
+
+    private void stubSuccessfulIdCardUpload(String relativeUrl) {
+        Map<String, Object> data = Map.of("idCardUrl", relativeUrl);
+        Map<String, Object> envelope = Map.of("data", data);
+        when(restTemplate.exchange(contains("/internal/id-cards"), any(), any(), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(envelope));
     }
 
     private RenewalReminderEvent reminderEvent(int days) {
@@ -200,6 +216,72 @@ class NotificationServiceTest {
 
         verify(whatsAppService).send(anyString(), msgCaptor.capture(), anyString(), anyString());
         assertThat(msgCaptor.getValue()).contains("Full Day");
+    }
+
+    // ── sendBookingConfirmation → student ID card (augments, doesn't replace,
+    //    the plain-text sends above) ────────────────────────────────────────
+
+    @Test
+    void sendBookingConfirmation_idCardUploadSucceeds_sendsDocumentTemplateAndEmailAttachment() {
+        byte[] pdf = new byte[]{1, 2, 3};
+        when(studentIdCardPdfService.buildIdCard(any(), any())).thenReturn(pdf);
+        stubSuccessfulIdCardUpload("/uploads/id-cards/A1B2C3D4.pdf");
+
+        notificationService.sendBookingConfirmation(bookingEvent("9876543210", "alice@test.com"));
+
+        // Plain-text sends still happen (augments, not replaces)
+        verify(whatsAppService).send(eq("9876543210"), anyString(), eq("user-123"), eq("BOOKING_CONFIRMED"));
+        verify(emailService).sendText(eq("alice@test.com"), anyString(), anyString(), eq("user-123"), eq("BOOKING_CONFIRMED"));
+
+        verify(whatsAppService).sendDocumentTemplate(
+                eq("9876543210"),
+                eq("https://targetzone.co.in/uploads/id-cards/A1B2C3D4.pdf"),
+                eq("A1B2C3D4_id_card.pdf"),
+                anyList(), eq("student_id_card"), eq("en"), eq("user-123"), eq("STUDENT_ID_CARD"));
+        verify(emailService).sendWithAttachment(eq("alice@test.com"), anyString(), anyString(),
+                eq(pdf), eq("A1B2C3D4_id_card.pdf"), eq("user-123"), eq("STUDENT_ID_CARD"));
+        verify(emailService).sendWithAttachment(eq("admin@test.com"), anyString(), anyString(),
+                eq(pdf), eq("A1B2C3D4_id_card.pdf"), isNull(), eq("STUDENT_ID_CARD_ADMIN"));
+    }
+
+    @Test
+    void sendBookingConfirmation_idCardUploadFails_stillSendsPlainTextNotifications() {
+        when(studentIdCardPdfService.buildIdCard(any(), any())).thenReturn(new byte[]{1, 2, 3});
+        when(restTemplate.exchange(contains("/internal/id-cards"), any(), any(), eq(Map.class)))
+                .thenThrow(new RuntimeException("connection refused"));
+
+        notificationService.sendBookingConfirmation(bookingEvent("9876543210", "alice@test.com"));
+
+        verify(whatsAppService).send(eq("9876543210"), anyString(), eq("user-123"), eq("BOOKING_CONFIRMED"));
+        verify(emailService).sendText(eq("alice@test.com"), anyString(), anyString(), eq("user-123"), eq("BOOKING_CONFIRMED"));
+        verify(whatsAppService, never()).sendDocumentTemplate(any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void sendBookingConfirmation_photoFetchThrows_stillBuildsCardAndSendsPlainText() {
+        BookingConfirmedEvent event = bookingEvent("9876543210", "alice@test.com");
+        event.setPhotoUrl("/uploads/photos/user_123.jpg");
+        when(restTemplate.getForEntity(anyString(), eq(byte[].class)))
+                .thenThrow(new RuntimeException("404"));
+        when(studentIdCardPdfService.buildIdCard(any(), any())).thenReturn(new byte[]{1, 2, 3});
+        stubSuccessfulIdCardUpload("/uploads/id-cards/A1B2C3D4.pdf");
+
+        notificationService.sendBookingConfirmation(event);
+
+        verify(whatsAppService).send(eq("9876543210"), anyString(), eq("user-123"), eq("BOOKING_CONFIRMED"));
+        verify(studentIdCardPdfService).buildIdCard(any(), isNull());
+    }
+
+    @Test
+    void sendBookingConfirmation_studentIdCardPdfServiceThrows_isolatedFromRestOfMethod() {
+        when(studentIdCardPdfService.buildIdCard(any(), any())).thenThrow(new RuntimeException("PDF generation failed"));
+
+        assertThatCode(() -> notificationService.sendBookingConfirmation(bookingEvent("9876543210", "alice@test.com")))
+                .doesNotThrowAnyException();
+
+        verify(whatsAppService).send(eq("9876543210"), anyString(), eq("user-123"), eq("BOOKING_CONFIRMED"));
+        verify(emailService).sendText(eq("alice@test.com"), anyString(), anyString(), eq("user-123"), eq("BOOKING_CONFIRMED"));
+        verify(whatsAppService, never()).sendDocumentTemplate(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     // ── sendWelcomeNotification ───────────────────────────────────────────────
@@ -385,6 +467,7 @@ class NotificationServiceTest {
                 eq("https://targetzone.co.in/uploads/receipts/INV-20260320-ABC123.pdf"),
                 eq("INV-20260320-ABC123.pdf"),
                 paramsCaptor.capture(),
+                eq("payment_receipt"), eq("en"),
                 eq("user-123"), eq("PAYMENT_RECEIPT"));
 
         // Must match "payment_receipt" template's {{1}}..{{5}} order exactly:
@@ -401,7 +484,8 @@ class NotificationServiceTest {
         notificationService.sendPaymentReceipt(receiptEvent("9876543210", "arjun@test.com"));
 
         verify(whatsAppService).sendDocumentTemplate(
-                eq("+911234567890"), anyString(), anyString(), anyList(), isNull(), eq("PAYMENT_RECEIPT_ADMIN"));
+                eq("+911234567890"), anyString(), anyString(), anyList(),
+                eq("payment_receipt"), eq("en"), isNull(), eq("PAYMENT_RECEIPT_ADMIN"));
     }
 
     @Test
@@ -412,7 +496,7 @@ class NotificationServiceTest {
 
         notificationService.sendPaymentReceipt(receiptEvent("9876543210", "arjun@test.com"));
 
-        verify(whatsAppService, never()).sendDocumentTemplate(any(), any(), any(), any(), any(), any());
+        verify(whatsAppService, never()).sendDocumentTemplate(any(), any(), any(), any(), any(), any(), any(), any());
         verify(whatsAppService).send(eq("9876543210"), anyString(), eq("user-123"), eq("PAYMENT_RECEIPT"));
     }
 
@@ -437,6 +521,6 @@ class NotificationServiceTest {
 
         notificationService.sendPaymentReceipt(receiptEvent(null, "arjun@test.com"));
 
-        verify(whatsAppService, never()).sendDocumentTemplate(any(), any(), any(), any(), any(), any());
+        verify(whatsAppService, never()).sendDocumentTemplate(any(), any(), any(), any(), any(), any(), any(), any());
     }
 }

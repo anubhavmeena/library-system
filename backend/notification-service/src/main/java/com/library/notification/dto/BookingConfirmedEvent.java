@@ -13,5 +13,6 @@ public class BookingConfirmedEvent {
     private BigDecimal amountPaid;
     private BigDecimal pendingAmount;
     private String wifiName, wifiPassword;
+    private String photoUrl;
     private String eventType;
 }

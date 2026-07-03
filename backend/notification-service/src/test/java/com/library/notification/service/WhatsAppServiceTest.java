@@ -35,9 +35,7 @@ class WhatsAppServiceTest {
         ReflectionTestUtils.setField(whatsAppService, "metaPhoneNumberId", "");
         ReflectionTestUtils.setField(whatsAppService, "metaApiVersion", "v21.0");
         ReflectionTestUtils.setField(whatsAppService, "metaTemplateName", "library_notification");
-        ReflectionTestUtils.setField(whatsAppService, "receiptTemplateName", "payment_receipt");
         ReflectionTestUtils.setField(whatsAppService, "metaLanguage", "en_US");
-        ReflectionTestUtils.setField(whatsAppService, "receiptLanguage", "en");
         // metaEnabled starts false (field default)
     }
 
@@ -141,7 +139,7 @@ class WhatsAppServiceTest {
         whatsAppService.sendDocumentTemplate(
                 "9876543210", "https://targetzone.co.in/uploads/receipts/INV-1.pdf", "INV-1.pdf",
                 List.of("Arjun", "300", "INV-1", "20/03/2026", "0"),
-                userId, "PAYMENT_RECEIPT");
+                "payment_receipt", "en", userId, "PAYMENT_RECEIPT");
 
         verify(logRepository).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(DeliveryStatus.SENT);
@@ -158,7 +156,7 @@ class WhatsAppServiceTest {
         whatsAppService.sendDocumentTemplate(
                 "9876543210", "https://targetzone.co.in/uploads/receipts/INV-1.pdf", "INV-1.pdf",
                 List.of("Arjun", "300", "INV-1", "20/03/2026", "0"),
-                null, "PAYMENT_RECEIPT_ADMIN");
+                "payment_receipt", "en", null, "PAYMENT_RECEIPT_ADMIN");
 
         verify(logRepository).save(captor.capture());
         assertThat(captor.getValue().getUserId()).isNull();
@@ -171,7 +169,20 @@ class WhatsAppServiceTest {
         assertThatCode(() -> whatsAppService.sendDocumentTemplate(
                 "9876543210", "https://targetzone.co.in/uploads/receipts/INV-1.pdf", "INV-1.pdf",
                 List.of("Arjun", "300", "INV-1", "20/03/2026", "0"),
-                null, "PAYMENT_RECEIPT"))
+                "payment_receipt", "en", null, "PAYMENT_RECEIPT"))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void sendDocumentTemplate_devMode_logsUsesGivenTemplateName() {
+        ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
+
+        whatsAppService.sendDocumentTemplate(
+                "9876543210", "https://targetzone.co.in/uploads/id-cards/A1B2C3D4_id_card.pdf", "A1B2C3D4_id_card.pdf",
+                List.of("Arjun", "A1B2C3D4", "Full Day Plan", "03 Aug 2026"),
+                "student_id_card", "en", null, "STUDENT_ID_CARD");
+
+        verify(logRepository).save(captor.capture());
+        assertThat(captor.getValue().getMessage()).startsWith("[student_id_card]");
     }
 }

@@ -42,15 +42,6 @@ public class WhatsAppService {
     @Value("${meta.whatsapp.language:en_US}")
     private String metaLanguage;
 
-    @Value("${meta.whatsapp.receipt-template-name:payment_receipt}")
-    private String receiptTemplateName;
-
-    // "payment_receipt" was created under plain English ("en"), not English (US)
-    // ("en_US") like the other template — Meta requires an exact language-code
-    // match per template or the send fails with a template-not-found error, so
-    // this is intentionally a separate property from metaLanguage above.
-    @Value("${meta.whatsapp.receipt-language:en}")
-    private String receiptLanguage;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -122,23 +113,24 @@ public class WhatsAppService {
         saveLog(userId, mobile, message, event, status, errorMessage);
     }
 
-    // Sends the approved "payment_receipt" template with a real DOCUMENT header —
-    // the template was originally created with a static TEXT header (literal text
-    // "Document" typed into the header field rather than the header FORMAT being
-    // set to Document), which caused a 100% failure rate in production (Meta error
-    // 132012, "header: Format mismatch, expected TEXT, received DOCUMENT") until
-    // the template was edited/resubmitted with a genuine Document header format.
+    // Sends an approved document-header template (e.g. "payment_receipt",
+    // "student_id_card") — the template must be created with header FORMAT set
+    // to Document (not a literal "Document" text header), or every send fails
+    // with Meta error 132012 ("header: Format mismatch, expected TEXT, received
+    // DOCUMENT") — this is a real production incident this repo already hit
+    // once with "payment_receipt" before the template was resubmitted correctly.
     // documentUrl must be a public HTTPS URL Meta's servers can fetch. bodyParams
-    // must match the template's {{1}}..{{n}} order exactly — for "payment_receipt"
+    // must match templateName's {{1}}..{{n}} order exactly — for "payment_receipt"
     // that's [name, amountPaid, invoiceId, paymentDate, pendingAmount].
     public void sendDocumentTemplate(String mobile, String documentUrl, String documentFilename,
-                                     List<String> bodyParams, String userId, String event) {
-        String logMessage = "[payment_receipt] document=" + documentFilename + " params=" + bodyParams;
+                                     List<String> bodyParams, String templateName, String language,
+                                     String userId, String event) {
+        String logMessage = "[" + templateName + "] document=" + documentFilename + " params=" + bodyParams;
         DeliveryStatus status = DeliveryStatus.SENT;
         String errorMessage   = null;
 
         if (!metaEnabled) {
-            log.info("[DEV] WhatsApp (payment_receipt template) → {} | Event: {} | {}", mobile, event, logMessage);
+            log.info("[DEV] WhatsApp ({} template) → {} | Event: {} | {}", templateName, mobile, event, logMessage);
         } else {
             try {
                 String to = mobile.replaceAll("[^0-9+]", "");
@@ -154,8 +146,8 @@ public class WhatsAppService {
                         "to", to,
                         "type", "template",
                         "template", Map.of(
-                                "name", receiptTemplateName,
-                                "language", Map.of("code", receiptLanguage),
+                                "name", templateName,
+                                "language", Map.of("code", language),
                                 "components", List.of(
                                         Map.of("type", "header",
                                                "parameters", List.of(
@@ -184,12 +176,12 @@ public class WhatsAppService {
                     throw new RuntimeException("Meta API error " + resp.statusCode() + ": " + resp.body());
                 }
 
-                log.info("WhatsApp payment_receipt template sent to {} via Meta Cloud API | Event: {}", mobile, event);
+                log.info("WhatsApp {} template sent to {} via Meta Cloud API | Event: {}", templateName, mobile, event);
 
             } catch (Exception e) {
                 status       = DeliveryStatus.FAILED;
                 errorMessage = e.getMessage();
-                log.error("WhatsApp payment_receipt template send failed to {} | Event: {}: {}", mobile, event, e.getMessage());
+                log.error("WhatsApp {} template send failed to {} | Event: {}: {}", templateName, mobile, event, e.getMessage());
             }
         }
 

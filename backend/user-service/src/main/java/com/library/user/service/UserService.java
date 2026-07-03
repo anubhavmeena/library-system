@@ -104,7 +104,7 @@ public class UserService {
         String fileName = "user_" + userId + "_" + UUID.randomUUID().toString().substring(0, 8) + ext;
         Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
 
-        String photoUrl = "/java-uploads/photos/" + fileName;
+        String photoUrl = "/uploads/photos/" + fileName;
         user.setPhotoUrl(photoUrl);
         userRepository.save(user);
 
@@ -138,7 +138,7 @@ public class UserService {
         String fileName = "aadhaar_" + userId + "_" + UUID.randomUUID().toString().substring(0, 8) + ext;
         Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
 
-        String aadhaarUrl = "/java-uploads/aadhaar/" + fileName;
+        String aadhaarUrl = "/uploads/aadhaar/" + fileName;
         user.setAadhaarUrl(aadhaarUrl);
         userRepository.save(user);
 
@@ -164,6 +164,21 @@ public class UserService {
         String receiptUrl = "/uploads/receipts/" + fileName;
         log.info("Receipt uploaded: {}", receiptUrl);
         return ReceiptUploadResponse.builder().receiptUrl(receiptUrl).message("Receipt uploaded successfully").build();
+    }
+
+    public IdCardUploadResponse uploadIdCard(String membershipId, MultipartFile file) throws IOException {
+        String safeMembershipId = membershipId.replaceAll("[^A-Za-z0-9\\-]", "");
+        if (safeMembershipId.isBlank()) throw new IllegalArgumentException("Invalid membership id.");
+
+        Path uploadPath = Paths.get(uploadDir, "id-cards");
+        Files.createDirectories(uploadPath);
+
+        String fileName = safeMembershipId + ".pdf";
+        Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+
+        String idCardUrl = "/uploads/id-cards/" + fileName;
+        log.info("ID card uploaded: {}", idCardUrl);
+        return IdCardUploadResponse.builder().idCardUrl(idCardUrl).message("ID card uploaded successfully").build();
     }
 
     @Transactional

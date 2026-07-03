@@ -84,4 +84,14 @@ public class UserController {
             @RequestParam("file") MultipartFile file) throws IOException {
         return ResponseEntity.ok(ApiResponse.success(userService.uploadReceipt(invoiceId, file)));
     }
+
+    // Called directly pod-to-pod by notification-service, same pattern as
+    // /internal/receipts above, to host a generated student ID card PDF so it
+    // can be linked from WhatsApp.
+    @PostMapping(value = "/internal/id-cards", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<IdCardUploadResponse>> uploadIdCard(
+            @RequestParam("membershipId") String membershipId,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(ApiResponse.success(userService.uploadIdCard(membershipId, file)));
+    }
 }

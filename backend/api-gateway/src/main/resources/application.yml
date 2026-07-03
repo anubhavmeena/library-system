@@ -51,6 +51,18 @@ spring:
             - StripPrefix=0
             - name: AuthFilter
 
+        # Uploaded files (photos, aadhaar, gallery, receipts, id-cards) — public,
+        # no auth: served the same way the k8s ingress serves them in production
+        # by routing straight to user-service, bypassing AuthFilter, since these
+        # URLs are embedded directly in <img>/document links with no Authorization
+        # header attached.
+        - id: uploads
+          uri: ${USER_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/uploads/**
+          filters:
+            - StripPrefix=0
+
         # Membership Service Routes (protected)
         - id: membership-service
           uri: ${MEMBERSHIP_SERVICE_URL:http://localhost:8083}

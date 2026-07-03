@@ -20,4 +20,5 @@ public class BookingConfirmedEvent {
     private BigDecimal pendingAmount;
     private String wifiName;
     private String wifiPassword;
+    private String photoUrl;
 }

@@ -147,7 +147,7 @@ class UserControllerTest {
     void uploadPhoto_validFile_returns200() throws Exception {
         when(userService.uploadPhoto(any(), any())).thenReturn(
                 PhotoUploadResponse.builder()
-                        .photoUrl("/java-uploads/photos/user_test.jpg")
+                        .photoUrl("/uploads/photos/user_test.jpg")
                         .message("Photo uploaded successfully")
                         .build());
 
@@ -159,7 +159,7 @@ class UserControllerTest {
                 .header("X-User-Id", UUID.randomUUID().toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.photoUrl").value("/java-uploads/photos/user_test.jpg"))
+                .andExpect(jsonPath("$.data.photoUrl").value("/uploads/photos/user_test.jpg"))
                 .andExpect(jsonPath("$.data.message").value("Photo uploaded successfully"));
     }
 
@@ -228,5 +228,45 @@ class UserControllerTest {
                 .header("X-User-Id", UUID.randomUUID().toString()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("No photo to delete."));
+    }
+
+    // ── POST /api/users/internal/id-cards ─────────────────────────────────────
+    // Internal, pod-to-pod endpoint called directly by notification-service
+    // (bypasses the gateway) — no X-User-Id header involved.
+
+    @Test
+    void uploadIdCard_multipartRequest_returns200WithIdCardUrl() throws Exception {
+        String membershipId = UUID.randomUUID().toString();
+        when(userService.uploadIdCard(any(), any())).thenReturn(
+                IdCardUploadResponse.builder()
+                        .idCardUrl("/uploads/id-cards/" + membershipId + ".pdf")
+                        .message("ID card uploaded successfully")
+                        .build());
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "card.pdf", "application/pdf", "fake-pdf".getBytes());
+
+        mockMvc.perform(multipart("/api/users/internal/id-cards")
+                .file(file)
+                .param("membershipId", membershipId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.idCardUrl").value("/uploads/id-cards/" + membershipId + ".pdf"))
+                .andExpect(jsonPath("$.data.message").value("ID card uploaded successfully"));
+    }
+
+    @Test
+    void uploadIdCard_invalidMembershipId_returns400() throws Exception {
+        when(userService.uploadIdCard(any(), any()))
+                .thenThrow(new IllegalArgumentException("Invalid membership id."));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "card.pdf", "application/pdf", "fake-pdf".getBytes());
+
+        mockMvc.perform(multipart("/api/users/internal/id-cards")
+                .file(file)
+                .param("membershipId", "///"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Invalid membership id."));
     }
 }

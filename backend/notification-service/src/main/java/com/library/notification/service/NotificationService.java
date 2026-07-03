@@ -31,6 +31,7 @@ public class NotificationService {
     private final WhatsAppService whatsAppService;
     private final EmailService    emailService;
     private final ReceiptPdfService receiptPdfService;
+    private final StudentIdCardPdfService studentIdCardPdfService;
     private final RestTemplate    restTemplate;
 
     @Value("${notification.admin-email:admin@targetzone.co.in}")
@@ -44,6 +45,23 @@ public class NotificationService {
 
     @Value("${app.frontend-url:https://targetzone.co.in}")
     private String frontendUrl;
+
+    // "payment_receipt" was created under plain English ("en"), not English (US)
+    // ("en_US") like the notification template — Meta requires an exact
+    // language-code match per template or the send fails with a
+    // template-not-found error, so each document template gets its own
+    // language property rather than sharing metaLanguage.
+    @Value("${meta.whatsapp.receipt-template-name:payment_receipt}")
+    private String receiptTemplateName;
+
+    @Value("${meta.whatsapp.receipt-language:en}")
+    private String receiptLanguage;
+
+    @Value("${meta.whatsapp.id-card-template-name:student_id_card}")
+    private String idCardTemplateName;
+
+    @Value("${meta.whatsapp.id-card-language:en}")
+    private String idCardLanguage;
 
     private List<String> adminWhatsappNumbers() {
         if (!hasValue(adminWhatsapp)) return List.of();
@@ -109,6 +127,107 @@ public class NotificationService {
         );
 
         log.info("Booking confirmation notifications sent for user: {}", event.getUserId());
+
+        sendStudentIdCard(event, name);
+    }
+
+    // ── Student ID Card (best-effort — must never block the notifications above,
+    //    since a rendering/upload/Meta-template failure here is a separate
+    //    concern from the plain-text booking confirmation the student is
+    //    already relying on) ─────────────────────────────────────────────────
+    private void sendStudentIdCard(BookingConfirmedEvent event, String name) {
+        try {
+            byte[] photoBytes = fetchPhotoBytes(event.getPhotoUrl());
+            byte[] pdf        = studentIdCardPdfService.buildIdCard(event, photoBytes);
+
+            String idNumber       = buildIdNumber(event.getMembershipId());
+            String attachmentName = idNumber + "_id_card.pdf";
+            String idCardLink     = uploadIdCardPdf(event.getMembershipId(), pdf, attachmentName);
+            String validUpto      = formatDateDdMmYyyy(event.getEndDate());
+
+            List<String> bodyParams = List.of(
+                    name,
+                    idNumber,
+                    hasValue(event.getPlanName()) ? event.getPlanName() : "",
+                    validUpto
+            );
+
+            if (idCardLink != null) {
+                if (hasValue(event.getUserMobile())) {
+                    whatsAppService.sendDocumentTemplate(event.getUserMobile(), idCardLink, attachmentName,
+                            bodyParams, idCardTemplateName, idCardLanguage, event.getUserId(), "STUDENT_ID_CARD");
+                }
+                for (String number : adminWhatsappNumbers()) {
+                    whatsAppService.sendDocumentTemplate(number, idCardLink, attachmentName,
+                            bodyParams, idCardTemplateName, idCardLanguage, null, "STUDENT_ID_CARD_ADMIN");
+                }
+            } else {
+                log.warn("ID card PDF not hosted for membership {} — skipping WhatsApp document send", event.getMembershipId());
+            }
+
+            if (hasValue(event.getUserEmail())) {
+                emailService.sendWithAttachment(event.getUserEmail(), "Your Target Zone Library ID Card",
+                        "Dear " + name + ",\n\nPlease find your library ID card attached.\n\nID No.: " + idNumber +
+                                "\nValid Upto: " + validUpto + "\n\nTarget Zone Library Team",
+                        pdf, attachmentName, event.getUserId(), "STUDENT_ID_CARD");
+            }
+            emailService.sendWithAttachment(adminEmail, "Student ID Card — " + name,
+                    "New ID card generated for " + name, pdf, attachmentName, null, "STUDENT_ID_CARD_ADMIN");
+
+        } catch (Exception e) {
+            log.warn("Student ID card generation/delivery failed for user {} (booking notifications already sent): {}",
+                    event.getUserId(), e.getMessage(), e);
+        }
+    }
+
+    private byte[] fetchPhotoBytes(String photoUrl) {
+        if (!hasValue(photoUrl)) return null;
+        try {
+            var resp = restTemplate.getForEntity(userServiceBaseUrl + photoUrl, byte[].class);
+            if (resp.getStatusCode().is2xxSuccessful() && resp.getBody() != null) return resp.getBody();
+        } catch (Exception e) {
+            log.warn("Could not fetch photo from {} for ID card — proceeding without photo: {}", photoUrl, e.getMessage());
+        }
+        return null;
+    }
+
+    // Same convention membership-service's IdCardService.buildQrData() already
+    // uses for its member ID — first 8 chars of the membership UUID, uppercased.
+    private String buildIdNumber(String membershipId) {
+        if (!hasValue(membershipId)) return "UNKNOWN";
+        return membershipId.length() >= 8
+                ? membershipId.substring(0, 8).toUpperCase()
+                : membershipId.toUpperCase();
+    }
+
+    private String uploadIdCardPdf(String membershipId, byte[] pdf, String filename) {
+        try {
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add("membershipId", membershipId);
+            body.add("file", new ByteArrayResource(pdf) {
+                @Override
+                public String getFilename() {
+                    return filename;
+                }
+            });
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);
+
+            var resp = restTemplate.exchange(
+                    userServiceBaseUrl + "/api/users/internal/id-cards",
+                    HttpMethod.POST, request, Map.class);
+
+            if (resp.getBody() != null && resp.getBody().get("data") instanceof Map<?, ?> data) {
+                Object url = data.get("idCardUrl");
+                if (url != null) return frontendUrl + url;
+            }
+        } catch (Exception e) {
+            log.warn("Could not host ID card PDF for membership {} — WhatsApp document send will be skipped: {}",
+                    membershipId, e.getMessage());
+        }
+        return null;
     }
 
     // ── Welcome Notification (after registration) ─────────────────────────────
@@ -372,11 +491,11 @@ public class NotificationService {
         if (receiptLink != null) {
             if (hasValue(event.getUserMobile())) {
                 whatsAppService.sendDocumentTemplate(event.getUserMobile(), receiptLink, attachmentName,
-                        bodyParams, event.getUserId(), "PAYMENT_RECEIPT");
+                        bodyParams, receiptTemplateName, receiptLanguage, event.getUserId(), "PAYMENT_RECEIPT");
             }
             for (String number : adminWhatsappNumbers()) {
                 whatsAppService.sendDocumentTemplate(number, receiptLink, attachmentName,
-                        bodyParams, null, "PAYMENT_RECEIPT_ADMIN");
+                        bodyParams, receiptTemplateName, receiptLanguage, null, "PAYMENT_RECEIPT_ADMIN");
             }
         } else {
             // Couldn't host the PDF — the document-header template requires a

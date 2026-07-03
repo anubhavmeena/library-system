@@ -266,7 +266,7 @@ class UserServiceTest {
 
         PhotoUploadResponse resp = userService.uploadPhoto(userId, file);
 
-        assertThat(resp.getPhotoUrl()).startsWith("/java-uploads/photos/");
+        assertThat(resp.getPhotoUrl()).startsWith("/uploads/photos/");
         assertThat(resp.getPhotoUrl()).endsWith(".jpg");
         assertThat(resp.getMessage()).isEqualTo("Photo uploaded successfully");
 
@@ -350,7 +350,7 @@ class UserServiceTest {
         Files.createDirectories(photosDir);
         Path oldFile = photosDir.resolve("old_photo.jpg");
         Files.write(oldFile, "old".getBytes());
-        user.setPhotoUrl("/java-uploads/photos/old_photo.jpg");
+        user.setPhotoUrl("/uploads/photos/old_photo.jpg");
 
         when(userRepository.findById(UUID.fromString(userId))).thenReturn(Optional.of(user));
         when(userRepository.save(any())).thenReturn(user);
@@ -385,7 +385,56 @@ class UserServiceTest {
 
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
-        assertThat(captor.getValue().getPhotoUrl()).startsWith("/java-uploads/photos/");
+        assertThat(captor.getValue().getPhotoUrl()).startsWith("/uploads/photos/");
+    }
+
+    // ── uploadIdCard ──────────────────────────────────────────────────────────
+    // Internal, pod-to-pod endpoint called by notification-service to host a
+    // generated student ID card PDF — mirrors uploadReceipt's storage pattern.
+
+    @Test
+    void uploadIdCard_validFile_writesToIdCardsSubdirAndReturnsUrl() throws IOException {
+        String membershipId = UUID.randomUUID().toString();
+        MultipartFile file = mockFile("application/pdf", 2048L, "card.pdf");
+
+        var resp = userService.uploadIdCard(membershipId, file);
+
+        assertThat(resp.getIdCardUrl()).isEqualTo("/uploads/id-cards/" + membershipId + ".pdf");
+        assertThat(resp.getMessage()).isEqualTo("ID card uploaded successfully");
+
+        Path idCardsDir = tempDir.resolve("id-cards");
+        assertThat(Files.list(idCardsDir).count()).isEqualTo(1);
+    }
+
+    @Test
+    void uploadIdCard_sanitizesMembershipId() throws IOException {
+        MultipartFile file = mockFile("application/pdf", 2048L, "card.pdf");
+
+        var resp = userService.uploadIdCard("../../etc/passwd", file);
+
+        assertThat(resp.getIdCardUrl()).isEqualTo("/uploads/id-cards/etcpasswd.pdf");
+    }
+
+    @Test
+    void uploadIdCard_blankAfterSanitizing_throwsIllegalArgument() throws IOException {
+        MultipartFile file = mockFile("application/pdf", 2048L, "card.pdf");
+
+        assertThatThrownBy(() -> userService.uploadIdCard("///", file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid membership id");
+    }
+
+    @Test
+    void uploadIdCard_overwritesExistingFileForSameMembership() throws IOException {
+        String membershipId = UUID.randomUUID().toString();
+        MultipartFile file1 = mockFile("application/pdf", 2048L, "card.pdf");
+        MultipartFile file2 = mockFile("application/pdf", 2048L, "card.pdf");
+
+        userService.uploadIdCard(membershipId, file1);
+        userService.uploadIdCard(membershipId, file2);
+
+        Path idCardsDir = tempDir.resolve("id-cards");
+        assertThat(Files.list(idCardsDir).count()).isEqualTo(1);
     }
 
     // ── deletePhoto ───────────────────────────────────────────────────────────
@@ -399,7 +448,7 @@ class UserServiceTest {
         Files.createDirectories(photosDir);
         Path photoFile = photosDir.resolve("photo.jpg");
         Files.write(photoFile, "content".getBytes());
-        user.setPhotoUrl("/java-uploads/photos/photo.jpg");
+        user.setPhotoUrl("/uploads/photos/photo.jpg");
 
         when(userRepository.findById(UUID.fromString(userId))).thenReturn(Optional.of(user));
         when(userRepository.save(any())).thenReturn(user);

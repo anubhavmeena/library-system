@@ -23,6 +23,7 @@ class BookingConfirmedEventTest {
         assertThat(event.getStartDate()).isNull();
         assertThat(event.getEndDate()).isNull();
         assertThat(event.getAmountPaid()).isNull();
+        assertThat(event.getPhotoUrl()).isNull();
         assertThat(event.getEventType()).isNull();
     }
 
@@ -41,6 +42,7 @@ class BookingConfirmedEventTest {
         event.setStartDate("2025-01-01");
         event.setEndDate("2025-01-31");
         event.setAmountPaid(new BigDecimal("600.00"));
+        event.setPhotoUrl("/uploads/photos/user_123.jpg");
         event.setEventType("BOOKING_CONFIRMED");
 
         assertThat(event.getUserId()).isEqualTo("user-123");
@@ -55,6 +57,7 @@ class BookingConfirmedEventTest {
         assertThat(event.getStartDate()).isEqualTo("2025-01-01");
         assertThat(event.getEndDate()).isEqualTo("2025-01-31");
         assertThat(event.getAmountPaid()).isEqualByComparingTo(new BigDecimal("600.00"));
+        assertThat(event.getPhotoUrl()).isEqualTo("/uploads/photos/user_123.jpg");
         assertThat(event.getEventType()).isEqualTo("BOOKING_CONFIRMED");
     }
 
