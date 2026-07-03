@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
@@ -272,16 +273,20 @@ export default function AdminSeatsPage() {
                         </div>
                         <div className="space-y-2">
                             {[
-                                { l: t('adminSeats.modal.student'), v: selected.studentName },
+                                { l: t('adminSeats.modal.student'), v: selected.studentName, link: selected.studentId ? `/admin/students/${selected.studentId}` : null },
                                 { l: t('adminSeats.modal.mobile'),  v: selected.studentMobile || '—' },
                                 { l: 'Gender',                       v: selected.studentGender || '—' },
                                 { l: t('adminSeats.modal.shift'),   v: shiftLabel(selected.shift) },
                                 { l: t('adminSeats.modal.expires'), v: selected.membershipEnd },
                                 { l: t('adminSeats.modal.daysLeft'), v: t('adminSeats.modal.daysLeftValue', { days: daysToExpiry(selected.membershipEnd, date) }) },
-                            ].map(({ l, v }) => (
+                            ].map(({ l, v, link }) => (
                                 <div key={l} className="flex justify-between py-2 border-b border-primary-700/30 last:border-0 text-sm">
                                     <span className="text-primary-400">{l}</span>
-                                    <span className="text-white">{v}</span>
+                                    {link ? (
+                                        <Link to={link} className="text-amber-400 hover:text-amber-300 hover:underline">{v}</Link>
+                                    ) : (
+                                        <span className="text-white">{v}</span>
+                                    )}
                                 </div>
                             ))}
                         </div>

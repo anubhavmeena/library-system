@@ -314,6 +314,7 @@ public class AdminService {
                     rowSeats.add(SeatMapDto.SeatInfoDto.builder()
                             .seatNumber(sn)
                             .isOccupied(true)
+                            .studentId(mem.getUserId().toString())
                             .studentName(student != null ? student.getName() : "Unknown")
                             .studentMobile(student != null ? student.getMobile() : null)
                             .studentGender(student != null ? student.getGender() : null)

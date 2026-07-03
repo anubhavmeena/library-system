@@ -19,6 +19,7 @@ public class SeatMapDto {
     public static class SeatInfoDto {
         private String  seatNumber;
         private Boolean isOccupied;
+        private String  studentId;      // userId — null when seat is available
         private String  studentName;    // null when seat is available
         private String  studentMobile;  // null when seat is available
         private String  studentGender;  // null when seat is available
