@@ -117,6 +117,17 @@ public class AdminMembershipService {
         BigDecimal paidAmount    = (req.getPaidAmount()    != null) ? req.getPaidAmount()    : planPrice;
         BigDecimal pendingAmount = (req.getPendingAmount() != null) ? req.getPendingAmount() : BigDecimal.ZERO;
 
+        // Guards against exactly the bug that produced a real bad production
+        // row: the admin UI's "Paid Amount" and "Pending Amount" fields are
+        // meant to always sum to the plan price, but a stale/unsynced client
+        // value could send e.g. paidAmount=600 and pendingAmount=600 for a
+        // ₹600 plan — double-counting the same amount as both paid and owed.
+        if (paidAmount.add(pendingAmount).compareTo(planPrice) != 0) {
+            throw new IllegalArgumentException(
+                    "Paid amount (₹" + paidAmount + ") + pending amount (₹" + pendingAmount +
+                    ") must equal the plan price (₹" + planPrice + ")");
+        }
+
         String cashOrderId = "cash_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         Payment payment = Payment.builder()
                 .membershipId(membership.getId())

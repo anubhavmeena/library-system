@@ -554,7 +554,12 @@ export default function AdminCreateMembershipPage() {
                                         type="number" min="0" step="1"
                                         className={`input text-sm py-0.5 w-28 text-right ${parseFloat(pendingAmount) > 0 ? 'text-red-400' : ''}`}
                                         value={pendingAmount}
-                                        onChange={e => setPendingAmount(e.target.value)}
+                                        onChange={e => {
+                                            setPendingAmount(e.target.value)
+                                            const pending = parseFloat(e.target.value) || 0
+                                            const paid    = Math.max(0, (selectedPlan?.price || 0) - pending)
+                                            setPaidAmount(String(paid))
+                                        }}
                                     />
                                 </div>
                             </div>

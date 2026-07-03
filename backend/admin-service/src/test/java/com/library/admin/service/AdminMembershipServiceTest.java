@@ -1,9 +1,13 @@
 package com.library.admin.service;
 
 import com.library.admin.dto.ChangeSeatRequest;
+import com.library.admin.dto.CreateCashMembershipRequest;
 import com.library.admin.entity.Membership;
+import com.library.admin.entity.Payment;
+import com.library.admin.entity.Plan;
 import com.library.admin.entity.Seat;
 import com.library.admin.entity.SeatBooking;
+import com.library.admin.entity.User;
 import com.library.admin.exception.ResourceNotFoundException;
 import com.library.admin.repository.*;
 import org.junit.jupiter.api.Test;
@@ -24,10 +28,11 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 // Covers AdminMembershipService.releaseSeat() (changed to allow releasing an
-// ACTIVE, not just GRACE, membership's seat) and changeSeat() (changed to
-// create a SeatBooking when the membership never had one, instead of silently
-// no-oping). createCashMembership/updateMembershipPlan are untouched by either
-// change and are not covered here.
+// ACTIVE, not just GRACE, membership's seat), changeSeat() (changed to create
+// a SeatBooking when the membership never had one, instead of silently
+// no-oping), and createCashMembership()'s new paid+pending == plan price
+// validation. updateMembershipPlan is untouched by any of these changes and
+// is not covered here.
 @ExtendWith(MockitoExtension.class)
 class AdminMembershipServiceTest {
 
@@ -260,5 +265,88 @@ class AdminMembershipServiceTest {
                 .hasMessageContaining("ACTIVE");
 
         verifyNoInteractions(seatBookingRepository);
+    }
+
+    // ── createCashMembership ─────────────────────────────────────────────────
+
+    @Test
+    void createCashMembership_paidPlusPendingMismatchesPlanPrice_throwsAndSavesNothingFinancial() {
+        // Regression for a real production bug: the admin "New Membership" form
+        // could submit paidAmount=600 and pendingAmount=600 for a ₹600 plan
+        // (a stale, unsynced field) — double-counting the same amount as both
+        // paid and still owed. The validation must catch this before the
+        // Payment/SeatBooking rows are ever written.
+        UUID studentId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        User student = User.builder().id(studentId).name("Sunil Meena").mobile("9990000000")
+                .role(User.Role.STUDENT).build();
+        Plan plan = Plan.builder().id(planId).name("Full Day").planType(Plan.PlanType.FULL_DAY)
+                .price(new BigDecimal("600.00")).durationDays(30).isActive(true).build();
+        Seat seat = new Seat(UUID.randomUUID(), "B14", "B", 14, true);
+
+        CreateCashMembershipRequest req = new CreateCashMembershipRequest();
+        req.setStudentId(studentId.toString());
+        req.setPlanId(planId.toString());
+        req.setSeatNumber("B14");
+        req.setPaidAmount(new BigDecimal("600.00"));
+        req.setPendingAmount(new BigDecimal("600.00"));
+
+        when(userRepository.findById(studentId)).thenReturn(Optional.of(student));
+        when(planRepository.findById(planId)).thenReturn(Optional.of(plan));
+        when(membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(studentId, Membership.Status.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(studentId))
+                .thenReturn(Optional.empty());
+        when(seatRepository.findBySeatNumber("B14")).thenReturn(Optional.of(seat));
+        when(seatBookingRepository.findActiveBookingsForSeat(eq(seat.getId()), any(), any()))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> adminMembershipService.createCashMembership(req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must equal the plan price");
+
+        verify(paymentRepository, never()).save(any());
+        verify(seatBookingRepository, never()).save(any());
+    }
+
+    @Test
+    void createCashMembership_paidPlusPendingMatchesPlanPrice_doesNotThrow() {
+        UUID studentId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        User student = User.builder().id(studentId).name("Sunil Meena").mobile("9990000000")
+                .role(User.Role.STUDENT).build();
+        Plan plan = Plan.builder().id(planId).name("Full Day").planType(Plan.PlanType.FULL_DAY)
+                .price(new BigDecimal("600.00")).durationDays(30).isActive(true).build();
+        Seat seat = new Seat(UUID.randomUUID(), "B14", "B", 14, true);
+
+        CreateCashMembershipRequest req = new CreateCashMembershipRequest();
+        req.setStudentId(studentId.toString());
+        req.setPlanId(planId.toString());
+        req.setSeatNumber("B14");
+        req.setPaidAmount(BigDecimal.ZERO);
+        req.setPendingAmount(new BigDecimal("600.00"));
+
+        when(userRepository.findById(studentId)).thenReturn(Optional.of(student));
+        when(planRepository.findById(planId)).thenReturn(Optional.of(plan));
+        when(membershipRepository.findFirstByUserIdAndStatusOrderByEndDateDesc(studentId, Membership.Status.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(studentId))
+                .thenReturn(Optional.empty());
+        when(seatRepository.findBySeatNumber("B14")).thenReturn(Optional.of(seat));
+        when(seatBookingRepository.findActiveBookingsForSeat(eq(seat.getId()), any(), any()))
+                .thenReturn(List.of());
+        when(membershipRepository.save(any())).thenAnswer(inv -> {
+            Membership m = inv.getArgument(0);
+            if (m.getId() == null) m.setId(UUID.randomUUID());
+            return m;
+        });
+
+        assertThatCode(() -> adminMembershipService.createCashMembership(req))
+                .doesNotThrowAnyException();
+
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(captor.capture());
+        assertThat(captor.getValue().getAmount()).isEqualByComparingTo("0");
+        assertThat(captor.getValue().getPendingAmount()).isEqualByComparingTo("600.00");
     }
 }
