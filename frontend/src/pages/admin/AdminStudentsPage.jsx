@@ -124,7 +124,10 @@ export default function AdminStudentsPage() {
     }
 
     const handleReleaseSeat = async (student) => {
-        if (!window.confirm(`Release seat ${student.seatNumber} for ${student.name}? Dues of ₹${student.duesAmount ?? 0} remain on record. This cannot be undone.`)) return
+        const activeWarning = student.membershipStatus === 'ACTIVE'
+            ? `${student.name}'s membership is currently ACTIVE and paid — releasing will immediately free their seat and mark them Released. `
+            : `Release seat ${student.seatNumber} for ${student.name}? `
+        if (!window.confirm(`${activeWarning}Dues of ₹${student.duesAmount ?? 0} remain on record. This cannot be undone.`)) return
         setReleasingSeat(student.id)
         try {
             await api.patch(`/admin/memberships/${student.membershipId}/release`)
@@ -366,7 +369,7 @@ export default function AdminStudentsPage() {
                                                                 {t('adminStudents.changeSeat')}
                                                             </button>
                                                         )}
-                                                        {s.membershipStatus === 'GRACE' && (
+                                                        {s.membershipId && (s.membershipStatus === 'ACTIVE' || s.membershipStatus === 'GRACE') && (
                                                             <button
                                                                 disabled={releasingSeat === s.id}
                                                                 onClick={() => { handleReleaseSeat(s); setOpenDropdown(null) }}

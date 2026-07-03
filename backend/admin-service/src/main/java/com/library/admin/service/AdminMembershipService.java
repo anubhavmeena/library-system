@@ -277,17 +277,20 @@ public class AdminMembershipService {
         log.info("Plan updated for membership {} to plan {}", membershipId, plan.getName());
     }
 
-    // Admin-only escape hatch: explicitly frees a seat that's been held in GRACE
-    // because the student never paid their dues. Finalizes the membership as
-    // EXPIRED (dues remain on record — not auto-waived) and releases the seat
-    // booking so it becomes bookable by other students again.
+    // Admin-only escape hatch: explicitly frees a currently-occupied seat, whether
+    // the membership is still ACTIVE (paid, but admin wants to force them off) or
+    // has been held in GRACE (student never paid their dues). Finalizes the
+    // membership as EXPIRED (dues, if any, remain on record — not auto-waived)
+    // and releases the seat booking so it becomes bookable by other students
+    // again. The student's admin-facing display status resolves to RELEASED
+    // (see StudentStatusResolver) once this runs.
     @Transactional
     public void releaseSeat(String membershipId) {
         Membership mem = membershipRepository.findById(UUID.fromString(membershipId))
                 .orElseThrow(() -> new ResourceNotFoundException("Membership not found: " + membershipId));
 
-        if (mem.getStatus() != Membership.Status.GRACE) {
-            throw new IllegalArgumentException("Only a membership in GRACE can be released");
+        if (mem.getStatus() != Membership.Status.ACTIVE && mem.getStatus() != Membership.Status.GRACE) {
+            throw new IllegalArgumentException("Membership has no currently-occupied seat to release");
         }
 
         mem.setStatus(Membership.Status.EXPIRED);

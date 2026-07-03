@@ -42,7 +42,7 @@ public class AdminMembershipController {
         return ResponseEntity.ok(ApiResponse.success("Plan updated"));
     }
 
-    // Explicitly frees a seat held by a GRACE (overdue, unpaid) membership.
+    // Explicitly frees a currently-occupied seat (ACTIVE or GRACE membership).
     // Only seats released this way become bookable again — a lapsed membership
     // never frees its seat on its own.
     @PatchMapping("/{membershipId}/release")
