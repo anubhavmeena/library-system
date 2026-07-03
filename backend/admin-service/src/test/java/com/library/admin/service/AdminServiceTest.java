@@ -171,6 +171,30 @@ class AdminServiceTest {
     }
 
     @Test
+    void getAllStudents_gracedStudentWithNewerActiveMembership_displayStatusIsGraceNotPaid() {
+        // Regression for a production bug: a student can end up with an old
+        // unresolved GRACE membership (dues owed) *and* a newer ACTIVE one
+        // (self-booked instead of paying dues on the old row). The list's SQL
+        // tab-filter correctly matches such a student into "Grace", so the
+        // per-row displayStatus computed here — driven by whichever membership
+        // findFirstByUserIdCurrentOrderByEndDateDesc resolves as "current" —
+        // must agree and also resolve to GRACE, not PAID.
+        UUID uid = UUID.randomUUID();
+        User user = buildUser(uid);
+        Membership grace = buildActiveMembership(uid, LocalDate.now().minusDays(2));
+        grace.setStatus(Membership.Status.GRACE);
+
+        stubEntityManagerForStudents(List.of(user), 1L);
+        when(membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(uid))
+                .thenReturn(Optional.of(grace));
+
+        StudentListDto result = adminService.getAllStudents(0, 20, "GRACE", null, "createdAt", "desc");
+
+        assertThat(result.getStudents()).hasSize(1);
+        assertThat(result.getStudents().get(0).getDisplayStatus()).isEqualTo("GRACE");
+    }
+
+    @Test
     void getAllStudents_studentWithNoMembership_hasMembershipFieldsNull() {
         UUID uid = UUID.randomUUID();
         stubEntityManagerForStudents(List.of(buildUser(uid)), 1L);

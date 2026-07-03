@@ -81,10 +81,19 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     // NonUniqueResultException here and take down the whole students list.
     // Backed by a Pageable-limited query instead so it's safe regardless of
     // how many rows actually match.
+    //
+    // GRACE always outranks ACTIVE here, regardless of endDate. A student can
+    // end up with both simultaneously if they self-book a brand new membership
+    // (going straight to ACTIVE) while an older one is still sitting unresolved
+    // in GRACE, instead of paying dues on the existing row. Ordering by endDate
+    // alone would silently prefer the newer ACTIVE row — hiding the fact that
+    // the student has unresolved dues/a held seat from admin.getAllStudents'
+    // status badge, even while the list's own tab-filter query (a separate,
+    // hand-written native query) correctly matches them into the Grace tab.
     @Query("""
         SELECT m FROM Membership m
         WHERE m.userId = :userId AND m.status IN ('ACTIVE', 'GRACE')
-        ORDER BY m.endDate DESC
+        ORDER BY CASE WHEN m.status = 'GRACE' THEN 0 ELSE 1 END, m.endDate DESC
         """)
     List<Membership> findCurrentByUserIdOrderByEndDateDesc(@Param("userId") UUID userId, Pageable pageable);
 
@@ -115,6 +124,10 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     // Used by getSeatHistory — every membership ever booked against this seat,
     // newest first. Includes PENDING/CANCELLED rows; caller filters those out.
     List<Membership> findBySeatNumberOrderByStartDateDesc(String seatNumber);
+
+    // Used by getStudentSeatHistory — every membership this student has ever had,
+    // newest first. Includes PENDING/CANCELLED rows; caller filters those out.
+    List<Membership> findByUserIdOrderByStartDateDesc(UUID userId);
 
     @Modifying
     @Transactional

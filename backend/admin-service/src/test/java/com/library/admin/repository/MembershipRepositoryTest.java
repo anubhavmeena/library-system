@@ -99,12 +99,19 @@ class MembershipRepositoryTest {
     }
 
     @Test
-    void findFirstByUserIdCurrentOrderByEndDateDesc_activeAndGraceBothMatch_doesNotThrow() {
+    void findFirstByUserIdCurrentOrderByEndDateDesc_activeAndGraceBothMatch_gracePreferredEvenWithEarlierEndDate() {
+        // Mirrors a real production case: a student self-books a brand new ACTIVE
+        // membership (ending further out) while an older one is still unresolved
+        // in GRACE (ending earlier, dues owed). GRACE must win regardless of
+        // endDate — an unresolved-dues row should never be masked by a newer,
+        // unrelated booking.
         save(userId1, Membership.Status.ACTIVE, LocalDate.now().plusDays(5), false);
-        save(userId1, Membership.Status.GRACE, LocalDate.now().minusDays(2), false);
+        Membership grace = save(userId1, Membership.Status.GRACE, LocalDate.now().minusDays(2), false);
 
-        assertThatCode(() -> membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(userId1))
-                .doesNotThrowAnyException();
+        Optional<Membership> result = membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(userId1);
+
+        assertThat(result).isPresent()
+                .get().extracting(Membership::getId).isEqualTo(grace.getId());
     }
 
     @Test
