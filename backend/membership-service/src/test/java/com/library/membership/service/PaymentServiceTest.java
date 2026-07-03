@@ -649,6 +649,7 @@ class PaymentServiceTest {
         userProfile.setName("Ravi Kumar");
         userProfile.setMobile("9876543210");
         userProfile.setEmail("ravi@example.com");
+        userProfile.setPhotoUrl("/uploads/photos/user_ravi.jpg");
         UserApiResponse userApiResponse = new UserApiResponse();
         userApiResponse.setData(userProfile);
         when(restTemplate.exchange(anyString(), any(), any(), eq(UserApiResponse.class)))
@@ -674,6 +675,7 @@ class PaymentServiceTest {
         assertThat(event.getSeatNumber()).isEqualTo("B12");
         assertThat(event.getShift()).isEqualTo("FULL_DAY");
         assertThat(event.getAmountPaid()).isEqualByComparingTo(BigDecimal.valueOf(600));
+        assertThat(event.getPhotoUrl()).isEqualTo("/uploads/photos/user_ravi.jpg");
         assertThat(event.getEventType()).isEqualTo("BOOKING_CONFIRMED");
     }
 
