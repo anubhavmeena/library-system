@@ -219,9 +219,14 @@ public class IdCardPdfGenerator {
         cb.clip();
         cb.newPath();
 
-        photo.scaleToFit(PHOTO_W, PHOTO_H);
-        float scaledW = photo.getScaledWidth();
-        float scaledH = photo.getScaledHeight();
+        // "Cover" scale — fills the whole box with no gaps, cropping any
+        // overflow via the clip above — rather than scaleToFit's "contain"
+        // behavior, which letterboxes photos whose aspect ratio doesn't
+        // match the box's.
+        float scale = Math.max(PHOTO_W / photo.getPlainWidth(), PHOTO_H / photo.getPlainHeight());
+        float scaledW = photo.getPlainWidth() * scale;
+        float scaledH = photo.getPlainHeight() * scale;
+        photo.scaleAbsolute(scaledW, scaledH);
         photo.setAbsolutePosition(
                 PHOTO_X + (PHOTO_W - scaledW) / 2f,
                 PHOTO_Y + (PHOTO_H - scaledH) / 2f);
