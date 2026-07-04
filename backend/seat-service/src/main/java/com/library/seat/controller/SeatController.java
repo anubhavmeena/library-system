@@ -55,6 +55,21 @@ public class SeatController {
         return ResponseEntity.ok(ApiResponse.success("Seat released successfully"));
     }
 
+    // ── Extend a Booking (internal — pod-to-pod, no gateway) ──────────────────
+    // Called directly by membership-service after a GRACE membership's dues
+    // are paid, to keep this booking's hold in sync with the reactivated
+    // membership's new endDate — bypasses the gateway, same pattern as
+    // user-service's /internal/id-cards endpoint (no auth header expected).
+    // PATCH /api/seats/internal/bookings/{membershipId}/extend
+
+    @PatchMapping("/internal/bookings/{membershipId}/extend")
+    public ResponseEntity<ApiResponse<String>> extendBooking(
+            @PathVariable String membershipId,
+            @Valid @RequestBody ExtendBookingRequest request) {
+        seatService.extendBooking(membershipId, request.getNewEndDate());
+        return ResponseEntity.ok(ApiResponse.success("Booking extended"));
+    }
+
     // ── My Active Bookings ────────────────────────────────────────────────────
     // Returns the student's current active seat booking.
     // GET /api/seats/my

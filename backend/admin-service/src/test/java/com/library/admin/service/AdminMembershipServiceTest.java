@@ -32,9 +32,11 @@ import static org.mockito.Mockito.*;
 // Covers AdminMembershipService.releaseSeat() (changed to allow releasing an
 // ACTIVE, not just GRACE, membership's seat), changeSeat() (changed to create
 // a SeatBooking when the membership never had one, instead of silently
-// no-oping), and createCashMembership()'s new paid+pending == plan price
-// validation. updateMembershipPlan is untouched by any of these changes and
-// is not covered here.
+// no-oping), createCashMembership()'s new paid+pending == plan price
+// validation, and clearDues()/renewSeat()/markMembershipGrace()/
+// updateMembershipPlan()'s SeatBooking-sync fixes (a prior gap where these
+// methods moved Membership.endDate/status without keeping the linked
+// SeatBooking.endDate in step, confirmed live in a production double-booking).
 @ExtendWith(MockitoExtension.class)
 class AdminMembershipServiceTest {
 
@@ -502,6 +504,8 @@ class AdminMembershipServiceTest {
         when(planRepository.findById(mem.getPlanId())).thenReturn(Optional.of(plan));
         when(paymentRepository.findFirstByMembershipIdOrderByCreatedAtDesc(id))
                 .thenReturn(Optional.of(oldPayment));
+        when(seatBookingRepository.findFirstByMembershipIdAndStatus(id, SeatBooking.Status.ACTIVE))
+                .thenReturn(Optional.empty());
 
         adminMembershipService.markMembershipGrace(id.toString());
 
@@ -511,6 +515,54 @@ class AdminMembershipServiceTest {
         assertThat(mem.getDuesAmount()).isEqualByComparingTo("600.00");
         assertThat(mem.getEndDate()).isEqualTo(LocalDate.now());
         verify(membershipRepository).save(mem);
+    }
+
+    @Test
+    void markMembershipGrace_activeSeatBooking_pushesEndDateToFarFutureSentinel() {
+        // The gap this fix closes: without pushing the linked booking to the
+        // sentinel, the seat's real (now-stale) endDate eventually passes while
+        // the membership sits unresolved in GRACE, freeing the seat for someone
+        // else to book on top of the still-unresolved student.
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        mem.setEndDate(LocalDate.now().plusDays(10));
+        Plan plan = Plan.builder().id(mem.getPlanId()).name("Full Day")
+                .planType(Plan.PlanType.FULL_DAY).price(new BigDecimal("600.00")).build();
+        SeatBooking booking = buildActiveBooking(id);
+        booking.setEndDate(mem.getEndDate()); // starts as a real, non-sentinel date
+
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+        when(planRepository.findById(mem.getPlanId())).thenReturn(Optional.of(plan));
+        when(paymentRepository.findFirstByMembershipIdOrderByCreatedAtDesc(id))
+                .thenReturn(Optional.empty());
+        when(seatBookingRepository.findFirstByMembershipIdAndStatus(id, SeatBooking.Status.ACTIVE))
+                .thenReturn(Optional.of(booking));
+
+        adminMembershipService.markMembershipGrace(id.toString());
+
+        assertThat(booking.getEndDate()).isEqualTo(LocalDate.of(9999, 12, 31));
+        verify(seatBookingRepository).save(booking);
+    }
+
+    @Test
+    void markMembershipGrace_noActiveSeatBooking_doesNotThrow() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        mem.setEndDate(LocalDate.now().plusDays(10));
+        Plan plan = Plan.builder().id(mem.getPlanId()).name("Full Day")
+                .planType(Plan.PlanType.FULL_DAY).price(new BigDecimal("600.00")).build();
+
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+        when(planRepository.findById(mem.getPlanId())).thenReturn(Optional.of(plan));
+        when(paymentRepository.findFirstByMembershipIdOrderByCreatedAtDesc(id))
+                .thenReturn(Optional.empty());
+        when(seatBookingRepository.findFirstByMembershipIdAndStatus(id, SeatBooking.Status.ACTIVE))
+                .thenReturn(Optional.empty());
+
+        assertThatCode(() -> adminMembershipService.markMembershipGrace(id.toString()))
+                .doesNotThrowAnyException();
+
+        verify(seatBookingRepository, never()).save(any());
     }
 
     @Test
@@ -653,5 +705,110 @@ class AdminMembershipServiceTest {
 
         verifyNoInteractions(paymentRepository);
         verify(membershipRepository, never()).save(any());
+    }
+
+    // ── updateMembershipPlan ─────────────────────────────────────────────────
+    // Admin action to swap a membership onto a different plan — recalculates
+    // endDate from startDate + the new plan's duration, which can move the
+    // date in either direction relative to the old plan.
+
+    private com.library.admin.dto.UpdateMembershipPlanRequest planReq(UUID planId) {
+        com.library.admin.dto.UpdateMembershipPlanRequest req =
+                new com.library.admin.dto.UpdateMembershipPlanRequest();
+        req.setPlanId(planId.toString());
+        return req;
+    }
+
+    @Test
+    void updateMembershipPlan_longerPlan_syncsSeatBookingToLaterEndDate() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        mem.setStartDate(LocalDate.now().minusDays(5));
+        mem.setEndDate(LocalDate.now().plusDays(25)); // 30-day plan remaining
+        UUID newPlanId = UUID.randomUUID();
+        Plan longerPlan = Plan.builder().id(newPlanId).name("Quarterly")
+                .planType(Plan.PlanType.FULL_DAY).price(new BigDecimal("1500.00"))
+                .durationDays(90).isActive(true).build();
+        SeatBooking booking = buildActiveBooking(id);
+        booking.setEndDate(mem.getEndDate());
+
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+        when(planRepository.findById(newPlanId)).thenReturn(Optional.of(longerPlan));
+        when(seatBookingRepository.findFirstByMembershipIdAndStatus(id, SeatBooking.Status.ACTIVE))
+                .thenReturn(Optional.of(booking));
+
+        adminMembershipService.updateMembershipPlan(id.toString(), planReq(newPlanId));
+
+        LocalDate expectedEndDate = mem.getStartDate().plusDays(90);
+        assertThat(mem.getEndDate()).isEqualTo(expectedEndDate);
+        assertThat(booking.getEndDate()).isEqualTo(expectedEndDate);
+        verify(seatBookingRepository).save(booking);
+    }
+
+    @Test
+    void updateMembershipPlan_shorterPlan_syncsSeatBookingToEarlierEndDate() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        mem.setStartDate(LocalDate.now().minusDays(5));
+        mem.setEndDate(LocalDate.now().plusDays(85)); // 90-day plan remaining
+        UUID newPlanId = UUID.randomUUID();
+        Plan shorterPlan = Plan.builder().id(newPlanId).name("Monthly")
+                .planType(Plan.PlanType.FULL_DAY).price(new BigDecimal("600.00"))
+                .durationDays(30).isActive(true).build();
+        SeatBooking booking = buildActiveBooking(id);
+        booking.setEndDate(mem.getEndDate());
+
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+        when(planRepository.findById(newPlanId)).thenReturn(Optional.of(shorterPlan));
+        when(seatBookingRepository.findFirstByMembershipIdAndStatus(id, SeatBooking.Status.ACTIVE))
+                .thenReturn(Optional.of(booking));
+
+        adminMembershipService.updateMembershipPlan(id.toString(), planReq(newPlanId));
+
+        LocalDate expectedEndDate = mem.getStartDate().plusDays(30);
+        assertThat(mem.getEndDate()).isEqualTo(expectedEndDate);
+        assertThat(booking.getEndDate()).isEqualTo(expectedEndDate);
+        verify(seatBookingRepository).save(booking);
+    }
+
+    @Test
+    void updateMembershipPlan_noActiveSeatBooking_doesNotThrow() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        mem.setStartDate(LocalDate.now().minusDays(5));
+        UUID newPlanId = UUID.randomUUID();
+        Plan plan = Plan.builder().id(newPlanId).name("Monthly")
+                .planType(Plan.PlanType.FULL_DAY).price(new BigDecimal("600.00"))
+                .durationDays(30).isActive(true).build();
+
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+        when(planRepository.findById(newPlanId)).thenReturn(Optional.of(plan));
+        when(seatBookingRepository.findFirstByMembershipIdAndStatus(id, SeatBooking.Status.ACTIVE))
+                .thenReturn(Optional.empty());
+
+        assertThatCode(() -> adminMembershipService.updateMembershipPlan(id.toString(), planReq(newPlanId)))
+                .doesNotThrowAnyException();
+
+        verify(seatBookingRepository, never()).save(any());
+    }
+
+    @Test
+    void updateMembershipPlan_inactivePlan_throwsAndDoesNotTouchSeatBooking() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        UUID newPlanId = UUID.randomUUID();
+        Plan inactivePlan = Plan.builder().id(newPlanId).name("Discontinued")
+                .planType(Plan.PlanType.FULL_DAY).price(new BigDecimal("600.00"))
+                .durationDays(30).isActive(false).build();
+
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+        when(planRepository.findById(newPlanId)).thenReturn(Optional.of(inactivePlan));
+
+        assertThatThrownBy(() -> adminMembershipService.updateMembershipPlan(id.toString(), planReq(newPlanId)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not active");
+
+        verify(membershipRepository, never()).save(any());
+        verifyNoInteractions(seatBookingRepository);
     }
 }

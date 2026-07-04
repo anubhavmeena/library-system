@@ -52,6 +52,9 @@ public class PaymentService {
     @Value("${app.user-service.base-url}")
     private String userServiceBaseUrl;
 
+    @Value("${app.seat-service.base-url}")
+    private String seatServiceBaseUrl;
+
     // Razorpay
     @Value("${razorpay.key-id:}")
     private String razorpayKeyId;
@@ -338,6 +341,15 @@ public class PaymentService {
         membership.setDuesAmount(BigDecimal.ZERO);
         membership = membershipRepository.save(membership);
 
+        // Keep the linked seat booking's hold in sync — otherwise the seat
+        // stays held at the far-future GRACE sentinel forever even though the
+        // membership now looks normally ACTIVE again (the same class of bug
+        // AdminMembershipService.clearDues() had). Best-effort: the payment
+        // and membership reactivation have already committed by this point,
+        // so a seat-sync failure here must never make the student think their
+        // payment failed.
+        extendSeatBooking(membership.getId().toString(), membership.getEndDate().toString());
+
         log.info("Dues cleared for user {} — membership {} resumed, new endDate {}",
                 userId, membership.getId(), membership.getEndDate());
 
@@ -347,6 +359,20 @@ public class PaymentService {
                 membership.getEndDate().toString(), "DUES_CLEARED");
 
         return MembershipDto.fromEntity(membership);
+    }
+
+    private void extendSeatBooking(String membershipId, String newEndDate) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, String>> request = new HttpEntity<>(Map.of("newEndDate", newEndDate), headers);
+            restTemplate.exchange(
+                    seatServiceBaseUrl + "/api/seats/internal/bookings/" + membershipId + "/extend",
+                    HttpMethod.PATCH, request, Void.class);
+        } catch (Exception e) {
+            log.warn("Could not extend seat booking for membership {} after dues payment — " +
+                    "seat may still show the old GRACE hold: {}", membershipId, e.getMessage());
+        }
     }
 
     // ── Razorpay Helpers ──────────────────────────────────────────────────────

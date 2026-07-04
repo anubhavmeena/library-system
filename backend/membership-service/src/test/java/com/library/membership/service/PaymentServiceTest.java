@@ -27,6 +27,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -70,6 +72,7 @@ class PaymentServiceTest {
         ReflectionTestUtils.setField(paymentService, "cashfreeSecretKey",   "");
         ReflectionTestUtils.setField(paymentService, "cashfreeEnv",         "sandbox");
         ReflectionTestUtils.setField(paymentService, "userServiceBaseUrl",  "http://localhost:8082");
+        ReflectionTestUtils.setField(paymentService, "seatServiceBaseUrl",  "http://localhost:8084");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -769,6 +772,59 @@ class PaymentServiceTest {
         assertThat(event.getReceiptType()).isEqualTo("DUES_CLEARED");
         assertThat(event.getAmountPaid()).isEqualByComparingTo(BigDecimal.valueOf(600));
         assertThat(event.getAmountPending()).isEqualByComparingTo(BigDecimal.ZERO);
+
+        // Keeps the linked SeatBooking's hold in sync with the reactivated
+        // membership's new endDate — the same bug class AdminMembershipService's
+        // clearDues() had before it synced its own SeatBooking directly.
+        ArgumentCaptor<HttpEntity> bodyCap = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate).exchange(
+                eq("http://localhost:8084/api/seats/internal/bookings/" + memId + "/extend"),
+                eq(HttpMethod.PATCH), bodyCap.capture(), eq(Void.class));
+        assertThat(bodyCap.getValue().getBody()).isEqualTo(
+                java.util.Map.of("newEndDate", membership.getEndDate().toString()));
+    }
+
+    @Test
+    void verifyAndPayDues_seatServiceCallFails_isSwallowedAndDoesNotAffectResult() {
+        // Best-effort by design: the payment and membership reactivation have
+        // already committed by this point, so a seat-service outage must never
+        // make the student think their dues payment failed.
+        String orderId = "dev_order_dues_seatfail";
+        UUID memId = UUID.randomUUID();
+
+        Plan plan = buildFullDayPlan();
+        Membership membership = buildSavedMembership(memId, plan);
+        membership.setStatus(Membership.Status.GRACE);
+        membership.setDuesAmount(BigDecimal.valueOf(600));
+        membership.setEndDate(LocalDate.now().minusDays(5));
+
+        Payment payment = buildSavedPayment(memId);
+        payment.setGatewayOrderId(orderId);
+        payment.setAmount(BigDecimal.valueOf(600));
+        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
+        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UserProfileDto userProfile = new UserProfileDto();
+        userProfile.setName("Ravi Kumar");
+        userProfile.setMobile("9876543210");
+        userProfile.setEmail("ravi@example.com");
+        UserApiResponse userApiResponse = new UserApiResponse();
+        userApiResponse.setData(userProfile);
+        when(restTemplate.exchange(anyString(), any(), any(), eq(UserApiResponse.class)))
+                .thenReturn(ResponseEntity.ok(userApiResponse));
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.PATCH), any(), eq(Void.class)))
+                .thenThrow(new org.springframework.web.client.ResourceAccessException("connection refused"));
+
+        PaymentVerifyRequest req = new PaymentVerifyRequest();
+        req.setGatewayOrderId(orderId);
+        req.setGatewayPaymentId("pay_dues_seatfail");
+
+        // If the exception isn't swallowed, this call throws and fails the test.
+        MembershipDto result = paymentService.verifyAndPayDues(userId, req);
+
+        assertThat(result.getStatus()).isEqualTo(Membership.Status.ACTIVE.name());
+        assertThat(membership.getDuesAmount()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test

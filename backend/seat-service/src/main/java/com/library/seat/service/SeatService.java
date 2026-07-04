@@ -148,6 +148,28 @@ public class SeatService {
                 });
     }
 
+    // ── Extend a Booking's End Date ───────────────────────────────────────────
+    // Called directly pod-to-pod by membership-service after a GRACE
+    // membership's dues are paid (PaymentService.verifyAndPayDues()), to keep
+    // this booking's hold in sync with the reactivated membership's new
+    // endDate — otherwise the seat stays held at the far-future GRACE
+    // sentinel forever even though the membership looks normally ACTIVE again.
+
+    @Transactional
+    public void extendBooking(String membershipId, String newEndDateStr) {
+        LocalDate newEndDate = LocalDate.parse(newEndDateStr);
+        seatBookingRepository.findByMembershipId(UUID.fromString(membershipId))
+                .ifPresent(booking -> {
+                    booking.setEndDate(newEndDate);
+                    seatBookingRepository.save(booking);
+                    // Bounded from today, not the booking's old endDate — that
+                    // could be the far-future GRACE sentinel, never a safe loop bound.
+                    invalidateCache(booking.getShift(), LocalDate.now(), newEndDate);
+                    log.info("Seat {} booking extended to {} for membership {}",
+                            booking.getSeat().getSeatNumber(), newEndDate, membershipId);
+                });
+    }
+
     // ── Get My Active Bookings ────────────────────────────────────────────────
 
     public List<SeatBookingDto> getMyBookings(String userId) {

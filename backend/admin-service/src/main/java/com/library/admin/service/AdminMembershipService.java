@@ -27,6 +27,10 @@ import java.util.UUID;
 @Slf4j
 public class AdminMembershipService {
 
+    // Mirrors ExpiryReminderScheduler's own copy of this sentinel — used to
+    // hold a seat indefinitely while a membership sits in GRACE.
+    private static final LocalDate SEAT_HOLD_SENTINEL = LocalDate.of(9999, 12, 31);
+
     private final UserRepository         userRepository;
     private final MembershipRepository   membershipRepository;
     private final PaymentRepository      paymentRepository;
@@ -302,9 +306,24 @@ public class AdminMembershipService {
         if (!Boolean.TRUE.equals(plan.getIsActive()))
             throw new IllegalArgumentException("Plan is not active");
 
+        LocalDate previousEndDate = membership.getEndDate();
         membership.setPlanId(plan.getId());
         membership.setEndDate(membership.getStartDate().plusDays(plan.getDurationDays()));
         membershipRepository.save(membership);
+
+        // A plan change can move endDate in either direction — a longer plan
+        // would otherwise leave the booking ending too early (double-booking
+        // risk); a shorter plan would otherwise hold the seat longer than it should.
+        seatBookingRepository.findFirstByMembershipIdAndStatus(membership.getId(), SeatBooking.Status.ACTIVE)
+                .ifPresent(booking -> {
+                    booking.setEndDate(membership.getEndDate());
+                    seatBookingRepository.save(booking);
+                });
+
+        LocalDate cacheFrom = previousEndDate.isBefore(membership.getEndDate()) ? previousEndDate : membership.getEndDate();
+        LocalDate cacheTo   = previousEndDate.isAfter(membership.getEndDate())  ? previousEndDate : membership.getEndDate();
+        invalidateSeatCache(membership.getShift(), cacheFrom, cacheTo);
+
         log.info("Plan updated for membership {} to plan {}", membershipId, plan.getName());
     }
 
@@ -410,6 +429,17 @@ public class AdminMembershipService {
         membership.setStatus(Membership.Status.GRACE);
         membership.setDuesAmount(plan.getPrice());
         membershipRepository.save(membership);
+
+        // Hold the seat indefinitely, same as a "natural" GRACE transition
+        // (ExpiryReminderScheduler.markExpiredAndStartGrace()) — otherwise the
+        // booking's real future endDate eventually passes while the membership
+        // sits unresolved in GRACE, and the seat becomes bookable by someone else.
+        seatBookingRepository.findFirstByMembershipIdAndStatus(membership.getId(), SeatBooking.Status.ACTIVE)
+                .ifPresent(booking -> {
+                    booking.setEndDate(SEAT_HOLD_SENTINEL);
+                    seatBookingRepository.save(booking);
+                });
+        invalidateSeatCache(membership.getShift(), LocalDate.now(), LocalDate.now().plusDays(60));
 
         log.info("Membership {} corrected to Grace by admin — dues ₹{}, expiry reset to {} (was wrongly marked fully paid)",
                 membershipId, plan.getPrice(), membership.getEndDate());

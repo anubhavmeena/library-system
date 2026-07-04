@@ -390,6 +390,57 @@ class SeatServiceTest {
         verify(redisTemplate).delete("seats:availability:MORNING:2025-01-01");
     }
 
+    // ── extendBooking ─────────────────────────────────────────────────────────
+
+    @Test
+    void extendBooking_found_updatesEndDate() {
+        UUID membershipId = UUID.randomUUID();
+        Seat s = seat("A1", "A", 1);
+        SeatBooking booking = SeatBooking.builder()
+                .id(UUID.randomUUID()).seat(s).userId(UUID.randomUUID())
+                .membershipId(membershipId).shift("MORNING")
+                .bookingDate(LocalDate.of(2025, 1, 1)).endDate(LocalDate.of(9999, 12, 31))
+                .status(SeatBooking.Status.ACTIVE).build();
+        when(seatBookingRepository.findByMembershipId(membershipId)).thenReturn(Optional.of(booking));
+        when(seatBookingRepository.save(any())).thenReturn(booking);
+
+        seatService.extendBooking(membershipId.toString(), "2025-03-01");
+
+        ArgumentCaptor<SeatBooking> captor = ArgumentCaptor.forClass(SeatBooking.class);
+        verify(seatBookingRepository).save(captor.capture());
+        assertThat(captor.getValue().getEndDate()).isEqualTo(LocalDate.of(2025, 3, 1));
+    }
+
+    @Test
+    void extendBooking_notFound_noOp() {
+        when(seatBookingRepository.findByMembershipId(any())).thenReturn(Optional.empty());
+
+        assertThatCode(() -> seatService.extendBooking(UUID.randomUUID().toString(), "2025-03-01"))
+                .doesNotThrowAnyException();
+        verify(seatBookingRepository, never()).save(any());
+    }
+
+    @Test
+    void extendBooking_found_invalidatesCacheFromTodayThroughNewEndDate() {
+        UUID membershipId = UUID.randomUUID();
+        Seat s = seat("A1", "A", 1);
+        SeatBooking booking = SeatBooking.builder()
+                .id(UUID.randomUUID()).seat(s).userId(UUID.randomUUID())
+                .membershipId(membershipId).shift("MORNING")
+                .bookingDate(LocalDate.of(2025, 1, 1)).endDate(LocalDate.of(9999, 12, 31))
+                .status(SeatBooking.Status.ACTIVE).build();
+        when(seatBookingRepository.findByMembershipId(membershipId)).thenReturn(Optional.of(booking));
+        when(seatBookingRepository.save(any())).thenReturn(booking);
+
+        LocalDate today = LocalDate.now();
+        LocalDate newEnd = today.plusDays(2);
+        seatService.extendBooking(membershipId.toString(), newEnd.toString());
+
+        verify(redisTemplate).delete("seats:availability:MORNING:" + today);
+        verify(redisTemplate).delete("seats:availability:MORNING:" + today.plusDays(1));
+        verify(redisTemplate).delete("seats:availability:MORNING:" + newEnd);
+    }
+
     // ── getMyBookings ─────────────────────────────────────────────────────────
 
     @Test

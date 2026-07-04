@@ -43,6 +43,8 @@ app:
   payment-gateway: ${PAYMENT_GATEWAY:CASHFREE}
   user-service:
     base-url: ${USER_SERVICE_URL:http://localhost:8082}
+  seat-service:
+    base-url: ${SEAT_SERVICE_URL:http://localhost:8084}
 
 management:
   endpoints:

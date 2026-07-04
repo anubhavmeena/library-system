@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -183,6 +184,30 @@ class SeatControllerTest {
     @Test
     void releaseSeat_missingRoleHeader_returns400() throws Exception {
         mockMvc.perform(delete("/api/seats/release/" + UUID.randomUUID()))
+                .andExpect(status().isBadRequest());
+    }
+
+    // ── PATCH /api/seats/internal/bookings/{membershipId}/extend ─────────────
+
+    @Test
+    void extendBooking_valid_returns200() throws Exception {
+        doNothing().when(seatService).extendBooking(any(), any());
+
+        mockMvc.perform(patch("/api/seats/internal/bookings/" + UUID.randomUUID() + "/extend")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"newEndDate\":\"2025-03-01\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value("Booking extended"));
+
+        verify(seatService).extendBooking(any(), eq("2025-03-01"));
+    }
+
+    @Test
+    void extendBooking_blankNewEndDate_returns400() throws Exception {
+        mockMvc.perform(patch("/api/seats/internal/bookings/" + UUID.randomUUID() + "/extend")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"newEndDate\":\"\"}"))
                 .andExpect(status().isBadRequest());
     }
 
