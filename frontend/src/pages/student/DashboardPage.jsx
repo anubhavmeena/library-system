@@ -2,7 +2,8 @@ import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { fetchMyMembership } from '../../store/slices/membershipSlice'
+import { fetchMyMembership, fetchMyDisplayStatus } from '../../store/slices/membershipSlice'
+import StatusBadge from '../../components/StatusBadge'
 
 function StatCard({ label, value, sub, color = 'amber' }) {
     const colors = {
@@ -24,9 +25,22 @@ export default function DashboardPage() {
     const dispatch = useDispatch()
     const { t } = useTranslation()
     const { user } = useSelector(s => s.auth)
-    const { current: membership } = useSelector(s => s.membership)
+    const { current: membership, displayStatus } = useSelector(s => s.membership)
 
-    useEffect(() => { dispatch(fetchMyMembership()) }, [])
+    useEffect(() => {
+        dispatch(fetchMyMembership())
+        dispatch(fetchMyDisplayStatus())
+    }, [])
+
+    const STATUS_META = {
+        PAID:     { color: 'emerald', sub: t('dashboard.stats.activeMembership') },
+        PENDING:  { color: 'amber',   sub: t('dashboard.stats.duesPending') },
+        GRACE:    { color: 'amber',   sub: t('dashboard.stats.gracePeriod') },
+        EXPIRED:  { color: 'amber',   sub: t('dashboard.stats.membershipExpired') },
+        RELEASED: { color: 'amber',   sub: t('dashboard.stats.seatReleased') },
+        NEW:      { color: 'blue',    sub: t('dashboard.stats.getPlan') },
+    }
+    const statusMeta = STATUS_META[displayStatus] || { color: 'amber', sub: t('dashboard.stats.getPlan') }
 
     const daysLeft = membership
         ? Math.max(0, Math.ceil((new Date(membership.endDate) - new Date()) / 86400000))
@@ -70,9 +84,9 @@ export default function DashboardPage() {
                     color={daysLeft !== null && daysLeft <= 5 ? 'amber' : 'emerald'} />
                 <StatCard
                     label={t('dashboard.stats.status')}
-                    value={membership?.status || t('dashboard.stats.inactive')}
-                    sub={membership ? t('dashboard.stats.activeMembership') : t('dashboard.stats.getPlan')}
-                    color={membership?.status === 'ACTIVE' ? 'emerald' : 'amber'} />
+                    value={<StatusBadge status={displayStatus} />}
+                    sub={statusMeta.sub}
+                    color={statusMeta.color} />
             </div>
 
             {!membership && (

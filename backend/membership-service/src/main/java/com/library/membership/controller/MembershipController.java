@@ -48,6 +48,15 @@ public class MembershipController {
         return ResponseEntity.ok(ApiResponse.success(membershipService.getUserActiveMembership(userId)));
     }
 
+    // ── Resolved display status (PAID/PENDING/GRACE/EXPIRED/RELEASED/NEW) ──────
+    // Shown on the student dashboard — see StudentStatusResolver.
+
+    @GetMapping("/api/memberships/my/status")
+    public ResponseEntity<ApiResponse<String>> getMyDisplayStatus(
+            @RequestHeader("X-User-Id") String userId) {
+        return ResponseEntity.ok(ApiResponse.success(membershipService.getMyDisplayStatus(userId)));
+    }
+
     // ── Download student ID card as PDF ───────────────────────────────────────
 
     @GetMapping(value = "/api/memberships/my/id-card", produces = "application/pdf")

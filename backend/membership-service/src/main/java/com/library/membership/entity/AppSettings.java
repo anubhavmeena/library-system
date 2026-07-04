@@ -7,8 +7,9 @@ import java.math.BigDecimal;
 
 // Read-only sibling of admin-service's AppSettings entity, mapping only the
 // columns this service needs (id + convenienceFee + wifi fields for the
-// booking-confirmation notification) — admin-service owns writes to this
-// singleton row (id=1); this service only ever reads it.
+// booking-confirmation notification, + graceDays for StudentStatusResolver)
+// — admin-service owns writes to this singleton row (id=1); this service
+// only ever reads it.
 @Entity
 @Table(name = "app_settings")
 @Data @Builder @NoArgsConstructor @AllArgsConstructor
@@ -26,4 +27,7 @@ public class AppSettings {
 
     @Column(name = "wifi_password")
     private String wifiPassword;
+
+    @Column(name = "grace_days")
+    private Integer graceDays;
 }

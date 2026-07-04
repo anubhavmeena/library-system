@@ -2,9 +2,11 @@ package com.library.membership.service;
 
 import com.library.membership.dto.MembershipDto;
 import com.library.membership.dto.PaymentDto;
+import com.library.membership.entity.AppSettings;
 import com.library.membership.entity.Membership;
 import com.library.membership.entity.Payment;
 import com.library.membership.entity.Plan;
+import com.library.membership.repository.AppSettingsRepository;
 import com.library.membership.repository.MembershipRepository;
 import com.library.membership.repository.PaymentRepository;
 import org.junit.jupiter.api.Test;
@@ -26,8 +28,9 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class MembershipServiceTest {
 
-    @Mock  MembershipRepository membershipRepository;
-    @Mock  PaymentRepository    paymentRepository;
+    @Mock  MembershipRepository  membershipRepository;
+    @Mock  PaymentRepository     paymentRepository;
+    @Mock  AppSettingsRepository appSettingsRepository;
     @InjectMocks MembershipService membershipService;
 
     private final String userId = UUID.randomUUID().toString();
@@ -65,6 +68,20 @@ class MembershipServiceTest {
                 .amount(BigDecimal.valueOf(600))
                 .gatewayOrderId("order_test")
                 .status(Payment.Status.SUCCESS)
+                .createdAt(LocalDateTime.now())
+                .build();
+    }
+
+    private Membership buildGraceMembership(LocalDate endDate) {
+        return Membership.builder()
+                .id(UUID.randomUUID())
+                .userId(UUID.fromString(userId))
+                .plan(buildPlan())
+                .seatNumber("A1")
+                .shift("FULL_DAY")
+                .startDate(endDate.minusDays(30))
+                .endDate(endDate)
+                .status(Membership.Status.GRACE)
                 .createdAt(LocalDateTime.now())
                 .build();
     }
@@ -186,5 +203,92 @@ class MembershipServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getId()).isEqualTo(realPaid.getId().toString());
+    }
+
+    // ── getMyDisplayStatus ────────────────────────────────────────────────────
+
+    @Test
+    void getMyDisplayStatus_activeNoPendingPayment_isPaid() {
+        Membership m = buildActiveMembership();
+        when(membershipRepository.findActiveByUserId(UUID.fromString(userId))).thenReturn(Optional.of(m));
+        Payment p = buildPayment();
+        p.setPendingAmount(BigDecimal.ZERO);
+        when(paymentRepository.findByMembershipId(m.getId())).thenReturn(Optional.of(p));
+        when(appSettingsRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThat(membershipService.getMyDisplayStatus(userId)).isEqualTo("PAID");
+    }
+
+    @Test
+    void getMyDisplayStatus_activeWithPendingPayment_isPending() {
+        Membership m = buildActiveMembership();
+        when(membershipRepository.findActiveByUserId(UUID.fromString(userId))).thenReturn(Optional.of(m));
+        Payment p = buildPayment();
+        p.setPendingAmount(BigDecimal.valueOf(200));
+        when(paymentRepository.findByMembershipId(m.getId())).thenReturn(Optional.of(p));
+        when(appSettingsRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThat(membershipService.getMyDisplayStatus(userId)).isEqualTo("PENDING");
+    }
+
+    @Test
+    void getMyDisplayStatus_graceWithinConfiguredWindow_isGrace() {
+        when(membershipRepository.findActiveByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
+        Membership grace = buildGraceMembership(LocalDate.now().minusDays(5));
+        when(membershipRepository.findGraceByUserId(UUID.fromString(userId))).thenReturn(Optional.of(grace));
+        when(paymentRepository.findByMembershipId(grace.getId())).thenReturn(Optional.empty());
+        AppSettings settings = AppSettings.builder().id(1L).graceDays(10).build();
+        when(appSettingsRepository.findById(1L)).thenReturn(Optional.of(settings));
+
+        assertThat(membershipService.getMyDisplayStatus(userId)).isEqualTo("GRACE");
+    }
+
+    @Test
+    void getMyDisplayStatus_gracePastConfiguredWindow_isExpired() {
+        when(membershipRepository.findActiveByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
+        Membership grace = buildGraceMembership(LocalDate.now().minusDays(15));
+        when(membershipRepository.findGraceByUserId(UUID.fromString(userId))).thenReturn(Optional.of(grace));
+        when(paymentRepository.findByMembershipId(grace.getId())).thenReturn(Optional.empty());
+        AppSettings settings = AppSettings.builder().id(1L).graceDays(10).build();
+        when(appSettingsRepository.findById(1L)).thenReturn(Optional.of(settings));
+
+        assertThat(membershipService.getMyDisplayStatus(userId)).isEqualTo("EXPIRED");
+    }
+
+    @Test
+    void getMyDisplayStatus_noCurrentLatestExpired_isReleased() {
+        when(membershipRepository.findActiveByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
+        when(membershipRepository.findGraceByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
+        Membership latest = buildActiveMembership();
+        latest.setStatus(Membership.Status.EXPIRED);
+        when(membershipRepository.findByUserIdOrderByCreatedAtDesc(UUID.fromString(userId)))
+                .thenReturn(List.of(latest));
+        when(appSettingsRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThat(membershipService.getMyDisplayStatus(userId)).isEqualTo("RELEASED");
+    }
+
+    @Test
+    void getMyDisplayStatus_noCurrentNoHistory_isNew() {
+        when(membershipRepository.findActiveByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
+        when(membershipRepository.findGraceByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
+        when(membershipRepository.findByUserIdOrderByCreatedAtDesc(UUID.fromString(userId)))
+                .thenReturn(List.of());
+        when(appSettingsRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThat(membershipService.getMyDisplayStatus(userId)).isEqualTo("NEW");
+    }
+
+    @Test
+    void getMyDisplayStatus_missingGraceDaysSetting_fallsBackToDefault() {
+        // No AppSettings row at all — DEFAULT_GRACE_DAYS (10) should apply,
+        // so 5 days overdue stays GRACE rather than EXPIRED.
+        when(membershipRepository.findActiveByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
+        Membership grace = buildGraceMembership(LocalDate.now().minusDays(5));
+        when(membershipRepository.findGraceByUserId(UUID.fromString(userId))).thenReturn(Optional.of(grace));
+        when(paymentRepository.findByMembershipId(grace.getId())).thenReturn(Optional.empty());
+        when(appSettingsRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThat(membershipService.getMyDisplayStatus(userId)).isEqualTo("GRACE");
     }
 }

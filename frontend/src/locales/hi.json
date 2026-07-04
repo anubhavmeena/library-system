@@ -204,7 +204,11 @@
       "fullDayShift": "पूरा दिन",
       "morning": "6AM–2PM",
       "evening": "2PM–10PM",
-      "expires": "समाप्ति {{date}}"
+      "expires": "समाप्ति {{date}}",
+      "duesPending": "बकाया राशि लंबित",
+      "gracePeriod": "छूट अवधि",
+      "membershipExpired": "सदस्यता समाप्त",
+      "seatReleased": "सीट रिलीज़ हो गई"
     },
     "noMembership": {
       "title": "अपनी पढ़ाई की यात्रा शुरू करें",

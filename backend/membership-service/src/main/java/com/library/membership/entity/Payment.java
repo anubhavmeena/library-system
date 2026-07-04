@@ -18,6 +18,11 @@ public class Payment {
     @Column(name = "membership_id", nullable = false) private UUID membershipId;
     @Column(name = "user_id",       nullable = false) private UUID userId;
     @Column(nullable = false, precision = 10, scale = 2) private BigDecimal amount;
+    // Used by StudentStatusResolver to distinguish PAID vs PENDING on an
+    // otherwise-ACTIVE membership — same column admin-service's own Payment
+    // entity maps.
+    @Column(name = "pending_amount", precision = 10, scale = 2)
+    private BigDecimal pendingAmount = BigDecimal.ZERO;
     @Column(name = "payment_gateway") private String paymentGateway = "RAZORPAY";
     @Column(name = "gateway_order_id")   private String gatewayOrderId;
     @Column(name = "gateway_payment_id") private String gatewayPaymentId;

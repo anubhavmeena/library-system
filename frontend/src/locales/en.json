@@ -208,7 +208,11 @@
       "fullDayShift": "Full day",
       "morning": "6AM–2PM",
       "evening": "2PM–10PM",
-      "expires": "Expires {{date}}"
+      "expires": "Expires {{date}}",
+      "duesPending": "Dues pending",
+      "gracePeriod": "Grace period",
+      "membershipExpired": "Membership expired",
+      "seatReleased": "Seat released"
     },
     "noMembership": {
       "title": "Start Your Study Journey",

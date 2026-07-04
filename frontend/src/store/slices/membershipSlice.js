@@ -11,6 +11,11 @@ export const fetchQueuedMembership = createAsyncThunk('membership/fetchQueued', 
     catch (err) { return rejectWithValue(err.response?.data?.message) }
 })
 
+export const fetchMyDisplayStatus = createAsyncThunk('membership/fetchMyDisplayStatus', async (_, { rejectWithValue }) => {
+    try { const res = await api.get('/memberships/my/status'); return res.data.data }
+    catch (err) { return rejectWithValue(err.response?.data?.message) }
+})
+
 export const fetchPlans = createAsyncThunk('membership/fetchPlans', async (_, { rejectWithValue }) => {
     try { const res = await api.get('/plans'); return res.data.data }
     catch (err) { return rejectWithValue(err.response?.data?.message) }
@@ -38,7 +43,7 @@ export const verifyDuesPayment = createAsyncThunk('membership/verifyDuesPayment'
 
 const membershipSlice = createSlice({
     name: 'membership',
-    initialState: { current: null, queued: null, plans: [], isLoading: false, order: null, error: null },
+    initialState: { current: null, queued: null, plans: [], isLoading: false, order: null, error: null, displayStatus: null },
     reducers: {
         setOrder: (state, action) => { state.order = action.payload }
     },
@@ -46,6 +51,7 @@ const membershipSlice = createSlice({
         builder
             .addCase(fetchMyMembership.fulfilled,   (state, a) => { state.current = a.payload })
             .addCase(fetchQueuedMembership.fulfilled,(state, a) => { state.queued  = a.payload })
+            .addCase(fetchMyDisplayStatus.fulfilled, (state, a) => { state.displayStatus = a.payload })
             .addCase(fetchPlans.fulfilled,          (state, a) => { state.plans   = a.payload })
             .addCase(createPaymentOrder.fulfilled,  (state, a) => { state.order   = a.payload })
             .addCase(verifyPayment.fulfilled,       (state, a) => {

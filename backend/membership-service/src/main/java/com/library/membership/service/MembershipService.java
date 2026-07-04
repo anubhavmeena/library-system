@@ -4,8 +4,11 @@ import com.library.membership.dto.MembershipDto;
 import com.library.membership.dto.PaymentDto;
 import com.library.membership.dto.UserApiResponse;
 import com.library.membership.dto.UserProfileDto;
+import com.library.membership.entity.AppSettings;
 import com.library.membership.entity.Membership;
+import com.library.membership.entity.Payment;
 import com.library.membership.event.SeatAssistanceEvent;
+import com.library.membership.repository.AppSettingsRepository;
 import com.library.membership.repository.MembershipRepository;
 import com.library.membership.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -25,8 +29,13 @@ import java.util.stream.Collectors;
 @Slf4j
 public class MembershipService {
 
+    // Mirrors admin-service's AppSettingsService.DEFAULT_GRACE_DAYS — used
+    // when the AppSettings row/graceDays column is somehow absent.
+    private static final int DEFAULT_GRACE_DAYS = 10;
+
     private final MembershipRepository          membershipRepository;
     private final PaymentRepository             paymentRepository;
+    private final AppSettingsRepository         appSettingsRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final RestTemplate                  restTemplate;
 
@@ -42,11 +51,40 @@ public class MembershipService {
      * for null and shows the "Get a plan" CTA.
      */
     public MembershipDto getUserActiveMembership(String userId) {
-        UUID uid = UUID.fromString(userId);
-        return membershipRepository.findActiveByUserId(uid)
-                .or(() -> membershipRepository.findGraceByUserId(uid))
+        return findCurrentMembership(UUID.fromString(userId))
                 .map(MembershipDto::fromEntity)
                 .orElse(null);
+    }
+
+    private Optional<Membership> findCurrentMembership(UUID uid) {
+        return membershipRepository.findActiveByUserId(uid)
+                .or(() -> membershipRepository.findGraceByUserId(uid));
+    }
+
+    /**
+     * Resolves the same richer display status admin-service computes for the
+     * Students list (see StudentStatusResolver) — PAID/PENDING for an
+     * otherwise-ACTIVE membership, GRACE/EXPIRED for a lapsed one, or
+     * RELEASED/NEW when the student has no current membership at all.
+     */
+    public String getMyDisplayStatus(String userId) {
+        UUID uid = UUID.fromString(userId);
+        Membership current = findCurrentMembership(uid).orElse(null);
+
+        Payment currentPayment = null;
+        Membership latestEver = null;
+        if (current != null) {
+            currentPayment = paymentRepository.findByMembershipId(current.getId()).orElse(null);
+        } else {
+            latestEver = membershipRepository.findByUserIdOrderByCreatedAtDesc(uid)
+                    .stream().findFirst().orElse(null);
+        }
+
+        long graceDays = appSettingsRepository.findById(1L)
+                .map(AppSettings::getGraceDays)
+                .orElse(DEFAULT_GRACE_DAYS);
+
+        return StudentStatusResolver.resolve(current, currentPayment, latestEver, graceDays).name();
     }
 
     public MembershipDto getUserQueuedMembership(String userId) {
