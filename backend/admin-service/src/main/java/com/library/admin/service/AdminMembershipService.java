@@ -419,10 +419,17 @@ public class AdminMembershipService {
     // Membership.Status.GRACE — "Expired" is just StudentStatusResolver's label
     // for grace overdue beyond the configured grace period, not a separate DB
     // status) who has paid off their outstanding dues in person. Records the
-    // payment, reactivates the membership for a fresh plan-duration period
-    // starting today (not extended from the old, possibly long-lapsed endDate —
-    // that could still land in the past for a student who was overdue a long
-    // time), and clears dues so the student reads as PAID afterward.
+    // payment, extends the membership by one month from its existing endDate
+    // (not reset to a fresh plan-duration period from today), keeps the linked
+    // SeatBooking's hold in sync (see changeSeat() for the same pattern), and
+    // clears dues so the student reads as PAID afterward.
+    //
+    // Note: extending from the old endDate rather than from today means a
+    // membership that's been overdue for longer than one month could still
+    // land in the past after this call (e.g. 45 days overdue + 1 month still
+    // ends up 15 days ago) — accepted tradeoff per explicit product decision,
+    // not an oversight. If that matters in practice, the admin can follow up
+    // with another Renew Seat / Clear Dues call, or this should be revisited.
     @Transactional
     public void clearDues(String membershipId) {
         Membership membership = membershipRepository.findById(UUID.fromString(membershipId))
@@ -449,15 +456,49 @@ public class AdminMembershipService {
                 .build();
         paymentRepository.save(payment);
 
-        membership.setEndDate(LocalDate.now().plusDays(plan.getDurationDays()));
+        LocalDate previousEndDate = membership.getEndDate();
+        membership.setEndDate(previousEndDate.plusMonths(1));
         membership.setStatus(Membership.Status.ACTIVE);
         membership.setDuesAmount(BigDecimal.ZERO);
         membershipRepository.save(membership);
 
-        invalidateSeatCache(membership.getShift(), LocalDate.now(), membership.getEndDate());
+        seatBookingRepository.findFirstByMembershipIdAndStatus(membership.getId(), SeatBooking.Status.ACTIVE)
+                .ifPresent(booking -> {
+                    booking.setEndDate(membership.getEndDate());
+                    seatBookingRepository.save(booking);
+                });
+
+        invalidateSeatCache(membership.getShift(), previousEndDate, membership.getEndDate());
 
         log.info("Dues cleared by admin for membership {} — ₹{} recorded, reactivated through {}",
                 membershipId, duesCleared, membership.getEndDate());
+    }
+
+    // Admin action for a fully-paid, currently-ACTIVE student (StudentStatusResolver's
+    // PAID) — manually extends their seat by one month without requiring the
+    // student to go through the student-facing renewal/payment flow. Keeps the
+    // linked SeatBooking's hold in sync, same pattern as changeSeat()/clearDues().
+    @Transactional
+    public void renewSeat(String membershipId) {
+        Membership membership = membershipRepository.findById(UUID.fromString(membershipId))
+                .orElseThrow(() -> new ResourceNotFoundException("Membership not found: " + membershipId));
+        if (membership.getStatus() != Membership.Status.ACTIVE) {
+            throw new IllegalArgumentException("Only an active membership can have its seat renewed");
+        }
+
+        LocalDate previousEndDate = membership.getEndDate();
+        membership.setEndDate(previousEndDate.plusMonths(1));
+        membershipRepository.save(membership);
+
+        seatBookingRepository.findFirstByMembershipIdAndStatus(membership.getId(), SeatBooking.Status.ACTIVE)
+                .ifPresent(booking -> {
+                    booking.setEndDate(membership.getEndDate());
+                    seatBookingRepository.save(booking);
+                });
+
+        invalidateSeatCache(membership.getShift(), previousEndDate, membership.getEndDate());
+
+        log.info("Seat renewed by admin for membership {} — extended to {}", membershipId, membership.getEndDate());
     }
 
     private void deleteLatestPayment(UUID membershipId) {

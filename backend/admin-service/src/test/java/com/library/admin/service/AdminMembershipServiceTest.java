@@ -533,12 +533,16 @@ class AdminMembershipServiceTest {
     @Test
     void clearDues_graceMembership_recordsPaymentAndReactivatesAsPaid() {
         UUID id = UUID.randomUUID();
-        Membership mem = buildMembership(id, Membership.Status.GRACE); // duesAmount = 500.00
+        Membership mem = buildMembership(id, Membership.Status.GRACE); // duesAmount = 500.00, endDate = yesterday
+        LocalDate originalEndDate = mem.getEndDate();
         Plan plan = Plan.builder().id(mem.getPlanId()).name("Full Day")
                 .planType(Plan.PlanType.FULL_DAY).price(new BigDecimal("500.00")).durationDays(30).build();
+        SeatBooking booking = buildActiveBooking(id);
 
         when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
         when(planRepository.findById(mem.getPlanId())).thenReturn(Optional.of(plan));
+        when(seatBookingRepository.findFirstByMembershipIdAndStatus(id, SeatBooking.Status.ACTIVE))
+                .thenReturn(Optional.of(booking));
 
         adminMembershipService.clearDues(id.toString());
 
@@ -550,8 +554,13 @@ class AdminMembershipServiceTest {
 
         assertThat(mem.getStatus()).isEqualTo(Membership.Status.ACTIVE);
         assertThat(mem.getDuesAmount()).isEqualByComparingTo("0");
-        assertThat(mem.getEndDate()).isEqualTo(LocalDate.now().plusDays(30));
+        // Extended incrementally from the membership's own prior endDate, not
+        // reset to a fresh plan-duration window from today.
+        assertThat(mem.getEndDate()).isEqualTo(originalEndDate.plusMonths(1));
         verify(membershipRepository).save(mem);
+
+        assertThat(booking.getEndDate()).isEqualTo(mem.getEndDate());
+        verify(seatBookingRepository).save(booking);
     }
 
     @Test
@@ -583,5 +592,66 @@ class AdminMembershipServiceTest {
                 .hasMessageContaining("Grace/Expired");
 
         verifyNoInteractions(paymentRepository);
+    }
+
+    // ── renewSeat ────────────────────────────────────────────────────────────
+    // Admin action for a fully-paid, ACTIVE student — manually extends their
+    // seat by one month without the student-facing renewal flow.
+
+    @Test
+    void renewSeat_activeMembership_extendsEndDateByOneMonth() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        LocalDate originalEndDate = mem.getEndDate();
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+
+        adminMembershipService.renewSeat(id.toString());
+
+        assertThat(mem.getStatus()).isEqualTo(Membership.Status.ACTIVE);
+        assertThat(mem.getEndDate()).isEqualTo(originalEndDate.plusMonths(1));
+        verify(membershipRepository).save(mem);
+    }
+
+    @Test
+    void renewSeat_updatesLinkedActiveSeatBooking() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        SeatBooking booking = buildActiveBooking(id);
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+        when(seatBookingRepository.findFirstByMembershipIdAndStatus(id, SeatBooking.Status.ACTIVE))
+                .thenReturn(Optional.of(booking));
+
+        adminMembershipService.renewSeat(id.toString());
+
+        assertThat(booking.getEndDate()).isEqualTo(mem.getEndDate());
+        verify(seatBookingRepository).save(booking);
+    }
+
+    @Test
+    void renewSeat_noActiveSeatBooking_doesNotThrow() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.ACTIVE);
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+        when(seatBookingRepository.findFirstByMembershipIdAndStatus(id, SeatBooking.Status.ACTIVE))
+                .thenReturn(Optional.empty());
+
+        assertThatCode(() -> adminMembershipService.renewSeat(id.toString())).doesNotThrowAnyException();
+
+        verify(membershipRepository).save(mem);
+        verify(seatBookingRepository, never()).save(any());
+    }
+
+    @Test
+    void renewSeat_nonActiveMembership_throws() {
+        UUID id = UUID.randomUUID();
+        Membership mem = buildMembership(id, Membership.Status.GRACE);
+        when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
+
+        assertThatThrownBy(() -> adminMembershipService.renewSeat(id.toString()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("active membership");
+
+        verifyNoInteractions(paymentRepository);
+        verify(membershipRepository, never()).save(any());
     }
 }

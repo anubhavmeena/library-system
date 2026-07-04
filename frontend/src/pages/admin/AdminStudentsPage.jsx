@@ -46,6 +46,7 @@ export default function AdminStudentsPage() {
     const [clearingFees, setClearingFees] = useState(null)
     const [releasingSeat, setReleasingSeat] = useState(null)
     const [clearingDues, setClearingDues] = useState(null)
+    const [renewingSeat, setRenewingSeat] = useState(null)
 
     const [changeStatusFor, setChangeStatusFor]         = useState(null)
     const [changeStatusTarget, setChangeStatusTarget]   = useState('PENDING')
@@ -140,7 +141,7 @@ export default function AdminStudentsPage() {
 
     const handleClearDues = async (student) => {
         if (!window.confirm(
-            `Clear dues for ${student.name}? This records their ₹${student.duesAmount ?? 0} payment and reactivates them as Paid for a fresh period starting today. This cannot be undone.`
+            `Clear dues for ${student.name}? This records their ₹${student.duesAmount ?? 0} payment, reactivates them as Paid, and extends their membership by one month from where it left off. This cannot be undone.`
         )) return
         setClearingDues(student.id)
         try {
@@ -151,6 +152,20 @@ export default function AdminStudentsPage() {
             toast.error(e.response?.data?.message || 'Failed to clear dues')
         } finally {
             setClearingDues(null)
+        }
+    }
+
+    const handleRenewSeat = async (student) => {
+        if (!window.confirm(`Renew ${student.name}'s seat by one month?`)) return
+        setRenewingSeat(student.id)
+        try {
+            await api.patch(`/admin/memberships/${student.membershipId}/renew`)
+            toast.success(`Seat renewed for ${student.name}`)
+            fetchStudents()
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Failed to renew seat')
+        } finally {
+            setRenewingSeat(null)
         }
     }
 
@@ -419,6 +434,14 @@ export default function AdminStudentsPage() {
                                                 </button>
                                                 {openDropdown === s.id && (
                                                     <div className="absolute right-0 mt-1 w-36 bg-primary-800 border border-primary-700/60 rounded-xl shadow-xl z-20 overflow-hidden">
+                                                        {s.membershipId && s.displayStatus === 'PAID' && (
+                                                            <button
+                                                                disabled={renewingSeat === s.id}
+                                                                onClick={() => { handleRenewSeat(s); setOpenDropdown(null) }}
+                                                                className="w-full text-left text-xs px-3 py-2.5 text-blue-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40 disabled:opacity-50">
+                                                                {renewingSeat === s.id ? 'Renewing…' : 'Renew Seat'}
+                                                            </button>
+                                                        )}
                                                         {s.membershipId && s.membershipStatus === 'ACTIVE' && (
                                                             <button
                                                                 onClick={() => { openChangeSeat(s); setOpenDropdown(null) }}

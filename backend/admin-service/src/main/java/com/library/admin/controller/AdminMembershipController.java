@@ -76,4 +76,12 @@ public class AdminMembershipController {
         adminMembershipService.clearDues(membershipId);
         return ResponseEntity.ok(ApiResponse.success("Dues cleared"));
     }
+
+    // For a fully-paid, ACTIVE student — manually extends their seat by one
+    // month without requiring the student-facing renewal flow.
+    @PatchMapping("/{membershipId}/renew")
+    public ResponseEntity<ApiResponse<String>> renewSeat(@PathVariable String membershipId) {
+        adminMembershipService.renewSeat(membershipId);
+        return ResponseEntity.ok(ApiResponse.success("Membership renewed"));
+    }
 }
