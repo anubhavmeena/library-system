@@ -1,5 +1,6 @@
 package com.library.notification.service;
 
+import com.library.common.idcard.IdCardImageConverter;
 import com.library.notification.dto.BookingConfirmedEvent;
 import com.library.notification.dto.BroadcastNotificationEvent;
 import com.library.notification.dto.PaymentReceiptEvent;
@@ -57,11 +58,15 @@ public class NotificationService {
     @Value("${meta.whatsapp.receipt-language:en}")
     private String receiptLanguage;
 
-    @Value("${meta.whatsapp.id-card-template-name:student_id_card}")
-    private String idCardTemplateName;
+    // Image-header template ("id_card") — replaces the earlier document-header
+    // "student_id_card" template for the WhatsApp send; the card still goes
+    // out as an actual PDF for email and for the website's on-demand
+    // download (IdCardService), only the WhatsApp copy is now an image.
+    @Value("${meta.whatsapp.id-card-image-template-name:id_card}")
+    private String idCardImageTemplateName;
 
-    @Value("${meta.whatsapp.id-card-language:en}")
-    private String idCardLanguage;
+    @Value("${meta.whatsapp.id-card-image-language:en}")
+    private String idCardImageLanguage;
 
     private List<String> adminWhatsappNumbers() {
         if (!hasValue(adminWhatsapp)) return List.of();
@@ -142,27 +147,28 @@ public class NotificationService {
 
             String idNumber       = buildIdNumber(event.getMembershipId());
             String attachmentName = idNumber + "_id_card.pdf";
-            String idCardLink     = uploadIdCardPdf(event.getMembershipId(), pdf, attachmentName);
             String validUpto      = formatDateDdMmYyyy(event.getEndDate());
 
-            List<String> bodyParams = List.of(
-                    name,
-                    idNumber,
-                    hasValue(event.getPlanName()) ? event.getPlanName() : "",
-                    validUpto
-            );
+            // WhatsApp gets an image (the "id_card" template has an image
+            // header, not a document one) — rendered from the same PDF so the
+            // design stays defined in exactly one place. Email and the
+            // website's on-demand download both still use the PDF itself.
+            byte[] png          = IdCardImageConverter.toPng(pdf);
+            String imageName    = idNumber + "_id_card.png";
+            String idCardImageLink = uploadIdCardFile(event.getMembershipId(), png, imageName);
 
-            if (idCardLink != null) {
+            if (idCardImageLink != null) {
+                List<String> imageBodyParams = List.of(name);
                 if (hasValue(event.getUserMobile())) {
-                    whatsAppService.sendDocumentTemplate(event.getUserMobile(), idCardLink, attachmentName,
-                            bodyParams, idCardTemplateName, idCardLanguage, event.getUserId(), "STUDENT_ID_CARD");
+                    whatsAppService.sendImageTemplate(event.getUserMobile(), idCardImageLink,
+                            imageBodyParams, idCardImageTemplateName, idCardImageLanguage, event.getUserId(), "STUDENT_ID_CARD");
                 }
                 for (String number : adminWhatsappNumbers()) {
-                    whatsAppService.sendDocumentTemplate(number, idCardLink, attachmentName,
-                            bodyParams, idCardTemplateName, idCardLanguage, null, "STUDENT_ID_CARD_ADMIN");
+                    whatsAppService.sendImageTemplate(number, idCardImageLink,
+                            imageBodyParams, idCardImageTemplateName, idCardImageLanguage, null, "STUDENT_ID_CARD_ADMIN");
                 }
             } else {
-                log.warn("ID card PDF not hosted for membership {} — skipping WhatsApp document send", event.getMembershipId());
+                log.warn("ID card image not hosted for membership {} — skipping WhatsApp send", event.getMembershipId());
             }
 
             if (hasValue(event.getUserEmail())) {
@@ -200,11 +206,11 @@ public class NotificationService {
                 : membershipId.toUpperCase();
     }
 
-    private String uploadIdCardPdf(String membershipId, byte[] pdf, String filename) {
+    private String uploadIdCardFile(String membershipId, byte[] fileBytes, String filename) {
         try {
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             body.add("membershipId", membershipId);
-            body.add("file", new ByteArrayResource(pdf) {
+            body.add("file", new ByteArrayResource(fileBytes) {
                 @Override
                 public String getFilename() {
                     return filename;
@@ -224,8 +230,8 @@ public class NotificationService {
                 if (url != null) return frontendUrl + url;
             }
         } catch (Exception e) {
-            log.warn("Could not host ID card PDF for membership {} — WhatsApp document send will be skipped: {}",
-                    membershipId, e.getMessage());
+            log.warn("Could not host ID card file {} for membership {} — WhatsApp send will be skipped: {}",
+                    filename, membershipId, e.getMessage());
         }
         return null;
     }

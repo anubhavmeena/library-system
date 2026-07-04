@@ -188,6 +188,74 @@ public class WhatsAppService {
         saveLog(userId, mobile, logMessage, event, status, errorMessage);
     }
 
+    // Sends an approved image-header template (e.g. "id_card") — same shape
+    // as sendDocumentTemplate but the header media is "image" (no filename
+    // field; Meta doesn't need one to display an image inline). imageUrl must
+    // be a public HTTPS URL Meta's servers can fetch. bodyParams must match
+    // templateName's {{1}}..{{n}} order exactly.
+    public void sendImageTemplate(String mobile, String imageUrl,
+                                  List<String> bodyParams, String templateName, String language,
+                                  String userId, String event) {
+        String logMessage = "[" + templateName + "] image=" + imageUrl + " params=" + bodyParams;
+        DeliveryStatus status = DeliveryStatus.SENT;
+        String errorMessage   = null;
+
+        if (!metaEnabled) {
+            log.info("[DEV] WhatsApp ({} template) → {} | Event: {} | {}", templateName, mobile, event, logMessage);
+        } else {
+            try {
+                String to = mobile.replaceAll("[^0-9+]", "");
+                to = to.startsWith("+") ? to.substring(1) : "91" + to;
+
+                List<Object> bodyParameters = bodyParams.stream()
+                        .map(WhatsAppService::sanitizeParam)
+                        .<Object>map(p -> Map.of("type", "text", "text", p))
+                        .toList();
+
+                Map<String, Object> body = Map.of(
+                        "messaging_product", "whatsapp",
+                        "to", to,
+                        "type", "template",
+                        "template", Map.of(
+                                "name", templateName,
+                                "language", Map.of("code", language),
+                                "components", List.of(
+                                        Map.of("type", "header",
+                                               "parameters", List.of(
+                                                       Map.of("type", "image",
+                                                              "image", Map.of("link", imageUrl))
+                                               )
+                                        ),
+                                        Map.of("type", "body", "parameters", bodyParameters)
+                                )
+                        )
+                );
+
+                HttpRequest req = HttpRequest.newBuilder()
+                        .uri(URI.create("https://graph.facebook.com/" + metaApiVersion + "/" + metaPhoneNumberId + "/messages"))
+                        .header("Authorization", "Bearer " + metaToken)
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+                        .build();
+
+                HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+
+                if (resp.statusCode() >= 400) {
+                    throw new RuntimeException("Meta API error " + resp.statusCode() + ": " + resp.body());
+                }
+
+                log.info("WhatsApp {} template sent to {} via Meta Cloud API | Event: {}", templateName, mobile, event);
+
+            } catch (Exception e) {
+                status       = DeliveryStatus.FAILED;
+                errorMessage = e.getMessage();
+                log.error("WhatsApp {} template send failed to {} | Event: {}: {}", templateName, mobile, event, e.getMessage());
+            }
+        }
+
+        saveLog(userId, mobile, logMessage, event, status, errorMessage);
+    }
+
     // Meta template params reject newlines, tabs, or 5+ consecutive spaces
     private static String sanitizeParam(String s) {
         if (s == null) return "";

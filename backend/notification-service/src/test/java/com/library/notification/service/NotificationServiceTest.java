@@ -3,6 +3,8 @@ package com.library.notification.service;
 import com.library.notification.dto.BookingConfirmedEvent;
 import com.library.notification.dto.PaymentReceiptEvent;
 import com.library.notification.dto.RenewalReminderEvent;
+import com.lowagie.text.Document;
+import com.lowagie.text.pdf.PdfWriter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,8 +54,23 @@ class NotificationServiceTest {
         ReflectionTestUtils.setField(notificationService, "frontendUrl", "https://targetzone.co.in");
         ReflectionTestUtils.setField(notificationService, "receiptTemplateName", "payment_receipt");
         ReflectionTestUtils.setField(notificationService, "receiptLanguage", "en");
-        ReflectionTestUtils.setField(notificationService, "idCardTemplateName", "student_id_card");
-        ReflectionTestUtils.setField(notificationService, "idCardLanguage", "en");
+        ReflectionTestUtils.setField(notificationService, "idCardImageTemplateName", "id_card");
+        ReflectionTestUtils.setField(notificationService, "idCardImageLanguage", "en");
+    }
+
+    // IdCardImageConverter.toPng() rasterizes real PDF bytes — a fake
+    // placeholder byte[] like {1,2,3} isn't a parseable PDF and would throw
+    // before the code under test even reaches the upload/WhatsApp/email
+    // steps these tests verify.
+    private byte[] validPdfBytes() throws Exception {
+        try (var baos = new java.io.ByteArrayOutputStream()) {
+            Document doc = new Document();
+            PdfWriter.getInstance(doc, baos);
+            doc.open();
+            doc.add(new com.lowagie.text.Paragraph("test"));
+            doc.close();
+            return baos.toByteArray();
+        }
     }
 
     private PaymentReceiptEvent receiptEvent(String mobile, String email) {
@@ -223,10 +240,10 @@ class NotificationServiceTest {
     //    the plain-text sends above) ────────────────────────────────────────
 
     @Test
-    void sendBookingConfirmation_idCardUploadSucceeds_sendsDocumentTemplateAndEmailAttachment() {
-        byte[] pdf = new byte[]{1, 2, 3};
+    void sendBookingConfirmation_idCardUploadSucceeds_sendsImageTemplateAndEmailAttachment() throws Exception {
+        byte[] pdf = validPdfBytes();
         when(studentIdCardPdfService.buildIdCard(any(), any())).thenReturn(pdf);
-        stubSuccessfulIdCardUpload("/uploads/id-cards/A1B2C3D4.pdf");
+        stubSuccessfulIdCardUpload("/uploads/id-cards/A1B2C3D4.png");
 
         notificationService.sendBookingConfirmation(bookingEvent("9876543210", "alice@test.com"));
 
@@ -234,11 +251,12 @@ class NotificationServiceTest {
         verify(whatsAppService).send(eq("9876543210"), anyString(), eq("user-123"), eq("BOOKING_CONFIRMED"));
         verify(emailService).sendText(eq("alice@test.com"), anyString(), anyString(), eq("user-123"), eq("BOOKING_CONFIRMED"));
 
-        verify(whatsAppService).sendDocumentTemplate(
+        // WhatsApp gets the rasterized PNG via the image-header "id_card"
+        // template; email still gets the PDF as a real attachment.
+        verify(whatsAppService).sendImageTemplate(
                 eq("9876543210"),
-                eq("https://targetzone.co.in/uploads/id-cards/A1B2C3D4.pdf"),
-                eq("A1B2C3D4_id_card.pdf"),
-                anyList(), eq("student_id_card"), eq("en"), eq("user-123"), eq("STUDENT_ID_CARD"));
+                eq("https://targetzone.co.in/uploads/id-cards/A1B2C3D4.png"),
+                anyList(), eq("id_card"), eq("en"), eq("user-123"), eq("STUDENT_ID_CARD"));
         verify(emailService).sendWithAttachment(eq("alice@test.com"), anyString(), anyString(),
                 eq(pdf), eq("A1B2C3D4_id_card.pdf"), eq("user-123"), eq("STUDENT_ID_CARD"));
         verify(emailService).sendWithAttachment(eq("admin@test.com"), anyString(), anyString(),
@@ -246,8 +264,8 @@ class NotificationServiceTest {
     }
 
     @Test
-    void sendBookingConfirmation_idCardUploadFails_stillSendsPlainTextNotifications() {
-        when(studentIdCardPdfService.buildIdCard(any(), any())).thenReturn(new byte[]{1, 2, 3});
+    void sendBookingConfirmation_idCardUploadFails_stillSendsPlainTextNotifications() throws Exception {
+        when(studentIdCardPdfService.buildIdCard(any(), any())).thenReturn(validPdfBytes());
         when(restTemplate.exchange(contains("/internal/id-cards"), any(), any(), eq(Map.class)))
                 .thenThrow(new RuntimeException("connection refused"));
 
@@ -255,17 +273,17 @@ class NotificationServiceTest {
 
         verify(whatsAppService).send(eq("9876543210"), anyString(), eq("user-123"), eq("BOOKING_CONFIRMED"));
         verify(emailService).sendText(eq("alice@test.com"), anyString(), anyString(), eq("user-123"), eq("BOOKING_CONFIRMED"));
-        verify(whatsAppService, never()).sendDocumentTemplate(any(), any(), any(), any(), any(), any(), any(), any());
+        verify(whatsAppService, never()).sendImageTemplate(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
-    void sendBookingConfirmation_photoFetchThrows_stillBuildsCardAndSendsPlainText() {
+    void sendBookingConfirmation_photoFetchThrows_stillBuildsCardAndSendsPlainText() throws Exception {
         BookingConfirmedEvent event = bookingEvent("9876543210", "alice@test.com");
         event.setPhotoUrl("/uploads/photos/user_123.jpg");
         when(restTemplate.getForEntity(anyString(), eq(byte[].class)))
                 .thenThrow(new RuntimeException("404"));
-        when(studentIdCardPdfService.buildIdCard(any(), any())).thenReturn(new byte[]{1, 2, 3});
-        stubSuccessfulIdCardUpload("/uploads/id-cards/A1B2C3D4.pdf");
+        when(studentIdCardPdfService.buildIdCard(any(), any())).thenReturn(validPdfBytes());
+        stubSuccessfulIdCardUpload("/uploads/id-cards/A1B2C3D4.png");
 
         notificationService.sendBookingConfirmation(event);
 
@@ -282,7 +300,7 @@ class NotificationServiceTest {
 
         verify(whatsAppService).send(eq("9876543210"), anyString(), eq("user-123"), eq("BOOKING_CONFIRMED"));
         verify(emailService).sendText(eq("alice@test.com"), anyString(), anyString(), eq("user-123"), eq("BOOKING_CONFIRMED"));
-        verify(whatsAppService, never()).sendDocumentTemplate(any(), any(), any(), any(), any(), any(), any(), any());
+        verify(whatsAppService, never()).sendImageTemplate(any(), any(), any(), any(), any(), any(), any());
     }
 
     // ── sendWelcomeNotification ───────────────────────────────────────────────

@@ -173,12 +173,23 @@ public class UserService {
         Path uploadPath = Paths.get(uploadDir, "id-cards");
         Files.createDirectories(uploadPath);
 
-        String fileName = safeMembershipId + ".pdf";
+        // notification-service hosts both the PDF (for email/document-template
+        // WhatsApp sends) and, for the image-template WhatsApp send, a PNG
+        // rendering of the same card — the extension comes from whatever it
+        // actually uploaded rather than being hardcoded to one format.
+        String fileName = safeMembershipId + extensionOf(file.getOriginalFilename());
         Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
 
         String idCardUrl = "/uploads/id-cards/" + fileName;
         log.info("ID card uploaded: {}", idCardUrl);
         return IdCardUploadResponse.builder().idCardUrl(idCardUrl).message("ID card uploaded successfully").build();
+    }
+
+    private String extensionOf(String originalFilename) {
+        if (originalFilename != null && originalFilename.contains(".")) {
+            return originalFilename.substring(originalFilename.lastIndexOf('.'));
+        }
+        return ".pdf";
     }
 
     @Transactional
