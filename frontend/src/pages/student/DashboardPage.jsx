@@ -43,7 +43,7 @@ export default function DashboardPage() {
     const statusMeta = STATUS_META[displayStatus] || { color: 'amber', sub: t('dashboard.stats.getPlan') }
 
     const daysLeft = membership
-        ? Math.max(0, Math.ceil((new Date(membership.endDate) - new Date()) / 86400000))
+        ? Math.ceil((new Date(membership.endDate) - new Date()) / 86400000)
         : null
 
     const quickActions = [

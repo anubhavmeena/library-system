@@ -56,7 +56,7 @@ export default function MembershipPage() {
     }, [])
 
     const daysLeft = membership
-        ? Math.max(0, Math.ceil((new Date(membership.endDate) - new Date()) / 86400000))
+        ? Math.ceil((new Date(membership.endDate) - new Date()) / 86400000)
         : null
 
     const formatShift = (shift) =>
@@ -294,6 +294,7 @@ export default function MembershipPage() {
                     </div>
                     <InfoRow label={t('membership.seatNumber')} value={membership.seatNumber} highlight />
                     <InfoRow label={t('membership.expiryDate')} value={membership.endDate} />
+                    <InfoRow label={t('membership.daysLeft')} value={daysLeft} highlight />
                     <div className="mt-5 pt-5 border-t border-primary-700/30">
                         <p className="text-primary-300 text-sm mb-1">
                             Your plan expired, but we're holding seat <span className="text-white font-mono">{membership.seatNumber}</span> for you.
