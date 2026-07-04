@@ -44,7 +44,10 @@ CREATE TABLE IF NOT EXISTS memberships (
     end_date      DATE NOT NULL,
     status        VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     reminder_sent BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at    TIMESTAMP
+    created_at    TIMESTAMP,
+    dues_amount    NUMERIC(10,2),             -- set when a membership enters GRACE
+    gateway_order_id  VARCHAR(255),           -- in-flight checkout correlation key for PaymentService.verify*()
+    checkout_amount   NUMERIC(10,2)           -- amount snapshotted at createOrder() time, read back on verify
 );
 
 -- payments (owned by membership-service)

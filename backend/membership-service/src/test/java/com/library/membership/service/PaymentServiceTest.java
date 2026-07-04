@@ -113,16 +113,13 @@ class PaymentServiceTest {
                 .build();
     }
 
-    private Payment buildSavedPayment(UUID membershipId) {
-        return Payment.builder()
-                .id(UUID.randomUUID())
-                .membershipId(membershipId)
-                .userId(UUID.fromString(userId))
-                .amount(BigDecimal.valueOf(600))
-                .gatewayOrderId("dev_order_abc123")
-                .status(Payment.Status.PENDING)
-                .createdAt(LocalDateTime.now())
-                .build();
+    // A membership mid-checkout — has stashed the gatewayOrderId/checkoutAmount
+    // that createOrder() would have set, ready for verify*() to resolve by order id.
+    private Membership buildMembershipAwaitingVerify(UUID id, Plan plan, String orderId, BigDecimal checkoutAmount) {
+        Membership m = buildSavedMembership(id, plan);
+        m.setGatewayOrderId(orderId);
+        m.setCheckoutAmount(checkoutAmount);
+        return m;
     }
 
     private String computeHmac(String orderId, String paymentId, String secret) throws Exception {
@@ -220,8 +217,10 @@ class PaymentServiceTest {
         paymentService.createOrder(userId, req);
 
         ArgumentCaptor<Membership> cap = ArgumentCaptor.forClass(Membership.class);
-        verify(membershipRepository).save(cap.capture());
-        assertThat(cap.getValue().getShift()).isEqualTo("FULL_DAY");
+        verify(membershipRepository, atLeastOnce()).save(cap.capture());
+        // First save is the freshly-built membership reflecting the request;
+        // the second (mock-echoed) save only stamps gatewayOrderId/checkoutAmount.
+        assertThat(cap.getAllValues().get(0).getShift()).isEqualTo("FULL_DAY");
     }
 
     @Test
@@ -251,8 +250,8 @@ class PaymentServiceTest {
         paymentService.createOrder(userId, req);
 
         ArgumentCaptor<Membership> cap = ArgumentCaptor.forClass(Membership.class);
-        verify(membershipRepository).save(cap.capture());
-        assertThat(cap.getValue().getSeatId()).isNull();
+        verify(membershipRepository, atLeastOnce()).save(cap.capture());
+        assertThat(cap.getAllValues().get(0).getSeatId()).isNull();
     }
 
     @Test
@@ -270,9 +269,9 @@ class PaymentServiceTest {
         paymentService.createOrder(userId, req);
 
         ArgumentCaptor<Membership> cap = ArgumentCaptor.forClass(Membership.class);
-        verify(membershipRepository).save(cap.capture());
-        assertThat(cap.getValue().getSeatId()).isEqualTo(seatId);
-        assertThat(cap.getValue().getSeatNumber()).isEqualTo("A12");
+        verify(membershipRepository, atLeastOnce()).save(cap.capture());
+        assertThat(cap.getAllValues().get(0).getSeatId()).isEqualTo(seatId);
+        assertThat(cap.getAllValues().get(0).getSeatNumber()).isEqualTo("A12");
     }
 
     @Test
@@ -286,9 +285,9 @@ class PaymentServiceTest {
         paymentService.createOrder(userId, req);
 
         ArgumentCaptor<Membership> cap = ArgumentCaptor.forClass(Membership.class);
-        verify(membershipRepository).save(cap.capture());
-        assertThat(cap.getValue().getStartDate()).isEqualTo(LocalDate.now());
-        assertThat(cap.getValue().getEndDate()).isEqualTo(LocalDate.now().plusDays(30));
+        verify(membershipRepository, atLeastOnce()).save(cap.capture());
+        assertThat(cap.getAllValues().get(0).getStartDate()).isEqualTo(LocalDate.now());
+        assertThat(cap.getAllValues().get(0).getEndDate()).isEqualTo(LocalDate.now().plusDays(30));
     }
 
     @Test
@@ -302,12 +301,14 @@ class PaymentServiceTest {
         paymentService.createOrder(userId, req);
 
         ArgumentCaptor<Membership> cap = ArgumentCaptor.forClass(Membership.class);
-        verify(membershipRepository).save(cap.capture());
-        assertThat(cap.getValue().getStatus()).isEqualTo(Membership.Status.PENDING);
+        verify(membershipRepository, atLeastOnce()).save(cap.capture());
+        assertThat(cap.getAllValues().get(0).getStatus()).isEqualTo(Membership.Status.PENDING);
     }
 
     @Test
-    void createOrder_paymentSavedWithPendingStatusAndOrderId() {
+    void createOrder_neverWritesAPaymentRow() {
+        // The core of this change: an order that's created but never confirmed
+        // must leave no Payment row behind at all — not even a PENDING one.
         Plan plan = buildFullDayPlan();
         UUID memId = UUID.randomUUID();
         when(planRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
@@ -317,11 +318,25 @@ class PaymentServiceTest {
         req.setPlanId(plan.getId().toString());
         paymentService.createOrder(userId, req);
 
-        ArgumentCaptor<Payment> cap = ArgumentCaptor.forClass(Payment.class);
-        verify(paymentRepository).save(cap.capture());
-        assertThat(cap.getValue().getStatus()).isEqualTo(Payment.Status.PENDING);
-        assertThat(cap.getValue().getMembershipId()).isEqualTo(memId);
-        assertThat(cap.getValue().getGatewayOrderId()).startsWith("dev_order_");
+        verifyNoInteractions(paymentRepository);
+    }
+
+    @Test
+    void createOrder_stampsMembershipWithGatewayOrderIdAndCheckoutAmount() {
+        Plan plan = buildFullDayPlan(); // price = 600
+        UUID memId = UUID.randomUUID();
+        when(planRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
+        when(membershipRepository.save(any())).thenReturn(buildSavedMembership(memId, plan));
+
+        CreateOrderRequest req = new CreateOrderRequest();
+        req.setPlanId(plan.getId().toString());
+        CreateOrderResponse resp = paymentService.createOrder(userId, req);
+
+        ArgumentCaptor<Membership> cap = ArgumentCaptor.forClass(Membership.class);
+        verify(membershipRepository, atLeastOnce()).save(cap.capture());
+        Membership lastSaved = cap.getValue();
+        assertThat(lastSaved.getGatewayOrderId()).isEqualTo(resp.getOrderId());
+        assertThat(lastSaved.getCheckoutAmount()).isEqualByComparingTo(BigDecimal.valueOf(600));
     }
 
     @Test
@@ -408,14 +423,10 @@ class PaymentServiceTest {
         String paymentId = "pay_test";
         UUID memId = UUID.randomUUID();
 
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId(orderId);
-        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
-
         Plan plan = buildFullDayPlan();
-        Membership membership = buildSavedMembership(memId, plan);
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, orderId, BigDecimal.valueOf(600));
         membership.setStatus(Membership.Status.PENDING);
-        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(membership));
         when(membershipRepository.save(any())).thenReturn(membership);
 
         PaymentVerifyRequest req = new PaymentVerifyRequest();
@@ -435,13 +446,9 @@ class PaymentServiceTest {
         String devOrderId = "dev_order_abc123";
         UUID memId = UUID.randomUUID();
 
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId(devOrderId);
-        when(paymentRepository.findByGatewayOrderId(devOrderId)).thenReturn(Optional.of(payment));
-
         Plan plan = buildFullDayPlan();
-        Membership membership = buildSavedMembership(memId, plan);
-        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, devOrderId, BigDecimal.valueOf(600));
+        when(membershipRepository.findByGatewayOrderId(devOrderId)).thenReturn(Optional.of(membership));
         when(membershipRepository.save(any())).thenReturn(membership);
 
         PaymentVerifyRequest req = new PaymentVerifyRequest();
@@ -461,13 +468,9 @@ class PaymentServiceTest {
         String orderId = "order_real123";
         UUID memId = UUID.randomUUID();
 
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId(orderId);
-        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
-
         Plan plan = buildFullDayPlan();
-        Membership membership = buildSavedMembership(memId, plan);
-        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, orderId, BigDecimal.valueOf(600));
+        when(membershipRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(membership));
         when(membershipRepository.save(any())).thenReturn(membership);
 
         PaymentVerifyRequest req = new PaymentVerifyRequest();
@@ -489,13 +492,9 @@ class PaymentServiceTest {
         String validSig = computeHmac(orderId, paymentId, TEST_SECRET);
         UUID memId = UUID.randomUUID();
 
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId(orderId);
-        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
-
         Plan plan = buildFullDayPlan();
-        Membership membership = buildSavedMembership(memId, plan);
-        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, orderId, BigDecimal.valueOf(600));
+        when(membershipRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(membership));
         when(membershipRepository.save(any())).thenReturn(membership);
 
         PaymentVerifyRequest req = new PaymentVerifyRequest();
@@ -526,7 +525,10 @@ class PaymentServiceTest {
 
     @Test
     void verify_paymentNotFound_throwsResourceNotFoundException() {
-        when(paymentRepository.findByGatewayOrderId(any())).thenReturn(Optional.empty());
+        // No membership is mid-checkout with this order id — a failed/abandoned
+        // or forged verify call has nothing to resolve, and (by design) never
+        // had a Payment row written for it in the first place.
+        when(membershipRepository.findByGatewayOrderId(any())).thenReturn(Optional.empty());
 
         PaymentVerifyRequest req = new PaymentVerifyRequest();
         req.setGatewayOrderId("dev_order_missing");
@@ -535,39 +537,22 @@ class PaymentServiceTest {
         assertThatThrownBy(() -> paymentService.verifyAndActivateMembership(userId, req))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Payment record not found");
-    }
 
-    @Test
-    void verify_membershipNotFound_throwsResourceNotFoundException() {
-        UUID memId = UUID.randomUUID();
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId("dev_order_1");
-        when(paymentRepository.findByGatewayOrderId("dev_order_1")).thenReturn(Optional.of(payment));
-        when(membershipRepository.findById(memId)).thenReturn(Optional.empty());
-
-        PaymentVerifyRequest req = new PaymentVerifyRequest();
-        req.setGatewayOrderId("dev_order_1");
-        req.setGatewayPaymentId("pay_x");
-
-        assertThatThrownBy(() -> paymentService.verifyAndActivateMembership(userId, req))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Membership not found");
+        verifyNoInteractions(paymentRepository);
     }
 
     // ── verifyAndActivateMembership — activation side effects ─────────────────
 
     @Test
-    void verify_success_paymentStatusSetToSuccess() {
+    void verify_success_paymentCreatedDirectlyAsSuccess() {
+        // No PENDING row ever existed for this order — verify() must create the
+        // Payment for the first time here, directly as SUCCESS.
         String orderId = "dev_order_2";
         UUID memId = UUID.randomUUID();
 
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId(orderId);
-        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
-
         Plan plan = buildFullDayPlan();
-        Membership membership = buildSavedMembership(memId, plan);
-        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, orderId, BigDecimal.valueOf(600));
+        when(membershipRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(membership));
         when(membershipRepository.save(any())).thenReturn(membership);
 
         PaymentVerifyRequest req = new PaymentVerifyRequest();
@@ -577,9 +562,12 @@ class PaymentServiceTest {
         paymentService.verifyAndActivateMembership(userId, req);
 
         ArgumentCaptor<Payment> cap = ArgumentCaptor.forClass(Payment.class);
-        verify(paymentRepository).save(cap.capture());
+        verify(paymentRepository, times(1)).save(cap.capture());
         assertThat(cap.getValue().getStatus()).isEqualTo(Payment.Status.SUCCESS);
         assertThat(cap.getValue().getGatewayPaymentId()).isEqualTo("pay_verified");
+        assertThat(cap.getValue().getGatewayOrderId()).isEqualTo(orderId);
+        assertThat(cap.getValue().getMembershipId()).isEqualTo(memId);
+        assertThat(cap.getValue().getAmount()).isEqualByComparingTo(BigDecimal.valueOf(600));
     }
 
     @Test
@@ -587,14 +575,10 @@ class PaymentServiceTest {
         String orderId = "dev_order_3";
         UUID memId = UUID.randomUUID();
 
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId(orderId);
-        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
-
         Plan plan = buildFullDayPlan();
-        Membership membership = buildSavedMembership(memId, plan);
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, orderId, BigDecimal.valueOf(600));
         membership.setStatus(Membership.Status.PENDING);
-        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(membership));
         when(membershipRepository.save(any())).thenReturn(membership);
 
         PaymentVerifyRequest req = new PaymentVerifyRequest();
@@ -613,13 +597,9 @@ class PaymentServiceTest {
         String orderId = "dev_order_4";
         UUID memId = UUID.randomUUID();
 
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId(orderId);
-        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
-
         Plan plan = buildFullDayPlan();
-        Membership membership = buildSavedMembership(memId, plan);
-        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, orderId, BigDecimal.valueOf(600));
+        when(membershipRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(membership));
         when(membershipRepository.save(any())).thenReturn(membership);
 
         PaymentVerifyRequest req = new PaymentVerifyRequest();
@@ -636,16 +616,11 @@ class PaymentServiceTest {
         String orderId = "dev_order_5";
         UUID memId = UUID.randomUUID();
 
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId(orderId);
-        payment.setAmount(BigDecimal.valueOf(600));
-        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
-
         Plan plan = buildFullDayPlan();
-        Membership membership = buildSavedMembership(memId, plan);
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, orderId, BigDecimal.valueOf(600));
         membership.setShift("FULL_DAY");
         membership.setSeatNumber("B12");
-        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(membership));
         when(membershipRepository.save(any())).thenReturn(membership);
 
         UserProfileDto userProfile = new UserProfileDto();
@@ -687,15 +662,10 @@ class PaymentServiceTest {
         String orderId = "dev_order_receipt";
         UUID memId = UUID.randomUUID();
 
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId(orderId);
-        payment.setAmount(BigDecimal.valueOf(600));
-        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
-
         Plan plan = buildFullDayPlan();
-        Membership membership = buildSavedMembership(memId, plan);
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, orderId, BigDecimal.valueOf(600));
         membership.setSeatNumber("B12");
-        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(membership));
         when(membershipRepository.save(any())).thenReturn(membership);
 
         UserProfileDto userProfile = new UserProfileDto();
@@ -713,6 +683,9 @@ class PaymentServiceTest {
 
         paymentService.verifyAndActivateMembership(userId, req);
 
+        ArgumentCaptor<Payment> paymentCap = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(paymentCap.capture());
+
         ArgumentCaptor<PaymentReceiptEvent> cap = ArgumentCaptor.forClass(PaymentReceiptEvent.class);
         verify(kafkaTemplate).send(eq("payment-receipt"), eq(userId), cap.capture());
 
@@ -722,7 +695,7 @@ class PaymentServiceTest {
         assertThat(event.getAmountPaid()).isEqualByComparingTo(BigDecimal.valueOf(600));
         assertThat(event.getAmountPending()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(event.getReceiptType()).isEqualTo("NEW_BOOKING");
-        assertThat(payment.getInvoiceId()).isEqualTo(event.getInvoiceId());
+        assertThat(paymentCap.getValue().getInvoiceId()).isEqualTo(event.getInvoiceId());
     }
 
     // ── verifyAndPayDues ───────────────────────────────────────────────────────
@@ -733,17 +706,13 @@ class PaymentServiceTest {
         UUID memId = UUID.randomUUID();
 
         Plan plan = buildFullDayPlan();
-        Membership membership = buildSavedMembership(memId, plan);
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, orderId, null);
         membership.setStatus(Membership.Status.GRACE);
         membership.setDuesAmount(BigDecimal.valueOf(600));
         membership.setEndDate(LocalDate.now().minusDays(5));
         LocalDate originalEndDate = membership.getEndDate();
 
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId(orderId);
-        payment.setAmount(BigDecimal.valueOf(600));
-        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
-        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(membership));
         when(membershipRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         UserProfileDto userProfile = new UserProfileDto();
@@ -764,7 +733,12 @@ class PaymentServiceTest {
         assertThat(result.getStatus()).isEqualTo(Membership.Status.ACTIVE.name());
         assertThat(membership.getDuesAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(membership.getEndDate()).isEqualTo(originalEndDate.plusDays(plan.getDurationDays()));
-        assertThat(payment.getInvoiceId()).startsWith("INV-");
+
+        ArgumentCaptor<Payment> paymentCap = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository, times(1)).save(paymentCap.capture());
+        assertThat(paymentCap.getValue().getStatus()).isEqualTo(Payment.Status.SUCCESS);
+        assertThat(paymentCap.getValue().getAmount()).isEqualByComparingTo(BigDecimal.valueOf(600));
+        assertThat(paymentCap.getValue().getInvoiceId()).startsWith("INV-");
 
         ArgumentCaptor<PaymentReceiptEvent> cap = ArgumentCaptor.forClass(PaymentReceiptEvent.class);
         verify(kafkaTemplate).send(eq("payment-receipt"), eq(userId), cap.capture());
@@ -793,16 +767,12 @@ class PaymentServiceTest {
         UUID memId = UUID.randomUUID();
 
         Plan plan = buildFullDayPlan();
-        Membership membership = buildSavedMembership(memId, plan);
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, orderId, null);
         membership.setStatus(Membership.Status.GRACE);
         membership.setDuesAmount(BigDecimal.valueOf(600));
         membership.setEndDate(LocalDate.now().minusDays(5));
 
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId(orderId);
-        payment.setAmount(BigDecimal.valueOf(600));
-        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
-        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(membership));
         when(membershipRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         UserProfileDto userProfile = new UserProfileDto();
@@ -833,13 +803,9 @@ class PaymentServiceTest {
         UUID memId = UUID.randomUUID();
 
         Plan plan = buildFullDayPlan();
-        Membership membership = buildSavedMembership(memId, plan);
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, orderId, null);
         membership.setStatus(Membership.Status.ACTIVE);
-
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId(orderId);
-        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
-        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(membership));
 
         PaymentVerifyRequest req = new PaymentVerifyRequest();
         req.setGatewayOrderId(orderId);
@@ -848,6 +814,9 @@ class PaymentServiceTest {
         assertThatThrownBy(() -> paymentService.verifyAndPayDues(userId, req))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("no longer awaiting dues");
+
+        // Rejected before any Payment row is ever created.
+        verifyNoInteractions(paymentRepository);
     }
 
     @Test
@@ -855,14 +824,10 @@ class PaymentServiceTest {
         String orderId = "dev_order_6";
         UUID memId = UUID.randomUUID();
 
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId(orderId);
-        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
-
         Plan plan = buildFullDayPlan();
-        Membership membership = buildSavedMembership(memId, plan);
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, orderId, BigDecimal.valueOf(600));
         membership.setStatus(Membership.Status.ACTIVE);
-        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(membership));
         when(membershipRepository.save(any())).thenReturn(membership);
 
         PaymentVerifyRequest req = new PaymentVerifyRequest();
@@ -890,8 +855,8 @@ class PaymentServiceTest {
         paymentService.createOrder(userId, req);
 
         ArgumentCaptor<Membership> cap = ArgumentCaptor.forClass(Membership.class);
-        verify(membershipRepository).save(cap.capture());
-        assertThat(cap.getValue().getStartDate()).isEqualTo(LocalDate.now());
+        verify(membershipRepository, atLeastOnce()).save(cap.capture());
+        assertThat(cap.getAllValues().get(0).getStartDate()).isEqualTo(LocalDate.now());
     }
 
     @Test
@@ -922,11 +887,12 @@ class PaymentServiceTest {
         paymentService.createOrder(userId, req);
 
         ArgumentCaptor<Membership> cap = ArgumentCaptor.forClass(Membership.class);
-        verify(membershipRepository).save(cap.capture());
-        assertThat(cap.getValue().getStartDate()).isEqualTo(LocalDate.now().plusDays(11));
-        assertThat(cap.getValue().getSeatId()).isEqualTo(activeSeatId);
-        assertThat(cap.getValue().getSeatNumber()).isEqualTo("C5");
-        assertThat(cap.getValue().getShift()).isEqualTo("MORNING");
+        verify(membershipRepository, atLeastOnce()).save(cap.capture());
+        Membership firstSaved = cap.getAllValues().get(0);
+        assertThat(firstSaved.getStartDate()).isEqualTo(LocalDate.now().plusDays(11));
+        assertThat(firstSaved.getSeatId()).isEqualTo(activeSeatId);
+        assertThat(firstSaved.getSeatNumber()).isEqualTo("C5");
+        assertThat(firstSaved.getShift()).isEqualTo("MORNING");
     }
 
     @Test
@@ -966,15 +932,11 @@ class PaymentServiceTest {
         String orderId = "dev_order_queue1";
         UUID memId = UUID.randomUUID();
 
-        Payment payment = buildSavedPayment(memId);
-        payment.setGatewayOrderId(orderId);
-        when(paymentRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(payment));
-
         Plan plan = buildFullDayPlan();
-        Membership membership = buildSavedMembership(memId, plan);
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, orderId, BigDecimal.valueOf(600));
         membership.setStartDate(LocalDate.now().plusDays(1));
         membership.setStatus(Membership.Status.PENDING);
-        when(membershipRepository.findById(memId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(membership));
         when(membershipRepository.save(any())).thenReturn(membership);
 
         PaymentVerifyRequest req = new PaymentVerifyRequest();

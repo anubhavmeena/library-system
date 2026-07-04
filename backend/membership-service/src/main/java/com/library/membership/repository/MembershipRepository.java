@@ -54,4 +54,9 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     }
 
     boolean existsBySeatIdAndStatus(UUID seatId, Membership.Status status);
+
+    // gatewayOrderId is unique per in-flight checkout (set once by createOrder()/
+    // createDuesOrder(), never shared across memberships), so a plain derived
+    // Optional lookup is safe here unlike the userId-scoped queries above.
+    Optional<Membership> findByGatewayOrderId(String gatewayOrderId);
 }

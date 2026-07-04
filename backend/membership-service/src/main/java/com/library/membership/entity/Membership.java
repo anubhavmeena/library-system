@@ -35,6 +35,12 @@ public class Membership {
     // Null for memberships that have never been in grace.
     @Column(name = "dues_amount", precision = 10, scale = 2) private BigDecimal duesAmount;
 
+    // In-flight checkout correlation, set by PaymentService.createOrder()/createDuesOrder()
+    // and read back by verify*() to build the Payment row — lets a Payment only ever get
+    // created once the gateway confirms success, instead of as a PENDING row up front.
+    @Column(name = "gateway_order_id") private String gatewayOrderId;
+    @Column(name = "checkout_amount", precision = 10, scale = 2) private BigDecimal checkoutAmount;
+
     @Column(name = "created_at", updatable = false) private LocalDateTime createdAt;
     @PrePersist protected void onCreate() { createdAt = LocalDateTime.now(); }
 

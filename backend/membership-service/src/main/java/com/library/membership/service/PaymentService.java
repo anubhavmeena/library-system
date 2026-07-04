@@ -160,16 +160,12 @@ public class PaymentService {
             paymentSessionId = cashfreeResult[1]; // null in dev mode
         }
 
-        // 6. Persist payment record in PENDING state
-        Payment payment = Payment.builder()
-                .membershipId(membership.getId())
-                .userId(UUID.fromString(userId))
-                .amount(chargeAmount)
-                .paymentGateway(activeGateway)
-                .gatewayOrderId(gatewayOrderId)
-                .status(Payment.Status.PENDING)
-                .build();
-        paymentRepository.save(payment);
+        // 6. Stash the order/amount on the membership itself — verify() resolves
+        // back to this row and creates the Payment fresh, directly as SUCCESS, so
+        // no Payment row is ever written for an order that's never confirmed.
+        membership.setGatewayOrderId(gatewayOrderId);
+        membership.setCheckoutAmount(chargeAmount);
+        membershipRepository.save(membership);
 
         // 7. Return order details to frontend
         return CreateOrderResponse.builder()
@@ -191,21 +187,27 @@ public class PaymentService {
 
         verifyGatewayPayment(request);
 
-        // 2. Update payment → SUCCESS
-        Payment payment = paymentRepository
+        // 2. Resolve the membership this order belongs to, then create the
+        // Payment row for the first time — directly as SUCCESS. If verification
+        // had failed above, execution never reaches here, so a failed/abandoned
+        // checkout never leaves a Payment row behind at all.
+        Membership membership = membershipRepository
                 .findByGatewayOrderId(request.getGatewayOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Payment record not found"));
 
-        payment.setGatewayPaymentId(request.getGatewayPaymentId());
-        payment.setStatus(Payment.Status.SUCCESS);
-        payment.setInvoiceId(generateInvoiceId());
+        Payment payment = Payment.builder()
+                .membershipId(membership.getId())
+                .userId(UUID.fromString(userId))
+                .amount(membership.getCheckoutAmount())
+                .paymentGateway(activeGateway)
+                .gatewayOrderId(request.getGatewayOrderId())
+                .gatewayPaymentId(request.getGatewayPaymentId())
+                .status(Payment.Status.SUCCESS)
+                .invoiceId(generateInvoiceId())
+                .build();
         paymentRepository.save(payment);
 
         // 3. Activate or queue the membership depending on its start date
-        Membership membership = membershipRepository
-                .findById(payment.getMembershipId())
-                .orElseThrow(() -> new ResourceNotFoundException("Membership not found"));
-
         boolean isQueued = membership.getStartDate().isAfter(LocalDate.now());
         membership.setStatus(isQueued ? Membership.Status.QUEUED : Membership.Status.ACTIVE);
         membership = membershipRepository.save(membership);
@@ -292,15 +294,11 @@ public class PaymentService {
             paymentSessionId = cashfreeResult[1];
         }
 
-        Payment payment = Payment.builder()
-                .membershipId(membership.getId())
-                .userId(UUID.fromString(userId))
-                .amount(duesAmount)
-                .paymentGateway(activeGateway)
-                .gatewayOrderId(gatewayOrderId)
-                .status(Payment.Status.PENDING)
-                .build();
-        paymentRepository.save(payment);
+        // Dues amount is already tracked on the membership itself (duesAmount)
+        // and isn't cleared until after a successful verify, so — unlike the
+        // fresh-order flow — nothing extra needs snapshotting for verify to read.
+        membership.setGatewayOrderId(gatewayOrderId);
+        membershipRepository.save(membership);
 
         return CreateOrderResponse.builder()
                 .orderId(gatewayOrderId)
@@ -317,24 +315,28 @@ public class PaymentService {
     public MembershipDto verifyAndPayDues(String userId, PaymentVerifyRequest request) {
         verifyGatewayPayment(request);
 
-        Payment payment = paymentRepository
+        Membership membership = membershipRepository
                 .findByGatewayOrderId(request.getGatewayOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Payment record not found"));
-
-        payment.setGatewayPaymentId(request.getGatewayPaymentId());
-        payment.setStatus(Payment.Status.SUCCESS);
-        payment.setInvoiceId(generateInvoiceId());
-        paymentRepository.save(payment);
-
-        Membership membership = membershipRepository
-                .findById(payment.getMembershipId())
-                .orElseThrow(() -> new ResourceNotFoundException("Membership not found"));
 
         // Defend against a race with an admin releasing this same seat in the meantime.
         if (membership.getStatus() != Membership.Status.GRACE) {
             throw new IllegalArgumentException(
                     "This membership is no longer awaiting dues — it may already have been paid or released.");
         }
+
+        BigDecimal paidAmount = membership.getDuesAmount();
+        Payment payment = Payment.builder()
+                .membershipId(membership.getId())
+                .userId(UUID.fromString(userId))
+                .amount(paidAmount)
+                .paymentGateway(activeGateway)
+                .gatewayOrderId(request.getGatewayOrderId())
+                .gatewayPaymentId(request.getGatewayPaymentId())
+                .status(Payment.Status.SUCCESS)
+                .invoiceId(generateInvoiceId())
+                .build();
+        paymentRepository.save(payment);
 
         membership.setEndDate(membership.getEndDate().plusDays(membership.getPlan().getDurationDays()));
         membership.setStatus(Membership.Status.ACTIVE);
