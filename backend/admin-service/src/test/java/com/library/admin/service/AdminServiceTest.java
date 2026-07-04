@@ -1061,7 +1061,7 @@ class AdminServiceTest {
         when(userRepository.findById(userId)).thenReturn(Optional.of(buildUser(userId)));
         when(membershipRepository.findFirstByUserIdCurrentOrderByEndDateDesc(userId))
                 .thenReturn(Optional.empty());
-        when(membershipRepository.findFirstByUserIdOrderByEndDateDesc(userId))
+        when(membershipRepository.findFirstByUserIdAndStatusNotOrderByCreatedAtDesc(userId, Membership.Status.PENDING))
                 .thenReturn(Optional.empty());
 
         adminService.clearPendingFees(userId.toString());

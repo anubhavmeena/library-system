@@ -11,7 +11,20 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface MembershipRepository extends JpaRepository<Membership, UUID> {
+    // Includes PENDING/CANCELLED rows by design — used for the student's full
+    // membership history display (getUserMemberships). Do NOT reuse this for
+    // "what's their last meaningful membership" fallback logic — see
+    // findFirstByUserIdAndStatusNotOrderByCreatedAtDesc below for that.
     List<Membership> findByUserIdOrderByCreatedAtDesc(UUID userId);
+
+    // Used by getMyDisplayStatus's "no current membership" fallback — the
+    // student's last MEANINGFUL membership, excluding PENDING (an abandoned/
+    // never-completed checkout attempt isn't real history — a student who
+    // retried a failed payment several times could leave newer-dated PENDING
+    // duds that beat a real EXPIRED/CANCELLED row here, making
+    // StudentStatusResolver wrongly resolve NEW instead of RELEASED). Mirrors
+    // admin-service's identically-purposed repository method.
+    Optional<Membership> findFirstByUserIdAndStatusNotOrderByCreatedAtDesc(UUID userId, Membership.Status status);
 
     // NOTE: these are custom @Query methods, not Spring-Data-derived "findFirst"
     // queries — Spring Data does NOT auto-limit @Query results to one row just

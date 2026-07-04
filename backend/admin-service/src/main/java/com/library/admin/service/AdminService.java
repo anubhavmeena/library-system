@@ -202,7 +202,9 @@ public class AdminService {
                     dto.setPendingAmount(currentPayment.getPendingAmount() != null ? currentPayment.getPendingAmount() : BigDecimal.ZERO);
                 }
             } else {
-                latestEver = membershipRepository.findFirstByUserIdOrderByEndDateDesc(user.getId()).orElse(null);
+                latestEver = membershipRepository
+                        .findFirstByUserIdAndStatusNotOrderByCreatedAtDesc(user.getId(), Membership.Status.PENDING)
+                        .orElse(null);
                 if (latestEver != null) {
                     dto.setMembershipStatus("EXPIRED");
                 }
@@ -239,7 +241,9 @@ public class AdminService {
                 dto.setPendingAmount(currentPayment.getPendingAmount() != null ? currentPayment.getPendingAmount() : BigDecimal.ZERO);
             }
         } else {
-            latestEver = membershipRepository.findFirstByUserIdOrderByEndDateDesc(user.getId()).orElse(null);
+            latestEver = membershipRepository
+                    .findFirstByUserIdAndStatusNotOrderByCreatedAtDesc(user.getId(), Membership.Status.PENDING)
+                    .orElse(null);
             if (latestEver != null) {
                 dto.setMembershipStatus("EXPIRED");
                 dto.setMembershipEnd(latestEver.getEndDate().toString());
@@ -606,7 +610,7 @@ public class AdminService {
 
         Optional<Membership> currentOrLatest = membershipRepository
                 .findFirstByUserIdCurrentOrderByEndDateDesc(uid)
-                .or(() -> membershipRepository.findFirstByUserIdOrderByEndDateDesc(uid));
+                .or(() -> membershipRepository.findFirstByUserIdAndStatusNotOrderByCreatedAtDesc(uid, Membership.Status.PENDING));
         String seatNumber = currentOrLatest.map(Membership::getSeatNumber).orElse(null);
         String validUpto = currentOrLatest.map(Membership::getEndDate).map(Object::toString).orElse(null);
         UUID membershipIdForClearance = currentOrLatest.map(Membership::getId)

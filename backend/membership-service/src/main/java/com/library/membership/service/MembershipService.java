@@ -76,8 +76,9 @@ public class MembershipService {
         if (current != null) {
             currentPayment = paymentRepository.findByMembershipId(current.getId()).orElse(null);
         } else {
-            latestEver = membershipRepository.findByUserIdOrderByCreatedAtDesc(uid)
-                    .stream().findFirst().orElse(null);
+            latestEver = membershipRepository
+                    .findFirstByUserIdAndStatusNotOrderByCreatedAtDesc(uid, Membership.Status.PENDING)
+                    .orElse(null);
         }
 
         long graceDays = appSettingsRepository.findById(1L)

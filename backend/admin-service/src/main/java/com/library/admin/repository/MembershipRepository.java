@@ -72,7 +72,7 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     // membership is either ACTIVE or GRACE (lapsed, seat still held, dues owed).
     //
     // NOTE: unlike findFirstByUserIdAndStatusOrderByEndDateDesc/
-    // findFirstByUserIdOrderByEndDateDesc below (pure Spring-Data-derived
+    // findFirstByUserIdAndStatusNotOrderByCreatedAtDesc below (pure Spring-Data-derived
     // queries, which Spring Data auto-limits to 1 row because it recognizes the
     // "findFirst" keyword), this is a custom @Query method — Spring Data does
     // NOT apply that same auto-limiting to @Query-annotated queries. A student
@@ -134,7 +134,14 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
 
     boolean existsByUserId(UUID userId);
 
-    Optional<Membership> findFirstByUserIdOrderByEndDateDesc(UUID userId);
+    // Used by getStudentDetails/getAllStudents/sendPendingFeeReminders — the
+    // student's last MEANINGFUL membership, consulted only when there's no
+    // current (ACTIVE/GRACE) one. Excludes PENDING: an abandoned/never-completed
+    // checkout attempt isn't real history — a student who retried a failed
+    // payment several times could leave newer-dated PENDING duds that beat a
+    // real EXPIRED/CANCELLED row here, making StudentStatusResolver wrongly
+    // resolve NEW instead of RELEASED.
+    Optional<Membership> findFirstByUserIdAndStatusNotOrderByCreatedAtDesc(UUID userId, Membership.Status status);
 
     // Used by getSeatHistory — every membership ever booked against this seat,
     // newest first. Includes PENDING/CANCELLED rows; caller filters those out.

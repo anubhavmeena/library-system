@@ -261,19 +261,37 @@ class MembershipServiceTest {
         when(membershipRepository.findGraceByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
         Membership latest = buildActiveMembership();
         latest.setStatus(Membership.Status.EXPIRED);
-        when(membershipRepository.findByUserIdOrderByCreatedAtDesc(UUID.fromString(userId)))
-                .thenReturn(List.of(latest));
+        when(membershipRepository.findFirstByUserIdAndStatusNotOrderByCreatedAtDesc(
+                UUID.fromString(userId), Membership.Status.PENDING))
+                .thenReturn(Optional.of(latest));
         when(appSettingsRepository.findById(1L)).thenReturn(Optional.empty());
 
         assertThat(membershipService.getMyDisplayStatus(userId)).isEqualTo("RELEASED");
     }
 
     @Test
+    void getMyDisplayStatus_noCurrentOnlyAbandonedPendingHistory_isNewNotReleased() {
+        // Regression: a student who retried a failed checkout leaves PENDING
+        // rows behind. Those must never be picked as "latestEver" — an
+        // abandoned attempt isn't real history, and letting it win here
+        // previously misreported RELEASED students as NEW (or vice versa).
+        when(membershipRepository.findActiveByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
+        when(membershipRepository.findGraceByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
+        when(membershipRepository.findFirstByUserIdAndStatusNotOrderByCreatedAtDesc(
+                UUID.fromString(userId), Membership.Status.PENDING))
+                .thenReturn(Optional.empty());
+        when(appSettingsRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThat(membershipService.getMyDisplayStatus(userId)).isEqualTo("NEW");
+    }
+
+    @Test
     void getMyDisplayStatus_noCurrentNoHistory_isNew() {
         when(membershipRepository.findActiveByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
         when(membershipRepository.findGraceByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
-        when(membershipRepository.findByUserIdOrderByCreatedAtDesc(UUID.fromString(userId)))
-                .thenReturn(List.of());
+        when(membershipRepository.findFirstByUserIdAndStatusNotOrderByCreatedAtDesc(
+                UUID.fromString(userId), Membership.Status.PENDING))
+                .thenReturn(Optional.empty());
         when(appSettingsRepository.findById(1L)).thenReturn(Optional.empty());
 
         assertThat(membershipService.getMyDisplayStatus(userId)).isEqualTo("NEW");
