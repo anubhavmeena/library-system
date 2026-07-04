@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
-import { fetchMyMembership, fetchQueuedMembership, fetchPlans, createPaymentOrder, verifyPayment, createDuesOrder, verifyDuesPayment } from '../../store/slices/membershipSlice'
+import { fetchMyMembership, fetchQueuedMembership, fetchPlans, fetchMyDisplayStatus, createPaymentOrder, verifyPayment, createDuesOrder, verifyDuesPayment } from '../../store/slices/membershipSlice'
 import api from '../../services/api'
 
 function InfoRow({ label, value, highlight }) {
@@ -33,7 +33,7 @@ function StatusBadge({ status }) {
 export default function MembershipPage() {
     const dispatch = useDispatch()
     const { t } = useTranslation()
-    const { current: membership, queued: queuedMembership, plans } = useSelector(s => s.membership)
+    const { current: membership, queued: queuedMembership, plans, displayStatus } = useSelector(s => s.membership)
     const [history, setHistory]                 = useState([])
     const [payments, setPayments]               = useState([])
     const [loading, setLoading]                 = useState(true)
@@ -48,6 +48,7 @@ export default function MembershipPage() {
         dispatch(fetchMyMembership())
         dispatch(fetchQueuedMembership())
         dispatch(fetchPlans())
+        dispatch(fetchMyDisplayStatus())
         api.get('/memberships/my/all').then(r => setHistory(r.data.data || [])).catch(() => {})
             .finally(() => setLoading(false))
         api.get('/payments/my').then(r => setPayments(r.data.data || [])).catch(() => {})
@@ -271,11 +272,11 @@ export default function MembershipPage() {
                             {downloadingCard ? 'Generating...' : 'Download ID Card'}
                         </button>
                     </div>
-                    {!queuedMembership && (
+                    {!queuedMembership && daysLeft <= 7 && (
                         <div className="mt-5 pt-5 border-t border-primary-700/30 flex items-center justify-between">
-                            <p className="text-primary-400 text-sm">Queue your next plan — it activates automatically when this one expires.</p>
-                            <button onClick={() => setQueueFlow('select')} className="btn-outline text-sm px-5 py-2.5">
-                                Queue Next Plan
+                            <p className="text-amber-400 text-sm">Your membership is expiring soon — renew your seat now to keep it. It activates automatically when your current plan expires.</p>
+                            <button onClick={() => setQueueFlow('select')} className="btn-primary text-sm px-5 py-2.5 whitespace-nowrap">
+                                Renew Seat
                             </button>
                         </div>
                     )}
@@ -284,11 +285,11 @@ export default function MembershipPage() {
                 <div className="card p-6 mb-6 border-red-500/30 bg-gradient-to-br from-red-500/5 to-transparent">
                     <div className="flex items-start justify-between mb-4">
                         <div>
-                            <h2 className="section-title">Membership Expired</h2>
+                            <h2 className="section-title">{displayStatus === 'EXPIRED' ? 'Grace Period Expired' : 'Membership in Grace Period'}</h2>
                             <p className="text-primary-400 text-sm mt-1">{membership.planName}</p>
                         </div>
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border bg-red-500/20 text-red-400 border-red-500/30">
-                            <span className="w-1.5 h-1.5 rounded-full bg-current" /> GRACE
+                            <span className="w-1.5 h-1.5 rounded-full bg-current" /> {displayStatus === 'EXPIRED' ? 'EXPIRED' : 'GRACE'}
                         </span>
                     </div>
                     <InfoRow label={t('membership.seatNumber')} value={membership.seatNumber} highlight />
@@ -301,7 +302,7 @@ export default function MembershipPage() {
                             Pay ₹{membership.duesAmount ?? membership.planPrice} to continue your plan — your seat may be released by the library if it remains unpaid.
                         </p>
                         <button onClick={handlePayDues} disabled={payingDues} className="btn-primary text-sm px-6 py-2.5">
-                            {payingDues ? 'Processing...' : `Pay ₹${membership.duesAmount ?? membership.planPrice}`}
+                            {payingDues ? 'Processing...' : `Pay Fee Due (₹${membership.duesAmount ?? membership.planPrice})`}
                         </button>
                     </div>
                 </div>
@@ -338,7 +339,7 @@ export default function MembershipPage() {
             {queueFlow === 'select' && (
                 <div className="card p-6 mb-6 border-violet-500/20">
                     <div className="flex items-center justify-between mb-5">
-                        <h2 className="section-title">Select Next Plan</h2>
+                        <h2 className="section-title">Renew Seat — Select Plan</h2>
                         <button onClick={() => { setQueueFlow(null); setSelectedQueuePlan(null) }}
                                 className="text-primary-400 hover:text-white text-sm transition-colors">✕ Cancel</button>
                     </div>

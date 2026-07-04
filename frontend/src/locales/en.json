@@ -222,7 +222,12 @@
     "expiring": {
       "title": "Membership expiring in {{count}} days",
       "desc": "Renew now to keep your seat {{seatNumber}}",
-      "renew": "Renew"
+      "renew": "Renew Seat"
+    },
+    "duesBanner": {
+      "title": "Your membership needs attention",
+      "desc": "Clear your pending dues to keep your seat {{seatNumber}}",
+      "cta": "Pay Fee Due"
     },
     "quickActions": {
       "title": "Quick Actions",
