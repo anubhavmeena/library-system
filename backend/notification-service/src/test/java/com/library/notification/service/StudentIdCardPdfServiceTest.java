@@ -1,5 +1,6 @@
 package com.library.notification.service;
 
+import com.library.common.idcard.IdCardPdfGenerator;
 import com.library.notification.dto.BookingConfirmedEvent;
 import org.junit.jupiter.api.Test;
 
@@ -11,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class StudentIdCardPdfServiceTest {
 
-    private final StudentIdCardPdfService service = new StudentIdCardPdfService();
+    private final StudentIdCardPdfService service = new StudentIdCardPdfService(new IdCardPdfGenerator());
 
     private BookingConfirmedEvent buildEvent() {
         BookingConfirmedEvent e = new BookingConfirmedEvent();
