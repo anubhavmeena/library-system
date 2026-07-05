@@ -164,6 +164,7 @@
 				2A20BAF39AC74E1E942A0821 /* Info.plist */,
 				0A7CDD0FDFE749419B20E37E /* Products */,
 			);
+			path = LibrarySystem;
 			sourceTree = "<group>";
 		};
 		0A7CDD0FDFE749419B20E37E /* Products */ = {
