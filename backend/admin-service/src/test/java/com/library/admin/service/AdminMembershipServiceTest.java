@@ -596,7 +596,7 @@ class AdminMembershipServiceTest {
         when(seatBookingRepository.findFirstByMembershipIdAndStatus(id, SeatBooking.Status.ACTIVE))
                 .thenReturn(Optional.of(booking));
 
-        adminMembershipService.clearDues(id.toString());
+        adminMembershipService.clearDues(id.toString(), new BigDecimal("500.00"));
 
         ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).save(captor.capture());
@@ -626,7 +626,7 @@ class AdminMembershipServiceTest {
         when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
         when(planRepository.findById(mem.getPlanId())).thenReturn(Optional.of(plan));
 
-        adminMembershipService.clearDues(id.toString());
+        adminMembershipService.clearDues(id.toString(), new BigDecimal("600.00"));
 
         ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).save(captor.capture());
@@ -639,7 +639,7 @@ class AdminMembershipServiceTest {
         Membership mem = buildMembership(id, Membership.Status.ACTIVE);
         when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
 
-        assertThatThrownBy(() -> adminMembershipService.clearDues(id.toString()))
+        assertThatThrownBy(() -> adminMembershipService.clearDues(id.toString(), new BigDecimal("100")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Grace/Expired");
 

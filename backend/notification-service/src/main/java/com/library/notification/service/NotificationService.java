@@ -43,6 +43,14 @@ public class NotificationService {
     // catalog) — used only if admin-service hasn't lazily seeded a row for this
     // key yet, so a fresh deployment behaves exactly like it did before this
     // settings table existed rather than silently going dark.
+    // Identical text to admin-service's NotificationSettingsService.GRACE_DUES_CLEARED_HINDI_STUDENT
+    // — duplicated because the two services don't share a module, but kept in
+    // sync so the very first clear-dues send (before admin-service has lazily
+    // created the real settings row) reads the same as every send after.
+    private static final String GRACE_DUES_CLEARED_HINDI_STUDENT =
+            "आपकी ग्रेस पीरियड की बकाया राशि जमा हो गई है और आपकी सदस्यता फिर से सक्रिय कर दी गई है। " +
+                    "आपकी सीट सुरक्षित है। धन्यवाद।\n📚 टारगेट ज़ोन लाइब्रेरी टीम";
+
     private static final Map<String, NotificationSetting> FAIL_OPEN_DEFAULTS = new LinkedHashMap<>();
     static {
         FAIL_OPEN_DEFAULTS.put("BOOKING_CONFIRMED",    defaultSetting(true, true));
@@ -55,6 +63,11 @@ public class NotificationService {
         FAIL_OPEN_DEFAULTS.put("PENDING_FEE_CLEARED",  defaultSetting(true, true));
         FAIL_OPEN_DEFAULTS.put("PAYMENT_RECEIPT",      defaultSetting(true, true));
         FAIL_OPEN_DEFAULTS.put("ADMIN_BROADCAST",      defaultSetting(true, true));
+        // Bilingual by default, unlike every other fail-open entry above.
+        FAIL_OPEN_DEFAULTS.put("GRACE_DUES_CLEARED", NotificationSetting.builder()
+                .sendToStudent(true).sendToAdmin(true)
+                .hindiEnabled(true).hindiTextStudent(GRACE_DUES_CLEARED_HINDI_STUDENT)
+                .build());
     }
 
     private static NotificationSetting defaultSetting(boolean student, boolean admin) {
@@ -373,6 +386,14 @@ public class NotificationService {
             sendPendingFeeClearedAdminAlert(event);
             return;
         }
+        if ("GRACE_DUES_CLEARED".equals(event.getEventType())) {
+            sendGraceDuesClearedStudentAlert(event);
+            return;
+        }
+        if ("GRACE_DUES_CLEARED_ADMIN".equals(event.getEventType())) {
+            sendGraceDuesClearedAdminAlert(event);
+            return;
+        }
         if ("SEAT_RELEASED_NONPAYMENT".equals(event.getEventType())) {
             sendSeatReleasedNonPaymentAlert(event);
             return;
@@ -555,6 +576,73 @@ public class NotificationService {
         );
 
         log.info("Pending fee cleared alert sent to admin for user: {} ({})", event.getUserName(), amount);
+    }
+
+    // ── Grace Dues Cleared ────────────────────────────────────────────────────
+    // Triggered by AdminMembershipService.clearDues() — the grace-period
+    // equivalent of Pending Fee Cleared above, but for Membership.duesAmount
+    // rather than Payment.pendingAmount. Ships bilingual by default (see
+    // FAIL_OPEN_DEFAULTS / admin-service's NotificationSettingsService).
+
+    private void sendGraceDuesClearedStudentAlert(RenewalReminderEvent event) {
+        NotificationSetting settings = settingsFor("GRACE_DUES_CLEARED");
+        String amount = event.getPendingAmount() != null
+                ? "₹" + event.getPendingAmount().stripTrailingZeros().toPlainString()
+                : "your outstanding dues";
+
+        String msg = withHindi(String.format(
+                "✅ Dues Cleared — Membership Reactivated\n\n"                              +
+                        "Hi %s,\n\n"                                                              +
+                        "Your grace-period dues of *%s* have been cleared. Your membership "     +
+                        "is active again and your seat *%s* is safe.\n\n"                        +
+                        "📚 Target Zone Library Team",
+                event.getUserName(), amount,
+                event.getSeatNumber() != null ? event.getSeatNumber() : "N/A"
+        ), settings, settings.getHindiTextStudent());
+
+        if (settings.isSendToStudent() && hasValue(event.getUserMobile())) {
+            whatsAppService.send(event.getUserMobile(), msg, event.getUserId(), "GRACE_DUES_CLEARED");
+        }
+        if (settings.isSendToStudent() && hasValue(event.getUserEmail())) {
+            emailService.sendText(
+                    event.getUserEmail(),
+                    "Dues Cleared — " + amount,
+                    msg,
+                    adminEmail,
+                    event.getUserId(), "GRACE_DUES_CLEARED"
+            );
+        }
+        log.info("Grace dues cleared confirmation sent to user: {} ({})", event.getUserId(), amount);
+    }
+
+    private void sendGraceDuesClearedAdminAlert(RenewalReminderEvent event) {
+        NotificationSetting settings = settingsFor("GRACE_DUES_CLEARED");
+        if (!settings.isSendToAdmin()) return;
+
+        String amount = event.getPendingAmount() != null
+                ? "₹" + event.getPendingAmount().stripTrailingZeros().toPlainString()
+                : "an outstanding amount";
+
+        String msg = withHindi(String.format(
+                "✅ Grace Dues Cleared\n\nStudent: %s\nSeat   : %s\nAmount : %s",
+                event.getUserName(),
+                event.getSeatNumber() != null ? event.getSeatNumber() : "N/A",
+                amount
+        ), settings, settings.getHindiTextAdmin());
+
+        for (String number : adminWhatsappNumbers()) {
+            whatsAppService.send(number, msg, null, "GRACE_DUES_CLEARED_ADMIN");
+        }
+
+        emailService.sendText(
+                adminEmail,
+                "Grace Dues Cleared — " + event.getUserName() + " (" + amount + ")",
+                msg,
+                null,
+                "GRACE_DUES_CLEARED_ADMIN"
+        );
+
+        log.info("Grace dues cleared alert sent to admin for user: {} ({})", event.getUserName(), amount);
     }
 
     // ── Seat Released (Non-Payment) ───────────────────────────────────────────

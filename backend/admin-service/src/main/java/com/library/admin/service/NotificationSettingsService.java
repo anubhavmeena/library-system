@@ -26,26 +26,49 @@ public class NotificationSettingsService {
     // Notification Settings plan for the full per-key rationale. `hindiEditable`
     // is false only for ADMIN_BROADCAST, whose body is authored fresh by the
     // admin on every send rather than being a static template.
+    //
+    // defaultHindiEnabled/defaultHindiText* let a specific key ship bilingual out
+    // of the box (see GRACE_DUES_CLEARED below) instead of every key defaulting
+    // to Hindi off until an admin manually opts in. KeyDefault.of(...) is the
+    // shorthand for the common case (Hindi off, no seeded text).
     private record KeyDefault(
             boolean defaultSendToStudent, boolean defaultSendToAdmin,
-            boolean studentEditable, boolean adminEditable, boolean hindiEditable) {
+            boolean studentEditable, boolean adminEditable, boolean hindiEditable,
+            boolean defaultHindiEnabled, String defaultHindiTextStudent, String defaultHindiTextAdmin) {
+
+        static KeyDefault of(boolean defaultSendToStudent, boolean defaultSendToAdmin,
+                              boolean studentEditable, boolean adminEditable, boolean hindiEditable) {
+            return new KeyDefault(defaultSendToStudent, defaultSendToAdmin, studentEditable, adminEditable,
+                    hindiEditable, false, null, null);
+        }
     }
+
+    // Seeded Hindi translation for GRACE_DUES_CLEARED — kept as a constant so
+    // notification-service's fail-open default (used before this row has ever
+    // been lazily created) can carry the identical text.
+    static final String GRACE_DUES_CLEARED_HINDI_STUDENT =
+            "आपकी ग्रेस पीरियड की बकाया राशि जमा हो गई है और आपकी सदस्यता फिर से सक्रिय कर दी गई है। " +
+                    "आपकी सीट सुरक्षित है। धन्यवाद।\n📚 टारगेट ज़ोन लाइब्रेरी टीम";
 
     private static final Map<String, KeyDefault> NOTIFICATION_DEFAULTS = new LinkedHashMap<>();
     static {
-        NOTIFICATION_DEFAULTS.put("BOOKING_CONFIRMED",     new KeyDefault(true, true, true, true, true));
-        NOTIFICATION_DEFAULTS.put("STUDENT_ID_CARD",       new KeyDefault(true, true, true, true, true));
-        NOTIFICATION_DEFAULTS.put("USER_REGISTERED",       new KeyDefault(true, true, true, true, true));
-        NOTIFICATION_DEFAULTS.put("RENEWAL_REMINDER",      new KeyDefault(true, false, true, false, true));
-        NOTIFICATION_DEFAULTS.put("PENDING_FEE_REMINDER",  new KeyDefault(true, false, true, false, true));
-        NOTIFICATION_DEFAULTS.put("GRACE_DUES_REMINDER",   new KeyDefault(true, false, true, false, true));
-        NOTIFICATION_DEFAULTS.put("MEMBERSHIP_GRACE",      new KeyDefault(true, true, true, true, true));
-        NOTIFICATION_DEFAULTS.put("PENDING_FEE_CLEARED",   new KeyDefault(true, true, true, true, true));
-        NOTIFICATION_DEFAULTS.put("PAYMENT_RECEIPT",       new KeyDefault(true, true, true, true, true));
+        NOTIFICATION_DEFAULTS.put("BOOKING_CONFIRMED",     KeyDefault.of(true, true, true, true, true));
+        NOTIFICATION_DEFAULTS.put("STUDENT_ID_CARD",       KeyDefault.of(true, true, true, true, true));
+        NOTIFICATION_DEFAULTS.put("USER_REGISTERED",       KeyDefault.of(true, true, true, true, true));
+        NOTIFICATION_DEFAULTS.put("RENEWAL_REMINDER",      KeyDefault.of(true, false, true, false, true));
+        NOTIFICATION_DEFAULTS.put("PENDING_FEE_REMINDER",  KeyDefault.of(true, false, true, false, true));
+        NOTIFICATION_DEFAULTS.put("GRACE_DUES_REMINDER",   KeyDefault.of(true, false, true, false, true));
+        NOTIFICATION_DEFAULTS.put("MEMBERSHIP_GRACE",      KeyDefault.of(true, true, true, true, true));
+        NOTIFICATION_DEFAULTS.put("PENDING_FEE_CLEARED",   KeyDefault.of(true, true, true, true, true));
+        NOTIFICATION_DEFAULTS.put("PAYMENT_RECEIPT",       KeyDefault.of(true, true, true, true, true));
         // Recipient is inherently "students"; sendToStudent doubles as the
         // feature's master on/off switch. sendToAdmin stays fixed true,
         // matching the existing unconditional echo-to-admin confirmation.
-        NOTIFICATION_DEFAULTS.put("ADMIN_BROADCAST",       new KeyDefault(true, true, true, false, false));
+        NOTIFICATION_DEFAULTS.put("ADMIN_BROADCAST",       KeyDefault.of(true, true, true, false, false));
+        // Ships bilingual by default — clearing a student's grace dues should
+        // read in Hindi too without an admin having to configure it first.
+        NOTIFICATION_DEFAULTS.put("GRACE_DUES_CLEARED",    new KeyDefault(true, true, true, true, true,
+                true, GRACE_DUES_CLEARED_HINDI_STUDENT, null));
     }
 
     private final NotificationSettingRepository notificationSettingRepository;
@@ -93,7 +116,9 @@ public class NotificationSettingsService {
                     .notificationKey(key)
                     .sendToStudent(def.defaultSendToStudent())
                     .sendToAdmin(def.defaultSendToAdmin())
-                    .hindiEnabled(false)
+                    .hindiEnabled(def.defaultHindiEnabled())
+                    .hindiTextStudent(def.defaultHindiTextStudent())
+                    .hindiTextAdmin(def.defaultHindiTextAdmin())
                     .build();
             return notificationSettingRepository.save(defaults);
         });

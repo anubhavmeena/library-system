@@ -48,6 +48,11 @@ export default function AdminStudentsPage() {
     const [clearingDues, setClearingDues] = useState(null)
     const [renewingSeat, setRenewingSeat] = useState(null)
 
+    const [clearDuesFor, setClearDuesFor]             = useState(null)
+    const [clearDuesAmountInput, setClearDuesAmountInput] = useState('')
+    const [clearFeesFor, setClearFeesFor]             = useState(null)
+    const [clearFeesAmountInput, setClearFeesAmountInput] = useState('')
+
     const [changeStatusFor, setChangeStatusFor]         = useState(null)
     const [changeStatusTarget, setChangeStatusTarget]   = useState('PENDING')
     const [pendingAmountInput, setPendingAmountInput]   = useState('')
@@ -112,14 +117,30 @@ export default function AdminStudentsPage() {
         }
     }
 
-    const handleClearPendingFees = async (student) => {
-        setClearingFees(student.id)
+    const closeClearFees = () => {
+        setClearFeesFor(null)
+        setClearFeesAmountInput('')
+    }
+
+    const handleClearPendingFees = async () => {
+        if (!clearFeesFor) return
+        const amount = Number(clearFeesAmountInput)
+        const outstanding = Number(clearFeesFor.pendingAmount ?? 0)
+        if (!amount || amount <= 0 || amount > outstanding) {
+            toast.error('Enter a valid amount up to the pending amount')
+            return
+        }
+        setClearingFees(clearFeesFor.id)
         try {
-            await api.patch(`/admin/students/${student.id}/clear-pending-fees`)
-            toast.success(`Pending fees cleared for ${student.name}`)
+            await api.patch(`/admin/students/${clearFeesFor.id}/clear-pending-fees`, { amountCleared: amount })
+            toast.success(`₹${amount} cleared for ${clearFeesFor.name}`)
+            closeClearFees()
             fetchStudents()
-        } catch { toast.error('Failed to clear pending fees') }
-        finally { setClearingFees(null) }
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Failed to clear pending fees')
+        } finally {
+            setClearingFees(null)
+        }
     }
 
     const handleReleaseSeat = async (student) => {
@@ -145,14 +166,24 @@ export default function AdminStudentsPage() {
         }
     }
 
-    const handleClearDues = async (student) => {
-        if (!window.confirm(
-            `Clear dues for ${student.name}? This records their ₹${student.duesAmount ?? 0} payment, reactivates them as Paid, and extends their membership by one month from where it left off. This cannot be undone.`
-        )) return
-        setClearingDues(student.id)
+    const closeClearDues = () => {
+        setClearDuesFor(null)
+        setClearDuesAmountInput('')
+    }
+
+    const handleClearDues = async () => {
+        if (!clearDuesFor) return
+        const amount = Number(clearDuesAmountInput)
+        const outstanding = Number(clearDuesFor.duesAmount ?? 0)
+        if (!amount || amount <= 0 || amount > outstanding) {
+            toast.error('Enter a valid amount up to the outstanding dues')
+            return
+        }
+        setClearingDues(clearDuesFor.id)
         try {
-            await api.patch(`/admin/memberships/${student.membershipId}/clear-dues`)
-            toast.success(`Dues cleared for ${student.name}`)
+            await api.patch(`/admin/memberships/${clearDuesFor.membershipId}/clear-dues`, { amountCleared: amount })
+            toast.success(`₹${amount} cleared for ${clearDuesFor.name}`)
+            closeClearDues()
             fetchStudents()
         } catch (e) {
             toast.error(e.response?.data?.message || 'Failed to clear dues')
@@ -383,7 +414,7 @@ export default function AdminStudentsPage() {
                                         {s.membershipStatus === 'GRACE' ? (
                                             <>
                                                 <p className="text-primary-300 text-xs">{t('adminStudents.expires')} {s.membershipEnd}</p>
-                                                <p className="text-xs font-semibold text-red-400 line-through">
+                                                <p className="text-xs font-semibold text-red-400">
                                                     {Math.max(0, Math.ceil((new Date() - new Date(s.membershipEnd)) / 86400000))}d overdue — {s.displayStatus === 'EXPIRED' ? 'expired' : 'grace'}
                                                 </p>
                                             </>
@@ -466,7 +497,7 @@ export default function AdminStudentsPage() {
                                                         {s.membershipId && s.membershipStatus === 'GRACE' && (
                                                             <button
                                                                 disabled={clearingDues === s.id}
-                                                                onClick={() => { handleClearDues(s); setOpenDropdown(null) }}
+                                                                onClick={() => { setClearDuesFor(s); setClearDuesAmountInput(String(s.duesAmount ?? 0)); setOpenDropdown(null) }}
                                                                 className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40 disabled:opacity-50">
                                                                 {clearingDues === s.id ? 'Clearing…' : 'Clear Dues'}
                                                             </button>
@@ -474,7 +505,7 @@ export default function AdminStudentsPage() {
                                                         {s.pendingAmount > 0 && (
                                                             <button
                                                                 disabled={clearingFees === s.id}
-                                                                onClick={() => { handleClearPendingFees(s); setOpenDropdown(null) }}
+                                                                onClick={() => { setClearFeesFor(s); setClearFeesAmountInput(String(s.pendingAmount ?? 0)); setOpenDropdown(null) }}
                                                                 className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40 disabled:opacity-50">
                                                                 {clearingFees === s.id ? 'Clearing…' : 'Clear Pending Fees'}
                                                             </button>
@@ -875,6 +906,87 @@ export default function AdminStudentsPage() {
                                 onClick={handleChangeStatus}
                                 className={`text-sm px-4 py-2 rounded-lg text-white disabled:opacity-40 transition-colors ${changeStatusTarget === 'PENDING' ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-orange-600 hover:bg-orange-700'}`}>
                                 {changeStatusSubmitting ? 'Saving…' : changeStatusTarget === 'PENDING' ? 'Mark Pending' : 'Mark Grace'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {clearDuesFor && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={closeClearDues}>
+                    <div className="card p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-semibold text-white mb-1">Clear Dues</h3>
+                        <p className="text-sm text-primary-400 mb-4">
+                            Record a payment for <span className="text-white">{clearDuesFor.name}</span>, reactivate them as Paid,
+                            and extend their membership by one month from where it left off. Any amount not cleared here stays
+                            on record as a pending balance.
+                        </p>
+
+                        <label className="label">Amount to Clear (₹) — outstanding: ₹{clearDuesFor.duesAmount ?? 0}</label>
+                        <input
+                            type="number" min="0" step="1" max={clearDuesFor.duesAmount ?? 0}
+                            autoFocus
+                            value={clearDuesAmountInput}
+                            onChange={e => setClearDuesAmountInput(e.target.value)}
+                            className="input w-full text-sm mb-1"
+                        />
+                        {Number(clearDuesAmountInput) > 0 && Number(clearDuesAmountInput) < Number(clearDuesFor.duesAmount ?? 0) && (
+                            <p className="text-xs text-amber-400 mb-3">
+                                ₹{(Number(clearDuesFor.duesAmount ?? 0) - Number(clearDuesAmountInput)).toFixed(2)} will remain as a pending amount.
+                            </p>
+                        )}
+
+                        <div className="flex gap-3 justify-end mt-3">
+                            <button onClick={closeClearDues} className="btn-outline text-sm px-4 py-2">
+                                Cancel
+                            </button>
+                            <button
+                                disabled={clearingDues === clearDuesFor.id
+                                    || !clearDuesAmountInput
+                                    || Number(clearDuesAmountInput) <= 0
+                                    || Number(clearDuesAmountInput) > Number(clearDuesFor.duesAmount ?? 0)}
+                                onClick={handleClearDues}
+                                className="text-sm px-4 py-2 rounded-lg text-white disabled:opacity-40 transition-colors bg-emerald-600 hover:bg-emerald-700">
+                                {clearingDues === clearDuesFor.id ? 'Clearing…' : 'Clear Dues'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {clearFeesFor && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={closeClearFees}>
+                    <div className="card p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-semibold text-white mb-1">Clear Pending Fees</h3>
+                        <p className="text-sm text-primary-400 mb-4">
+                            Record a payment for <span className="text-white">{clearFeesFor.name}</span>'s pending cash balance.
+                            Any amount not cleared here stays on record as a pending balance.
+                        </p>
+
+                        <label className="label">Amount to Clear (₹) — outstanding: ₹{clearFeesFor.pendingAmount ?? 0}</label>
+                        <input
+                            type="number" min="0" step="1" max={clearFeesFor.pendingAmount ?? 0}
+                            autoFocus
+                            value={clearFeesAmountInput}
+                            onChange={e => setClearFeesAmountInput(e.target.value)}
+                            className="input w-full text-sm mb-1"
+                        />
+                        {Number(clearFeesAmountInput) > 0 && Number(clearFeesAmountInput) < Number(clearFeesFor.pendingAmount ?? 0) && (
+                            <p className="text-xs text-amber-400 mb-3">
+                                ₹{(Number(clearFeesFor.pendingAmount ?? 0) - Number(clearFeesAmountInput)).toFixed(2)} will remain as a pending amount.
+                            </p>
+                        )}
+
+                        <div className="flex gap-3 justify-end mt-3">
+                            <button onClick={closeClearFees} className="btn-outline text-sm px-4 py-2">
+                                Cancel
+                            </button>
+                            <button
+                                disabled={clearingFees === clearFeesFor.id
+                                    || !clearFeesAmountInput
+                                    || Number(clearFeesAmountInput) <= 0
+                                    || Number(clearFeesAmountInput) > Number(clearFeesFor.pendingAmount ?? 0)}
+                                onClick={handleClearPendingFees}
+                                className="text-sm px-4 py-2 rounded-lg text-white disabled:opacity-40 transition-colors bg-emerald-600 hover:bg-emerald-700">
+                                {clearingFees === clearFeesFor.id ? 'Clearing…' : 'Clear Pending Fees'}
                             </button>
                         </div>
                     </div>

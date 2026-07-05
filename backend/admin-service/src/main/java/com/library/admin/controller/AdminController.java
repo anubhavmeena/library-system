@@ -88,9 +88,13 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(adminService.getStudentsWithOrphanedSeats()));
     }
 
+    // Only `amountCleared` is recorded as paid; any remainder becomes a new
+    // pending balance instead of being wiped out.
     @PatchMapping("/students/{userId}/clear-pending-fees")
-    public ResponseEntity<ApiResponse<String>> clearPendingFees(@PathVariable String userId) {
-        adminService.clearPendingFees(userId);
+    public ResponseEntity<ApiResponse<String>> clearPendingFees(
+            @PathVariable String userId,
+            @Valid @RequestBody ClearAmountRequest req) {
+        adminService.clearPendingFees(userId, req.getAmountCleared());
         return ResponseEntity.ok(ApiResponse.success("Pending fees cleared"));
     }
 

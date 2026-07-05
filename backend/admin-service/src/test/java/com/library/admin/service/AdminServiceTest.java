@@ -1098,7 +1098,7 @@ class AdminServiceTest {
         when(membershipRepository.findFirstByUserIdAndStatusNotOrderByCreatedAtDesc(userId, Membership.Status.PENDING))
                 .thenReturn(Optional.empty());
 
-        adminService.clearPendingFees(userId.toString());
+        adminService.clearPendingFees(userId.toString(), new BigDecimal("400.00"));
 
         // Original row's own `amount` field was never reassigned by this method —
         // only the bulk UPDATE (mocked away here) would zero its pendingAmount.
@@ -1123,7 +1123,7 @@ class AdminServiceTest {
         when(paymentRepository.findByUserIdAndPendingAmountGreaterThan(userId, BigDecimal.ZERO))
                 .thenReturn(List.of());
 
-        adminService.clearPendingFees(userId.toString());
+        adminService.clearPendingFees(userId.toString(), BigDecimal.TEN);
 
         verify(paymentRepository, never()).save(any());
         verify(kafkaTemplate, never()).send(anyString(), anyString(), any());

@@ -597,22 +597,28 @@ public class AdminService {
     }
 
     @Transactional
-    public void clearPendingFees(String userId) {
+    public void clearPendingFees(String userId, BigDecimal amountCleared) {
         UUID uid = UUID.fromString(userId);
 
         List<Payment> pendingPayments = paymentRepository
                 .findByUserIdAndPendingAmountGreaterThan(uid, BigDecimal.ZERO);
-        BigDecimal totalCleared = pendingPayments.stream()
+        BigDecimal totalPending = pendingPayments.stream()
                 .map(Payment::getPendingAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        if (totalPending.compareTo(BigDecimal.ZERO) <= 0) return; // nothing was actually pending
+        if (amountCleared.compareTo(totalPending) > 0) {
+            throw new IllegalArgumentException(
+                    "Amount cleared (₹" + amountCleared + ") cannot exceed the pending amount (₹" + totalPending + ")");
+        }
+        BigDecimal remaining = totalPending.subtract(amountCleared);
+
         // Zero out the pending balance on the original rows — their `amount`
         // stays untouched, so each original payment still shows as its own
-        // separate, unaltered entry in payment history.
+        // separate, unaltered entry in payment history. Any remainder is
+        // carried forward on the new clearancePayment row below instead.
         paymentRepository.clearPendingAmountByUserId(uid);
-        log.info("Pending fees cleared for user {}", userId);
-
-        if (totalCleared.compareTo(BigDecimal.ZERO) <= 0) return; // nothing was actually pending
+        log.info("Pending fees cleared for user {} (₹{} recorded, ₹{} still pending)", userId, amountCleared, remaining);
 
         User user = userRepository.findById(uid).orElse(null);
         if (user == null) return;
@@ -636,8 +642,8 @@ public class AdminService {
         Payment clearancePayment = Payment.builder()
                 .membershipId(membershipIdForClearance)
                 .userId(uid)
-                .amount(totalCleared)
-                .pendingAmount(BigDecimal.ZERO)
+                .amount(amountCleared)
+                .pendingAmount(remaining)
                 .paymentGateway("CASH")
                 .gatewayOrderId("cash_dues_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8))
                 .status(Payment.Status.SUCCESS)
@@ -651,7 +657,7 @@ public class AdminService {
                 .userMobile(user.getMobile())
                 .userEmail(user.getEmail())
                 .seatNumber(seatNumber)
-                .pendingAmount(totalCleared)
+                .pendingAmount(amountCleared)
                 .eventType("PENDING_FEE_CLEARED_ADMIN")
                 .build();
         kafkaTemplate.send("renewal-reminder", uid.toString(), adminEvent);
@@ -662,7 +668,7 @@ public class AdminService {
                 .userMobile(user.getMobile())
                 .userEmail(user.getEmail())
                 .seatNumber(seatNumber)
-                .pendingAmount(totalCleared)
+                .pendingAmount(amountCleared)
                 .eventType("PENDING_FEE_CLEARED")
                 .build();
         kafkaTemplate.send("renewal-reminder", uid.toString(), studentEvent);
@@ -674,8 +680,8 @@ public class AdminService {
                 .userEmail(user.getEmail())
                 .invoiceId(invoiceId)
                 .paymentDate(LocalDate.now().toString())
-                .amountPaid(totalCleared)
-                .amountPending(BigDecimal.ZERO)
+                .amountPaid(amountCleared)
+                .amountPending(remaining)
                 .seatNumber(seatNumber)
                 .validUpto(validUpto)
                 .paymentMethod("CASH")
@@ -683,7 +689,7 @@ public class AdminService {
                 .build();
         kafkaTemplate.send("payment-receipt", uid.toString(), receiptEvent);
 
-        log.info("Pending fee cleared notifications queued for user '{}' (₹{})", user.getName(), totalCleared);
+        log.info("Pending fee cleared notifications queued for user '{}' (₹{})", user.getName(), amountCleared);
     }
 
     @Transactional

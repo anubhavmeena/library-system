@@ -478,7 +478,7 @@ public class AdminMembershipService {
     // not an oversight. If that matters in practice, the admin can follow up
     // with another Renew Seat / Clear Dues call, or this should be revisited.
     @Transactional
-    public void clearDues(String membershipId) {
+    public void clearDues(String membershipId, BigDecimal amountCleared) {
         Membership membership = membershipRepository.findById(UUID.fromString(membershipId))
                 .orElseThrow(() -> new ResourceNotFoundException("Membership not found: " + membershipId));
         if (membership.getStatus() != Membership.Status.GRACE) {
@@ -488,18 +488,24 @@ public class AdminMembershipService {
         Plan plan = planRepository.findById(membership.getPlanId())
                 .orElseThrow(() -> new ResourceNotFoundException("Plan not found for membership: " + membershipId));
 
-        BigDecimal duesCleared = membership.getDuesAmount() != null ? membership.getDuesAmount() : plan.getPrice();
+        BigDecimal duesTotal = membership.getDuesAmount() != null ? membership.getDuesAmount() : plan.getPrice();
+        if (amountCleared.compareTo(duesTotal) > 0) {
+            throw new IllegalArgumentException(
+                    "Amount cleared (₹" + amountCleared + ") cannot exceed the outstanding dues (₹" + duesTotal + ")");
+        }
+        BigDecimal remaining = duesTotal.subtract(amountCleared);
 
         String duesOrderId = "dues_cleared_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String invoiceId = generateInvoiceId();
         Payment payment = Payment.builder()
                 .membershipId(membership.getId())
                 .userId(membership.getUserId())
-                .amount(duesCleared)
-                .pendingAmount(BigDecimal.ZERO)
+                .amount(amountCleared)
+                .pendingAmount(remaining)
                 .paymentGateway("CASH")
                 .gatewayOrderId(duesOrderId)
                 .status(Payment.Status.SUCCESS)
-                .invoiceId(generateInvoiceId())
+                .invoiceId(invoiceId)
                 .build();
         paymentRepository.save(payment);
 
@@ -517,8 +523,56 @@ public class AdminMembershipService {
 
         invalidateSeatCache(membership.getShift(), previousEndDate, membership.getEndDate());
 
-        log.info("Dues cleared by admin for membership {} — ₹{} recorded, reactivated through {}",
-                membershipId, duesCleared, membership.getEndDate());
+        log.info("Dues cleared by admin for membership {} — ₹{} recorded (₹{} still pending), reactivated through {}",
+                membershipId, amountCleared, remaining, membership.getEndDate());
+
+        // Notify + receipt — mirrors AdminService.clearPendingFees()'s three-event
+        // publish for the cash-pending-balance equivalent of this action.
+        userRepository.findById(membership.getUserId()).ifPresent(student -> {
+            RenewalReminderEvent studentEvent = RenewalReminderEvent.builder()
+                    .userId(student.getId().toString())
+                    .membershipId(membership.getId().toString())
+                    .userName(student.getName())
+                    .userMobile(student.getMobile())
+                    .userEmail(student.getEmail())
+                    .seatNumber(membership.getSeatNumber())
+                    .pendingAmount(amountCleared)
+                    .eventType("GRACE_DUES_CLEARED")
+                    .build();
+            kafkaTemplate.send("renewal-reminder", student.getId().toString(), studentEvent);
+
+            RenewalReminderEvent adminEvent = RenewalReminderEvent.builder()
+                    .userId(student.getId().toString())
+                    .membershipId(membership.getId().toString())
+                    .userName(student.getName())
+                    .userMobile(student.getMobile())
+                    .userEmail(student.getEmail())
+                    .seatNumber(membership.getSeatNumber())
+                    .pendingAmount(amountCleared)
+                    .eventType("GRACE_DUES_CLEARED_ADMIN")
+                    .build();
+            kafkaTemplate.send("renewal-reminder", student.getId().toString(), adminEvent);
+
+            PaymentReceiptEvent receiptEvent = PaymentReceiptEvent.builder()
+                    .userId(student.getId().toString())
+                    .membershipId(membership.getId().toString())
+                    .userName(student.getName())
+                    .userMobile(student.getMobile())
+                    .userEmail(student.getEmail())
+                    .invoiceId(invoiceId)
+                    .paymentDate(LocalDate.now().toString())
+                    .amountPaid(amountCleared)
+                    .amountPending(remaining)
+                    .planName(plan.getName())
+                    .seatNumber(membership.getSeatNumber())
+                    .validUpto(membership.getEndDate().toString())
+                    .paymentMethod("CASH")
+                    .receiptType("GRACE_DUES_CLEARED")
+                    .build();
+            kafkaTemplate.send("payment-receipt", student.getId().toString(), receiptEvent);
+
+            log.info("Grace dues cleared notifications queued for user '{}' (₹{})", student.getName(), amountCleared);
+        });
     }
 
     // Admin action for a fully-paid, currently-ACTIVE student (StudentStatusResolver's

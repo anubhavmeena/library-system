@@ -89,6 +89,52 @@ export default function AdminImportPage() {
                 <p className="text-primary-400">{t('adminImport.subtitle')}</p>
             </div>
 
+            {/* ── Manual entry form ──────────────────────────────────────────── */}
+            <div className="border-b border-primary-700/30 pb-8 mb-8">
+                <div className="mb-5">
+                    <h2 className="section-title">{t('adminImport.manual.title')}</h2>
+                    <p className="text-primary-400 text-sm">{t('adminImport.manual.subtitle')}</p>
+                </div>
+
+                <form onSubmit={onManualSubmit} className="card p-6 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="label">{t('adminImport.manual.name')} *</label>
+                            <input
+                                className="input w-full"
+                                placeholder={t('adminImport.manual.namePlaceholder')}
+                                value={form.name}
+                                onChange={e => field('name', e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="label">{t('adminImport.manual.phone')} *</label>
+                            <input
+                                className="input w-full"
+                                placeholder={t('adminImport.manual.phonePlaceholder')}
+                                value={form.phone}
+                                onChange={e => field('phone', e.target.value.replace(/[^0-9]/g, ''))}
+                                maxLength={10}
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    {formError && (
+                        <p className="text-red-400 text-sm">{formError}</p>
+                    )}
+
+                    <button
+                        type="submit"
+                        disabled={submitting}
+                        className="btn-primary py-2 px-6 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        {submitting ? t('adminImport.manual.submitting') : t('adminImport.manual.submit')}
+                    </button>
+                </form>
+            </div>
+
             {/* Format hint */}
             <div className="card p-4 mb-6 border-blue-500/20 bg-blue-500/5">
                 <p className="text-blue-300 text-sm">
@@ -203,52 +249,6 @@ export default function AdminImportPage() {
                     )}
                 </div>
             )}
-
-            {/* ── Manual entry form ──────────────────────────────────────────── */}
-            <div className="border-t border-primary-700/30 pt-8">
-                <div className="mb-5">
-                    <h2 className="section-title">{t('adminImport.manual.title')}</h2>
-                    <p className="text-primary-400 text-sm">{t('adminImport.manual.subtitle')}</p>
-                </div>
-
-                <form onSubmit={onManualSubmit} className="card p-6 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label className="label">{t('adminImport.manual.name')} *</label>
-                            <input
-                                className="input w-full"
-                                placeholder={t('adminImport.manual.namePlaceholder')}
-                                value={form.name}
-                                onChange={e => field('name', e.target.value)}
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="label">{t('adminImport.manual.phone')} *</label>
-                            <input
-                                className="input w-full"
-                                placeholder={t('adminImport.manual.phonePlaceholder')}
-                                value={form.phone}
-                                onChange={e => field('phone', e.target.value.replace(/[^0-9]/g, ''))}
-                                maxLength={10}
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    {formError && (
-                        <p className="text-red-400 text-sm">{formError}</p>
-                    )}
-
-                    <button
-                        type="submit"
-                        disabled={submitting}
-                        className="btn-primary py-2 px-6 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                        {submitting ? t('adminImport.manual.submitting') : t('adminImport.manual.submit')}
-                    </button>
-                </form>
-            </div>
         </div>
     )
 }

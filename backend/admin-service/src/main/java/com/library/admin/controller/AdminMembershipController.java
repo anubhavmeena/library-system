@@ -1,6 +1,7 @@
 package com.library.admin.controller;
 
 import com.library.admin.dto.ChangeSeatRequest;
+import com.library.admin.dto.ClearAmountRequest;
 import com.library.admin.dto.CreateCashMembershipRequest;
 import com.library.admin.dto.MarkPendingRequest;
 import com.library.admin.dto.MembershipDto;
@@ -76,10 +77,14 @@ public class AdminMembershipController {
     }
 
     // For a Grace/Expired student who has paid off their dues in person —
-    // records the payment and reactivates the membership as Paid.
+    // records the payment and reactivates the membership as Paid. Only
+    // `amountCleared` is recorded as paid; any remainder becomes a new
+    // pending balance instead of being wiped out.
     @PatchMapping("/{membershipId}/clear-dues")
-    public ResponseEntity<ApiResponse<String>> clearDues(@PathVariable String membershipId) {
-        adminMembershipService.clearDues(membershipId);
+    public ResponseEntity<ApiResponse<String>> clearDues(
+            @PathVariable String membershipId,
+            @Valid @RequestBody ClearAmountRequest req) {
+        adminMembershipService.clearDues(membershipId, req.getAmountCleared());
         return ResponseEntity.ok(ApiResponse.success("Dues cleared"));
     }
 
