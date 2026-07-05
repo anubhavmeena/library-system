@@ -3,6 +3,7 @@ package com.library.notification.service;
 import com.library.notification.dto.BookingConfirmedEvent;
 import com.library.notification.dto.PaymentReceiptEvent;
 import com.library.notification.dto.RenewalReminderEvent;
+import com.library.notification.repository.NotificationSettingRepository;
 import com.lowagie.text.Document;
 import com.lowagie.text.pdf.PdfWriter;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +20,7 @@ import org.springframework.web.client.RestTemplate;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -43,6 +45,9 @@ class NotificationServiceTest {
     @Mock
     RestTemplate restTemplate;
 
+    @Mock
+    NotificationSettingRepository notificationSettingRepository;
+
     @InjectMocks
     NotificationService notificationService;
 
@@ -56,6 +61,10 @@ class NotificationServiceTest {
         ReflectionTestUtils.setField(notificationService, "receiptLanguage", "en");
         ReflectionTestUtils.setField(notificationService, "idCardImageTemplateName", "id_card");
         ReflectionTestUtils.setField(notificationService, "idCardImageLanguage", "en");
+        // No settings row saved yet in any of these tests — falls back to the
+        // fail-open defaults (every audience enabled, no Hindi), i.e. the exact
+        // behavior these pre-existing tests were written against.
+        lenient().when(notificationSettingRepository.findById(anyString())).thenReturn(Optional.empty());
     }
 
     // IdCardImageConverter.toPng() rasterizes real PDF bytes — a fake

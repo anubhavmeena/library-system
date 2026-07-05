@@ -29,6 +29,7 @@ public class AdminService {
     private final MembershipRepository        membershipRepository;
     private final PaymentRepository           paymentRepository;
     private final SeatBookingRepository       seatBookingRepository;
+    private final SeatRepository              seatRepository;
     private final FeedbackRepository          feedbackRepository;
     private final PlanRepository              planRepository;
     private final BroadcastMessageRepository  broadcastMessageRepository;
@@ -291,59 +292,67 @@ public class AdminService {
         Map<UUID, User> userMap = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
 
-        // Build row-ordered seat grid: A(28), B(28), C(28), D(28)
-        Map<String, Integer> rowCounts = new LinkedHashMap<>();
-        rowCounts.put("A", 28);
-        rowCounts.put("B", 28);
-        rowCounts.put("C", 28);
-        rowCounts.put("D", 26);
+        // Real seat layout, read from the `seats` table — not a hardcoded
+        // row-count literal. seat-service and createCashMembership() both
+        // validate bookings against this same table, so building the grid
+        // from anything else can silently drift out of sync with what's
+        // actually bookable (a hardcoded "D has 26 seats" literal here once
+        // hid two genuinely-occupied seats — D27/D28 — that existed as active
+        // rows in `seats` but fell outside that literal's range).
+        List<Seat> allSeats = seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc();
+
+        Set<String> activeSeatNumbers = allSeats.stream().map(Seat::getSeatNumber).collect(Collectors.toSet());
+        seatMap.forEach((sn, mem) -> {
+            if (!activeSeatNumbers.contains(sn)) {
+                log.warn("Membership {} occupies seat '{}', which is not an active row in the seats " +
+                        "table — it will not appear on the admin seat map. Check for stale/incorrect seat data.",
+                        mem.getId(), sn);
+            }
+        });
 
         Map<String, List<SeatMapDto.SeatInfoDto>> seatsByRow = new LinkedHashMap<>();
+        int occupiedCount = 0;
 
-        for (Map.Entry<String, Integer> entry : rowCounts.entrySet()) {
-            String row  = entry.getKey();
-            int    count = entry.getValue();
-            List<SeatMapDto.SeatInfoDto> rowSeats = new ArrayList<>();
+        for (Seat seat : allSeats) {
+            String sn  = seat.getSeatNumber();
+            Membership mem = seatMap.get(sn);
+            List<SeatMapDto.SeatInfoDto> rowSeats =
+                    seatsByRow.computeIfAbsent(seat.getRowLabel(), k -> new ArrayList<>());
 
-            for (int i = 1; i <= count; i++) {
-                String     sn  = row + i;
-                Membership mem = seatMap.get(sn);
-
-                if (mem != null) {
-                    User    student          = userMap.get(mem.getUserId());
-                    boolean heldIndefinitely = isHeldIndefinitely(mem);
-                    Integer daysOverdue = heldIndefinitely
-                            ? (int) ChronoUnit.DAYS.between(mem.getEndDate(), LocalDate.now())
-                            : null;
-                    rowSeats.add(SeatMapDto.SeatInfoDto.builder()
-                            .seatNumber(sn)
-                            .isOccupied(true)
-                            .studentId(mem.getUserId().toString())
-                            .studentName(student != null ? student.getName() : "Unknown")
-                            .studentMobile(student != null ? student.getMobile() : null)
-                            .studentGender(student != null ? student.getGender() : null)
-                            .shift(mem.getShift())
-                            .membershipEnd(mem.getEndDate().toString())
-                            .membershipId(mem.getId().toString())
-                            .membershipStatus(mem.getStatus().name())
-                            .daysOverdue(daysOverdue)
-                            .build());
-                } else {
-                    rowSeats.add(SeatMapDto.SeatInfoDto.builder()
-                            .seatNumber(sn)
-                            .isOccupied(false)
-                            .build());
-                }
+            if (mem != null) {
+                occupiedCount++;
+                User    student          = userMap.get(mem.getUserId());
+                boolean heldIndefinitely = isHeldIndefinitely(mem);
+                Integer daysOverdue = heldIndefinitely
+                        ? (int) ChronoUnit.DAYS.between(mem.getEndDate(), LocalDate.now())
+                        : null;
+                rowSeats.add(SeatMapDto.SeatInfoDto.builder()
+                        .seatNumber(sn)
+                        .isOccupied(true)
+                        .studentId(mem.getUserId().toString())
+                        .studentName(student != null ? student.getName() : "Unknown")
+                        .studentMobile(student != null ? student.getMobile() : null)
+                        .studentGender(student != null ? student.getGender() : null)
+                        .shift(mem.getShift())
+                        .membershipEnd(mem.getEndDate().toString())
+                        .membershipId(mem.getId().toString())
+                        .membershipStatus(mem.getStatus().name())
+                        .daysOverdue(daysOverdue)
+                        .build());
+            } else {
+                rowSeats.add(SeatMapDto.SeatInfoDto.builder()
+                        .seatNumber(sn)
+                        .isOccupied(false)
+                        .build());
             }
-            seatsByRow.put(row, rowSeats);
         }
 
         return SeatMapDto.builder()
                 .shift(shift)
                 .date(date.toString())
-                .totalSeats(110)
-                .occupiedSeats(seatMap.size())
-                .availableSeats(110 - seatMap.size())
+                .totalSeats(allSeats.size())
+                .occupiedSeats(occupiedCount)
+                .availableSeats(allSeats.size() - occupiedCount)
                 .seatsByRow(seatsByRow)
                 .build();
     }

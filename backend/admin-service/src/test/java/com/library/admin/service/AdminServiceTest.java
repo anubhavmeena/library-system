@@ -28,6 +28,7 @@ class AdminServiceTest {
     @Mock MembershipRepository     membershipRepository;
     @Mock PaymentRepository        paymentRepository;
     @Mock PlanRepository           planRepository;
+    @Mock SeatRepository           seatRepository;
     @Mock VisitorEventRepository   visitorEventRepository;
     @Mock AppSettingsRepository    appSettingsRepository;
     @Mock KafkaTemplate<String, Object> kafkaTemplate;
@@ -75,6 +76,24 @@ class AdminServiceTest {
                 .endDate(endDate)
                 .status(Membership.Status.ACTIVE)
                 .build();
+    }
+
+    // Standard 110-seat layout (A28/B28/C28/D26) — the real `seats` table
+    // getSeatMap() now reads from instead of a hardcoded row-count literal.
+    private List<Seat> buildAllSeats() {
+        Map<String, Integer> rowCounts = new LinkedHashMap<>();
+        rowCounts.put("A", 28);
+        rowCounts.put("B", 28);
+        rowCounts.put("C", 28);
+        rowCounts.put("D", 26);
+
+        List<Seat> seats = new ArrayList<>();
+        rowCounts.forEach((row, count) -> {
+            for (int i = 1; i <= count; i++) {
+                seats.add(new Seat(UUID.randomUUID(), row + i, row, i, true));
+            }
+        });
+        return seats;
     }
 
     // ================================================================
@@ -277,6 +296,7 @@ class AdminServiceTest {
     @Test
     void getSeatMap_nullDate_defaultsToToday() {
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of());
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -287,6 +307,7 @@ class AdminServiceTest {
     @Test
     void getSeatMap_specificDate_usedAsIs() {
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of());
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", "2025-06-01");
@@ -297,6 +318,7 @@ class AdminServiceTest {
     @Test
     void getSeatMap_totalSeatsAlways110() {
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of());
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -307,6 +329,7 @@ class AdminServiceTest {
     @Test
     void getSeatMap_rowStructure_correctSeatCounts() {
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of());
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -326,6 +349,7 @@ class AdminServiceTest {
         User user = buildUser(uid);
 
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of(user));
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -343,6 +367,7 @@ class AdminServiceTest {
         User user = buildUser(uid);
 
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of(user));
 
         SeatMapDto dto = adminService.getSeatMap("MORNING", null);
@@ -359,6 +384,7 @@ class AdminServiceTest {
         User user = buildUser(uid);
 
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of(user));
 
         SeatMapDto dto = adminService.getSeatMap("MORNING", null);
@@ -374,6 +400,7 @@ class AdminServiceTest {
         mem.setShift("EVENING");
 
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("MORNING", null);
@@ -389,6 +416,7 @@ class AdminServiceTest {
         mem.setStartDate(LocalDate.now().plusDays(1)); // starts tomorrow
 
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -406,6 +434,7 @@ class AdminServiceTest {
         String futureDate = LocalDate.now().plusDays(10).toString();
 
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", futureDate);
@@ -423,6 +452,7 @@ class AdminServiceTest {
         User user = buildUser(uid);
 
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of(user));
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -446,6 +476,7 @@ class AdminServiceTest {
         User user = buildUser(uid);
 
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of(user));
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -473,6 +504,7 @@ class AdminServiceTest {
         User user2 = buildUser(uid2);
 
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(m1, m2));
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of(user1, user2));
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -488,6 +520,7 @@ class AdminServiceTest {
         mem.setSeatNumber("A1");
 
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of(mem));
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of()); // user not found
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);
@@ -504,6 +537,7 @@ class AdminServiceTest {
     @Test
     void getSeatMap_noBookings_allSeatsAvailable() {
         when(membershipRepository.findOccupyingSeatMemberships(any())).thenReturn(List.of());
+        when(seatRepository.findByIsActiveTrueOrderByRowLabelAscSeatIndexAsc()).thenReturn(buildAllSeats());
         when(userRepository.findAllById(anyIterable())).thenReturn(List.of());
 
         SeatMapDto dto = adminService.getSeatMap("FULL_DAY", null);

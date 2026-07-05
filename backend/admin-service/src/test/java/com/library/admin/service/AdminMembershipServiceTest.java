@@ -96,7 +96,7 @@ class AdminMembershipServiceTest {
         when(seatBookingRepository.findFirstByMembershipIdAndStatus(id, SeatBooking.Status.ACTIVE))
                 .thenReturn(Optional.of(booking));
 
-        adminMembershipService.releaseSeat(id.toString());
+        adminMembershipService.releaseSeat(id.toString(), false);
 
         assertThat(mem.getStatus()).isEqualTo(Membership.Status.EXPIRED);
         assertThat(booking.getStatus()).isEqualTo(SeatBooking.Status.RELEASED);
@@ -116,7 +116,7 @@ class AdminMembershipServiceTest {
         when(seatBookingRepository.findFirstByMembershipIdAndStatus(id, SeatBooking.Status.ACTIVE))
                 .thenReturn(Optional.of(booking));
 
-        adminMembershipService.releaseSeat(id.toString());
+        adminMembershipService.releaseSeat(id.toString(), false);
 
         assertThat(mem.getStatus()).isEqualTo(Membership.Status.EXPIRED);
         assertThat(booking.getStatus()).isEqualTo(SeatBooking.Status.RELEASED);
@@ -130,7 +130,7 @@ class AdminMembershipServiceTest {
         Membership mem = buildMembership(id, Membership.Status.PENDING);
         when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
 
-        assertThatThrownBy(() -> adminMembershipService.releaseSeat(id.toString()))
+        assertThatThrownBy(() -> adminMembershipService.releaseSeat(id.toString(), false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("no currently-occupied seat");
 
@@ -144,7 +144,7 @@ class AdminMembershipServiceTest {
         Membership mem = buildMembership(id, Membership.Status.EXPIRED);
         when(membershipRepository.findById(id)).thenReturn(Optional.of(mem));
 
-        assertThatThrownBy(() -> adminMembershipService.releaseSeat(id.toString()))
+        assertThatThrownBy(() -> adminMembershipService.releaseSeat(id.toString(), false))
                 .isInstanceOf(IllegalArgumentException.class);
 
         verify(membershipRepository, never()).save(any());
@@ -155,7 +155,7 @@ class AdminMembershipServiceTest {
         UUID id = UUID.randomUUID();
         when(membershipRepository.findById(id)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> adminMembershipService.releaseSeat(id.toString()))
+        assertThatThrownBy(() -> adminMembershipService.releaseSeat(id.toString(), false))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining(id.toString());
     }
@@ -168,7 +168,7 @@ class AdminMembershipServiceTest {
         when(seatBookingRepository.findFirstByMembershipIdAndStatus(id, SeatBooking.Status.ACTIVE))
                 .thenReturn(Optional.empty());
 
-        adminMembershipService.releaseSeat(id.toString());
+        adminMembershipService.releaseSeat(id.toString(), false);
 
         assertThat(mem.getStatus()).isEqualTo(Membership.Status.EXPIRED);
         verify(membershipRepository).save(mem);
@@ -186,7 +186,7 @@ class AdminMembershipServiceTest {
         when(seatBookingRepository.findFirstByMembershipIdAndStatus(id, SeatBooking.Status.ACTIVE))
                 .thenReturn(Optional.of(booking));
 
-        adminMembershipService.releaseSeat(id.toString());
+        adminMembershipService.releaseSeat(id.toString(), false);
 
         // invalidateSeatCache walks LocalDate.now()..+14 inclusive (15 days) and,
         // for FULL_DAY, deletes 3 keys per day (FULL_DAY + MORNING + EVENING).

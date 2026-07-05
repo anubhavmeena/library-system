@@ -27,21 +27,21 @@ class AdminMembershipControllerTest {
     @Test
     void releaseSeat_success_returns200WithConfirmationMessage() throws Exception {
         String membershipId = UUID.randomUUID().toString();
-        doNothing().when(adminMembershipService).releaseSeat(membershipId);
+        doNothing().when(adminMembershipService).releaseSeat(membershipId, false);
 
         mockMvc.perform(patch("/api/admin/memberships/{membershipId}/release", membershipId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").value("Seat released"));
 
-        verify(adminMembershipService).releaseSeat(membershipId);
+        verify(adminMembershipService).releaseSeat(membershipId, false);
     }
 
     @Test
     void releaseSeat_membershipNotFound_returns404() throws Exception {
         String membershipId = UUID.randomUUID().toString();
         doThrow(new ResourceNotFoundException("Membership not found: " + membershipId))
-                .when(adminMembershipService).releaseSeat(membershipId);
+                .when(adminMembershipService).releaseSeat(membershipId, false);
 
         mockMvc.perform(patch("/api/admin/memberships/{membershipId}/release", membershipId))
                 .andExpect(status().isNotFound())
@@ -53,7 +53,7 @@ class AdminMembershipControllerTest {
     void releaseSeat_noOccupiedSeat_returns400() throws Exception {
         String membershipId = UUID.randomUUID().toString();
         doThrow(new IllegalArgumentException("Membership has no currently-occupied seat to release"))
-                .when(adminMembershipService).releaseSeat(membershipId);
+                .when(adminMembershipService).releaseSeat(membershipId, false);
 
         mockMvc.perform(patch("/api/admin/memberships/{membershipId}/release", membershipId))
                 .andExpect(status().isBadRequest())
