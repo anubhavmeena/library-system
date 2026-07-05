@@ -1,6 +1,10 @@
 import Foundation
 
-struct ApiResponse<T: Codable>: Codable {
+// Only ever decoded (it's the response envelope every backend call returns) —
+// never encoded — so T only needs Decodable, not the full Codable this used to
+// require. That stricter bound broke every generic request<T: Decodable>() call
+// site, since T there is only guaranteed Decodable, not Encodable.
+struct ApiResponse<T: Decodable>: Decodable {
     let success: Bool
     let message: String?
     let data: T?
