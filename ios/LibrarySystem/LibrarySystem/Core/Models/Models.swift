@@ -10,7 +10,7 @@ struct ApiResponse<T: Decodable>: Decodable {
     let data: T?
 }
 
-struct User: Codable, Identifiable {
+struct User: Codable, Identifiable, Equatable {
     let id: String
     let name: String
     let mobile: String
@@ -55,7 +55,7 @@ struct OtpVerifyResponse: Codable {
     let newUser: Bool
 }
 
-struct Membership: Codable, Identifiable {
+struct Membership: Codable, Identifiable, Equatable {
     let id: String
     let userId: String
     let planId: String

@@ -30,7 +30,7 @@ struct PaymentSuccessView: View {
                             InfoRow(label: "Shift",      value: m.shift.capitalized)
                             InfoRow(label: "Valid From", value: m.startDate)
                             InfoRow(label: "Valid Until",value: m.endDate)
-                            InfoRow(label: "Amount Paid",value: "₹\(String(format: "%.0f", m.amountPaid))")
+                            InfoRow(label: "Amount Paid",value: "₹\(String(format: "%.0f", m.displayAmount))")
                         }
                     }
                     .padding(.horizontal, 24)
