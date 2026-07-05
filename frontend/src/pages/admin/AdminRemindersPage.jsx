@@ -16,6 +16,11 @@ export default function AdminRemindersPage() {
     const [pendingSending, setPendingSending]     = useState(false)
     const [pendingSelected, setPendingSelected]   = useState(new Set())
 
+    const [graceStudents, setGraceStudents] = useState([])
+    const [graceLoading, setGraceLoading]   = useState(true)
+    const [graceSending, setGraceSending]   = useState(false)
+    const [graceSelected, setGraceSelected] = useState(new Set())
+
     const [orphanedStudents, setOrphanedStudents] = useState([])
     const [orphanedLoading, setOrphanedLoading]   = useState(true)
 
@@ -42,9 +47,17 @@ export default function AdminRemindersPage() {
         finally { setOrphanedLoading(false) }
     }
 
+    const fetchGraceDues = async () => {
+        setGraceLoading(true)
+        try { const res = await api.get('/admin/students/grace-dues'); setGraceStudents(res.data.data || []) }
+        catch { toast.error('Failed to load grace-period students') }
+        finally { setGraceLoading(false) }
+    }
+
     useEffect(() => { fetchExpiring() }, [withinDays])
     useEffect(() => { fetchPendingFees() }, [])
     useEffect(() => { fetchOrphanedSeats() }, [])
+    useEffect(() => { fetchGraceDues() }, [])
 
     const toggleAll = () => {
         if (selected.size === students.length) setSelected(new Set())
@@ -61,6 +74,17 @@ export default function AdminRemindersPage() {
     const togglePendingOne = (id) => {
         const next = new Set(pendingSelected); next.has(id) ? next.delete(id) : next.add(id); setPendingSelected(next)
     }
+
+    const toggleGraceAll = () => {
+        if (graceSelected.size === graceStudents.length) setGraceSelected(new Set())
+        else setGraceSelected(new Set(graceStudents.map(s => s.id)))
+    }
+    const toggleGraceOne = (id) => {
+        const next = new Set(graceSelected); next.has(id) ? next.delete(id) : next.add(id); setGraceSelected(next)
+    }
+
+    const daysOverdue = (membershipEnd) =>
+        Math.max(0, Math.ceil((new Date() - new Date(membershipEnd)) / 86400000))
 
     const handleSend = async () => {
         setSending(true)
@@ -80,6 +104,16 @@ export default function AdminRemindersPage() {
             setPendingSelected(new Set())
         } catch { toast.error('Failed to send pending fee reminders') }
         finally { setPendingSending(false) }
+    }
+
+    const handleSendGraceDues = async () => {
+        setGraceSending(true)
+        try {
+            const res = await api.post('/admin/reminders/grace-dues', { userIds: graceSelected.size > 0 ? [...graceSelected] : [] })
+            toast.success(res.data.data)
+            setGraceSelected(new Set())
+        } catch { toast.error('Failed to send grace dues reminders') }
+        finally { setGraceSending(false) }
     }
 
     const urgencyColor = (days) => {
@@ -289,7 +323,103 @@ export default function AdminRemindersPage() {
                 )}
             </div>
 
-            {/* ── Section 3: Students Needing a Seat ── */}
+            {/* ── Section 3: Grace Period Dues Reminders ── */}
+            <div>
+                <div className="mb-6">
+                    <h2 className="section-title">Grace Period Dues Reminders</h2>
+                    <p className="text-primary-400 text-sm mt-1">Students in grace period who still owe dues to keep their seat</p>
+                </div>
+
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-primary-400">
+                            {graceStudents.length} student{graceStudents.length !== 1 ? 's' : ''} with grace-period dues
+                        </span>
+                        <button onClick={fetchGraceDues} disabled={graceLoading}
+                                className="text-xs text-primary-500 hover:text-primary-300 border border-primary-700/40 px-2 py-1 rounded-lg transition-colors">
+                            ↻ Refresh
+                        </button>
+                    </div>
+                    <div className="flex gap-3">
+                        {graceStudents.length > 0 && (
+                            <button onClick={toggleGraceAll} className="btn-ghost text-sm border border-primary-700/40 px-4 py-2 rounded-xl">
+                                {graceSelected.size === graceStudents.length ? 'Deselect All' : 'Select All'}
+                            </button>
+                        )}
+                        <button onClick={handleSendGraceDues} disabled={graceSending || graceStudents.length === 0}
+                                className="bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-all">
+                            {graceSending
+                                ? 'Sending…'
+                                : graceSelected.size > 0
+                                    ? `Send to ${graceSelected.size} selected`
+                                    : 'Send to All'}
+                        </button>
+                    </div>
+                </div>
+
+                {graceLoading ? (
+                    <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="shimmer h-16 rounded-xl" />)}</div>
+                ) : graceStudents.length === 0 ? (
+                    <div className="card p-12 text-center">
+                        <div className="text-4xl mb-3">✅</div>
+                        <p className="text-white font-semibold">No dues to clear</p>
+                        <p className="text-primary-400 text-sm mt-1">All grace-period students are settled.</p>
+                    </div>
+                ) : (
+                    <div className="card overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                <tr className="border-b border-primary-700/40">
+                                    <th className="p-4 text-left">
+                                        <input type="checkbox" checked={graceSelected.size === graceStudents.length && graceStudents.length > 0} onChange={toggleGraceAll} className="rounded" />
+                                    </th>
+                                    <th className="p-4 text-left text-primary-400 font-medium">Student</th>
+                                    <th className="p-4 text-left text-primary-400 font-medium">Contact</th>
+                                    <th className="p-4 text-left text-primary-400 font-medium">Seat</th>
+                                    <th className="p-4 text-left text-primary-400 font-medium">Membership Ended</th>
+                                    <th className="p-4 text-left text-primary-400 font-medium">Days Overdue</th>
+                                    <th className="p-4 text-left text-primary-400 font-medium">Dues Amount</th>
+                                </tr>
+                                </thead>
+                                <tbody className="divide-y divide-primary-700/20">
+                                {graceStudents.map(s => (
+                                    <tr key={s.id} className={`hover:bg-primary-800/30 transition-colors ${graceSelected.has(s.id) ? 'bg-primary-800/20' : ''}`}>
+                                        <td className="p-4">
+                                            <input type="checkbox" checked={graceSelected.has(s.id)} onChange={() => toggleGraceOne(s.id)} className="rounded" />
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-primary-600 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+                                                    {s.name?.[0]?.toUpperCase()}
+                                                </div>
+                                                <span className="text-white font-medium">{s.name}</span>
+                                            </div>
+                                        </td>
+                                        <td className="p-4">
+                                            <p className="text-primary-300">{s.mobile || '—'}</p>
+                                            <p className="text-primary-500 text-xs">{s.email || '—'}</p>
+                                        </td>
+                                        <td className="p-4 text-primary-300 font-mono">{s.seatNumber || '—'}</td>
+                                        <td className="p-4 text-primary-300">{s.membershipEnd || '—'}</td>
+                                        <td className="p-4">
+                                            <span className="badge border text-xs font-semibold px-2 py-1 rounded-full text-orange-400 bg-orange-500/10 border-orange-500/30">
+                                                {daysOverdue(s.membershipEnd)}d overdue
+                                            </span>
+                                        </td>
+                                        <td className="p-4">
+                                            <span className="text-red-400 font-bold text-sm">₹{s.duesAmount}</span>
+                                        </td>
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* ── Section 4: Students Needing a Seat ── */}
             <div>
                 <div className="mb-6">
                     <h2 className="section-title">Students Needing a Seat</h2>

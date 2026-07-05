@@ -6,6 +6,8 @@ import com.library.notification.dto.BroadcastNotificationEvent;
 import com.library.notification.dto.PaymentReceiptEvent;
 import com.library.notification.dto.RenewalReminderEvent;
 import com.library.notification.dto.SeatAssistanceEvent;
+import com.library.notification.entity.NotificationSetting;
+import com.library.notification.repository.NotificationSettingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +23,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +37,40 @@ public class NotificationService {
     private final ReceiptPdfService receiptPdfService;
     private final StudentIdCardPdfService studentIdCardPdfService;
     private final RestTemplate    restTemplate;
+    private final NotificationSettingRepository notificationSettingRepository;
+
+    // Fail-open defaults (mirrors admin-service's NotificationSettingsService
+    // catalog) — used only if admin-service hasn't lazily seeded a row for this
+    // key yet, so a fresh deployment behaves exactly like it did before this
+    // settings table existed rather than silently going dark.
+    private static final Map<String, NotificationSetting> FAIL_OPEN_DEFAULTS = new LinkedHashMap<>();
+    static {
+        FAIL_OPEN_DEFAULTS.put("BOOKING_CONFIRMED",    defaultSetting(true, true));
+        FAIL_OPEN_DEFAULTS.put("STUDENT_ID_CARD",      defaultSetting(true, true));
+        FAIL_OPEN_DEFAULTS.put("USER_REGISTERED",      defaultSetting(true, true));
+        FAIL_OPEN_DEFAULTS.put("RENEWAL_REMINDER",     defaultSetting(true, false));
+        FAIL_OPEN_DEFAULTS.put("PENDING_FEE_REMINDER", defaultSetting(true, false));
+        FAIL_OPEN_DEFAULTS.put("GRACE_DUES_REMINDER",  defaultSetting(true, false));
+        FAIL_OPEN_DEFAULTS.put("MEMBERSHIP_GRACE",     defaultSetting(true, true));
+        FAIL_OPEN_DEFAULTS.put("PENDING_FEE_CLEARED",  defaultSetting(true, true));
+        FAIL_OPEN_DEFAULTS.put("PAYMENT_RECEIPT",      defaultSetting(true, true));
+        FAIL_OPEN_DEFAULTS.put("ADMIN_BROADCAST",      defaultSetting(true, true));
+    }
+
+    private static NotificationSetting defaultSetting(boolean student, boolean admin) {
+        return NotificationSetting.builder().sendToStudent(student).sendToAdmin(admin).hindiEnabled(false).build();
+    }
+
+    private NotificationSetting settingsFor(String key) {
+        return notificationSettingRepository.findById(key).orElseGet(() -> FAIL_OPEN_DEFAULTS.get(key));
+    }
+
+    // Bilingual single message — appends the admin-provided Hindi translation
+    // after the English text when the notification type has Hindi enabled and
+    // a translation has actually been saved for this audience.
+    private String withHindi(String englishText, NotificationSetting settings, String hindiText) {
+        return settings.isHindiEnabled() && hasValue(hindiText) ? englishText + "\n\n" + hindiText : englishText;
+    }
 
     @Value("${notification.admin-email:admin@targetzone.co.in}")
     private String adminEmail;
@@ -80,13 +117,14 @@ public class NotificationService {
     // Sends WhatsApp + email to student, and an alert to admin
 
     public void sendBookingConfirmation(BookingConfirmedEvent event) {
+        NotificationSetting settings = settingsFor("BOOKING_CONFIRMED");
         String name         = hasValue(event.getUserName()) ? event.getUserName() : "Student";
-        String whatsappMsg  = buildBookingWhatsApp(event, name);
+        String whatsappMsg  = withHindi(buildBookingWhatsApp(event, name), settings, settings.getHindiTextStudent());
         String emailSubject = "✅ Your Library Seat is Confirmed!";
-        String emailBody    = buildBookingEmail(event, name);
+        String emailBody    = withHindi(buildBookingEmail(event, name), settings, settings.getHindiTextStudent());
 
         // Notify student via WhatsApp
-        if (hasValue(event.getUserMobile())) {
+        if (settings.isSendToStudent() && hasValue(event.getUserMobile())) {
             whatsAppService.send(
                     event.getUserMobile(), whatsappMsg,
                     event.getUserId(), "BOOKING_CONFIRMED"
@@ -94,7 +132,7 @@ public class NotificationService {
         }
 
         // Notify student via email
-        if (hasValue(event.getUserEmail())) {
+        if (settings.isSendToStudent() && hasValue(event.getUserEmail())) {
             emailService.sendText(
                     event.getUserEmail(), emailSubject, emailBody,
                     event.getUserId(), "BOOKING_CONFIRMED"
@@ -102,7 +140,7 @@ public class NotificationService {
         }
 
         // Alert admin via WhatsApp (if configured)
-        String adminMsg = String.format(
+        String adminMsg = withHindi(String.format(
                 "📚 New Booking!\n\n" +
                         "Student        : %s\n" +
                         "Seat           : %s\n" +
@@ -116,20 +154,22 @@ public class NotificationService {
                 formatShift(event.getShift()),
                 event.getAmountPaid(),
                 pendingOrZero(event)
-        );
+        ), settings, settings.getHindiTextAdmin());
 
-        for (String number : adminWhatsappNumbers()) {
-            whatsAppService.send(number, adminMsg, null, "ADMIN_BOOKING_ALERT");
+        if (settings.isSendToAdmin()) {
+            for (String number : adminWhatsappNumbers()) {
+                whatsAppService.send(number, adminMsg, null, "ADMIN_BOOKING_ALERT");
+            }
+
+            // Alert admin via email (always sent if adminEmail is configured)
+            emailService.sendText(
+                    adminEmail,
+                    "New Booking — " + name + " | Seat " + event.getSeatNumber(),
+                    adminMsg,
+                    null,
+                    "ADMIN_BOOKING_ALERT"
+            );
         }
-
-        // Alert admin via email (always sent if adminEmail is configured)
-        emailService.sendText(
-                adminEmail,
-                "New Booking — " + name + " | Seat " + event.getSeatNumber(),
-                adminMsg,
-                null,
-                "ADMIN_BOOKING_ALERT"
-        );
 
         log.info("Booking confirmation notifications sent for user: {}", event.getUserId());
 
@@ -142,6 +182,7 @@ public class NotificationService {
     //    already relying on) ─────────────────────────────────────────────────
     private void sendStudentIdCard(BookingConfirmedEvent event, String name) {
         try {
+            NotificationSetting settings = settingsFor("STUDENT_ID_CARD");
             byte[] photoBytes = fetchPhotoBytes(event.getPhotoUrl());
             byte[] pdf        = studentIdCardPdfService.buildIdCard(event, photoBytes);
 
@@ -153,32 +194,39 @@ public class NotificationService {
             // header, not a document one) — rendered from the same PDF so the
             // design stays defined in exactly one place. Email and the
             // website's on-demand download both still use the PDF itself.
+            // The Meta template is fixed/pre-approved, so Hindi translation
+            // only applies to the email copy below, never this WhatsApp send.
             byte[] png          = IdCardImageConverter.toPng(pdf);
             String imageName    = idNumber + "_id_card.png";
             String idCardImageLink = uploadIdCardFile(event.getMembershipId(), png, imageName);
 
             if (idCardImageLink != null) {
                 List<String> imageBodyParams = List.of(name);
-                if (hasValue(event.getUserMobile())) {
+                if (settings.isSendToStudent() && hasValue(event.getUserMobile())) {
                     whatsAppService.sendImageTemplate(event.getUserMobile(), idCardImageLink,
                             imageBodyParams, idCardImageTemplateName, idCardImageLanguage, event.getUserId(), "STUDENT_ID_CARD");
                 }
-                for (String number : adminWhatsappNumbers()) {
-                    whatsAppService.sendImageTemplate(number, idCardImageLink,
-                            imageBodyParams, idCardImageTemplateName, idCardImageLanguage, null, "STUDENT_ID_CARD_ADMIN");
+                if (settings.isSendToAdmin()) {
+                    for (String number : adminWhatsappNumbers()) {
+                        whatsAppService.sendImageTemplate(number, idCardImageLink,
+                                imageBodyParams, idCardImageTemplateName, idCardImageLanguage, null, "STUDENT_ID_CARD_ADMIN");
+                    }
                 }
             } else {
                 log.warn("ID card image not hosted for membership {} — skipping WhatsApp send", event.getMembershipId());
             }
 
-            if (hasValue(event.getUserEmail())) {
+            if (settings.isSendToStudent() && hasValue(event.getUserEmail())) {
                 emailService.sendWithAttachment(event.getUserEmail(), "Your Target Zone Library ID Card",
-                        "Dear " + name + ",\n\nPlease find your library ID card attached.\n\nID No.: " + idNumber +
-                                "\nValid Upto: " + validUpto + "\n\nTarget Zone Library Team",
+                        withHindi("Dear " + name + ",\n\nPlease find your library ID card attached.\n\nID No.: " + idNumber +
+                                "\nValid Upto: " + validUpto + "\n\nTarget Zone Library Team", settings, settings.getHindiTextStudent()),
                         pdf, attachmentName, event.getUserId(), "STUDENT_ID_CARD");
             }
-            emailService.sendWithAttachment(adminEmail, "Student ID Card — " + name,
-                    "New ID card generated for " + name, pdf, attachmentName, null, "STUDENT_ID_CARD_ADMIN");
+            if (settings.isSendToAdmin()) {
+                emailService.sendWithAttachment(adminEmail, "Student ID Card — " + name,
+                        withHindi("New ID card generated for " + name, settings, settings.getHindiTextAdmin()),
+                        pdf, attachmentName, null, "STUDENT_ID_CARD_ADMIN");
+            }
 
         } catch (Exception e) {
             log.warn("Student ID card generation/delivery failed for user {} (booking notifications already sent): {}",
@@ -239,7 +287,8 @@ public class NotificationService {
     // ── Welcome Notification (after registration) ─────────────────────────────
 
     public void sendWelcomeNotification(BookingConfirmedEvent event) {
-        String msg = String.format(
+        NotificationSetting settings = settingsFor("USER_REGISTERED");
+        String msg = withHindi(String.format(
                 "🎉 Welcome to Target Zone Library!\n\n"                                +
                         "Hi %s, your account has been created successfully.\n\n"          +
                         "You can now browse our membership plans and book your preferred " +
@@ -247,16 +296,16 @@ public class NotificationService {
                         "📚 Visit: https://targetzone.co.in\n\n"                          +
                         "Happy studying!",
                 event.getUserName()
-        );
+        ), settings, settings.getHindiTextStudent());
 
-        if (hasValue(event.getUserMobile())) {
+        if (settings.isSendToStudent() && hasValue(event.getUserMobile())) {
             whatsAppService.send(
                     event.getUserMobile(), msg,
                     event.getUserId(), "USER_REGISTERED"
             );
         }
 
-        if (hasValue(event.getUserEmail())) {
+        if (settings.isSendToStudent() && hasValue(event.getUserEmail())) {
             emailService.sendText(
                     event.getUserEmail(),
                     "Welcome to Target Zone Library! 📚",
@@ -267,24 +316,26 @@ public class NotificationService {
         }
 
         // Alert admin
-        String adminMsg = String.format(
+        String adminMsg = withHindi(String.format(
                 "🆕 New Student Registered!\n\nName   : %s\nMobile : %s\nEmail  : %s",
                 event.getUserName(),
                 hasValue(event.getUserMobile()) ? event.getUserMobile() : "—",
                 hasValue(event.getUserEmail())  ? event.getUserEmail()  : "—"
-        );
+        ), settings, settings.getHindiTextAdmin());
 
-        for (String number : adminWhatsappNumbers()) {
-            whatsAppService.send(number, adminMsg, null, "ADMIN_REGISTRATION_ALERT");
+        if (settings.isSendToAdmin()) {
+            for (String number : adminWhatsappNumbers()) {
+                whatsAppService.send(number, adminMsg, null, "ADMIN_REGISTRATION_ALERT");
+            }
+
+            emailService.sendText(
+                    adminEmail,
+                    "New Registration — " + event.getUserName(),
+                    adminMsg,
+                    null,
+                    "ADMIN_REGISTRATION_ALERT"
+            );
         }
-
-        emailService.sendText(
-                adminEmail,
-                "New Registration — " + event.getUserName(),
-                adminMsg,
-                null,
-                "ADMIN_REGISTRATION_ALERT"
-        );
 
         log.info("Welcome notification sent for user: {}", event.getUserId());
     }
@@ -300,6 +351,10 @@ public class NotificationService {
         }
         if ("PENDING_FEE_REMINDER".equals(event.getEventType())) {
             sendPendingFeeReminder(event);
+            return;
+        }
+        if ("GRACE_DUES_REMINDER".equals(event.getEventType())) {
+            sendGraceDuesReminder(event);
             return;
         }
         if ("MEMBERSHIP_GRACE_STARTED".equals(event.getEventType())) {
@@ -318,11 +373,16 @@ public class NotificationService {
             sendPendingFeeClearedAdminAlert(event);
             return;
         }
+        if ("SEAT_RELEASED_NONPAYMENT".equals(event.getEventType())) {
+            sendSeatReleasedNonPaymentAlert(event);
+            return;
+        }
 
         // Escalate urgency label based on days remaining
+        NotificationSetting settings = settingsFor("RENEWAL_REMINDER");
         String urgency = event.getDaysRemaining() <= 3 ? "⚠️ URGENT" : "⏰ Reminder";
 
-        String whatsappMsg = String.format(
+        String whatsappMsg = withHindi(String.format(
                 "%s — Membership Expiring!\n\n"                                  +
                         "Hi %s,\n\n"                                                      +
                         "Your library membership expires on *%s* (%d day%s left).\n\n"   +
@@ -335,20 +395,20 @@ public class NotificationService {
                 event.getDaysRemaining(),
                 event.getDaysRemaining() == 1 ? "" : "s",
                 event.getSeatNumber() != null ? event.getSeatNumber() : "N/A"
-        );
+        ), settings, settings.getHindiTextStudent());
 
         String emailSubject = urgency + ": Membership expiring in "
                 + event.getDaysRemaining() + " day"
                 + (event.getDaysRemaining() == 1 ? "" : "s");
 
-        if (hasValue(event.getUserMobile())) {
+        if (settings.isSendToStudent() && hasValue(event.getUserMobile())) {
             whatsAppService.send(
                     event.getUserMobile(), whatsappMsg,
                     event.getUserId(), "RENEWAL_REMINDER"
             );
         }
 
-        if (hasValue(event.getUserEmail())) {
+        if (settings.isSendToStudent() && hasValue(event.getUserEmail())) {
             emailService.sendText(
                     event.getUserEmail(), emailSubject, whatsappMsg,
                     adminEmail,
@@ -363,23 +423,24 @@ public class NotificationService {
     // ── Pending Fee Reminder ──────────────────────────────────────────────────
 
     private void sendPendingFeeReminder(RenewalReminderEvent event) {
+        NotificationSetting settings = settingsFor("PENDING_FEE_REMINDER");
         String amount = event.getPendingAmount() != null
                 ? "₹" + event.getPendingAmount().stripTrailingZeros().toPlainString()
                 : "an outstanding amount";
 
-        String msg = String.format(
+        String msg = withHindi(String.format(
                 "💰 Pending Fee Reminder\n\n"                                         +
                         "Hi %s,\n\n"                                                         +
                         "You have a pending library fee of *%s*.\n\n"                        +
                         "Please visit the library or contact us to clear your dues.\n\n"     +
                         "📚 Target Zone Library Team",
                 event.getUserName(), amount
-        );
+        ), settings, settings.getHindiTextStudent());
 
-        if (hasValue(event.getUserMobile())) {
+        if (settings.isSendToStudent() && hasValue(event.getUserMobile())) {
             whatsAppService.send(event.getUserMobile(), msg, event.getUserId(), "PENDING_FEE_REMINDER");
         }
-        if (hasValue(event.getUserEmail())) {
+        if (settings.isSendToStudent() && hasValue(event.getUserEmail())) {
             emailService.sendText(
                     event.getUserEmail(),
                     "Pending Fee Reminder — " + amount,
@@ -391,28 +452,70 @@ public class NotificationService {
         log.info("Pending fee reminder sent for user: {} ({})", event.getUserId(), amount);
     }
 
+    // ── Grace Period Dues Reminder ────────────────────────────────────────────
+    // Manually triggered by an admin (POST /api/admin/reminders/grace-dues) for
+    // students whose membership is already in GRACE with dues still owed —
+    // distinct from PENDING_FEE_REMINDER (cash balance on an ACTIVE membership)
+    // and from MEMBERSHIP_EXPIRED_GRACE (the one-time alert fired automatically
+    // the moment a membership first enters grace).
+
+    private void sendGraceDuesReminder(RenewalReminderEvent event) {
+        NotificationSetting settings = settingsFor("GRACE_DUES_REMINDER");
+        String amount = event.getPendingAmount() != null
+                ? "₹" + event.getPendingAmount().stripTrailingZeros().toPlainString()
+                : "the pending amount";
+
+        String msg = withHindi(String.format(
+                "⏳ Grace Period — Dues Reminder\n\n"                                    +
+                        "Hi %s,\n\n"                                                            +
+                        "Your membership is in its grace period and fees is overdue. "         +
+                        "Your seat *%s* is being held for you — please clear *%s* "            +
+                        "soon to avoid losing your seat.\n\n"                                  +
+                        "🔗 Pay now: https://targetzone.co.in/student/membership\n\n"          +
+                        "📚 Target Zone Library Team",
+                event.getUserName(),
+                event.getSeatNumber() != null ? event.getSeatNumber() : "N/A",
+                amount
+        ), settings, settings.getHindiTextStudent());
+
+        if (settings.isSendToStudent() && hasValue(event.getUserMobile())) {
+            whatsAppService.send(event.getUserMobile(), msg, event.getUserId(), "GRACE_DUES_REMINDER");
+        }
+        if (settings.isSendToStudent() && hasValue(event.getUserEmail())) {
+            emailService.sendText(
+                    event.getUserEmail(),
+                    "Grace Period Dues Reminder — " + amount,
+                    msg,
+                    adminEmail,
+                    event.getUserId(), "GRACE_DUES_REMINDER"
+            );
+        }
+        log.info("Grace dues reminder sent for user: {} ({})", event.getUserId(), amount);
+    }
+
     // ── Pending Fee Cleared ───────────────────────────────────────────────────
     // Triggered by AdminService.clearPendingFees() — sent to both the student
     // (confirmation) and admin (audit trail), unlike the reminder above which is
     // student-facing only.
 
     private void sendPendingFeeClearedStudentAlert(RenewalReminderEvent event) {
+        NotificationSetting settings = settingsFor("PENDING_FEE_CLEARED");
         String amount = event.getPendingAmount() != null
                 ? "₹" + event.getPendingAmount().stripTrailingZeros().toPlainString()
                 : "your outstanding amount";
 
-        String msg = String.format(
+        String msg = withHindi(String.format(
                 "✅ Pending Fee Cleared\n\n"                                          +
                         "Hi %s,\n\n"                                                         +
                         "Your pending library fee of *%s* has been cleared. Thank you!\n\n"  +
                         "📚 Target Zone Library Team",
                 event.getUserName(), amount
-        );
+        ), settings, settings.getHindiTextStudent());
 
-        if (hasValue(event.getUserMobile())) {
+        if (settings.isSendToStudent() && hasValue(event.getUserMobile())) {
             whatsAppService.send(event.getUserMobile(), msg, event.getUserId(), "PENDING_FEE_CLEARED");
         }
-        if (hasValue(event.getUserEmail())) {
+        if (settings.isSendToStudent() && hasValue(event.getUserEmail())) {
             emailService.sendText(
                     event.getUserEmail(),
                     "Pending Fee Cleared — " + amount,
@@ -425,16 +528,19 @@ public class NotificationService {
     }
 
     private void sendPendingFeeClearedAdminAlert(RenewalReminderEvent event) {
+        NotificationSetting settings = settingsFor("PENDING_FEE_CLEARED");
+        if (!settings.isSendToAdmin()) return;
+
         String amount = event.getPendingAmount() != null
                 ? "₹" + event.getPendingAmount().stripTrailingZeros().toPlainString()
                 : "an outstanding amount";
 
-        String msg = String.format(
+        String msg = withHindi(String.format(
                 "✅ Pending Fee Cleared\n\nStudent: %s\nSeat   : %s\nAmount : %s",
                 event.getUserName(),
                 event.getSeatNumber() != null ? event.getSeatNumber() : "N/A",
                 amount
-        );
+        ), settings, settings.getHindiTextAdmin());
 
         for (String number : adminWhatsappNumbers()) {
             whatsAppService.send(number, msg, null, "PENDING_FEE_CLEARED_ADMIN");
@@ -451,6 +557,35 @@ public class NotificationService {
         log.info("Pending fee cleared alert sent to admin for user: {} ({})", event.getUserName(), amount);
     }
 
+    // ── Seat Released (Non-Payment) ───────────────────────────────────────────
+    // Triggered by AdminMembershipService.releaseSeat() only when the admin
+    // explicitly opts in via the confirmation dialog — a per-action choice, not
+    // a persistent Notification Settings toggle, so there's no on/off gate here.
+
+    private void sendSeatReleasedNonPaymentAlert(RenewalReminderEvent event) {
+        String msg = String.format(
+                "Hi %s, your seat %s has expired due to non-payment of dues and has been " +
+                        "released by the admin. You are no longer a student at the library. " +
+                        "Thanks you.\n\n-Admin",
+                event.getUserName(),
+                event.getSeatNumber() != null ? event.getSeatNumber() : "N/A"
+        );
+
+        if (hasValue(event.getUserMobile())) {
+            whatsAppService.send(event.getUserMobile(), msg, event.getUserId(), "SEAT_RELEASED_NONPAYMENT");
+        }
+        if (hasValue(event.getUserEmail())) {
+            emailService.sendText(
+                    event.getUserEmail(),
+                    "Your Library Seat Has Been Released",
+                    msg,
+                    adminEmail,
+                    event.getUserId(), "SEAT_RELEASED_NONPAYMENT"
+            );
+        }
+        log.info("Seat-released (non-payment) notification sent to user: {}", event.getUserId());
+    }
+
     // ── Payment Receipt ───────────────────────────────────────────────────────
     // Triggered by membership-service (online payment) and admin-service (cash
     // payment / dues clearance) after a payment is confirmed. Generates a PDF,
@@ -459,6 +594,7 @@ public class NotificationService {
     // template (to both student and admin), and emails it as a real attachment too.
 
     public void sendPaymentReceipt(PaymentReceiptEvent event) {
+        NotificationSetting settings = settingsFor("PAYMENT_RECEIPT");
         byte[] pdf = receiptPdfService.buildReceipt(event);
         String attachmentName = (event.getInvoiceId() != null ? event.getInvoiceId() : "receipt") + ".pdf";
         String receiptLink = uploadReceiptPdf(event.getInvoiceId(), pdf, attachmentName);
@@ -500,13 +636,15 @@ public class NotificationService {
         );
 
         if (receiptLink != null) {
-            if (hasValue(event.getUserMobile())) {
+            if (settings.isSendToStudent() && hasValue(event.getUserMobile())) {
                 whatsAppService.sendDocumentTemplate(event.getUserMobile(), receiptLink, attachmentName,
                         bodyParams, receiptTemplateName, receiptLanguage, event.getUserId(), "PAYMENT_RECEIPT");
             }
-            for (String number : adminWhatsappNumbers()) {
-                whatsAppService.sendDocumentTemplate(number, receiptLink, attachmentName,
-                        bodyParams, receiptTemplateName, receiptLanguage, null, "PAYMENT_RECEIPT_ADMIN");
+            if (settings.isSendToAdmin()) {
+                for (String number : adminWhatsappNumbers()) {
+                    whatsAppService.sendDocumentTemplate(number, receiptLink, attachmentName,
+                            bodyParams, receiptTemplateName, receiptLanguage, null, "PAYMENT_RECEIPT_ADMIN");
+                }
             }
         } else {
             // Couldn't host the PDF — the document-header template requires a
@@ -519,22 +657,26 @@ public class NotificationService {
                     event.getInvoiceId(), event.getPaymentDate(), paid, pending, validUptoFallbackLine
             );
             log.warn("Receipt PDF not hosted for invoice {} — WhatsApp falling back to text-only message", event.getInvoiceId());
-            if (hasValue(event.getUserMobile())) {
+            if (settings.isSendToStudent() && hasValue(event.getUserMobile())) {
                 whatsAppService.send(event.getUserMobile(), fallbackMsg, event.getUserId(), "PAYMENT_RECEIPT");
             }
-            for (String number : adminWhatsappNumbers()) {
-                whatsAppService.send(number, fallbackMsg, null, "PAYMENT_RECEIPT_ADMIN");
+            if (settings.isSendToAdmin()) {
+                for (String number : adminWhatsappNumbers()) {
+                    whatsAppService.send(number, fallbackMsg, null, "PAYMENT_RECEIPT_ADMIN");
+                }
             }
         }
 
-        if (hasValue(event.getUserEmail())) {
+        if (settings.isSendToStudent() && hasValue(event.getUserEmail())) {
             emailService.sendWithAttachment(
-                    event.getUserEmail(), emailSubject, emailBody, pdf, attachmentName,
-                    event.getUserId(), "PAYMENT_RECEIPT");
+                    event.getUserEmail(), emailSubject, withHindi(emailBody, settings, settings.getHindiTextStudent()),
+                    pdf, attachmentName, event.getUserId(), "PAYMENT_RECEIPT");
         }
-        emailService.sendWithAttachment(
-                adminEmail, emailSubject + " — " + event.getUserName(), emailBody, pdf, attachmentName,
-                null, "PAYMENT_RECEIPT_ADMIN");
+        if (settings.isSendToAdmin()) {
+            emailService.sendWithAttachment(
+                    adminEmail, emailSubject + " — " + event.getUserName(), withHindi(emailBody, settings, settings.getHindiTextAdmin()),
+                    pdf, attachmentName, null, "PAYMENT_RECEIPT_ADMIN");
+        }
 
         log.info("Payment receipt sent for user: {} invoice: {}", event.getUserId(), event.getInvoiceId());
     }
@@ -589,7 +731,7 @@ public class NotificationService {
                 event.getMessage()
         );
 
-        if (hasValue(event.getMobile())) {
+        if (settingsFor("ADMIN_BROADCAST").isSendToStudent() && hasValue(event.getMobile())) {
             whatsAppService.send(
                     event.getMobile(), msg,
                     event.getUserId(), "ADMIN_BROADCAST"
@@ -679,11 +821,14 @@ public class NotificationService {
     // student during the grace period and only released by an explicit admin action.
 
     private void sendGraceStartedAdminAlert(RenewalReminderEvent event) {
+        NotificationSetting settings = settingsFor("MEMBERSHIP_GRACE");
+        if (!settings.isSendToAdmin()) return;
+
         String dues = event.getPendingAmount() != null
                 ? "₹" + event.getPendingAmount().stripTrailingZeros().toPlainString()
                 : "an outstanding amount";
 
-        String msg = String.format(
+        String msg = withHindi(String.format(
                 "🔒 Seat Held — Grace Period Started\n\n"                              +
                         "Seat   : %s\n"                                                        +
                         "Student: %s\n"                                                        +
@@ -693,7 +838,7 @@ public class NotificationService {
                         "until you release it (Admin → Students → Actions → Release Seat).",
                 event.getSeatNumber() != null ? event.getSeatNumber() : "N/A",
                 event.getUserName(), event.getExpiryDate(), dues
-        );
+        ), settings, settings.getHindiTextAdmin());
 
         for (String number : adminWhatsappNumbers()) {
             whatsAppService.send(number, msg, null, "MEMBERSHIP_GRACE_STARTED");
@@ -713,11 +858,12 @@ public class NotificationService {
     }
 
     private void sendMembershipExpiredGraceAlert(RenewalReminderEvent event) {
+        NotificationSetting settings = settingsFor("MEMBERSHIP_GRACE");
         String dues = event.getPendingAmount() != null
                 ? "₹" + event.getPendingAmount().stripTrailingZeros().toPlainString()
                 : "the plan amount";
 
-        String msg = String.format(
+        String msg = withHindi(String.format(
                 "⚠️ Your Membership Has Expired\n\n"                                     +
                         "Hi %s,\n\n"                                                             +
                         "Your library membership expired on *%s*.\n\n"                          +
@@ -728,19 +874,19 @@ public class NotificationService {
                         "📚 Target Zone Library Team",
                 event.getUserName(), event.getExpiryDate(),
                 event.getSeatNumber() != null ? event.getSeatNumber() : "N/A", dues
-        );
+        ), settings, settings.getHindiTextStudent());
 
         String emailSubject = "Your membership has expired — seat " +
                 (event.getSeatNumber() != null ? event.getSeatNumber() : "") + " held for you";
 
-        if (hasValue(event.getUserMobile())) {
+        if (settings.isSendToStudent() && hasValue(event.getUserMobile())) {
             whatsAppService.send(
                     event.getUserMobile(), msg,
                     event.getUserId(), "MEMBERSHIP_EXPIRED_GRACE"
             );
         }
 
-        if (hasValue(event.getUserEmail())) {
+        if (settings.isSendToStudent() && hasValue(event.getUserEmail())) {
             emailService.sendText(
                     event.getUserEmail(), emailSubject, msg,
                     adminEmail,

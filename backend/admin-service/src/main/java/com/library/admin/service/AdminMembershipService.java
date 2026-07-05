@@ -4,6 +4,7 @@ import com.library.admin.dto.ChangeSeatRequest;
 import com.library.admin.dto.CreateCashMembershipRequest;
 import com.library.admin.dto.MarkPendingRequest;
 import com.library.admin.dto.MembershipDto;
+import com.library.admin.dto.RenewalReminderEvent;
 import com.library.admin.entity.*;
 import com.library.admin.event.BookingConfirmedEvent;
 import com.library.admin.event.PaymentReceiptEvent;
@@ -335,7 +336,7 @@ public class AdminMembershipService {
     // again. The student's admin-facing display status resolves to RELEASED
     // (see StudentStatusResolver) once this runs.
     @Transactional
-    public void releaseSeat(String membershipId) {
+    public void releaseSeat(String membershipId, boolean notifyStudent) {
         Membership mem = membershipRepository.findById(UUID.fromString(membershipId))
                 .orElseThrow(() -> new ResourceNotFoundException("Membership not found: " + membershipId));
 
@@ -356,6 +357,22 @@ public class AdminMembershipService {
 
         log.info("Seat {} released by admin for membership {} (dues {} remain on record)",
                 mem.getSeatNumber(), membershipId, mem.getDuesAmount());
+
+        if (notifyStudent) {
+            userRepository.findById(mem.getUserId()).ifPresent(student -> {
+                RenewalReminderEvent event = RenewalReminderEvent.builder()
+                        .userId(student.getId().toString())
+                        .membershipId(mem.getId().toString())
+                        .userName(student.getName())
+                        .userMobile(student.getMobile())
+                        .userEmail(student.getEmail())
+                        .seatNumber(mem.getSeatNumber())
+                        .eventType("SEAT_RELEASED_NONPAYMENT")
+                        .build();
+                kafkaTemplate.send("renewal-reminder", student.getId().toString(), event);
+                log.info("Seat-released notification queued for user '{}'", student.getName());
+            });
+        }
     }
 
     // Admin correction: a membership was wrongly marked fully paid (the same

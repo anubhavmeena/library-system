@@ -4,6 +4,7 @@ import com.library.admin.dto.ChangeSeatRequest;
 import com.library.admin.dto.CreateCashMembershipRequest;
 import com.library.admin.dto.MarkPendingRequest;
 import com.library.admin.dto.MembershipDto;
+import com.library.admin.dto.ReleaseSeatRequest;
 import com.library.admin.dto.UpdateMembershipPlanRequest;
 import com.library.admin.service.AdminMembershipService;
 import com.library.common.dto.ApiResponse;
@@ -45,10 +46,15 @@ public class AdminMembershipController {
 
     // Explicitly frees a currently-occupied seat (ACTIVE or GRACE membership).
     // Only seats released this way become bookable again — a lapsed membership
-    // never frees its seat on its own.
+    // never frees its seat on its own. `notifyStudent` is an explicit per-action
+    // choice the admin makes in the confirmation dialog, not a persistent
+    // setting — defaults to false (quiet release) if the body is omitted.
     @PatchMapping("/{membershipId}/release")
-    public ResponseEntity<ApiResponse<String>> releaseSeat(@PathVariable String membershipId) {
-        adminMembershipService.releaseSeat(membershipId);
+    public ResponseEntity<ApiResponse<String>> releaseSeat(
+            @PathVariable String membershipId,
+            @RequestBody(required = false) ReleaseSeatRequest request) {
+        boolean notifyStudent = request != null && request.isNotifyStudent();
+        adminMembershipService.releaseSeat(membershipId, notifyStudent);
         return ResponseEntity.ok(ApiResponse.success("Seat released"));
     }
 

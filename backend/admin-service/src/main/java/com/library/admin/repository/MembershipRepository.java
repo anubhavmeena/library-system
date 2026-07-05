@@ -57,6 +57,11 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
         """)
     List<Membership> findExpiredActive(@Param("today") LocalDate today);
 
+    // Used by getStudentsInGraceWithDues — every membership currently held in
+    // grace (seat locked, dues outstanding until an admin clears them or
+    // releases the seat).
+    List<Membership> findByStatus(Membership.Status status);
+
     // Same @Query-without-limit hazard as findFirstByUserIdCurrentOrderByEndDateDesc
     // below — kept safe the same way even though a second QUEUED row shouldn't
     // normally occur (application logic guards against it at creation time).

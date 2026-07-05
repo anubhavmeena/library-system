@@ -127,10 +127,16 @@ export default function AdminStudentsPage() {
             ? `${student.name}'s membership is currently ACTIVE and paid — releasing will immediately free their seat and mark them Released. `
             : `Release seat ${student.seatNumber} for ${student.name}? `
         if (!window.confirm(`${activeWarning}Dues of ₹${student.duesAmount ?? 0} remain on record. This cannot be undone.`)) return
+
+        const notifyStudent = window.confirm(
+            `Send ${student.name} a notification that their seat has expired due to non-payment and been released?\n\n` +
+            `Click OK to notify them, or Cancel to release the seat quietly.`
+        )
+
         setReleasingSeat(student.id)
         try {
-            await api.patch(`/admin/memberships/${student.membershipId}/release`)
-            toast.success(`Seat ${student.seatNumber} released`)
+            await api.patch(`/admin/memberships/${student.membershipId}/release`, { notifyStudent })
+            toast.success(`Seat ${student.seatNumber} released${notifyStudent ? ' — student notified' : ''}`)
             fetchStudents()
         } catch (e) {
             toast.error(e.response?.data?.message || 'Failed to release seat')

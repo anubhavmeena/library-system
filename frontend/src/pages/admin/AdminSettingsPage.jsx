@@ -22,6 +22,223 @@ function SettingField({ label, value, onChange, integer = false, prefix }) {
     )
 }
 
+// Frontend-only reference config — labels/descriptions/preview text for
+// translation guidance. Does not affect what's actually sent; the English
+// wording lives in notification-service's NotificationService.java.
+// `adminEditable`/`hindiEditable` come from the backend per-row (locked
+// checkboxes stay disabled even if this config drifts).
+const NOTIFICATION_CATALOG = [
+    {
+        key: 'BOOKING_CONFIRMED',
+        label: 'Booking Confirmed',
+        description: "Sent when a student's payment is verified and their seat is booked.",
+        previewStudent: '"✅ Booking Confirmed! Hi {name}, Plan: {plan}, Seat: {seat}…"',
+        previewAdmin: '"📚 New Booking! Student: {name}, Seat: {seat}…"',
+    },
+    {
+        key: 'STUDENT_ID_CARD',
+        label: 'Student ID Card',
+        description: "The ID card sent right after booking confirmation. Hindi only affects the emailed copy — the WhatsApp image uses a fixed, pre-approved Meta template.",
+        previewStudent: '"Dear {name}, please find your library ID card attached…"',
+        previewAdmin: '"New ID card generated for {name}"',
+    },
+    {
+        key: 'USER_REGISTERED',
+        label: 'Welcome / New Registration',
+        description: 'Sent right after a student creates their account.',
+        previewStudent: '"🎉 Welcome to Target Zone Library! Hi {name}, your account has been created…"',
+        previewAdmin: '"🆕 New Student Registered! Name: {name}, Mobile: {mobile}…"',
+    },
+    {
+        key: 'RENEWAL_REMINDER',
+        label: 'Renewal Reminder',
+        description: 'Sent 7 and 3 days before a membership expires, or manually from Admin → Reminders.',
+        previewStudent: '"⏰ Reminder — Membership Expiring! Hi {name}, your membership expires on {date}…"',
+    },
+    {
+        key: 'PENDING_FEE_REMINDER',
+        label: 'Pending Fee Reminder',
+        description: 'Manual admin reminder for a student with an outstanding cash balance.',
+        previewStudent: '"💰 Pending Fee Reminder. Hi {name}, you have a pending library fee of {amount}…"',
+    },
+    {
+        key: 'GRACE_DUES_REMINDER',
+        label: 'Grace Dues Reminder',
+        description: 'Manual admin reminder for a student in grace period with unpaid dues.',
+        previewStudent: '"⏳ Grace Period — Dues Reminder. Hi {name}, your membership is in its grace period…"',
+    },
+    {
+        key: 'MEMBERSHIP_GRACE',
+        label: 'Membership Entered Grace Period',
+        description: 'Fired automatically the moment a membership lapses into grace — a student alert and a "seat held" admin alert.',
+        previewStudent: '"⚠️ Your Membership Has Expired. Hi {name}, we\'re holding your seat…"',
+        previewAdmin: '"🔒 Seat Held — Grace Period Started. Seat: {seat}, Student: {name}…"',
+    },
+    {
+        key: 'PENDING_FEE_CLEARED',
+        label: 'Pending Fee Cleared',
+        description: 'Confirmation sent to the student and an audit alert to admin after a cash balance is cleared.',
+        previewStudent: '"✅ Pending Fee Cleared. Hi {name}, your pending library fee has been cleared…"',
+        previewAdmin: '"✅ Pending Fee Cleared. Student: {name}, Amount: {amount}"',
+    },
+    {
+        key: 'PAYMENT_RECEIPT',
+        label: 'Payment Receipt',
+        description: 'The receipt sent after any confirmed payment. Hindi only affects the emailed copy — WhatsApp uses a fixed, pre-approved document template.',
+        previewStudent: '"Dear {name}, please find attached your payment receipt…"',
+        previewAdmin: '"Dear {name}, please find attached your payment receipt…" (sent to admin)',
+    },
+    {
+        key: 'ADMIN_BROADCAST',
+        label: 'Broadcast Messages',
+        description: "The ad-hoc message an admin sends to active members from Admin → Broadcast. Admin always gets a send confirmation, and each broadcast's text is written fresh, so there's no Hindi option here.",
+        isBroadcast: true,
+    },
+]
+
+function NotificationSettingCard({ catalog, row, onSaved }) {
+    const [sendToStudent, setSendToStudent]         = useState(row.sendToStudent)
+    const [sendToAdmin, setSendToAdmin]             = useState(row.sendToAdmin)
+    const [hindiEnabled, setHindiEnabled]           = useState(row.hindiEnabled)
+    const [hindiTextStudent, setHindiTextStudent]   = useState(row.hindiTextStudent || '')
+    const [hindiTextAdmin, setHindiTextAdmin]       = useState(row.hindiTextAdmin || '')
+    const [saving, setSaving]                       = useState(false)
+
+    const save = async () => {
+        setSaving(true)
+        try {
+            const res = await api.patch(`/admin/notification-settings/${catalog.key}`, {
+                sendToStudent, sendToAdmin, hindiEnabled, hindiTextStudent, hindiTextAdmin,
+            })
+            onSaved(res.data.data)
+            toast.success(`${catalog.label} settings saved`)
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Failed to save')
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    return (
+        <div className="card p-5 mb-4">
+            <p className="text-white font-semibold">{catalog.label}</p>
+            <p className="text-primary-400 text-xs mt-1 mb-3">{catalog.description}</p>
+
+            <div className="flex flex-wrap gap-4 mb-3">
+                {catalog.isBroadcast ? (
+                    <label className="flex items-center gap-2 text-sm text-primary-200">
+                        <input type="checkbox" className="rounded" checked={sendToStudent}
+                               onChange={e => setSendToStudent(e.target.checked)} />
+                        Enable Broadcast Feature
+                    </label>
+                ) : (
+                    <>
+                        <label className={`flex items-center gap-2 text-sm ${row.studentEditable ? 'text-primary-200' : 'text-primary-500'}`}>
+                            <input type="checkbox" className="rounded" checked={sendToStudent}
+                                   disabled={!row.studentEditable}
+                                   onChange={e => setSendToStudent(e.target.checked)} />
+                            Send to Student
+                        </label>
+                        <label className={`flex items-center gap-2 text-sm ${row.adminEditable ? 'text-primary-200' : 'text-primary-500'}`}>
+                            <input type="checkbox" className="rounded" checked={sendToAdmin}
+                                   disabled={!row.adminEditable}
+                                   onChange={e => setSendToAdmin(e.target.checked)} />
+                            Send to Admin
+                            {!row.adminEditable && <span className="text-primary-600 text-xs">(not available)</span>}
+                        </label>
+                    </>
+                )}
+            </div>
+
+            {row.hindiEditable && (
+                <div className="border-t border-primary-700/30 pt-3 mt-1">
+                    <label className="flex items-center gap-2 text-sm text-primary-200 mb-2">
+                        <input type="checkbox" className="rounded" checked={hindiEnabled}
+                               onChange={e => setHindiEnabled(e.target.checked)} />
+                        Include Hindi translation in the same message
+                    </label>
+                    {hindiEnabled && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {sendToStudent && (
+                                <div>
+                                    <label className="label text-xs">Student message — Hindi</label>
+                                    <p className="text-primary-500 text-xs mb-1 italic">{catalog.previewStudent}</p>
+                                    <textarea className="input w-full text-sm" rows={3}
+                                              value={hindiTextStudent}
+                                              onChange={e => setHindiTextStudent(e.target.value)} />
+                                </div>
+                            )}
+                            {sendToAdmin && catalog.previewAdmin && (
+                                <div>
+                                    <label className="label text-xs">Admin message — Hindi</label>
+                                    <p className="text-primary-500 text-xs mb-1 italic">{catalog.previewAdmin}</p>
+                                    <textarea className="input w-full text-sm" rows={3}
+                                              value={hindiTextAdmin}
+                                              onChange={e => setHindiTextAdmin(e.target.value)} />
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            <button onClick={save} disabled={saving}
+                    className="btn-ghost text-xs border border-primary-700/40 px-3 py-1.5 rounded-lg mt-3">
+                {saving ? 'Saving…' : 'Save'}
+            </button>
+        </div>
+    )
+}
+
+function NotificationSettingsSection() {
+    const [rows, setRows]       = useState([])
+    const [loading, setLoading] = useState(true)
+
+    const load = async () => {
+        setLoading(true)
+        try {
+            const res = await api.get('/admin/notification-settings')
+            setRows(res.data.data || [])
+        } catch {
+            toast.error('Failed to load notification settings')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    useEffect(() => { load() }, [])
+
+    const updateRow = (key, patched) => {
+        setRows(prev => prev.map(r => r.notificationKey === key ? patched : r))
+    }
+
+    return (
+        <div className="mb-6">
+            <p className="text-primary-400 text-xs uppercase tracking-widest mb-3">Notification Settings</p>
+            <p className="text-primary-500 text-xs mb-4">
+                Turn notifications on/off, choose who receives them, and optionally add a Hindi
+                translation that's appended to the same WhatsApp/email message.
+            </p>
+            {loading ? (
+                <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="shimmer h-24 rounded-xl" />)}</div>
+            ) : (
+                NOTIFICATION_CATALOG.map(cat => {
+                    const row = rows.find(r => r.notificationKey === cat.key)
+                    if (!row) return null
+                    return (
+                        <NotificationSettingCard
+                            key={cat.key}
+                            catalog={cat}
+                            row={row}
+                            onSaved={patched => updateRow(cat.key, patched)}
+                        />
+                    )
+                })
+            )}
+        </div>
+    )
+}
+
 export default function AdminSettingsPage() {
     const { t } = useTranslation()
 
@@ -146,6 +363,11 @@ export default function AdminSettingsPage() {
                     >
                         {saving ? t('adminSettings.saving') : t('adminSettings.save')}
                     </button>
+
+                    {/* Notification settings — saves per-row, independent of the button above */}
+                    <div className="mt-8">
+                        <NotificationSettingsSection />
+                    </div>
                 </>
             )}
         </div>

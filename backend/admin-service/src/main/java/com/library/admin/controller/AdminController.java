@@ -94,6 +94,11 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success("Pending fees cleared"));
     }
 
+    @GetMapping("/students/grace-dues")
+    public ResponseEntity<ApiResponse<List<StudentDto>>> getStudentsInGraceWithDues() {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getStudentsInGraceWithDues()));
+    }
+
     @PostMapping("/students/import/single")
     public ResponseEntity<ApiResponse<String>> importSingleStudent(
             @Valid @RequestBody ManualStudentImportRequest req) {
@@ -159,6 +164,14 @@ public class AdminController {
         int count = adminService.sendPendingFeeReminders(request.getUserIds());
         return ResponseEntity.ok(ApiResponse.success(
                 "Pending fee reminders queued for " + count + " students"));
+    }
+
+    @PostMapping("/reminders/grace-dues")
+    public ResponseEntity<ApiResponse<String>> sendGraceDuesReminders(
+            @RequestBody SendReminderRequest request) {
+        int count = adminService.sendGraceDuesReminders(request.getUserIds());
+        return ResponseEntity.ok(ApiResponse.success(
+                "Grace dues reminders queued for " + count + " students"));
     }
 
     @PostMapping("/students/{userId}/message")

@@ -707,6 +707,65 @@ public class AdminService {
         return sent;
     }
 
+    // ── Grace Period Dues ─────────────────────────────────────────────────────
+    // Students whose membership has lapsed into GRACE (seat held, dues owed)
+    // and who haven't cleared their dues yet — distinct from getStudentsWithPendingFees()
+    // above, which covers a partial-cash-payment balance on an otherwise ACTIVE membership.
+
+    public List<StudentDto> getStudentsInGraceWithDues() {
+        int graceDays = currentGraceDays();
+        List<Membership> memberships = membershipRepository.findByStatus(Membership.Status.GRACE).stream()
+                .filter(m -> m.getDuesAmount() != null && m.getDuesAmount().compareTo(BigDecimal.ZERO) > 0)
+                .collect(Collectors.toList());
+        if (memberships.isEmpty()) return List.of();
+
+        Set<UUID> userIds = memberships.stream().map(Membership::getUserId).collect(Collectors.toSet());
+        Map<UUID, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        return memberships.stream()
+                .filter(m -> userMap.containsKey(m.getUserId()))
+                .map(m -> {
+                    StudentDto dto = StudentDto.fromEntities(userMap.get(m.getUserId()), m);
+                    dto.setDisplayStatus(StudentStatusResolver.resolve(m, null, null, graceDays).name());
+                    return dto;
+                })
+                .sorted(Comparator.comparing(StudentDto::getMembershipEnd))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public int sendGraceDuesReminders(List<String> userIds) {
+        List<StudentDto> targets = userIds == null || userIds.isEmpty()
+                ? getStudentsInGraceWithDues()
+                : userIds.stream()
+                        .map(id -> {
+                            try { return getStudentDetails(id); } catch (Exception e) { return null; }
+                        })
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+
+        int sent = 0;
+        for (StudentDto s : targets) {
+            if (!"GRACE".equals(s.getMembershipStatus())) continue;
+            if (s.getDuesAmount() == null || s.getDuesAmount().compareTo(BigDecimal.ZERO) <= 0) continue;
+            RenewalReminderEvent event = RenewalReminderEvent.builder()
+                    .userId(s.getId())
+                    .userName(s.getName())
+                    .userMobile(s.getMobile())
+                    .userEmail(s.getEmail())
+                    .seatNumber(s.getSeatNumber())
+                    .expiryDate(s.getMembershipEnd())
+                    .pendingAmount(s.getDuesAmount())
+                    .eventType("GRACE_DUES_REMINDER")
+                    .build();
+            kafkaTemplate.send("renewal-reminder", s.getId(), event);
+            sent++;
+            log.info("Grace dues reminder queued for user '{}' (₹{})", s.getName(), s.getDuesAmount());
+        }
+        return sent;
+    }
+
     // ── Revenue Report ────────────────────────────────────────────────────────
 
     public List<PaymentAmountBreakdownDto> getPaymentAmountBreakdown(String fromStr, String toStr) {
