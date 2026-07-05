@@ -57,6 +57,18 @@
 		35C93F79A6D34DF58931EDB6 /* razorpay_checkout.html in Resources */ = {isa = PBXBuildFile; fileRef = 1DC8AB397735418F8BD21A44 /* razorpay_checkout.html */; };
 		5115F879ED5C41D0917F979F /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E02F05CD608649028D063B95 /* SplashView.swift */; };
 		78F6433162E64F8B8F09D94D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 19BDE1BA67EC4C438A195B10 /* Assets.xcassets */; };
+		22A0814E666B86257BF35B30 /* GalleryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001B89560C66BC7DC3520415 /* GalleryRepository.swift */; };
+		4BDC8CB2671A6ADF92710FF4 /* ContactAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 311C0DB1898E9978C54C8581 /* ContactAdminView.swift */; };
+		563B1CFD97CFB20D761912ED /* StudentGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 557ACF0185A4BE61B436DDD4 /* StudentGalleryView.swift */; };
+		6112EC442C7FEC5382EEC8C1 /* AdminExpensesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60BA32548D7E4E15C483FAFF /* AdminExpensesView.swift */; };
+		6AFD550269475EE211A29EFC /* AdminGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6339DD16A8ECFEA212683211 /* AdminGalleryView.swift */; };
+		7453FC0BDA4CF0C60E94BFC9 /* AdminImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718575AD66ACDABB92C102A5 /* AdminImportView.swift */; };
+		7E190CC52E2658CDBED74772 /* AdminInboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7923EE308D41A0A7D4445BEF /* AdminInboxView.swift */; };
+		834C88D7DC5E42AB29EC5570 /* AdminRevenueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832F2F0687285A3D4A9EB87D /* AdminRevenueView.swift */; };
+		A5AD7FC0FBDA4744FC6776CA /* AdminSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 927F9E46108C1588B64A9B86 /* AdminSettingsView.swift */; };
+		AE9BAB912CC77B44A82830E6 /* AdminAppSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2621F3E59DAB15F30443A0 /* AdminAppSettingsView.swift */; };
+		C0A0F6B298A6BD2D4E0F07B7 /* CashfreeWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF9BCF79E23535136844043 /* CashfreeWebView.swift */; };
+		CF01F3EBDA786E984EB1CF4B /* cashfree_checkout.html in Resources */ = {isa = PBXBuildFile; fileRef = C7013F53C0983DAE556D6072 /* cashfree_checkout.html */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -112,6 +124,18 @@
 		E02F05CD608649028D063B95 /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
 		19BDE1BA67EC4C438A195B10 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2A20BAF39AC74E1E942A0821 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		001B89560C66BC7DC3520415 /* GalleryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryRepository.swift; sourceTree = "<group>"; };
+		311C0DB1898E9978C54C8581 /* ContactAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactAdminView.swift; sourceTree = "<group>"; };
+		557ACF0185A4BE61B436DDD4 /* StudentGalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudentGalleryView.swift; sourceTree = "<group>"; };
+		60BA32548D7E4E15C483FAFF /* AdminExpensesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminExpensesView.swift; sourceTree = "<group>"; };
+		6339DD16A8ECFEA212683211 /* AdminGalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminGalleryView.swift; sourceTree = "<group>"; };
+		718575AD66ACDABB92C102A5 /* AdminImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminImportView.swift; sourceTree = "<group>"; };
+		7923EE308D41A0A7D4445BEF /* AdminInboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminInboxView.swift; sourceTree = "<group>"; };
+		832F2F0687285A3D4A9EB87D /* AdminRevenueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminRevenueView.swift; sourceTree = "<group>"; };
+		927F9E46108C1588B64A9B86 /* AdminSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSettingsView.swift; sourceTree = "<group>"; };
+		AC2621F3E59DAB15F30443A0 /* AdminAppSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminAppSettingsView.swift; sourceTree = "<group>"; };
+		BEF9BCF79E23535136844043 /* CashfreeWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CashfreeWebView.swift; sourceTree = "<group>"; };
+		C7013F53C0983DAE556D6072 /* cashfree_checkout.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = cashfree_checkout.html; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -182,6 +206,7 @@
 			children = (
 				A6FC8E5F63D3462BA4AB72C5 /* APIClient.swift */,
 				6434163DCFDB48CA8CBDB559 /* Endpoints.swift */,
+				001B89560C66BC7DC3520415 /* GalleryRepository.swift */,
 			);
 			path = Network;
 			sourceTree = "<group>";
@@ -240,6 +265,8 @@
 				8047A338BC224CCE971CEB85 /* FacilitiesView.swift */,
 				339AF9DD3F014DCC9793BE03 /* FeedbackView.swift */,
 				E52AFA800CF04594BBD749F3 /* PaymentSuccessView.swift */,
+				311C0DB1898E9978C54C8581 /* ContactAdminView.swift */,
+				557ACF0185A4BE61B436DDD4 /* StudentGalleryView.swift */,
 			);
 			path = Student;
 			sourceTree = "<group>";
@@ -257,6 +284,13 @@
 				EFFC33970F9A4857B2564DF4 /* AdminFeedbackView.swift */,
 				886CBD8173894FB3BC8543B3 /* AdminBroadcastView.swift */,
 				96CAEFB07061468DA623A025 /* AdminCreateMembershipView.swift */,
+				60BA32548D7E4E15C483FAFF /* AdminExpensesView.swift */,
+				6339DD16A8ECFEA212683211 /* AdminGalleryView.swift */,
+				718575AD66ACDABB92C102A5 /* AdminImportView.swift */,
+				7923EE308D41A0A7D4445BEF /* AdminInboxView.swift */,
+				832F2F0687285A3D4A9EB87D /* AdminRevenueView.swift */,
+				927F9E46108C1588B64A9B86 /* AdminSettingsView.swift */,
+				AC2621F3E59DAB15F30443A0 /* AdminAppSettingsView.swift */,
 			);
 			path = Admin;
 			sourceTree = "<group>";
@@ -291,6 +325,8 @@
 			children = (
 				0A8A57ADF4544C78A8C7C6EA /* RazorpayWebView.swift */,
 				1DC8AB397735418F8BD21A44 /* razorpay_checkout.html */,
+				BEF9BCF79E23535136844043 /* CashfreeWebView.swift */,
+				C7013F53C0983DAE556D6072 /* cashfree_checkout.html */,
 			);
 			path = Payment;
 			sourceTree = "<group>";
@@ -370,6 +406,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				35C93F79A6D34DF58931EDB6 /* razorpay_checkout.html in Resources */,
+				CF01F3EBDA786E984EB1CF4B /* cashfree_checkout.html in Resources */,
 				78F6433162E64F8B8F09D94D /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -428,6 +465,17 @@
 				74215C01F8A34914B943E8FB /* SeatGridView.swift in Sources */,
 				D2D4C0A80A1E43019358D14B /* LoadingView.swift in Sources */,
 				F07CBC65A5D94444ABCCA604 /* RazorpayWebView.swift in Sources */,
+				22A0814E666B86257BF35B30 /* GalleryRepository.swift in Sources */,
+				4BDC8CB2671A6ADF92710FF4 /* ContactAdminView.swift in Sources */,
+				563B1CFD97CFB20D761912ED /* StudentGalleryView.swift in Sources */,
+				6112EC442C7FEC5382EEC8C1 /* AdminExpensesView.swift in Sources */,
+				6AFD550269475EE211A29EFC /* AdminGalleryView.swift in Sources */,
+				7453FC0BDA4CF0C60E94BFC9 /* AdminImportView.swift in Sources */,
+				7E190CC52E2658CDBED74772 /* AdminInboxView.swift in Sources */,
+				834C88D7DC5E42AB29EC5570 /* AdminRevenueView.swift in Sources */,
+				A5AD7FC0FBDA4744FC6776CA /* AdminSettingsView.swift in Sources */,
+				AE9BAB912CC77B44A82830E6 /* AdminAppSettingsView.swift in Sources */,
+				C0A0F6B298A6BD2D4E0F07B7 /* CashfreeWebView.swift in Sources */,
 				5115F879ED5C41D0917F979F /* SplashView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

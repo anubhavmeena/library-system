@@ -240,6 +240,19 @@ struct BookingView: View {
                 }
                 .padding(24)
                 .background(Color.navyDeep)
+            } else if order.gateway == "CASHFREE" {
+                CashfreeWebView(order: order, mode: "sandbox") {
+                    showPayment = false
+                    vm.verifyPayment(gatewayOrderId: order.orderId, gatewayPaymentId: order.orderId,
+                                     signature: "", membershipId: order.membershipId)
+                } onFailure: { message in
+                    showPayment = false
+                    vm.error = message
+                    vm.resetBooking()
+                } onDismiss: {
+                    showPayment = false
+                }
+                .ignoresSafeArea()
             } else {
                 RazorpayWebView(order: order) { paymentId, orderId, signature in
                     showPayment = false

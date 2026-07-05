@@ -137,7 +137,10 @@ struct PaymentOrder: Codable, Equatable {
     let orderId: String
     let membershipId: String
     let amount: Double
-    let razorpayKeyId: String
+    let currency: String?
+    let gateway: String?          // "CASHFREE" | "RAZORPAY"
+    let paymentSessionId: String? // Cashfree only
+    let razorpayKeyId: String?    // Razorpay only
 }
 
 struct AdminStats: Codable {

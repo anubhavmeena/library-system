@@ -329,6 +329,20 @@ struct MembershipView: View {
                 }
                 .padding(24)
                 .background(Color.navyDeep)
+            } else if order.gateway == "CASHFREE" {
+                CashfreeWebView(order: order, mode: "sandbox") {
+                    showQueuePaymentSheet = false
+                    showQueueFlow = false
+                    vm.verifyQueuePayment(gatewayOrderId: order.orderId, gatewayPaymentId: order.orderId,
+                                         signature: "", membershipId: order.membershipId)
+                } onFailure: { message in
+                    showQueuePaymentSheet = false
+                    vm.error = message
+                    vm.resetQueuePayment()
+                } onDismiss: {
+                    showQueuePaymentSheet = false
+                }
+                .ignoresSafeArea()
             } else {
                 RazorpayWebView(order: order) { paymentId, orderId, signature in
                     showQueuePaymentSheet = false
@@ -362,6 +376,19 @@ struct MembershipView: View {
                 }
                 .padding(24)
                 .background(Color.navyDeep)
+            } else if order.gateway == "CASHFREE" {
+                CashfreeWebView(order: order, mode: "sandbox") {
+                    showDuesPaymentSheet = false
+                    vm.verifyDuesPayment(gatewayOrderId: order.orderId, gatewayPaymentId: order.orderId,
+                                        signature: "", membershipId: order.membershipId)
+                } onFailure: { message in
+                    showDuesPaymentSheet = false
+                    vm.error = message
+                    vm.resetDuesPayment()
+                } onDismiss: {
+                    showDuesPaymentSheet = false
+                }
+                .ignoresSafeArea()
             } else {
                 RazorpayWebView(order: order) { paymentId, orderId, signature in
                     showDuesPaymentSheet = false

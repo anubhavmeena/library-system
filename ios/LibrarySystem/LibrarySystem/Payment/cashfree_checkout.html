@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body { background: #0D1B4B; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family: -apple-system, sans-serif; color: #F0F4FF; }
+  .loader { text-align:center; }
+  .loader p { color: #8AA6F8; margin-top:16px; }
+  .spinner { width:40px; height:40px; border:3px solid rgba(245,158,11,0.3); border-top-color:#F59E0B; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="loader" id="loader">
+  <div class="spinner"></div>
+  <p>Opening payment...</p>
+</div>
+<script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    try {
+      var cashfree = Cashfree({ mode: "{{MODE}}" });
+      cashfree.checkout({
+        paymentSessionId: "{{PAYMENT_SESSION_ID}}",
+        redirectTarget: "_self"
+      }).then(function(result) {
+        if (result.error) {
+          window.webkit.messageHandlers.cashfreeBridge.postMessage({
+            type: "failed",
+            error: result.error.message || "Payment failed"
+          });
+        } else {
+          window.webkit.messageHandlers.cashfreeBridge.postMessage({ type: "success" });
+        }
+      }).catch(function(err) {
+        window.webkit.messageHandlers.cashfreeBridge.postMessage({
+          type: "failed",
+          error: (err && err.message) || "Payment failed"
+        });
+      });
+    } catch (err) {
+      window.webkit.messageHandlers.cashfreeBridge.postMessage({
+        type: "failed",
+        error: (err && err.message) || "Could not start payment"
+      });
+    }
+  });
+</script>
+</body>
+</html>

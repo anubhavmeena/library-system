@@ -33,7 +33,7 @@ struct RazorpayWebView: UIViewRepresentable {
         html = html
             .replacingOccurrences(of: "{{ORDER_ID}}",    with: order.orderId)
             .replacingOccurrences(of: "{{AMOUNT_PAISE}}", with: "\(amountPaise)")
-            .replacingOccurrences(of: "{{KEY_ID}}",      with: order.razorpayKeyId)
+            .replacingOccurrences(of: "{{KEY_ID}}",      with: order.razorpayKeyId ?? "")
             .replacingOccurrences(of: "{{MEMBERSHIP_ID}}", with: order.membershipId)
         return html
     }
