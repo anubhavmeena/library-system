@@ -10,6 +10,16 @@ final class AdminViewModel: ObservableObject {
     @Published var seatMap:           SeatMapDto?
     @Published var expiring:          [ReminderStudent] = []
     @Published var pendingFeeStudents: [StudentDetail] = []
+    @Published var graceDuesStudents: [StudentDetail] = []
+    @Published var orphanedSeatStudents: [StudentDetail] = []
+    @Published var notificationSettings: [NotificationSetting] = []
+    @Published var seatHistory: [SeatHistoryEntry] = []
+    @Published var studentSeatHistory: [SeatHistoryEntry] = []
+    @Published var paymentBreakdown: [PaymentBreakdownItem] = []
+    @Published var appSettings = AppSettings()
+    @Published var appSettingsLoaded = false
+    @Published var importResult: ImportResult?
+    @Published var studentDeleted = false
     @Published var feedback:          [FeedbackItem] = []
     @Published var plans:             [Plan] = []
     @Published var broadcastHistory:  [BroadcastHistory] = []
@@ -113,14 +123,147 @@ final class AdminViewModel: ObservableObject {
         }
     }
 
-    func clearPendingFees(userId: String) {
+    func clearPendingFees(userId: String, amountCleared: Double) {
         Task {
             do {
-                try await repo.clearPendingFees(userId: userId)
-                successMsg = "Pending fees cleared"
+                try await repo.clearPendingFees(userId: userId, amountCleared: amountCleared)
+                successMsg = "₹\(Int(amountCleared)) cleared"
                 loadPendingFeeStudents()
                 if selectedStudent?.id == userId { loadStudentDetail(id: userId) }
             } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func loadGraceDuesStudents() {
+        isLoading = true
+        Task {
+            do { graceDuesStudents = try await repo.getStudentsInGraceWithDues() }
+            catch { self.error = error.localizedDescription }
+            isLoading = false
+        }
+    }
+
+    func clearDues(membershipId: String, amountCleared: Double, userId: String) {
+        Task {
+            do {
+                try await repo.clearDues(membershipId: membershipId, amountCleared: amountCleared)
+                successMsg = "₹\(Int(amountCleared)) cleared"
+                loadGraceDuesStudents()
+                if selectedStudent?.id == userId { loadStudentDetail(id: userId) }
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func releaseSeat(membershipId: String, notifyStudent: Bool, userId: String) {
+        Task {
+            do {
+                try await repo.releaseSeat(membershipId: membershipId, notifyStudent: notifyStudent)
+                successMsg = "Seat released\(notifyStudent ? " — student notified" : "")"
+                loadStudentDetail(id: userId)
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func markPending(membershipId: String, pendingAmount: Double, userId: String) {
+        Task {
+            do {
+                try await repo.markPending(membershipId: membershipId, pendingAmount: pendingAmount)
+                successMsg = "Marked as Pending"
+                loadStudentDetail(id: userId)
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func markGrace(membershipId: String, userId: String) {
+        Task {
+            do {
+                try await repo.markGrace(membershipId: membershipId)
+                successMsg = "Marked as Grace"
+                loadStudentDetail(id: userId)
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func renewSeat(membershipId: String, userId: String) {
+        Task {
+            do {
+                try await repo.renewSeat(membershipId: membershipId)
+                successMsg = "Seat renewed"
+                loadStudentDetail(id: userId)
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func deleteStudent(id: String) {
+        Task {
+            do {
+                try await repo.deleteStudent(id: id)
+                successMsg = "Student deleted"
+                studentDeleted = true
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func loadOrphanedSeatStudents() {
+        Task {
+            do { orphanedSeatStudents = try await repo.getStudentsWithOrphanedSeats() }
+            catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func loadSeatHistory(seatNumber: String) {
+        Task {
+            do { seatHistory = try await repo.getSeatHistory(seatNumber: seatNumber) }
+            catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func loadStudentSeatHistory(userId: String) {
+        Task {
+            do { studentSeatHistory = try await repo.getStudentSeatHistory(userId: userId) }
+            catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func runExpiryCheck() {
+        isLoading = true
+        Task {
+            do { successMsg = try await repo.runExpiryCheck() }
+            catch { self.error = error.localizedDescription }
+            isLoading = false
+        }
+    }
+
+    // MARK: - Bulk Import
+    func importStudentsCSV(data: Data, fileName: String, mimeType: String) {
+        isLoading = true
+        Task {
+            do { importResult = try await repo.importStudentsCSV(data: data, fileName: fileName, mimeType: mimeType) }
+            catch { self.error = error.localizedDescription }
+            isLoading = false
+        }
+    }
+
+    // MARK: - App Settings
+    func loadAppSettings() {
+        Task {
+            do { appSettings = try await repo.getAppSettings() }
+            catch { self.error = error.localizedDescription }
+            appSettingsLoaded = true
+        }
+    }
+
+    func saveAppSettings(wifiName: String?, wifiPassword: String?, graceDays: Int,
+                        convenienceFee: Double, waterTankerRate: Double) {
+        isLoading = true
+        Task {
+            do {
+                appSettings = try await repo.saveAppSettings(
+                    wifiName: wifiName, wifiPassword: wifiPassword, graceDays: graceDays,
+                    convenienceFee: convenienceFee, waterTankerRate: waterTankerRate)
+                successMsg = "Settings saved"
+            } catch { self.error = error.localizedDescription }
+            isLoading = false
         }
     }
 
@@ -163,6 +306,41 @@ final class AdminViewModel: ObservableObject {
                 successMsg = "Pending fee reminders sent"
             } catch { self.error = error.localizedDescription }
             isLoading = false
+        }
+    }
+
+    func sendGraceDuesReminders(userIds: [String]) {
+        isLoading = true
+        Task {
+            do {
+                try await repo.sendGraceDuesReminders(userIds: userIds)
+                successMsg = "Grace dues reminders sent"
+            } catch { self.error = error.localizedDescription }
+            isLoading = false
+        }
+    }
+
+    // MARK: - Notification Settings
+    func loadNotificationSettings() {
+        Task {
+            do { notificationSettings = try await repo.getNotificationSettings() }
+            catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func updateNotificationSetting(key: String, sendToStudent: Bool, sendToAdmin: Bool,
+                                   hindiEnabled: Bool, hindiTextStudent: String?, hindiTextAdmin: String?) {
+        Task {
+            do {
+                let updated = try await repo.updateNotificationSetting(
+                    key: key, sendToStudent: sendToStudent, sendToAdmin: sendToAdmin,
+                    hindiEnabled: hindiEnabled, hindiTextStudent: hindiTextStudent,
+                    hindiTextAdmin: hindiTextAdmin)
+                if let idx = notificationSettings.firstIndex(where: { $0.notificationKey == key }) {
+                    notificationSettings[idx] = updated
+                }
+                successMsg = "Settings saved"
+            } catch { self.error = error.localizedDescription }
         }
     }
 
@@ -244,7 +422,10 @@ final class AdminViewModel: ObservableObject {
     func loadRevenueReport(from: String, to: String) {
         isLoading = true
         Task {
-            do { revenueReport = try await repo.getRevenueReport(from: from, to: to) }
+            do {
+                revenueReport = try await repo.getRevenueReport(from: from, to: to)
+                paymentBreakdown = try await repo.getPaymentBreakdown(from: from, to: to)
+            }
             catch { self.error = error.localizedDescription }
             isLoading = false
         }

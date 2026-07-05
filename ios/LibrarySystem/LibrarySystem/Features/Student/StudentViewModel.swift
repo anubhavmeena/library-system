@@ -16,6 +16,16 @@ final class StudentViewModel: ObservableObject {
     @Published var selectedSeat: String?
     @Published var pendingOrder: PaymentOrder?
 
+    // Renew/queue next plan (kept separate from pendingOrder above so the
+    // Booking tab's payment sheet never reacts to an order created from the
+    // Membership tab's renew flow, since both tabs stay alive under TabView)
+    @Published var queueOrder: PaymentOrder?
+    @Published var queuePaying = false
+
+    // Pay off grace-period dues
+    @Published var duesOrder: PaymentOrder?
+    @Published var payingDues = false
+
     // Profile
     @Published var profile: User?
     @Published var photoUrl: String?
@@ -123,6 +133,91 @@ final class StudentViewModel: ObservableObject {
         selectedSeat = nil
         seats = []
         pendingOrder = nil
+    }
+
+    // MARK: - Renew / Queue Next Plan
+    // Reuses the same create-order/verify endpoints as a fresh booking — the
+    // backend auto-detects an existing active membership and queues the new
+    // one, inheriting seat and shift, instead of activating it immediately.
+
+    func startQueuePayment(planId: String) {
+        queuePaying = true; error = nil
+        Task {
+            do { queueOrder = try await membershipRepo.createOrder(planId: planId, seatNumber: "", shift: "") }
+            catch { self.error = error.localizedDescription }
+            queuePaying = false
+        }
+    }
+
+    func verifyQueuePayment(gatewayOrderId: String, gatewayPaymentId: String,
+                            signature: String, membershipId: String) {
+        queuePaying = true
+        Task {
+            do {
+                let queued = try await membershipRepo.verifyPayment(
+                    gatewayOrderId: gatewayOrderId, gatewayPaymentId: gatewayPaymentId,
+                    signature: signature, membershipId: membershipId)
+                if !queued.seatNumber.isEmpty {
+                    do {
+                        try await seatRepo.bookSeat(seatNumber: queued.seatNumber, membershipId: queued.id,
+                                                    shift: queued.shift, startDate: queued.startDate,
+                                                    endDate: queued.endDate)
+                    } catch {
+                        self.error = "Payment succeeded, but seat reservation failed — please contact support to finalize your seat."
+                    }
+                }
+                queuedMembership = queued
+                queueOrder = nil
+                successMsg = "Plan queued! It will activate when your current plan expires."
+            } catch { self.error = error.localizedDescription }
+            queuePaying = false
+        }
+    }
+
+    func devVerifyQueuePayment(membershipId: String) {
+        verifyQueuePayment(gatewayOrderId: queueOrder?.orderId ?? "",
+                           gatewayPaymentId: "dev_pay_\(membershipId)",
+                           signature: "dev_sig", membershipId: membershipId)
+    }
+
+    func resetQueuePayment() {
+        queueOrder = nil
+    }
+
+    // MARK: - Pay Grace Dues
+
+    func startDuesPayment() {
+        payingDues = true; error = nil
+        Task {
+            do { duesOrder = try await membershipRepo.createDuesOrder() }
+            catch { self.error = error.localizedDescription }
+            payingDues = false
+        }
+    }
+
+    func verifyDuesPayment(gatewayOrderId: String, gatewayPaymentId: String,
+                           signature: String, membershipId: String) {
+        payingDues = true
+        Task {
+            do {
+                membership = try await membershipRepo.verifyDuesPayment(
+                    gatewayOrderId: gatewayOrderId, gatewayPaymentId: gatewayPaymentId,
+                    signature: signature, membershipId: membershipId)
+                duesOrder = nil
+                successMsg = "Dues cleared — your membership is active again!"
+            } catch { self.error = error.localizedDescription }
+            payingDues = false
+        }
+    }
+
+    func devVerifyDuesPayment(membershipId: String) {
+        verifyDuesPayment(gatewayOrderId: duesOrder?.orderId ?? "",
+                          gatewayPaymentId: "dev_pay_\(membershipId)",
+                          signature: "dev_sig", membershipId: membershipId)
+    }
+
+    func resetDuesPayment() {
+        duesOrder = nil
     }
 
     // MARK: - Profile

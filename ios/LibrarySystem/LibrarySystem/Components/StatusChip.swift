@@ -6,7 +6,7 @@ struct StatusChip: View {
     private var color: Color {
         switch status.uppercased() {
         case "ACTIVE":              return .emerald
-        case "PENDING":             return .amber
+        case "PENDING", "GRACE":    return .amber
         case "EXPIRED", "INACTIVE": return .redAlert
         case "OPEN":                return .amber
         case "IN_PROGRESS", "UNDER_REVIEW": return .blueSoft

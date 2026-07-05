@@ -24,6 +24,7 @@ struct AdminRevenueView: View {
                         if vm.revenueReport.totalRevenue > 0 || !vm.revenueReport.fromDate.isEmpty {
                             summaryCards
                             breakdownSection
+                            paymentBreakdownSection
                         }
 
                         if let err = vm.error { ErrorBanner(message: err) }
@@ -98,6 +99,41 @@ struct AdminRevenueView: View {
                             Text("₹\(String(format: "%.0f", day.amount))")
                                 .font(.headlineSmall).foregroundColor(.amber)
                             Image(systemName: "chevron.right").foregroundColor(.textMuted)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var paymentBreakdownSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Payment Distribution").font(.headlineSmall).foregroundColor(.textPrimary)
+            if vm.paymentBreakdown.isEmpty {
+                Text("No payments in this range").font(.bodySmall).foregroundColor(.textMuted)
+                    .frame(maxWidth: .infinity).padding(.vertical, 8)
+            } else {
+                let maxCount = vm.paymentBreakdown.map(\.count).max() ?? 1
+                AppCard {
+                    VStack(spacing: 10) {
+                        ForEach(Array(vm.paymentBreakdown.enumerated()), id: \.offset) { _, item in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("₹\(String(format: "%.0f", item.amount))")
+                                        .font(.labelMedium).foregroundColor(.textPrimary)
+                                    Spacer()
+                                    Text("\(item.count) payment\(item.count == 1 ? "" : "s")")
+                                        .font(.labelSmall).foregroundColor(.textSub)
+                                }
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        RoundedRectangle(cornerRadius: 4).fill(Color.navyLight).frame(height: 8)
+                                        RoundedRectangle(cornerRadius: 4).fill(Color.amber)
+                                            .frame(width: geo.size.width * CGFloat(item.count) / CGFloat(maxCount), height: 8)
+                                    }
+                                }
+                                .frame(height: 8)
+                            }
                         }
                     }
                 }

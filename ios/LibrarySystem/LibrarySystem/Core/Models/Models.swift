@@ -64,6 +64,7 @@ struct Membership: Codable, Identifiable {
     let status: String
     let amountPaid: Double?  // from payment verification response
     let planPrice: Double?   // from membership service MembershipDto
+    let duesAmount: Double?  // non-null while status == GRACE
 
     var displayAmount: Double { amountPaid ?? planPrice ?? 0 }
 
@@ -71,13 +72,15 @@ struct Membership: Codable, Identifiable {
         id: String = "", userId: String = "", planId: String = "",
         planName: String = "", planType: String = "", seatNumber: String = "",
         shift: String = "", startDate: String = "", endDate: String = "",
-        status: String = "", amountPaid: Double? = nil, planPrice: Double? = nil
+        status: String = "", amountPaid: Double? = nil, planPrice: Double? = nil,
+        duesAmount: Double? = nil
     ) {
         self.id = id; self.userId = userId; self.planId = planId
         self.planName = planName; self.planType = planType
         self.seatNumber = seatNumber; self.shift = shift
         self.startDate = startDate; self.endDate = endDate
         self.status = status; self.amountPaid = amountPaid; self.planPrice = planPrice
+        self.duesAmount = duesAmount
     }
 }
 
@@ -130,7 +133,7 @@ struct SeatInfoItem: Codable {
     let membershipEnd: String?
 }
 
-struct PaymentOrder: Codable {
+struct PaymentOrder: Codable, Equatable {
     let orderId: String
     let membershipId: String
     let amount: Double
@@ -213,6 +216,8 @@ struct StudentDetail: Codable, Identifiable {
     let daysRemaining: Int
     let paymentMode: String?
     let pendingAmount: Double?
+    let duesAmount: Double? // overdue grace-period dues, distinct from pendingAmount above
+    let displayStatus: String? // NEW | PAID | PENDING | GRACE | EXPIRED | RELEASED
 }
 
 struct FeedbackItem: Codable, Identifiable {
@@ -355,6 +360,80 @@ struct GalleryPhoto: Codable, Identifiable {
     let url: String
     let caption: String?
     let uploadedAt: String?
+}
+
+// MARK: - Seat History
+
+struct SeatHistoryEntry: Codable, Identifiable {
+    let membershipId: String
+    let studentName: String?
+    let studentMobile: String?
+    let shift: String?
+    let startDate: String?
+    let endDate: String?
+    let status: String?
+    let seatNumber: String? // populated on the per-student endpoint only
+    let planName: String?
+
+    var id: String { membershipId }
+}
+
+// MARK: - Payment Breakdown
+
+struct PaymentBreakdownItem: Codable {
+    let amount: Double
+    let count: Int
+}
+
+// MARK: - App Settings
+
+struct AppSettings: Codable {
+    var wifiName: String?
+    var wifiPassword: String?
+    var graceDays: Int?
+    var convenienceFee: Double?
+    var waterTankerRate: Double?
+    let updatedAt: String?
+
+    init(wifiName: String? = nil, wifiPassword: String? = nil, graceDays: Int? = nil,
+         convenienceFee: Double? = nil, waterTankerRate: Double? = nil, updatedAt: String? = nil) {
+        self.wifiName = wifiName; self.wifiPassword = wifiPassword; self.graceDays = graceDays
+        self.convenienceFee = convenienceFee; self.waterTankerRate = waterTankerRate
+        self.updatedAt = updatedAt
+    }
+}
+
+// MARK: - Bulk Import Result
+
+struct ImportResult: Codable {
+    let totalRows: Int
+    let imported: Int
+    let skipped: Int
+    let errors: [RowError]?
+
+    struct RowError: Codable, Identifiable {
+        var id: Int { row }
+        let row: Int
+        let name: String?
+        let phone: String?
+        let reason: String
+    }
+}
+
+// MARK: - Notification Settings
+
+struct NotificationSetting: Codable, Identifiable {
+    var id: String { notificationKey }
+    let notificationKey: String
+    var sendToStudent: Bool
+    var sendToAdmin: Bool
+    let studentEditable: Bool // false = "Send to Student" is fixed, UI must disable the toggle
+    let adminEditable: Bool   // false = "Send to Admin" is fixed, UI must disable the toggle
+    let hindiEditable: Bool   // false = this notification has no Hindi translation option at all
+    var hindiEnabled: Bool
+    var hindiTextStudent: String?
+    var hindiTextAdmin: String?
+    let updatedAt: String?
 }
 
 // MARK: - Student Payment History

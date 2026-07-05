@@ -39,8 +39,62 @@ struct AdminRepository {
         try await api.request(.getStudentsWithPendingFees, token: token)
     }
 
-    func clearPendingFees(userId: String) async throws {
-        try await api.requestVoid(.clearPendingFees(userId: userId), token: token)
+    func getStudentsWithOrphanedSeats() async throws -> [StudentDetail] {
+        try await api.request(.getStudentsWithOrphanedSeats, token: token)
+    }
+
+    func getStudentSeatHistory(userId: String) async throws -> [SeatHistoryEntry] {
+        try await api.request(.getStudentSeatHistory(userId: userId), token: token)
+    }
+
+    func deleteStudent(id: String) async throws {
+        try await api.requestVoid(.deleteStudent(id: id), token: token)
+    }
+
+    func importStudentsCSV(data: Data, fileName: String, mimeType: String) async throws -> ImportResult {
+        try await api.uploadMultipartDecoded(path: "admin/students/import", fieldName: "file",
+                                             fileName: fileName, mimeType: mimeType,
+                                             data: data, token: token)
+    }
+
+    func clearPendingFees(userId: String, amountCleared: Double) async throws {
+        let req = ClearAmountRequest(amountCleared: amountCleared)
+        try await api.requestVoid(.clearPendingFees(userId: userId, req: req), token: token)
+    }
+
+    func getStudentsInGraceWithDues() async throws -> [StudentDetail] {
+        try await api.request(.getStudentsInGraceWithDues, token: token)
+    }
+
+    func clearDues(membershipId: String, amountCleared: Double) async throws {
+        let req = ClearAmountRequest(amountCleared: amountCleared)
+        try await api.requestVoid(.clearDues(membershipId: membershipId, req: req), token: token)
+    }
+
+    func releaseSeat(membershipId: String, notifyStudent: Bool) async throws {
+        let req = ReleaseSeatRequest(notifyStudent: notifyStudent)
+        try await api.requestVoid(.releaseSeat(membershipId: membershipId, req: req), token: token)
+    }
+
+    func markPending(membershipId: String, pendingAmount: Double) async throws {
+        let req = MarkPendingRequest(pendingAmount: pendingAmount)
+        try await api.requestVoid(.markPending(membershipId: membershipId, req: req), token: token)
+    }
+
+    func markGrace(membershipId: String) async throws {
+        try await api.requestVoid(.markGrace(membershipId: membershipId), token: token)
+    }
+
+    func renewSeat(membershipId: String) async throws {
+        try await api.requestVoid(.renewSeat(membershipId: membershipId), token: token)
+    }
+
+    func runExpiryCheck() async throws -> String {
+        try await api.request(.runExpiryCheck, token: token)
+    }
+
+    func getSeatHistory(seatNumber: String) async throws -> [SeatHistoryEntry] {
+        try await api.request(.getSeatHistory(seatNumber: seatNumber), token: token)
     }
 
     // MARK: - Memberships & Seats
@@ -83,6 +137,26 @@ struct AdminRepository {
         try await api.requestVoid(.sendPendingFeeReminders(req), token: token)
     }
 
+    func sendGraceDuesReminders(userIds: [String]) async throws {
+        let req = SendReminderRequest(userIds: userIds)
+        try await api.requestVoid(.sendGraceDuesReminders(req), token: token)
+    }
+
+    // MARK: - Notification Settings
+    func getNotificationSettings() async throws -> [NotificationSetting] {
+        try await api.request(.getNotificationSettings, token: token)
+    }
+
+    func updateNotificationSetting(key: String, sendToStudent: Bool, sendToAdmin: Bool,
+                                   hindiEnabled: Bool, hindiTextStudent: String?,
+                                   hindiTextAdmin: String?) async throws -> NotificationSetting {
+        let req = UpdateNotificationSettingRequest(sendToStudent: sendToStudent, sendToAdmin: sendToAdmin,
+                                                   hindiEnabled: hindiEnabled,
+                                                   hindiTextStudent: hindiTextStudent,
+                                                   hindiTextAdmin: hindiTextAdmin)
+        return try await api.request(.updateNotificationSetting(key: key, req: req), token: token)
+    }
+
     func sendBroadcast(message: String, targetGroup: String = "ALL") async throws {
         let req = BroadcastRequest(message: message, targetGroup: targetGroup)
         try await api.requestVoid(.sendBroadcast(req), token: token)
@@ -114,6 +188,23 @@ struct AdminRepository {
 
     func getDailyPayments(date: String) async throws -> [DailyPayment] {
         try await api.request(.getDailyPayments(date: date), token: token)
+    }
+
+    func getPaymentBreakdown(from: String, to: String) async throws -> [PaymentBreakdownItem] {
+        try await api.request(.getPaymentBreakdown(from: from, to: to), token: token)
+    }
+
+    // MARK: - App Settings
+    func getAppSettings() async throws -> AppSettings {
+        try await api.request(.getAppSettings, token: token)
+    }
+
+    func saveAppSettings(wifiName: String?, wifiPassword: String?, graceDays: Int,
+                        convenienceFee: Double, waterTankerRate: Double) async throws -> AppSettings {
+        let req = SaveAppSettingsRequest(wifiName: wifiName, wifiPassword: wifiPassword,
+                                         graceDays: graceDays, convenienceFee: convenienceFee,
+                                         waterTankerRate: waterTankerRate)
+        return try await api.request(.saveAppSettings(req), token: token)
     }
 
     // MARK: - Expenses

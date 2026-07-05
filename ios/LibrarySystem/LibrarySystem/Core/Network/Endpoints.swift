@@ -56,6 +56,10 @@ extension Endpoint {
     static func verifyPayment(_ req: VerifyPaymentRequest) -> Endpoint {
         Endpoint(path: "payments/verify", method: .POST, body: encode(req))
     }
+    static let createDuesOrder = Endpoint(path: "payments/dues/create-order", method: .POST)
+    static func verifyDuesPayment(_ req: VerifyPaymentRequest) -> Endpoint {
+        Endpoint(path: "payments/dues/verify", method: .POST, body: encode(req))
+    }
 
     // MARK: - Seats
     static func getSeatAvailability(shift: String, date: String? = nil) -> Endpoint {
@@ -96,10 +100,18 @@ extension Endpoint {
     static func updateStudent(id: String, req: UpdateStudentRequest) -> Endpoint {
         Endpoint(path: "admin/students/\(id)", method: .PATCH, body: encode(req))
     }
-    static let getStudentsWithPendingFees = Endpoint(path: "admin/students/pending-fees")
-    static func clearPendingFees(userId: String) -> Endpoint {
-        Endpoint(path: "admin/students/\(userId)/clear-pending-fees", method: .PATCH)
+    static func deleteStudent(id: String) -> Endpoint {
+        Endpoint(path: "admin/students/\(id)", method: .DELETE)
     }
+    static let getStudentsWithPendingFees = Endpoint(path: "admin/students/pending-fees")
+    static let getStudentsWithOrphanedSeats = Endpoint(path: "admin/students/orphaned-seats")
+    static func getStudentSeatHistory(userId: String) -> Endpoint {
+        Endpoint(path: "admin/students/\(userId)/seat-history")
+    }
+    static func clearPendingFees(userId: String, req: ClearAmountRequest) -> Endpoint {
+        Endpoint(path: "admin/students/\(userId)/clear-pending-fees", method: .PATCH, body: encode(req))
+    }
+    static let getStudentsInGraceWithDues = Endpoint(path: "admin/students/grace-dues")
 
     // MARK: - Admin: Memberships & Seats
     static func changeSeat(membershipId: String, req: ChangeSeatRequest) -> Endpoint {
@@ -120,6 +132,25 @@ extension Endpoint {
         if let date { items.append(URLQueryItem(name: "date", value: date)) }
         return Endpoint(path: "admin/seats/map", queryItems: items)
     }
+    static func clearDues(membershipId: String, req: ClearAmountRequest) -> Endpoint {
+        Endpoint(path: "admin/memberships/\(membershipId)/clear-dues", method: .PATCH, body: encode(req))
+    }
+    static func releaseSeat(membershipId: String, req: ReleaseSeatRequest) -> Endpoint {
+        Endpoint(path: "admin/memberships/\(membershipId)/release", method: .PATCH, body: encode(req))
+    }
+    static func markPending(membershipId: String, req: MarkPendingRequest) -> Endpoint {
+        Endpoint(path: "admin/memberships/\(membershipId)/mark-pending", method: .PATCH, body: encode(req))
+    }
+    static func markGrace(membershipId: String) -> Endpoint {
+        Endpoint(path: "admin/memberships/\(membershipId)/mark-grace", method: .PATCH)
+    }
+    static func renewSeat(membershipId: String) -> Endpoint {
+        Endpoint(path: "admin/memberships/\(membershipId)/renew", method: .PATCH)
+    }
+    static let runExpiryCheck = Endpoint(path: "admin/memberships/run-expiry-check", method: .POST)
+    static func getSeatHistory(seatNumber: String) -> Endpoint {
+        Endpoint(path: "admin/seats/\(seatNumber)/history")
+    }
 
     // MARK: - Admin: Reminders & Broadcast
     static func sendReminders(_ req: SendReminderRequest) -> Endpoint {
@@ -128,12 +159,21 @@ extension Endpoint {
     static func sendPendingFeeReminders(_ req: SendReminderRequest) -> Endpoint {
         Endpoint(path: "admin/reminders/pending-fees", method: .POST, body: encode(req))
     }
+    static func sendGraceDuesReminders(_ req: SendReminderRequest) -> Endpoint {
+        Endpoint(path: "admin/reminders/grace-dues", method: .POST, body: encode(req))
+    }
     static func sendBroadcast(_ req: BroadcastRequest) -> Endpoint {
         Endpoint(path: "admin/broadcast", method: .POST, body: encode(req))
     }
     static let getBroadcastHistory = Endpoint(path: "admin/broadcast/history")
     static func sendMessageToStudent(_ id: String, _ req: BroadcastRequest) -> Endpoint {
         Endpoint(path: "admin/students/\(id)/message", method: .POST, body: encode(req))
+    }
+
+    // MARK: - Admin: Notification Settings
+    static let getNotificationSettings = Endpoint(path: "admin/notification-settings")
+    static func updateNotificationSetting(key: String, req: UpdateNotificationSettingRequest) -> Endpoint {
+        Endpoint(path: "admin/notification-settings/\(key)", method: .PATCH, body: encode(req))
     }
 
     // MARK: - Admin: Feedback
@@ -151,6 +191,17 @@ extension Endpoint {
     static func getDailyPayments(date: String) -> Endpoint {
         Endpoint(path: "admin/reports/payments/daily",
                  queryItems: [URLQueryItem(name: "date", value: date)])
+    }
+    static func getPaymentBreakdown(from: String, to: String) -> Endpoint {
+        Endpoint(path: "admin/reports/payments/breakdown",
+                 queryItems: [URLQueryItem(name: "from", value: from),
+                               URLQueryItem(name: "to",   value: to)])
+    }
+
+    // MARK: - Admin: App Settings
+    static let getAppSettings = Endpoint(path: "admin/settings")
+    static func saveAppSettings(_ req: SaveAppSettingsRequest) -> Endpoint {
+        Endpoint(path: "admin/settings", method: .POST, body: encode(req))
     }
 
     // MARK: - Admin: Expenses

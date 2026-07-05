@@ -3,14 +3,28 @@ import SwiftUI
 struct AdminStudentDetailView: View {
     @ObservedObject var vm: AdminViewModel
     let studentId: String
+    @Environment(\.dismiss) private var dismiss
 
     @State private var showChangeSeat   = false
     @State private var seatMapSeats:    [Seat] = []
     @State private var selectedNewSeat: String?
     @State private var showPayments     = false
+    @State private var showSeatHistory  = false
     @State private var showMessage      = false
     @State private var messageText      = ""
     @State private var showEdit         = false
+
+    private enum ClearKind { case fees, dues }
+    @State private var clearKind:       ClearKind?
+    @State private var clearAmountText = ""
+    @State private var showReleaseConfirm = false
+    @State private var showReleaseNotifyPrompt = false
+    @State private var showRenewConfirm = false
+    @State private var showDeleteConfirm = false
+
+    @State private var showChangeStatus     = false
+    @State private var changeStatusTarget   = "PENDING" // PENDING | GRACE
+    @State private var pendingAmountInput   = ""
 
     private let baseURL = "https://targetzone.co.in"
 
@@ -28,9 +42,15 @@ struct AdminStudentDetailView: View {
                             if s.pendingAmount ?? 0 > 0 {
                                 pendingFeesSection(s)
                             }
+                            if s.membershipStatus == "GRACE" && (s.duesAmount ?? 0) > 0 {
+                                graceDuesSection(s)
+                            }
                             actionsSection(s)
                             if showPayments {
                                 paymentHistorySection
+                            }
+                            if showSeatHistory {
+                                seatHistorySection
                             }
                         }
                         .padding(16)
@@ -48,6 +68,9 @@ struct AdminStudentDetailView: View {
             .sheet(isPresented: $showEdit) {
                 if let s = vm.selectedStudent { editSheet(s) }
             }
+            .sheet(isPresented: $showChangeStatus) {
+                if let s = vm.selectedStudent { changeStatusSheet(s) }
+            }
         }
         .navigationTitle("Student Details")
         .navigationBarTitleDisplayMode(.inline)
@@ -55,6 +78,71 @@ struct AdminStudentDetailView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { vm.loadStudentDetail(id: studentId) }
+        .onChange(of: vm.studentDeleted) { deleted in
+            if deleted { vm.studentDeleted = false; dismiss() }
+        }
+        .alert(clearKind == .dues ? "Clear Dues" : "Clear Pending Fees",
+               isPresented: Binding(get: { clearKind != nil }, set: { if !$0 { clearKind = nil } })) {
+            TextField("Amount", text: $clearAmountText).keyboardType(.decimalPad)
+            Button("Cancel", role: .cancel) { clearKind = nil }
+            Button("Clear") {
+                guard let s = vm.selectedStudent, let amount = Double(clearAmountText), amount > 0 else { return }
+                if clearKind == .dues {
+                    if let membershipId = s.membershipId {
+                        vm.clearDues(membershipId: membershipId, amountCleared: amount, userId: s.id)
+                    }
+                } else {
+                    vm.clearPendingFees(userId: s.id, amountCleared: amount)
+                }
+                clearKind = nil
+            }
+        } message: {
+            if let s = vm.selectedStudent {
+                let outstanding = clearKind == .dues ? (s.duesAmount ?? 0) : (s.pendingAmount ?? 0)
+                Text("Outstanding: ₹\(String(format: "%.0f", outstanding)). Any amount not cleared stays on record as a pending balance.")
+            }
+        }
+        .alert("Release Seat", isPresented: $showReleaseConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Release", role: .destructive) { showReleaseNotifyPrompt = true }
+        } message: {
+            if let s = vm.selectedStudent {
+                Text("Release seat \(s.seatNumber ?? "—") for \(s.name)? Dues of ₹\(String(format: "%.0f", s.duesAmount ?? 0)) remain on record. This cannot be undone.")
+            }
+        }
+        .alert("Notify Student?", isPresented: $showReleaseNotifyPrompt) {
+            Button("Notify") { releaseSeat(notify: true) }
+            Button("Release Quietly") { releaseSeat(notify: false) }
+        } message: {
+            Text("Send a notification that their seat has expired due to non-payment and been released?")
+        }
+        .alert("Renew Seat", isPresented: $showRenewConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Renew") {
+                if let s = vm.selectedStudent, let membershipId = s.membershipId {
+                    vm.renewSeat(membershipId: membershipId, userId: s.id)
+                }
+            }
+        } message: {
+            if let s = vm.selectedStudent {
+                Text("Renew \(s.name)'s seat by one month?")
+            }
+        }
+        .alert("Delete Student", isPresented: $showDeleteConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                if let s = vm.selectedStudent { vm.deleteStudent(id: s.id) }
+            }
+        } message: {
+            if let s = vm.selectedStudent {
+                Text("Permanently delete \(s.name) and all their memberships, payments, and seat bookings? This cannot be undone.")
+            }
+        }
+    }
+
+    private func releaseSeat(notify: Bool) {
+        guard let s = vm.selectedStudent, let membershipId = s.membershipId else { return }
+        vm.releaseSeat(membershipId: membershipId, notifyStudent: notify, userId: s.id)
     }
 
     private func profileHeader(_ s: StudentDetail) -> some View {
@@ -122,11 +210,42 @@ struct AdminStudentDetailView: View {
                 Text("Outstanding balance on cash membership")
                     .font(.bodySmall).foregroundColor(.textSub)
                 Button {
-                    vm.clearPendingFees(userId: s.id)
+                    clearKind = .fees
+                    clearAmountText = String(format: "%.0f", s.pendingAmount ?? 0)
                 } label: {
                     HStack {
                         Image(systemName: "checkmark.circle")
                         Text("Mark as Cleared")
+                    }
+                    .font(.labelMedium).foregroundColor(.emerald)
+                    .frame(maxWidth: .infinity).padding(10)
+                    .background(Color.emeraldFaint)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.emerald.opacity(0.4)))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+            }
+        }
+    }
+
+    private func graceDuesSection(_ s: StudentDetail) -> some View {
+        AppCard(accentColor: .amber) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label("Grace Period Dues", systemImage: "hourglass")
+                        .font(.headlineSmall).foregroundColor(.amber)
+                    Spacer()
+                    Text("₹\(String(format: "%.0f", s.duesAmount ?? 0))")
+                        .font(.headlineMedium).foregroundColor(.amber)
+                }
+                Text("Seat is being held — clear dues to reactivate as Paid.")
+                    .font(.bodySmall).foregroundColor(.textSub)
+                Button {
+                    clearKind = .dues
+                    clearAmountText = String(format: "%.0f", s.duesAmount ?? 0)
+                } label: {
+                    HStack {
+                        Image(systemName: "checkmark.circle")
+                        Text("Clear Dues")
                     }
                     .font(.labelMedium).foregroundColor(.emerald)
                     .frame(maxWidth: .infinity).padding(10)
@@ -161,6 +280,34 @@ struct AdminStudentDetailView: View {
                 OutlineButton("Change Seat") { showChangeSeat = true }
             }
 
+            if s.membershipId != nil && (s.membershipStatus == "ACTIVE" || s.membershipStatus == "GRACE") {
+                Button {
+                    showReleaseConfirm = true
+                } label: {
+                    HStack {
+                        Image(systemName: "chair.lounge")
+                        Text("Release Seat")
+                    }
+                    .font(.labelLarge).foregroundColor(.redAlert)
+                    .frame(maxWidth: .infinity).padding(14)
+                    .background(Color.redFaint)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.redAlert.opacity(0.4)))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            }
+
+            if s.membershipId != nil && s.displayStatus == "PAID" {
+                OutlineButton("Renew Seat") { showRenewConfirm = true }
+            }
+
+            if s.membershipId != nil && s.membershipStatus == "ACTIVE" {
+                OutlineButton("Change Status") {
+                    changeStatusTarget = "PENDING"
+                    pendingAmountInput = ""
+                    showChangeStatus = true
+                }
+            }
+
             OutlineButton("Send Message") { showMessage = true }
 
             Button {
@@ -175,6 +322,35 @@ struct AdminStudentDetailView: View {
                 .frame(maxWidth: .infinity).padding(14)
                 .background(Color.blueFaint)
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.blueSoft.opacity(0.4)))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+
+            Button {
+                showSeatHistory.toggle()
+                if showSeatHistory { vm.loadStudentSeatHistory(userId: s.id) }
+            } label: {
+                HStack {
+                    Image(systemName: "clock.arrow.circlepath")
+                    Text(showSeatHistory ? "Hide Seat History" : "View Seat History")
+                }
+                .font(.labelLarge).foregroundColor(.blueSoft)
+                .frame(maxWidth: .infinity).padding(14)
+                .background(Color.blueFaint)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.blueSoft.opacity(0.4)))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+
+            Button {
+                showDeleteConfirm = true
+            } label: {
+                HStack {
+                    Image(systemName: "trash")
+                    Text("Delete Student")
+                }
+                .font(.labelLarge).foregroundColor(.redAlert)
+                .frame(maxWidth: .infinity).padding(14)
+                .background(Color.redFaint)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.redAlert.opacity(0.4)))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
 
@@ -225,6 +401,95 @@ struct AdminStudentDetailView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var seatHistorySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Seat History").font(.headlineSmall).foregroundColor(.textPrimary)
+            if vm.studentSeatHistory.isEmpty {
+                Text("No seat history found").font(.bodySmall).foregroundColor(.textMuted)
+                    .frame(maxWidth: .infinity).padding(.vertical, 8)
+            } else {
+                ForEach(vm.studentSeatHistory) { h in
+                    AppCard {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(h.seatNumber ?? "—")
+                                    .font(.labelLarge).foregroundColor(.textPrimary)
+                                Spacer()
+                                if let status = h.status { StatusChip(status: status) }
+                            }
+                            Text("\(h.startDate ?? "—") → \(h.endDate ?? "—") · \((h.shift ?? "").capitalized)")
+                                .font(.bodySmall).foregroundColor(.textSub)
+                            if let plan = h.planName {
+                                Text(plan).font(.bodySmall).foregroundColor(.textMuted)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func changeStatusSheet(_ s: StudentDetail) -> some View {
+        NavigationStack {
+            ZStack {
+                Color.navyDeep.ignoresSafeArea()
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Correct \(s.name)'s wrongly-marked-Paid membership. This deletes their last payment record and cannot be undone.")
+                        .font(.bodySmall).foregroundColor(.textSub)
+
+                    HStack(spacing: 10) {
+                        statusTargetButton("Pending", value: "PENDING")
+                        statusTargetButton("Grace", value: "GRACE")
+                    }
+
+                    if changeStatusTarget == "PENDING" {
+                        AppTextField(label: "Pending Amount (₹)", text: $pendingAmountInput,
+                                    placeholder: "e.g. 200", keyboardType: .decimalPad,
+                                    leadingIcon: "indianrupeesign")
+                    } else {
+                        Text("Sets dues to the full plan price and resets their expiry date to today, so days-overdue counts from now.")
+                            .font(.bodySmall).foregroundColor(.textSub)
+                    }
+
+                    Spacer()
+
+                    PrimaryButton(changeStatusTarget == "PENDING" ? "Mark Pending" : "Mark Grace") {
+                        guard let membershipId = s.membershipId else { return }
+                        if changeStatusTarget == "PENDING" {
+                            guard let amount = Double(pendingAmountInput), amount > 0 else { return }
+                            vm.markPending(membershipId: membershipId, pendingAmount: amount, userId: s.id)
+                        } else {
+                            vm.markGrace(membershipId: membershipId, userId: s.id)
+                        }
+                        showChangeStatus = false
+                    }
+                    .disabled(changeStatusTarget == "PENDING" && (Double(pendingAmountInput) ?? 0) <= 0)
+                }
+                .padding(16)
+            }
+            .navigationTitle("Change Status")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { showChangeStatus = false }.foregroundColor(.amber)
+                }
+            }
+        }
+    }
+
+    private func statusTargetButton(_ title: String, value: String) -> some View {
+        let selected = changeStatusTarget == value
+        return Button { changeStatusTarget = value } label: {
+            Text(title)
+                .font(.labelMedium)
+                .foregroundColor(selected ? .navyDeep : .textSub)
+                .frame(maxWidth: .infinity).padding(.vertical, 10)
+                .background(selected ? Color.amber : Color.cardBg)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(selected ? Color.amber : Color.cardBorder))
         }
     }
 

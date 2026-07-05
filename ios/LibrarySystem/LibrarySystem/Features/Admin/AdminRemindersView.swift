@@ -3,10 +3,15 @@ import SwiftUI
 struct AdminRemindersView: View {
     @ObservedObject var vm: AdminViewModel
 
-    @State private var activeTab    = 0   // 0 = Expiring, 1 = Pending Fees
+    @State private var activeTab    = 0   // 0 = Expiring, 1 = Pending Fees, 2 = Grace Dues, 3 = No Seat
     @State private var withinDays   = 7
     @State private var selectedIds  = Set<String>()
     @State private var selectAll    = false
+
+    // Shared "clear amount" prompt — used by both Pending Fees and Grace Dues rows.
+    @State private var clearTarget:      StudentDetail?
+    @State private var clearAmountText   = ""
+    @State private var clearIsGraceDues  = false
 
     private let dayOptions = [3, 5, 7]
 
@@ -18,8 +23,12 @@ struct AdminRemindersView: View {
                     tabBar
                     if activeTab == 0 {
                         expiringContent
-                    } else {
+                    } else if activeTab == 1 {
                         pendingFeesContent
+                    } else if activeTab == 2 {
+                        graceDuesContent
+                    } else {
+                        orphanedSeatsContent
                     }
                 }
             }
@@ -32,6 +41,29 @@ struct AdminRemindersView: View {
         .onAppear {
             vm.loadExpiring(withinDays: withinDays)
             vm.loadPendingFeeStudents()
+            vm.loadGraceDuesStudents()
+            vm.loadOrphanedSeatStudents()
+        }
+        .alert(clearIsGraceDues ? "Clear Dues" : "Clear Pending Fees",
+               isPresented: Binding(get: { clearTarget != nil }, set: { if !$0 { clearTarget = nil } })) {
+            TextField("Amount", text: $clearAmountText).keyboardType(.decimalPad)
+            Button("Cancel", role: .cancel) { clearTarget = nil }
+            Button("Clear") {
+                guard let target = clearTarget, let amount = Double(clearAmountText), amount > 0 else { return }
+                if clearIsGraceDues {
+                    if let membershipId = target.membershipId {
+                        vm.clearDues(membershipId: membershipId, amountCleared: amount, userId: target.id)
+                    }
+                } else {
+                    vm.clearPendingFees(userId: target.id, amountCleared: amount)
+                }
+                clearTarget = nil
+            }
+        } message: {
+            if let target = clearTarget {
+                let outstanding = clearIsGraceDues ? (target.duesAmount ?? 0) : (target.pendingAmount ?? 0)
+                Text("Record a payment for \(target.name). Outstanding: ₹\(String(format: "%.0f", outstanding)). Any amount not cleared stays on record as a pending balance.")
+            }
         }
     }
 
@@ -39,6 +71,8 @@ struct AdminRemindersView: View {
         HStack(spacing: 0) {
             tabButton(title: "Expiring", index: 0)
             tabButton(title: "Pending Fees", index: 1)
+            tabButton(title: "Grace Dues", index: 2)
+            tabButton(title: "No Seat", index: 3)
         }
         .background(Color.navyMid.opacity(0.3))
     }
@@ -228,13 +262,147 @@ struct AdminRemindersView: View {
                                 Spacer()
 
                                 Button {
-                                    vm.clearPendingFees(userId: student.id)
+                                    clearIsGraceDues = false
+                                    clearAmountText = String(format: "%.0f", student.pendingAmount ?? 0)
+                                    clearTarget = student
                                 } label: {
                                     Text("Clear")
                                         .font(.labelSmall).foregroundColor(.emerald)
                                         .padding(.horizontal, 10).padding(.vertical, 5)
                                         .background(Color.emeraldFaint)
                                         .clipShape(Capsule())
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    // MARK: - Grace Dues Tab
+
+    private var graceDuesContent: some View {
+        VStack(spacing: 0) {
+            graceDuesControls
+            if vm.isLoading {
+                LoadingView()
+            } else {
+                graceDuesList
+            }
+        }
+    }
+
+    private var graceDuesControls: some View {
+        HStack {
+            Toggle("Select All", isOn: $selectAll)
+                .toggleStyle(CheckboxToggleStyle())
+                .foregroundColor(.textSub)
+                .onChange(of: selectAll) { val in
+                    selectedIds = val ? Set(vm.graceDuesStudents.map(\.id)) : []
+                }
+            Spacer()
+            PrimaryButton(selectedIds.isEmpty ? "Remind All" : "Remind (\(selectedIds.count))") {
+                let ids = selectedIds.isEmpty ? vm.graceDuesStudents.map(\.id) : Array(selectedIds)
+                vm.sendGraceDuesReminders(userIds: ids)
+            }
+            .frame(width: 160)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .background(Color.navyMid.opacity(0.2))
+    }
+
+    private func daysOverdue(_ endDate: String?) -> Int {
+        guard let endDate else { return 0 }
+        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+        guard let end = fmt.date(from: endDate) else { return 0 }
+        let days = Calendar.current.dateComponents([.day], from: end, to: Date()).day ?? 0
+        return max(0, days)
+    }
+
+    private var graceDuesList: some View {
+        ScrollView {
+            LazyVStack(spacing: 10) {
+                if vm.graceDuesStudents.isEmpty {
+                    Text("No dues to clear").foregroundColor(.textMuted)
+                        .frame(maxWidth: .infinity).padding(.top, 60)
+                } else {
+                    ForEach(vm.graceDuesStudents) { student in
+                        AppCard {
+                            HStack(spacing: 12) {
+                                Image(systemName: selectedIds.contains(student.id) ? "checkmark.square.fill" : "square")
+                                    .foregroundColor(selectedIds.contains(student.id) ? .amber : .textMuted)
+                                    .font(.title3)
+                                    .onTapGesture {
+                                        if selectedIds.contains(student.id) { selectedIds.remove(student.id) }
+                                        else { selectedIds.insert(student.id) }
+                                    }
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(student.name).font(.labelLarge).foregroundColor(.textPrimary)
+                                    Text(student.mobile).font(.bodySmall).foregroundColor(.textSub)
+                                    HStack(spacing: 8) {
+                                        Label("₹\(String(format: "%.0f", student.duesAmount ?? 0)) dues",
+                                              systemImage: "hourglass")
+                                            .font(.labelSmall).foregroundColor(.redAlert)
+                                        Text("· \(daysOverdue(student.membershipEnd))d overdue")
+                                            .font(.labelSmall).foregroundColor(.amber)
+                                        if let seat = student.seatNumber {
+                                            Text("· Seat \(seat)").font(.labelSmall).foregroundColor(.textMuted)
+                                        }
+                                    }
+                                }
+
+                                Spacer()
+
+                                Button {
+                                    clearIsGraceDues = true
+                                    clearAmountText = String(format: "%.0f", student.duesAmount ?? 0)
+                                    clearTarget = student
+                                } label: {
+                                    Text("Clear")
+                                        .font(.labelSmall).foregroundColor(.emerald)
+                                        .padding(.horizontal, 10).padding(.vertical, 5)
+                                        .background(Color.emeraldFaint)
+                                        .clipShape(Capsule())
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    // MARK: - No Seat Tab
+
+    private var orphanedSeatsContent: some View {
+        ScrollView {
+            LazyVStack(spacing: 10) {
+                if vm.orphanedSeatStudents.isEmpty {
+                    Text("Everyone has a seat").foregroundColor(.textMuted)
+                        .frame(maxWidth: .infinity).padding(.top, 60)
+                } else {
+                    ForEach(vm.orphanedSeatStudents) { student in
+                        NavigationLink {
+                            AdminStudentDetailView(vm: vm, studentId: student.id)
+                        } label: {
+                            AppCard {
+                                HStack(spacing: 12) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(student.name).font(.labelLarge).foregroundColor(.textPrimary)
+                                        Text(student.mobile).font(.bodySmall).foregroundColor(.textSub)
+                                        if let plan = student.planName {
+                                            Text(plan).font(.labelSmall).foregroundColor(.amber)
+                                        }
+                                        if let end = student.membershipEnd {
+                                            Text("Ends \(end)").font(.labelSmall).foregroundColor(.textMuted)
+                                        }
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right").foregroundColor(.textMuted)
                                 }
                             }
                         }

@@ -34,6 +34,9 @@ struct DashboardView: View {
                             LoadingView().frame(height: 200)
                         } else if let membership = vm.membership, membership.status == "ACTIVE" {
                             activeMembershipSection(membership)
+                        } else if let membership = vm.membership,
+                                  membership.status == "GRACE" || membership.status == "EXPIRED" {
+                            graceExpiredSection(membership)
                         } else {
                             noMembershipSection
                         }
@@ -94,6 +97,33 @@ struct DashboardView: View {
         }
     }
 
+    private func graceExpiredSection(_ m: Membership) -> some View {
+        AppCard(accentColor: .redAlert) {
+            VStack(spacing: 12) {
+                HStack {
+                    Text(m.planName)
+                        .font(.headlineMedium)
+                        .foregroundColor(.textPrimary)
+                    Spacer()
+                    StatusChip(status: m.status)
+                }
+                Divider().background(Color.dividerColor)
+                InfoRow(label: "Seat",       value: m.seatNumber.isEmpty ? "—" : m.seatNumber)
+                InfoRow(label: "Expired",    value: m.endDate)
+                if let days = daysRemaining(m.endDate) {
+                    InfoRow(label: "Days Left", value: "\(days)", valueColor: .redAlert)
+                }
+                HStack(spacing: 10) {
+                    Image(systemName: "lock.fill").foregroundColor(.redAlert)
+                    Text("Your seat is being held for you — pay ₹\(String(format: "%.0f", m.duesAmount ?? m.planPrice ?? 0)) to continue your plan on the Membership tab.")
+                        .font(.bodySmall).foregroundColor(.textSub)
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding(.horizontal, 16)
+    }
+
     private var noMembershipSection: some View {
         AppCard {
             VStack(spacing: 12) {
@@ -148,7 +178,6 @@ struct DashboardView: View {
     private func daysRemaining(_ endDate: String) -> Int? {
         let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
         guard let end = fmt.date(from: endDate) else { return nil }
-        let days = Calendar.current.dateComponents([.day], from: Date(), to: end).day ?? 0
-        return max(0, days)
+        return Calendar.current.dateComponents([.day], from: Date(), to: end).day ?? 0
     }
 }

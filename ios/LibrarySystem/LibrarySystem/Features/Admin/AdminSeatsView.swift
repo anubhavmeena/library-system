@@ -7,6 +7,7 @@ struct AdminSeatsView: View {
     @State private var selectedDate  = Date()
     @State private var showDatePicker = false
     @State private var tappedSeat:   SeatInfoItem?
+    @State private var showSeatHistory = false
 
     private let shifts = ["MORNING", "EVENING", "FULL_DAY"]
 
@@ -33,7 +34,7 @@ struct AdminSeatsView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .sheet(isPresented: $showDatePicker) { datePickerSheet }
-            .sheet(item: $tappedSeat) { seat in seatDetailSheet(seat) }
+            .sheet(item: $tappedSeat, onDismiss: { showSeatHistory = false; vm.seatHistory = [] }) { seat in seatDetailSheet(seat) }
         }
         .onAppear { vm.loadSeatMap(shift: selectedShift, date: dateString) }
     }
@@ -183,19 +184,60 @@ struct AdminSeatsView: View {
         NavigationStack {
             ZStack {
                 Color.navyDeep.ignoresSafeArea()
-                VStack(spacing: 0) {
-                    AppCard(accentColor: .amber) {
-                        VStack(spacing: 12) {
-                            Text("Seat \(seat.seatNumber)").font(.headlineLarge).foregroundColor(.textPrimary)
-                            Divider().background(Color.dividerColor)
-                            if let name = seat.studentName { InfoRow(label: "Student",  value: name) }
-                            if let mob  = seat.studentMobile { InfoRow(label: "Mobile",  value: mob) }
-                            if let end  = seat.membershipEnd { InfoRow(label: "Expires", value: end) }
-                            if let sh   = seat.shift { InfoRow(label: "Shift", value: sh.capitalized) }
+                ScrollView {
+                    VStack(spacing: 16) {
+                        AppCard(accentColor: .amber) {
+                            VStack(spacing: 12) {
+                                Text("Seat \(seat.seatNumber)").font(.headlineLarge).foregroundColor(.textPrimary)
+                                Divider().background(Color.dividerColor)
+                                if let name = seat.studentName { InfoRow(label: "Student",  value: name) }
+                                if let mob  = seat.studentMobile { InfoRow(label: "Mobile",  value: mob) }
+                                if let end  = seat.membershipEnd { InfoRow(label: "Expires", value: end) }
+                                if let sh   = seat.shift { InfoRow(label: "Shift", value: sh.capitalized) }
+                            }
+                        }
+
+                        Button {
+                            showSeatHistory.toggle()
+                            if showSeatHistory { vm.loadSeatHistory(seatNumber: seat.seatNumber) }
+                        } label: {
+                            HStack {
+                                Text(showSeatHistory ? "Hide Seat History" : "View Seat History")
+                                Spacer()
+                                Image(systemName: showSeatHistory ? "chevron.up" : "chevron.down")
+                            }
+                            .font(.labelMedium).foregroundColor(.blueSoft)
+                            .padding(12)
+                            .background(Color.blueFaint)
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.blueSoft.opacity(0.4)))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+
+                        if showSeatHistory {
+                            if vm.seatHistory.isEmpty {
+                                Text("No booking history for this seat").font(.bodySmall).foregroundColor(.textMuted)
+                                    .frame(maxWidth: .infinity).padding(.vertical, 8)
+                            } else {
+                                ForEach(vm.seatHistory) { h in
+                                    AppCard {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            HStack {
+                                                Text(h.studentName ?? "—").font(.labelLarge).foregroundColor(.textPrimary)
+                                                Spacer()
+                                                if let status = h.status { StatusChip(status: status) }
+                                            }
+                                            if let mob = h.studentMobile {
+                                                Text(mob).font(.bodySmall).foregroundColor(.textSub)
+                                            }
+                                            Text("\(h.startDate ?? "—") → \(h.endDate ?? "—") · \((h.shift ?? "").capitalized)")
+                                                .font(.bodySmall).foregroundColor(.textMuted)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     .padding(24)
-                    Spacer()
                 }
             }
             .navigationTitle("Seat Info")

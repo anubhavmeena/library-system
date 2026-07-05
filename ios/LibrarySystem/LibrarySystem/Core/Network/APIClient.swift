@@ -117,6 +117,47 @@ actor APIClient {
         let envelope = try decoder.decode(ApiResponse<[String: String]>.self, from: responseData)
         return envelope.data?["photoUrl"] ?? envelope.data?["aadhaarUrl"] ?? ""
     }
+
+    // Multipart upload that decodes the response payload into any Decodable type
+    // (e.g. bulk CSV/XLSX import results), rather than the fixed [String: String]
+    // map used by uploadMultipart above.
+    func uploadMultipartDecoded<T: Decodable>(path: String, fieldName: String, fileName: String,
+                                              mimeType: String, data: Data, token: String?) async throws -> T {
+        guard let url = URL(string: baseURL.absoluteString + path) else {
+            throw APIError.invalidURL
+        }
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var request = URLRequest(url: url, timeoutInterval: 60)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(data)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+
+        let (responseData, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+            throw APIError.unauthorized
+        }
+        do {
+            let envelope = try decoder.decode(ApiResponse<T>.self, from: responseData)
+            if let payload = envelope.data, envelope.success {
+                return payload
+            }
+            throw APIError.serverError(envelope.message ?? "Request failed")
+        } catch let e as APIError {
+            throw e
+        } catch {
+            throw APIError.decodingError(error)
+        }
+    }
 }
 
 // Placeholder for void responses

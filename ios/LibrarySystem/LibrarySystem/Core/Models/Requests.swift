@@ -137,3 +137,34 @@ struct ManualImportRequest: Codable {
     let date: String?
     let seatNumber: String
 }
+
+// Shared by clear-dues and clear-pending-fees — the admin enters how much is
+// actually being collected; any remainder is carried forward as a new
+// pending balance rather than being wiped out.
+struct ClearAmountRequest: Codable {
+    let amountCleared: Double
+}
+
+struct ReleaseSeatRequest: Codable {
+    let notifyStudent: Bool
+}
+
+struct MarkPendingRequest: Codable {
+    let pendingAmount: Double
+}
+
+struct SaveAppSettingsRequest: Codable {
+    let wifiName: String?
+    let wifiPassword: String?
+    let graceDays: Int
+    let convenienceFee: Double
+    let waterTankerRate: Double
+}
+
+struct UpdateNotificationSettingRequest: Codable {
+    let sendToStudent: Bool
+    let sendToAdmin: Bool
+    let hindiEnabled: Bool
+    let hindiTextStudent: String?
+    let hindiTextAdmin: String?
+}

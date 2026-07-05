@@ -34,6 +34,18 @@ struct MembershipRepository {
         return try await api.request(.verifyPayment(req), token: token)
     }
 
+    func createDuesOrder() async throws -> PaymentOrder {
+        try await api.request(.createDuesOrder, token: token)
+    }
+
+    func verifyDuesPayment(gatewayOrderId: String, gatewayPaymentId: String,
+                           signature: String, membershipId: String) async throws -> Membership {
+        let req = VerifyPaymentRequest(gatewayOrderId: gatewayOrderId,
+                                       gatewayPaymentId: gatewayPaymentId,
+                                       signature: signature, membershipId: membershipId)
+        return try await api.request(.verifyDuesPayment(req), token: token)
+    }
+
     func submitFeedback(type: String, subject: String, description: String) async throws -> FeedbackItem {
         let req = SubmitFeedbackRequest(type: type, subject: subject, description: description)
         return try await api.request(.submitFeedback(req), token: token)

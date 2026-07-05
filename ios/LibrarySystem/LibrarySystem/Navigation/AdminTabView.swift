@@ -3,6 +3,7 @@ import SwiftUI
 struct AdminTabView: View {
     @StateObject private var vm = AdminViewModel()
     @State private var showCreateMembership = false
+    @State private var showRunExpiryConfirm = false
 
     var body: some View {
         TabView {
@@ -27,6 +28,12 @@ struct AdminTabView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showCreateMembership) {
             AdminCreateMembershipView(vm: vm)
+        }
+        .alert("Run Expiry Check", isPresented: $showRunExpiryConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Run Now") { vm.runExpiryCheck() }
+        } message: {
+            Text("Manually runs the daily grace-transition job now, moving any overdue ACTIVE memberships into Grace/Expired immediately instead of waiting for the next scheduled run.")
         }
     }
 
@@ -54,6 +61,18 @@ struct AdminTabView: View {
 
                         NavigationLink { AdminInboxView(vm: vm) } label: {
                             moreActionRow(icon: "tray.full.fill", label: "Inbox")
+                        }
+
+                        NavigationLink { AdminSettingsView(vm: vm) } label: {
+                            moreActionRow(icon: "bell.badge.fill", label: "Notification Settings")
+                        }
+
+                        NavigationLink { AdminAppSettingsView(vm: vm) } label: {
+                            moreActionRow(icon: "gearshape.fill", label: "App Settings")
+                        }
+
+                        Button { showRunExpiryConfirm = true } label: {
+                            moreActionRow(icon: "clock.arrow.circlepath", label: "Run Expiry Check")
                         }
 
                         NavigationLink { AdminGalleryView() } label: {
