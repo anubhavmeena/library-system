@@ -148,13 +148,13 @@ struct AdminImportView: View {
                 AppTextField(label: "Full Name *", text: $name,
                              placeholder: "Student name", leadingIcon: "person")
                 AppTextField(label: "Phone Number *", text: $phone,
-                             placeholder: "10-digit mobile number", leadingIcon: "phone",
-                             keyboardType: .phonePad)
+                             placeholder: "10-digit mobile number", keyboardType: .phonePad,
+                             leadingIcon: "phone")
                 AppTextField(label: "Seat Number *", text: $seatNumber,
                              placeholder: "e.g. A1, B12", leadingIcon: "chair")
                 AppTextField(label: "Fees (optional)", text: $fees,
                              placeholder: "Amount — matches nearest plan",
-                             leadingIcon: "indianrupeesign", keyboardType: .decimalPad)
+                             keyboardType: .decimalPad, leadingIcon: "indianrupeesign")
                 AppTextField(label: "Start Date (optional)", text: $date,
                              placeholder: "YYYY-MM-DD — defaults to today",
                              leadingIcon: "calendar")
