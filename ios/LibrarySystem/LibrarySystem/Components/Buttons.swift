@@ -35,6 +35,11 @@ struct OutlineButton: View {
     let title: String
     let action: () -> Void
 
+    init(_ title: String, action: @escaping () -> Void) {
+        self.title = title
+        self.action = action
+    }
+
     var body: some View {
         Button(action: action) {
             Text(title)

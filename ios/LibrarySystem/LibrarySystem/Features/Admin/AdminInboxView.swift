@@ -3,6 +3,7 @@ import SwiftUI
 struct AdminInboxView: View {
     @ObservedObject var vm: AdminViewModel
     @State private var selectedSummary: InboxSummary?
+    @State private var showDetail = false
 
     var body: some View {
         NavigationStack {
@@ -17,8 +18,10 @@ struct AdminInboxView: View {
                         messageList
                     }
                 }
-                .navigationDestination(item: $selectedSummary) { summary in
-                    InboxMessageDetailView(vm: vm, summary: summary)
+                .navigationDestination(isPresented: $showDetail) {
+                    if let summary = selectedSummary {
+                        InboxMessageDetailView(vm: vm, summary: summary)
+                    }
                 }
             }
             .navigationTitle("Inbox")
@@ -53,6 +56,7 @@ struct AdminInboxView: View {
                     Button {
                         selectedSummary = summary
                         vm.loadInboxMessage(summary.messageNumber)
+                        showDetail = true
                     } label: {
                         AppCard {
                             HStack(spacing: 12) {

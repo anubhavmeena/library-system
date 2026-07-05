@@ -44,7 +44,7 @@ struct AdminExpensesView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .onAppear { vm.loadExpenses(year: selectedYear, month: selectedMonth) }
-        .onChange(of: vm.expense) { populateFields() }
+        .onChange(of: vm.expense) { _ in populateFields() }
     }
 
     private var periodPicker: some View {
