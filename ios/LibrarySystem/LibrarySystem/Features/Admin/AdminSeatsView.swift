@@ -91,9 +91,17 @@ struct AdminSeatsView: View {
                 }
                 .padding(.horizontal, 16)
 
-                // Seat grid (admin read-only version — tap to see occupant)
-                adminSeatGrid(map)
-                    .padding(16)
+                // Seat grid (admin read-only version — tap to see occupant).
+                // A full row (row label + 14 seats + aisle + 14 seats) is
+                // ~900pt wide, far more than screen width — without its own
+                // horizontal scroll, the outer VStack's default center
+                // alignment clips it symmetrically on both sides instead of
+                // starting from the leading edge, hiding the row label and
+                // first several seats entirely.
+                ScrollView(.horizontal, showsIndicators: true) {
+                    adminSeatGrid(map)
+                        .padding(16)
+                }
             }
             .padding(.bottom, 24)
         }
