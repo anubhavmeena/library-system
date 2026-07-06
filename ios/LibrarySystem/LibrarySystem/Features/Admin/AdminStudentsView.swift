@@ -197,7 +197,8 @@ struct AdminStudentsView: View {
                             }
                         }
                         if let joined = s.joinedAt {
-                            Text("Joined \(joined.prefix(10))").font(.caption).foregroundColor(.textMuted)
+                            let joinedShort = String(joined.prefix(10))
+                            Text("Joined \(joinedShort)").font(.caption).foregroundColor(.textMuted)
                         }
                         Text(s.mobile + (s.email.map { " · \($0)" } ?? ""))
                             .font(.bodySmall).foregroundColor(.textSub)
