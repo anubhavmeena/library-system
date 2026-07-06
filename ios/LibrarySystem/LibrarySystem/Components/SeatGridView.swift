@@ -4,16 +4,28 @@ enum SeatState {
     case available, selected, booked
 }
 
+// Shared seat-picker grid — used by student booking (BookingView), admin
+// "change seat" (AdminStudentDetailView), and admin "Create Membership" (step 3).
+// Mirrors the real physical layout (same one AdminSeatsView's read-only admin
+// seat map already uses, and the web app's SeatGrid): each row splits into a
+// left block (seats 1-14) and a right block (15-28) with an aisle between them,
+// each block arranged as two stacked sub-rows of 7 back-to-back desk pairs —
+// not one flat strip of 14 seats, which didn't match the actual desk
+// arrangement and was wider than a phone screen really needs.
 struct SeatGridView: View {
     let seats: [Seat]
     let selectedSeat: String?
     let onSelect: (Seat) -> Void
     var readOnly: Bool = false
 
-    // Row counts matching the physical library layout
-    private let rows: [(label: String, count: Int)] = [
-        ("A", 28), ("B", 28), ("C", 28), ("D", 26)
-    ]
+    private let rowLabels = ["A", "B", "C", "D"]
+    // Physically blocked by pillars — excluded from selection regardless of
+    // what the backend returns for them, same as AdminSeatsView.
+    private let inactiveSeatNumbers: Set<String> = ["B8", "B18"]
+    private let leftTopSeats     = [13, 11, 9, 7, 5, 3, 1]
+    private let leftBottomSeats  = [14, 12, 10, 8, 6, 4, 2]
+    private let rightTopSeats    = [15, 17, 19, 21, 23, 25, 27]
+    private let rightBottomSeats = [16, 18, 20, 22, 24, 26, 28]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -26,52 +38,63 @@ struct SeatGridView: View {
             .padding(.bottom, 12)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(rows, id: \.label) { row in
-                        rowView(rowLabel: row.label, count: row.count)
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(rowLabels, id: \.self) { row in
+                        rowView(rowLabel: row)
                     }
                 }
-                .padding(.horizontal, 4)
+                .padding(4)
             }
         }
     }
 
-    private func rowView(rowLabel: String, count: Int) -> some View {
-        let rowSeats = seatsForRow(rowLabel, count: count)
-        let half = (count + 1) / 2
-        return HStack(alignment: .top, spacing: 0) {
+    private func rowView(rowLabel: String) -> some View {
+        let rowSeats = seatsForRow(rowLabel)
+        return HStack(alignment: .top, spacing: 6) {
             Text(rowLabel)
                 .font(.labelSmall)
                 .foregroundColor(.textMuted)
-                .frame(width: 18)
+                .frame(width: 16)
                 .padding(.top, 4)
 
-            // Left half
-            HStack(spacing: 4) {
-                ForEach(0..<half, id: \.self) { i in
-                    if i < rowSeats.count {
-                        seatCell(rowSeats[i])
-                    }
+            VStack(spacing: 4) {
+                HStack(spacing: 4) {
+                    ForEach(leftTopSeats, id: \.self) { n in seatCell(rowLabel: rowLabel, number: n, rowSeats: rowSeats) }
+                }
+                HStack(spacing: 4) {
+                    ForEach(leftBottomSeats, id: \.self) { n in seatCell(rowLabel: rowLabel, number: n, rowSeats: rowSeats) }
                 }
             }
 
             // Aisle
             Rectangle()
                 .fill(Color.clear)
-                .frame(width: 20)
+                .frame(width: 18)
 
-            // Right half
-            HStack(spacing: 4) {
-                ForEach(half..<count, id: \.self) { i in
-                    if i < rowSeats.count {
-                        seatCell(rowSeats[i])
-                    }
+            VStack(spacing: 4) {
+                HStack(spacing: 4) {
+                    ForEach(rightTopSeats, id: \.self) { n in seatCell(rowLabel: rowLabel, number: n, rowSeats: rowSeats) }
+                }
+                HStack(spacing: 4) {
+                    ForEach(rightBottomSeats, id: \.self) { n in seatCell(rowLabel: rowLabel, number: n, rowSeats: rowSeats) }
                 }
             }
         }
     }
 
-    private func seatCell(_ seat: Seat) -> some View {
+    @ViewBuilder
+    private func seatCell(rowLabel: String, number: Int, rowSeats: [Seat]) -> some View {
+        let seatNumber = "\(rowLabel)\(number)"
+        if inactiveSeatNumbers.contains(seatNumber) {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.navyMid.opacity(0.5))
+                .frame(width: 28, height: 28)
+        } else {
+            actualSeatCell(seat(rowLabel: rowLabel, number: number, in: rowSeats))
+        }
+    }
+
+    private func actualSeatCell(_ seat: Seat) -> some View {
         let state = seatState(seat)
         return Button {
             if !readOnly && state != .booked { onSelect(seat) }
@@ -91,16 +114,18 @@ struct SeatGridView: View {
         .disabled(readOnly || state == .booked)
     }
 
-    private func seatsForRow(_ rowLabel: String, count: Int) -> [Seat] {
-        let filtered = seats.filter { $0.row == rowLabel || $0.rowLabel == rowLabel }
-        if !filtered.isEmpty { return filtered }
-        // Synthesize placeholder seats if data has a flat list
-        return (1...count).map { i in
-            let number = "\(rowLabel)\(i)"
-            return seats.first { $0.seatNumber == number }
-                ?? Seat(id: number, seatNumber: number, row: rowLabel, isBooked: false,
-                        studentName: nil, studentMobile: nil, membershipEnd: nil)
-        }
+    // Looks up a specific seat number in the row's data; any seat number the
+    // backend didn't return (shouldn't normally happen) is treated as
+    // available rather than omitted — matches AdminSeatsView's own fallback.
+    private func seat(rowLabel: String, number: Int, in rowSeats: [Seat]) -> Seat {
+        let seatNumber = "\(rowLabel)\(number)"
+        return rowSeats.first(where: { $0.seatNumber == seatNumber })
+            ?? Seat(id: seatNumber, seatNumber: seatNumber, row: rowLabel, isBooked: false,
+                    studentName: nil, studentMobile: nil, membershipEnd: nil)
+    }
+
+    private func seatsForRow(_ rowLabel: String) -> [Seat] {
+        seats.filter { $0.row == rowLabel || $0.rowLabel == rowLabel }
     }
 
     private func seatState(_ seat: Seat) -> SeatState {
