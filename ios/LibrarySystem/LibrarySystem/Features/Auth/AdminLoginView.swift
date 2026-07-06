@@ -53,6 +53,22 @@ struct AdminLoginView: View {
                                 guard otp.count >= 4 else { return }
                                 vm.adminLogin(otp: otp)
                             }
+
+                            Button(vm.canResend ? "Resend OTP" : "Resend in \(vm.secondsLeft)s") {
+                                vm.resendOtp()
+                            }
+                            .font(.labelMedium)
+                            .foregroundColor(vm.canResend ? .amber : .textMuted)
+                            .disabled(!vm.canResend || vm.isLoading)
+
+                            if vm.showSmsOption {
+                                Button("Still no OTP? Send via SMS instead") {
+                                    vm.sendOtpViaSms()
+                                }
+                                .font(.labelMedium)
+                                .foregroundColor(.blueSoft)
+                                .disabled(vm.isLoading)
+                            }
                         }
 
                         if let err = vm.error {

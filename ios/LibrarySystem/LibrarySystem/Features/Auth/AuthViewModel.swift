@@ -122,6 +122,8 @@ final class AuthViewModel: ObservableObject {
             do {
                 try await repo.sendOtp(contact: contact)
                 otpSent = true
+                otpSendCount = 1
+                startResendTimer()
             } catch { self.error = error.localizedDescription }
             isLoading = false
         }
