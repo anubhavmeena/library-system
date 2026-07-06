@@ -16,6 +16,17 @@ val Magenta     = Color(0xFFD946EF)
 val MagentaFaint= Color(0x22D946EF)
 val BlueSoft    = Color(0xFF3B82F6)
 val BlueFaint   = Color(0x223B82F6)
+// Expiry/status tiers matching the web admin students & seat map pages'
+// Tailwind palette (orange-500, yellow-500, red-950, indigo-500) — needed
+// because the 6-value displayStatus (NEW/PAID/PENDING/GRACE/EXPIRED/RELEASED)
+// doesn't fit the app's original 4-color set.
+val Orange      = Color(0xFFF97316)
+val OrangeFaint = Color(0x26F97316)
+val YellowWarn  = Color(0xFFEAB308)
+val YellowFaint = Color(0x26EAB308)
+val RedDeep     = Color(0xFF450A0A)
+val Indigo      = Color(0xFF6366F1)
+val IndigoFaint = Color(0x336366F1)
 val TextPrimary = Color(0xFFF0F4FF)
 val TextSub     = Color(0xFF8AA6F8)
 val TextMuted   = Color(0xFF4A5FA8)

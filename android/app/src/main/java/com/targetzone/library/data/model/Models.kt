@@ -138,14 +138,23 @@ data class StudentSummary(
     val mobile: String = "",
     val email: String? = null,
     val isActive: Boolean = true,
+    val photoUrl: String? = null,
+    val joinedAt: String? = null,
     val membershipId: String? = null,
     val membershipStatus: String? = null,
     val seatNumber: String? = null,
     val shift: String? = null,
     val membershipStart: String? = null,
-    val endDate: String? = null,
+    // Backend's StudentDto sends "membershipEnd", not "endDate" — Gson does
+    // exact-name field matching with no naming policy configured, so this was
+    // silently null on every student and "Expires ..." never rendered.
+    val membershipEnd: String? = null,
     val planName: String? = null,
-    val pendingAmount: Double? = null
+    val daysRemaining: Int = 0,
+    val paymentMode: String? = null,
+    val pendingAmount: Double? = null,
+    val duesAmount: Double? = null,
+    val displayStatus: String? = null
 )
 
 data class StudentDetail(
@@ -171,7 +180,9 @@ data class StudentDetail(
     val membershipStatus: String? = null,
     val daysRemaining: Int = 0,
     val paymentMode: String? = null,
-    val pendingAmount: Double? = null
+    val pendingAmount: Double? = null,
+    val duesAmount: Double? = null,
+    val displayStatus: String? = null
 )
 
 data class FeedbackItem(
