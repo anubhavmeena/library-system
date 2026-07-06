@@ -342,18 +342,21 @@ struct AdminSeatsView: View {
 
     @ViewBuilder
     private func adminSeatCell(_ seat: SeatInfoItem) -> some View {
+        // Seat cells respond to a double tap, not a single tap — plain views
+        // with onTapGesture(count: 2) rather than Button, since a Button's
+        // own single-tap recognizer would otherwise fire on the first tap of
+        // any double tap anyway.
         if viewMode == .expiry, seat.isOccupied, let days = daysToExpiry(seat.membershipEnd) {
             let color = expiryColor(days)
-            Button { tappedSeat = seat } label: {
-                Text("\(days)")
-                    .font(.system(size: 7, weight: .bold))
-                    .foregroundColor(color)
-                    .frame(width: 22, height: 22)
-                    .background(color.opacity(0.18))
-                    .overlay(Circle().stroke(color, lineWidth: 1))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
+            Text("\(days)")
+                .font(.system(size: 7, weight: .bold))
+                .foregroundColor(color)
+                .frame(width: 22, height: 22)
+                .background(color.opacity(0.18))
+                .overlay(Circle().stroke(color, lineWidth: 1))
+                .clipShape(Circle())
+                .contentShape(Circle())
+                .onTapGesture(count: 2) { tappedSeat = seat }
         } else {
             // Standard view: available seats are muted emerald, occupied seats
             // are colored by gender (matching the web admin seat map) —
@@ -361,17 +364,15 @@ struct AdminSeatsView: View {
             let isFemale = seat.isOccupied && seat.studentGender?.caseInsensitiveCompare("Female") == .orderedSame
             let fg: Color = seat.isOccupied ? (isFemale ? .fuchsia : .redAlert) : .emerald
             let bg: Color = seat.isOccupied ? (isFemale ? Color.fuchsiaFaint : Color.redFaint) : Color.emeraldFaint
-            Button { if seat.isOccupied { tappedSeat = seat } } label: {
-                Text(viewMode == .expiry ? "" : String(seat.seatNumber.dropFirst()))
-                    .font(.system(size: 7, weight: .medium))
-                    .foregroundColor(fg)
-                    .frame(width: 22, height: 22)
-                    .background(bg)
-                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(fg, lineWidth: 1))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-            }
-            .buttonStyle(.plain)
-            .disabled(!seat.isOccupied)
+            Text(viewMode == .expiry ? "" : String(seat.seatNumber.dropFirst()))
+                .font(.system(size: 7, weight: .medium))
+                .foregroundColor(fg)
+                .frame(width: 22, height: 22)
+                .background(bg)
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(fg, lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) { if seat.isOccupied { tappedSeat = seat } }
         }
     }
 
