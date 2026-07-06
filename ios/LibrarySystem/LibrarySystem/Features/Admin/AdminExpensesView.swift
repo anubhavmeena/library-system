@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct AdminExpensesView: View {
     @ObservedObject var vm: AdminViewModel
@@ -39,7 +38,7 @@ struct AdminExpensesView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
-            .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
+            .dismissKeyboardOnTap()
             .navigationTitle("Expenses")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.navyMid, for: .navigationBar)
@@ -92,10 +91,6 @@ struct AdminExpensesView: View {
         selectedMonth = newMonth
         selectedYear  = newYear
         vm.loadExpenses(year: selectedYear, month: selectedMonth)
-    }
-
-    private func dismissKeyboard() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     private var currentExpenseSummary: some View {

@@ -26,6 +26,7 @@ struct AdminGalleryView: View {
                     photoDetailSheet(photo)
                 }
             }
+            .dismissKeyboardOnTap()
             .navigationTitle("Gallery")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.navyMid, for: .navigationBar)

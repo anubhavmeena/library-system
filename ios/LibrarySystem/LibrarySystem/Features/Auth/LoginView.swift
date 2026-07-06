@@ -93,7 +93,9 @@ struct LoginView: View {
             )) {
                 RegisterView(vm: vm)
             }
+            .scrollDismissesKeyboard(.interactively)
         }
+        .dismissKeyboardOnTap()
         .navigationBarHidden(true)
     }
 }

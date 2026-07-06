@@ -78,7 +78,9 @@ struct AdminLoginView: View {
                     .padding(.horizontal, 24)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
         }
+        .dismissKeyboardOnTap()
         .navigationTitle("Admin")
         .navigationBarTitleDisplayMode(.inline)
     }

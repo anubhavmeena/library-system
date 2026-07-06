@@ -72,6 +72,7 @@ struct AdminStudentDetailView: View {
                 if let s = vm.selectedStudent { changeStatusSheet(s) }
             }
         }
+        .dismissKeyboardOnTap()
         .navigationTitle("Student Details")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.navyMid, for: .navigationBar)
@@ -477,6 +478,7 @@ struct AdminStudentDetailView: View {
                 }
                 .padding(16)
             }
+            .dismissKeyboardOnTap()
             .navigationTitle("Change Status")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -534,6 +536,7 @@ struct AdminStudentDetailView: View {
                 .padding(16)
                 .frame(maxHeight: .infinity, alignment: .top)
             }
+            .dismissKeyboardOnTap()
             .navigationTitle("Send Message")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -696,7 +699,9 @@ private struct EditStudentSheet: View {
                     }
                     .padding(16)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
+            .dismissKeyboardOnTap()
             .navigationTitle("Edit Profile")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear { vm.loadPlans() }

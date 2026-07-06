@@ -35,7 +35,9 @@ struct AdminBroadcastView: View {
                     }
                     .padding(16)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
+            .dismissKeyboardOnTap()
             .navigationTitle("Broadcast")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.navyMid, for: .navigationBar)

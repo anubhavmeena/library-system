@@ -42,6 +42,7 @@ struct AdminStudentsView: View {
             .navigationDestination(isPresented: $showDetail) {
                 AdminStudentDetailView(vm: vm, studentId: selectedId)
             }
+            .dismissKeyboardOnTap()
         }
         .onAppear { loadStudents() }
     }
@@ -149,6 +150,7 @@ struct AdminStudentsView: View {
             }
             .padding(16)
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 
     // Mirrors the web row's status badge colors exactly (STATUS_BADGE_CLASSES

@@ -122,6 +122,7 @@ struct AdminFeedbackView: View {
                 }
                 .padding(16)
             }
+            .dismissKeyboardOnTap()
             .navigationTitle("Respond")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -19,7 +19,9 @@ struct FeedbackView: View {
                     }
                     .padding(16)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
+            .dismissKeyboardOnTap()
             .navigationTitle("Feedback")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.navyMid, for: .navigationBar)

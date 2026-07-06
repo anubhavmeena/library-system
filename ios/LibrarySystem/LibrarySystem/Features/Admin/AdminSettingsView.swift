@@ -68,7 +68,9 @@ struct AdminSettingsView: View {
                     }
                     .padding(16)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
+            .dismissKeyboardOnTap()
             .navigationTitle("Notification Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.navyMid, for: .navigationBar)

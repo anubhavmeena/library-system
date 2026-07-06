@@ -57,8 +57,10 @@ struct AdminCreateMembershipView: View {
                         }
                         .padding(16)
                     }
+                    .scrollDismissesKeyboard(.interactively)
                 }
             }
+            .dismissKeyboardOnTap()
             .navigationTitle("Create Membership")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.navyMid, for: .navigationBar)

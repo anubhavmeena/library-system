@@ -84,7 +84,9 @@ struct RegisterView: View {
                 }
                 .padding(.bottom, 40)
             }
+            .scrollDismissesKeyboard(.interactively)
         }
+        .dismissKeyboardOnTap()
         .navigationBarTitleDisplayMode(.inline)
     }
 }

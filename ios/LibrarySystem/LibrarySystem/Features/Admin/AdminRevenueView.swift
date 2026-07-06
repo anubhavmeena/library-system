@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct AdminRevenueView: View {
     @ObservedObject var vm: AdminViewModel
@@ -37,7 +36,7 @@ struct AdminRevenueView: View {
                     drillDownSheet
                 }
             }
-            .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
+            .dismissKeyboardOnTap()
             .navigationTitle("Revenue")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.navyMid, for: .navigationBar)
@@ -45,10 +44,6 @@ struct AdminRevenueView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .onAppear { loadDefaultRange() }
-    }
-
-    private func dismissKeyboard() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     // fromDate/toDate stay "yyyy-MM-dd" strings (what vm.loadRevenueReport expects),
