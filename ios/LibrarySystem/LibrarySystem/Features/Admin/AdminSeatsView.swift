@@ -19,20 +19,22 @@ struct AdminSeatsView: View {
     @State private var tappedSeat:   SeatInfoItem?
     @State private var showSeatHistory = false
     @State private var viewMode: SeatViewMode = .standard
+    @State private var showStudentDetail = false
+    @State private var tappedStudentId = ""
 
     // Pinch-to-zoom / pan for the seat grid specifically (not the legend or
-    // the rest of the page). seatMapFitScale is computed at runtime from the
-    // grid's real measured size vs. the available width (see zoomableSeatGrid)
-    // so the map always *loads* zoomed out just enough to show all four rows
-    // at once, on any screen size — rather than assuming a hardcoded scale
-    // happens to fit. It doubles as the zoom-out floor and the double-tap
-    // reset target, so you can never pinch past "everything visible."
+    // the rest of the page). The grid starts at its natural 1.0 scale — bigger
+    // than the fixed-height container — so it's scrollable/pannable right from
+    // the start rather than needing a pinch first. seatMapFitScale is computed
+    // at runtime from the grid's real measured size vs. the available width
+    // (see zoomableSeatGrid) and only used as the pinch-out floor and the
+    // double-tap reset target, so you can always zoom back out to see every
+    // row at once, but that's no longer the load-time default.
     @State private var seatMapScale: CGFloat = 1.0
     @State private var seatMapLastScale: CGFloat = 1.0
     @State private var seatMapOffset: CGSize = .zero
     @State private var seatMapLastOffset: CGSize = .zero
     @State private var seatMapFitScale: CGFloat = 1.0
-    @State private var seatMapFitApplied = false
 
     private enum SeatViewMode { case standard, expiry }
 
@@ -237,7 +239,7 @@ struct AdminSeatsView: View {
     private func seat(row: String, number: Int, in rowSeats: [SeatInfoItem]) -> SeatInfoItem {
         let seatNumber = "\(row)\(number)"
         return rowSeats.first(where: { $0.seatNumber == seatNumber })
-            ?? SeatInfoItem(seatNumber: seatNumber, isOccupied: false, studentName: nil,
+            ?? SeatInfoItem(seatNumber: seatNumber, isOccupied: false, studentId: nil, studentName: nil,
                             studentMobile: nil, studentGender: nil, shift: nil, membershipEnd: nil)
     }
 
@@ -267,10 +269,11 @@ struct AdminSeatsView: View {
     // SeatGridSizeKey) so seatMapFitScale can be computed from actual layout —
     // min(containerWidth/contentWidth, containerHeight/contentHeight, 1.0) —
     // rather than assuming a fixed cell size happens to fit every screen.
-    // That fit scale is the load-time default, the pinch-out floor, and the
-    // double-tap reset target, so the whole grid is always visible without
-    // ever needing a manual zoom-out. Panning only takes effect once zoomed
-    // in past the fit level.
+    // The grid loads at its natural (unscaled) size — bigger than the 340pt
+    // container, so it's scrollable/pannable immediately without needing to
+    // pinch first — and fit scale only serves as the pinch-out floor and the
+    // double-tap reset target (a way to zoom all the way out to see every row
+    // at once), not the starting state.
     private func zoomableSeatGrid(_ map: SeatMapDto) -> some View {
         GeometryReader { geo in
             adminSeatGrid(map)
@@ -302,7 +305,6 @@ struct AdminSeatsView: View {
                             },
                         DragGesture()
                             .onChanged { value in
-                                guard seatMapScale > seatMapFitScale else { return }
                                 seatMapOffset = CGSize(
                                     width: seatMapLastOffset.width + value.translation.width,
                                     height: seatMapLastOffset.height + value.translation.height
@@ -324,17 +326,11 @@ struct AdminSeatsView: View {
                 .onPreferenceChange(SeatGridSizeKey.self) { size in
                     guard size.width > 0, size.height > 0,
                           geo.size.width > 0, geo.size.height > 0 else { return }
-                    let fit = min(geo.size.width / size.width, geo.size.height / size.height, 1.0)
-                    seatMapFitScale = fit
-                    // Only snap the actual displayed scale to the newly-measured
-                    // fit level once, on the very first measurement — after that,
-                    // this just keeps the zoom-out floor current without
-                    // fighting the user's own pinch/reset zoom level.
-                    if !seatMapFitApplied {
-                        seatMapScale = fit
-                        seatMapLastScale = fit
-                        seatMapFitApplied = true
-                    }
+                    // Only used as the pinch-out floor / double-tap reset target —
+                    // the displayed scale starts at its natural 1.0 default (see
+                    // seatMapScale's declaration) so the grid is scrollable right
+                    // away, not auto-fitted-and-static on load.
+                    seatMapFitScale = min(geo.size.width / size.width, geo.size.height / size.height, 1.0)
                 }
         }
         .frame(height: 340)
@@ -477,7 +473,26 @@ struct AdminSeatsView: View {
                             VStack(spacing: 12) {
                                 Text("Seat \(seat.seatNumber)").font(.headlineLarge).foregroundColor(.textPrimary)
                                 Divider().background(Color.dividerColor)
-                                if let name = seat.studentName { InfoRow(label: "Student",  value: name) }
+                                if let name = seat.studentName {
+                                    if let sid = seat.studentId {
+                                        Button {
+                                            tappedStudentId = sid
+                                            showStudentDetail = true
+                                        } label: {
+                                            HStack {
+                                                Text("Student").font(.bodySmall).foregroundColor(.textMuted)
+                                                Spacer()
+                                                Text(name).font(.labelMedium).foregroundColor(.amber)
+                                                Image(systemName: "chevron.right").font(.caption).foregroundColor(.textMuted)
+                                            }
+                                            .padding(.vertical, 8)
+                                        }
+                                        .buttonStyle(.plain)
+                                        Divider().background(Color.dividerColor)
+                                    } else {
+                                        InfoRow(label: "Student", value: name)
+                                    }
+                                }
                                 if let mob  = seat.studentMobile { InfoRow(label: "Mobile",  value: mob) }
                                 if let gen  = seat.studentGender { InfoRow(label: "Gender", value: gen) }
                                 if let end  = seat.membershipEnd { InfoRow(label: "Expires", value: end) }
@@ -538,6 +553,9 @@ struct AdminSeatsView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { tappedSeat = nil }.foregroundColor(.amber)
                 }
+            }
+            .navigationDestination(isPresented: $showStudentDetail) {
+                AdminStudentDetailView(vm: vm, studentId: tappedStudentId)
             }
         }
     }

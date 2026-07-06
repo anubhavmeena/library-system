@@ -168,6 +168,7 @@ struct SeatMapDto: Codable {
 struct SeatInfoItem: Codable {
     let seatNumber: String
     let isOccupied: Bool
+    let studentId: String?      // userId — already sent by SeatMapDto.SeatInfoDto, just wasn't decoded here
     let studentName: String?
     let studentMobile: String?
     let studentGender: String?
