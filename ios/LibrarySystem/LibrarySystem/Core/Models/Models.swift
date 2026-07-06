@@ -37,6 +37,34 @@ struct User: Codable, Identifiable, Equatable {
         self.address = address; self.gender = gender
         self.dateOfBirth = dateOfBirth; self.aadhaarUrl = aadhaarUrl
     }
+
+    // auth-service's login/register/admin-login responses embed a slimmer
+    // UserInfoDto (id, name, mobile, email, role, photoUrl only) than the full
+    // user-service profile returned by /users/me — isActive and the other
+    // fields below simply aren't present in that shape. The default
+    // synthesized Decodable init has no fallback for a genuinely absent
+    // isActive key (it's non-optional), which threw "The data couldn't be
+    // read because it is missing" on every login. Decode defensively instead.
+    enum CodingKeys: String, CodingKey {
+        case id, name, mobile, email, role, isActive, photoUrl
+        case fatherName, address, gender, dateOfBirth, aadhaarUrl
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id          = try container.decode(String.self, forKey: .id)
+        name        = try container.decode(String.self, forKey: .name)
+        mobile      = try container.decodeIfPresent(String.self, forKey: .mobile) ?? ""
+        email       = try container.decodeIfPresent(String.self, forKey: .email)
+        role        = try container.decode(String.self, forKey: .role)
+        isActive    = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
+        photoUrl    = try container.decodeIfPresent(String.self, forKey: .photoUrl)
+        fatherName  = try container.decodeIfPresent(String.self, forKey: .fatherName)
+        address     = try container.decodeIfPresent(String.self, forKey: .address)
+        gender      = try container.decodeIfPresent(String.self, forKey: .gender)
+        dateOfBirth = try container.decodeIfPresent(String.self, forKey: .dateOfBirth)
+        aadhaarUrl  = try container.decodeIfPresent(String.self, forKey: .aadhaarUrl)
+    }
 }
 
 struct AdminContact: Codable {
