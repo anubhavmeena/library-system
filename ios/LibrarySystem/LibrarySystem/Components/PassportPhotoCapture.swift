@@ -47,27 +47,42 @@ private let cropWindowHeight: CGFloat = cropWindowWidth / passportAspect
 // No crop library exists in this app, and Apple's built-in UIImagePickerController editor
 // only offers a square crop — this view fills that gap.
 struct PassportCropView: View {
-    let image: UIImage
     let onDone: (UIImage) -> Void
     let onCancel: () -> Void
+
+    // Computed once in init rather than as computed properties re-deriving from `image`
+    // on every access — normalizedOrientation() does a full UIGraphicsImageRenderer redraw,
+    // and re-running that on every read (imageSize/baseScale/displaySize/clampedOffset were
+    // all re-deriving it) during high-frequency pinch/drag gesture callbacks pegged the main
+    // thread hard enough to freeze the gesture and eventually get the app killed by the
+    // watchdog. Precomputing these once turns the gesture-time math back into cheap arithmetic.
+    private let normalizedImage: UIImage
+    private let imageSize: CGSize
+    private let baseScale: CGFloat
 
     @State private var scale: CGFloat = 1
     @State private var lastScale: CGFloat = 1
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
 
-    private var normalizedImage: UIImage { image.normalizedOrientation() }
+    init(image: UIImage, onDone: @escaping (UIImage) -> Void, onCancel: @escaping () -> Void) {
+        self.onDone = onDone
+        self.onCancel = onCancel
 
-    // Natural pixel dimensions of the (now upright) image — deriving this from cgImage
-    // rather than UIImage.size keeps the math correct regardless of the image's `scale`
-    // factor (size is in points, cgImage width/height are in pixels).
-    private var imageSize: CGSize {
-        guard let cg = normalizedImage.cgImage else { return normalizedImage.size }
-        return CGSize(width: CGFloat(cg.width), height: CGFloat(cg.height))
-    }
+        let normalized = image.normalizedOrientation()
+        self.normalizedImage = normalized
 
-    private var baseScale: CGFloat {
-        max(cropWindowWidth / imageSize.width, cropWindowHeight / imageSize.height)
+        // Natural pixel dimensions of the (now upright) image — deriving this from cgImage
+        // rather than UIImage.size keeps the math correct regardless of the image's `scale`
+        // factor (size is in points, cgImage width/height are in pixels).
+        let size: CGSize
+        if let cg = normalized.cgImage {
+            size = CGSize(width: CGFloat(cg.width), height: CGFloat(cg.height))
+        } else {
+            size = normalized.size
+        }
+        self.imageSize = size
+        self.baseScale = max(cropWindowWidth / size.width, cropWindowHeight / size.height)
     }
 
     private var effectiveScale: CGFloat { baseScale * scale }
@@ -102,8 +117,7 @@ struct PassportCropView: View {
                         .frame(width: cropWindowWidth, height: cropWindowHeight)
                         .clipped()
                         .contentShape(Rectangle())
-                        .gesture(dragGesture)
-                        .gesture(magnificationGesture)
+                        .gesture(SimultaneousGesture(magnificationGesture, dragGesture))
 
                         RoundedRectangle(cornerRadius: 4)
                             .stroke(Color.amber, lineWidth: 2)
