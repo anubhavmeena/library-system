@@ -22,6 +22,8 @@ extension Color {
     static let redDeep      = Color(hex: 0x450A0A)
     static let fuchsia      = Color(hex: 0xD946EF)
     static let fuchsiaFaint = Color(hex: 0xD946EF, alpha: 0.15)
+    static let indigo       = Color(hex: 0x6366F1)
+    static let indigoFaint  = Color(hex: 0x6366F1, alpha: 0.2)
     static let textPrimary  = Color(hex: 0xF0F4FF)
     static let textSub      = Color(hex: 0x8AA6F8)
     static let textMuted    = Color(hex: 0x4A5FA8)

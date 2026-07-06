@@ -243,6 +243,8 @@ struct StudentSummary: Codable, Identifiable {
     let mobile: String
     let email: String?
     let isActive: Bool
+    let photoUrl: String?
+    let joinedAt: String?
     let membershipId: String?
     let membershipStatus: String?
     let seatNumber: String?
@@ -250,7 +252,11 @@ struct StudentSummary: Codable, Identifiable {
     let membershipStart: String?
     let membershipEnd: String?
     let planName: String?
+    let daysRemaining: Int
+    let paymentMode: String?
     let pendingAmount: Double?
+    let duesAmount: Double?
+    let displayStatus: String?
 
     // Defensive decode: the backend's StudentDto (GET /admin/students) has no
     // isActive field at all — the admin service has no student enable/disable
@@ -258,8 +264,9 @@ struct StudentSummary: Codable, Identifiable {
     // the list against a non-optional isActive with no fallback failed the
     // WHOLE array, so the students screen always showed "No students found."
     enum CodingKeys: String, CodingKey {
-        case id, name, mobile, email, isActive, membershipId, membershipStatus
-        case seatNumber, shift, membershipStart, membershipEnd, planName, pendingAmount
+        case id, name, mobile, email, isActive, photoUrl, joinedAt, membershipId, membershipStatus
+        case seatNumber, shift, membershipStart, membershipEnd, planName, daysRemaining
+        case paymentMode, pendingAmount, duesAmount, displayStatus
     }
 
     init(from decoder: Decoder) throws {
@@ -269,6 +276,8 @@ struct StudentSummary: Codable, Identifiable {
         mobile           = try c.decode(String.self, forKey: .mobile)
         email            = try c.decodeIfPresent(String.self, forKey: .email)
         isActive         = try c.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
+        photoUrl         = try c.decodeIfPresent(String.self, forKey: .photoUrl)
+        joinedAt         = try c.decodeIfPresent(String.self, forKey: .joinedAt)
         membershipId     = try c.decodeIfPresent(String.self, forKey: .membershipId)
         membershipStatus = try c.decodeIfPresent(String.self, forKey: .membershipStatus)
         seatNumber       = try c.decodeIfPresent(String.self, forKey: .seatNumber)
@@ -276,7 +285,11 @@ struct StudentSummary: Codable, Identifiable {
         membershipStart  = try c.decodeIfPresent(String.self, forKey: .membershipStart)
         membershipEnd    = try c.decodeIfPresent(String.self, forKey: .membershipEnd)
         planName         = try c.decodeIfPresent(String.self, forKey: .planName)
+        daysRemaining    = try c.decodeIfPresent(Int.self, forKey: .daysRemaining) ?? 0
+        paymentMode      = try c.decodeIfPresent(String.self, forKey: .paymentMode)
         pendingAmount    = try c.decodeIfPresent(Double.self, forKey: .pendingAmount)
+        duesAmount       = try c.decodeIfPresent(Double.self, forKey: .duesAmount)
+        displayStatus    = try c.decodeIfPresent(String.self, forKey: .displayStatus)
     }
 }
 
