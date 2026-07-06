@@ -55,8 +55,8 @@ struct AdminDashboardView: View {
             Text("Students").font(.headlineSmall).foregroundColor(.textPrimary).padding(.horizontal, 16)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 StatCard(label: "Total Students",   value: "\(vm.stats.totalStudents)",   accent: .blueSoft)
-                StatCard(label: "Active Students",  value: "\(vm.stats.activeStudents)",  accent: .emerald)
                 StatCard(label: "Active Memberships",value: "\(vm.stats.activeMemberships)", accent: .amber)
+                StatCard(label: "Expired Memberships",value: "\(vm.stats.expiredMemberships)", accent: .emerald)
                 StatCard(label: "Expiring This Week",value: "\(vm.stats.expiringThisWeek)", accent: .redAlert)
             }
             .padding(.horizontal, 16)

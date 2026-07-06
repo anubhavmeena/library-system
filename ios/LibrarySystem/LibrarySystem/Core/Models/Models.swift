@@ -177,9 +177,10 @@ struct PaymentOrder: Codable, Equatable {
 
 struct AdminStats: Codable {
     let totalStudents: Int
-    let activeStudents: Int
     let activeMemberships: Int
+    let expiredMemberships: Int
     let expiringThisWeek: Int
+    let orphanedSeatMemberships: Int
     let totalSeats: Int
     let occupiedSeats: Int
     let availableSeats: Int
@@ -190,18 +191,48 @@ struct AdminStats: Codable {
     let visitorsToday: Int
 
     init(
-        totalStudents: Int = 0, activeStudents: Int = 0,
-        activeMemberships: Int = 0, expiringThisWeek: Int = 0,
+        totalStudents: Int = 0, activeMemberships: Int = 0, expiredMemberships: Int = 0,
+        expiringThisWeek: Int = 0, orphanedSeatMemberships: Int = 0,
         totalSeats: Int = 0, occupiedSeats: Int = 0, availableSeats: Int = 0,
         revenueToday: Double = 0, revenueThisMonth: Double = 0, paymentsThisMonth: Int = 0,
         totalVisitors: Int = 0, visitorsToday: Int = 0
     ) {
-        self.totalStudents = totalStudents; self.activeStudents = activeStudents
-        self.activeMemberships = activeMemberships; self.expiringThisWeek = expiringThisWeek
+        self.totalStudents = totalStudents; self.activeMemberships = activeMemberships
+        self.expiredMemberships = expiredMemberships; self.expiringThisWeek = expiringThisWeek
+        self.orphanedSeatMemberships = orphanedSeatMemberships
         self.totalSeats = totalSeats; self.occupiedSeats = occupiedSeats
         self.availableSeats = availableSeats; self.revenueToday = revenueToday
         self.revenueThisMonth = revenueThisMonth; self.paymentsThisMonth = paymentsThisMonth
         self.totalVisitors = totalVisitors; self.visitorsToday = visitorsToday
+    }
+
+    // Defensive decode: the default synthesized init has no fallback for a
+    // missing/renamed key on these non-optional numeric fields, so ANY single
+    // field drifting from the backend's DashboardDto (as activeStudents did —
+    // an iOS-only field the backend never actually returned) fails the WHOLE
+    // decode, silently leaving every stat at 0 rather than just the one that
+    // doesn't match. Missing fields now degrade to 0 individually instead.
+    enum CodingKeys: String, CodingKey {
+        case totalStudents, activeMemberships, expiredMemberships, expiringThisWeek
+        case orphanedSeatMemberships, totalSeats, occupiedSeats, availableSeats
+        case revenueToday, revenueThisMonth, paymentsThisMonth, totalVisitors, visitorsToday
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        totalStudents           = try c.decodeIfPresent(Int.self, forKey: .totalStudents) ?? 0
+        activeMemberships       = try c.decodeIfPresent(Int.self, forKey: .activeMemberships) ?? 0
+        expiredMemberships      = try c.decodeIfPresent(Int.self, forKey: .expiredMemberships) ?? 0
+        expiringThisWeek        = try c.decodeIfPresent(Int.self, forKey: .expiringThisWeek) ?? 0
+        orphanedSeatMemberships = try c.decodeIfPresent(Int.self, forKey: .orphanedSeatMemberships) ?? 0
+        totalSeats              = try c.decodeIfPresent(Int.self, forKey: .totalSeats) ?? 0
+        occupiedSeats           = try c.decodeIfPresent(Int.self, forKey: .occupiedSeats) ?? 0
+        availableSeats          = try c.decodeIfPresent(Int.self, forKey: .availableSeats) ?? 0
+        revenueToday            = try c.decodeIfPresent(Double.self, forKey: .revenueToday) ?? 0
+        revenueThisMonth        = try c.decodeIfPresent(Double.self, forKey: .revenueThisMonth) ?? 0
+        paymentsThisMonth       = try c.decodeIfPresent(Int.self, forKey: .paymentsThisMonth) ?? 0
+        totalVisitors           = try c.decodeIfPresent(Int.self, forKey: .totalVisitors) ?? 0
+        visitorsToday           = try c.decodeIfPresent(Int.self, forKey: .visitorsToday) ?? 0
     }
 }
 
