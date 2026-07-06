@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct AdminExpensesView: View {
     @ObservedObject var vm: AdminViewModel
@@ -36,7 +37,9 @@ struct AdminExpensesView: View {
                     }
                     .padding(16)
                 }
+                .scrollDismissesKeyboard(.immediately)
             }
+            .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
             .navigationTitle("Expenses")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.navyMid, for: .navigationBar)
@@ -47,38 +50,52 @@ struct AdminExpensesView: View {
         .onChange(of: vm.expense) { _ in populateFields() }
     }
 
+    // Prev/next month arrows around a "Month YYYY" label, matching the web
+    // app's calendar-header style rather than two separate wheel pickers.
     private var periodPicker: some View {
         AppCard {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Period").font(.labelMedium).foregroundColor(.textSub)
-                HStack(spacing: 12) {
-                    Picker("Month", selection: $selectedMonth) {
-                        ForEach(1...12, id: \.self) { m in
-                            Text(months[m-1]).tag(m)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .tint(.amber)
-
-                    Picker("Year", selection: $selectedYear) {
-                        ForEach((2024...2030).reversed(), id: \.self) { y in
-                            Text(String(y)).tag(y)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .tint(.amber)
-
-                    Spacer()
-
-                    Button("Load") {
-                        vm.loadExpenses(year: selectedYear, month: selectedMonth)
-                    }
-                    .font(.labelMedium).foregroundColor(.amber)
+            HStack {
+                Button { changeMonth(by: -1) } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.headlineSmall).foregroundColor(.amber)
+                        .frame(width: 36, height: 36)
+                        .background(Color.amberFaint)
+                        .clipShape(Circle())
                 }
-                .onChange(of: selectedMonth) { _ in vm.loadExpenses(year: selectedYear, month: selectedMonth) }
-                .onChange(of: selectedYear)  { _ in vm.loadExpenses(year: selectedYear, month: selectedMonth) }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text("\(months[selectedMonth - 1]) \(String(selectedYear))")
+                    .font(.headlineSmall).foregroundColor(.textPrimary)
+
+                Spacer()
+
+                Button { changeMonth(by: 1) } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.headlineSmall).foregroundColor(.amber)
+                        .frame(width: 36, height: 36)
+                        .background(Color.amberFaint)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
             }
         }
+    }
+
+    private func changeMonth(by delta: Int) {
+        var newMonth = selectedMonth + delta
+        var newYear  = selectedYear
+        if newMonth < 1  { newMonth = 12; newYear -= 1 }
+        if newMonth > 12 { newMonth = 1;  newYear += 1 }
+        guard (2024...2030).contains(newYear) else { return }
+        selectedMonth = newMonth
+        selectedYear  = newYear
+        vm.loadExpenses(year: selectedYear, month: selectedMonth)
+    }
+
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     private var currentExpenseSummary: some View {

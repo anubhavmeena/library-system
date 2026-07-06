@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct AdminRevenueView: View {
     @ObservedObject var vm: AdminViewModel
@@ -31,10 +32,12 @@ struct AdminRevenueView: View {
                     }
                     .padding(16)
                 }
+                .scrollDismissesKeyboard(.immediately)
                 .sheet(isPresented: $showDrillDown) {
                     drillDownSheet
                 }
             }
+            .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
             .navigationTitle("Revenue")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.navyMid, for: .navigationBar)
@@ -44,15 +47,55 @@ struct AdminRevenueView: View {
         .onAppear { loadDefaultRange() }
     }
 
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
+    // fromDate/toDate stay "yyyy-MM-dd" strings (what vm.loadRevenueReport expects),
+    // with these Binding<Date> adapters driving actual DatePicker wheels — the
+    // previous version used plain AppTextFields with a "yyyy-MM-dd" placeholder and
+    // no real picker at all, so there was nothing to tap that would ever open one.
+    private var fromDateBinding: Binding<Date> {
+        Binding(get: { parseDate(fromDate) ?? Date() },
+                set: { fromDate = formatDate($0) })
+    }
+
+    private var toDateBinding: Binding<Date> {
+        Binding(get: { parseDate(toDate) ?? Date() },
+                set: { toDate = formatDate($0) })
+    }
+
+    private func parseDate(_ s: String) -> Date? {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current
+        return f.date(from: s)
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current
+        return f.string(from: date)
+    }
+
     private var dateRangeSection: some View {
         AppCard {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Date Range").font(.labelMedium).foregroundColor(.textSub)
                 HStack(spacing: 12) {
-                    AppTextField(label: "From", text: $fromDate,
-                                 placeholder: "yyyy-MM-dd", leadingIcon: "calendar")
-                    AppTextField(label: "To", text: $toDate,
-                                 placeholder: "yyyy-MM-dd", leadingIcon: "calendar")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("From").font(.labelSmall).foregroundColor(.textMuted)
+                        DatePicker("", selection: fromDateBinding, in: ...Date(), displayedComponents: .date)
+                            .datePickerStyle(.compact)
+                            .labelsHidden()
+                            .tint(.amber)
+                            .colorScheme(.dark)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("To").font(.labelSmall).foregroundColor(.textMuted)
+                        DatePicker("", selection: toDateBinding, in: ...Date(), displayedComponents: .date)
+                            .datePickerStyle(.compact)
+                            .labelsHidden()
+                            .tint(.amber)
+                            .colorScheme(.dark)
+                    }
                 }
             }
         }
