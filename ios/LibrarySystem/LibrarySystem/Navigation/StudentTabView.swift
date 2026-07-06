@@ -45,15 +45,19 @@ struct StudentTabView: View {
                         NavigationLink { ContactAdminView(vm: vm) } label: {
                             moreRow(icon: "phone.circle.fill", label: "Contact Admin")
                         }
+                        .buttonStyle(.plain)
                         NavigationLink { StudentGalleryView(vm: vm) } label: {
                             moreRow(icon: "photo.fill.on.rectangle.fill", label: "Photo Gallery")
                         }
+                        .buttonStyle(.plain)
                         NavigationLink { FeedbackView(vm: vm) } label: {
                             moreRow(icon: "text.bubble.fill", label: "Feedback")
                         }
+                        .buttonStyle(.plain)
                         NavigationLink { FacilitiesView() } label: {
                             moreRow(icon: "building.columns.fill", label: "Facilities & Rules")
                         }
+                        .buttonStyle(.plain)
                     }
                     .padding(16)
                 }

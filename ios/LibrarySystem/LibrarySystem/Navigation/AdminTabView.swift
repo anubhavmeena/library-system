@@ -46,30 +46,37 @@ struct AdminTabView: View {
                         NavigationLink { AdminBroadcastView(vm: vm) } label: {
                             moreActionRow(icon: "megaphone.fill", label: "Broadcast Message")
                         }
+                        .buttonStyle(.plain)
 
                         NavigationLink { AdminFeedbackView(vm: vm) } label: {
                             moreActionRow(icon: "text.bubble.fill", label: "Feedback & Complaints")
                         }
+                        .buttonStyle(.plain)
 
                         NavigationLink { AdminRevenueView(vm: vm) } label: {
                             moreActionRow(icon: "chart.line.uptrend.xyaxis", label: "Revenue & Reports")
                         }
+                        .buttonStyle(.plain)
 
                         NavigationLink { AdminExpensesView(vm: vm) } label: {
                             moreActionRow(icon: "list.bullet.rectangle", label: "Monthly Expenses")
                         }
+                        .buttonStyle(.plain)
 
                         NavigationLink { AdminInboxView(vm: vm) } label: {
                             moreActionRow(icon: "tray.full.fill", label: "Inbox")
                         }
+                        .buttonStyle(.plain)
 
                         NavigationLink { AdminSettingsView(vm: vm) } label: {
                             moreActionRow(icon: "bell.badge.fill", label: "Notification Settings")
                         }
+                        .buttonStyle(.plain)
 
                         NavigationLink { AdminAppSettingsView(vm: vm) } label: {
                             moreActionRow(icon: "gearshape.fill", label: "App Settings")
                         }
+                        .buttonStyle(.plain)
 
                         Button { showRunExpiryConfirm = true } label: {
                             moreActionRow(icon: "clock.arrow.circlepath", label: "Run Expiry Check")
@@ -79,10 +86,12 @@ struct AdminTabView: View {
                         NavigationLink { AdminGalleryView() } label: {
                             moreActionRow(icon: "photo.fill.on.rectangle.fill", label: "Photo Gallery")
                         }
+                        .buttonStyle(.plain)
 
                         NavigationLink { AdminImportView() } label: {
                             moreActionRow(icon: "person.badge.plus", label: "Import Student")
                         }
+                        .buttonStyle(.plain)
 
                         Button { showCreateMembership = true } label: {
                             moreActionRow(icon: "plus.circle.fill", label: "Create Membership")
