@@ -32,7 +32,7 @@ struct AdminRevenueView: View {
                     }
                     .padding(16)
                 }
-                .scrollDismissesKeyboard(.immediately)
+                .scrollDismissesKeyboard(.interactively)
                 .sheet(isPresented: $showDrillDown) {
                     drillDownSheet
                 }

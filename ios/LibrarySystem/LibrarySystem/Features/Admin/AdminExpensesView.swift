@@ -37,7 +37,7 @@ struct AdminExpensesView: View {
                     }
                     .padding(16)
                 }
-                .scrollDismissesKeyboard(.immediately)
+                .scrollDismissesKeyboard(.interactively)
             }
             .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
             .navigationTitle("Expenses")
