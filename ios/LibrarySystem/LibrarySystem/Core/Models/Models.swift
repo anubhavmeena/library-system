@@ -144,6 +144,16 @@ struct Seat: Codable, Identifiable {
     let studentMobile: String?
     let membershipEnd: String?
 
+    // seat-service's SeatDto sends this field as "rowLabel", not "row" — the
+    // required, non-optional `row` key was never actually present in the
+    // response, so every seat in the array failed to decode (on top of the
+    // separate SeatAvailability wrapper-object mismatch fixed in
+    // SeatRepository.getAvailability).
+    enum CodingKeys: String, CodingKey {
+        case id, seatNumber, isBooked, studentName, studentMobile, membershipEnd
+        case row = "rowLabel"
+    }
+
     var rowLabel: String { row }
 }
 

@@ -31,7 +31,7 @@ struct SeatGridView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Legend
             HStack(spacing: 16) {
-                legendItem(color: .cardBg, border: .cardBorder, label: "Available")
+                legendItem(color: .emeraldFaint, border: .emerald, label: "Available")
                 legendItem(color: .amberFaint, border: .amber, label: "Selected")
                 legendItem(color: .redFaint, border: .redAlert, label: "Booked")
             }
@@ -136,7 +136,7 @@ struct SeatGridView: View {
 
     private func backgroundFor(_ state: SeatState) -> Color {
         switch state {
-        case .available: return .cardBg
+        case .available: return .emeraldFaint
         case .selected:  return .amberFaint
         case .booked:    return .redFaint
         }
@@ -144,7 +144,7 @@ struct SeatGridView: View {
 
     private func borderFor(_ state: SeatState) -> Color {
         switch state {
-        case .available: return .cardBorder
+        case .available: return .emerald
         case .selected:  return .amber
         case .booked:    return .redAlert
         }
@@ -152,7 +152,7 @@ struct SeatGridView: View {
 
     private func foregroundFor(_ state: SeatState) -> Color {
         switch state {
-        case .available: return .textSub
+        case .available: return .emerald
         case .selected:  return .amber
         case .booked:    return .redAlert
         }
