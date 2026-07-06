@@ -58,6 +58,7 @@ struct StudentGalleryView: View {
                 placeholderTile
             }
         }
+        .buttonStyle(.plain)
     }
 
     private var placeholderTile: some View {

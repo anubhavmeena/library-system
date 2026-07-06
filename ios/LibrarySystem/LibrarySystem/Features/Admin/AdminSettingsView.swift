@@ -141,6 +141,7 @@ private struct NotificationSettingCard: View {
                         .overlay(Capsule().stroke(Color.amber.opacity(0.5)))
                         .clipShape(Capsule())
                 }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -155,6 +156,7 @@ private struct NotificationSettingCard: View {
                 Text(label).font(.bodySmall).foregroundColor(enabled ? .textSub : .textMuted)
             }
         }
+        .buttonStyle(.plain)
         .disabled(!enabled)
     }
 

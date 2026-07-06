@@ -103,6 +103,7 @@ struct AdminCreateMembershipView: View {
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(selected ? Color.amber : Color.cardBorder))
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -122,6 +123,7 @@ struct AdminCreateMembershipView: View {
                             .background(sel ? Color.amber : Color.cardBg)
                             .clipShape(Capsule())
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }

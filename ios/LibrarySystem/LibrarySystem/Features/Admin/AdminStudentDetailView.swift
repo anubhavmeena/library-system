@@ -223,6 +223,7 @@ struct AdminStudentDetailView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.emerald.opacity(0.4)))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -253,6 +254,7 @@ struct AdminStudentDetailView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.emerald.opacity(0.4)))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -273,6 +275,7 @@ struct AdminStudentDetailView: View {
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(s.isActive ? Color.redAlert.opacity(0.4) : Color.emerald.opacity(0.4)))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .buttonStyle(.plain)
 
             OutlineButton("Edit Profile") { showEdit = true }
 
@@ -294,6 +297,7 @@ struct AdminStudentDetailView: View {
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.redAlert.opacity(0.4)))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
+                .buttonStyle(.plain)
             }
 
             if s.membershipId != nil && s.displayStatus == "PAID" {
@@ -324,6 +328,7 @@ struct AdminStudentDetailView: View {
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.blueSoft.opacity(0.4)))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .buttonStyle(.plain)
 
             Button {
                 showSeatHistory.toggle()
@@ -339,6 +344,7 @@ struct AdminStudentDetailView: View {
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.blueSoft.opacity(0.4)))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .buttonStyle(.plain)
 
             Button {
                 showDeleteConfirm = true
@@ -353,6 +359,7 @@ struct AdminStudentDetailView: View {
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.redAlert.opacity(0.4)))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .buttonStyle(.plain)
 
             if let err = vm.error { ErrorBanner(message: err) }
             if let msg = vm.successMsg {
@@ -491,6 +498,7 @@ struct AdminStudentDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(selected ? Color.amber : Color.cardBorder))
         }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder

@@ -74,6 +74,7 @@ struct AdminTabView: View {
                         Button { showRunExpiryConfirm = true } label: {
                             moreActionRow(icon: "clock.arrow.circlepath", label: "Run Expiry Check")
                         }
+                        .buttonStyle(.plain)
 
                         NavigationLink { AdminGalleryView() } label: {
                             moreActionRow(icon: "photo.fill.on.rectangle.fill", label: "Photo Gallery")
@@ -86,6 +87,7 @@ struct AdminTabView: View {
                         Button { showCreateMembership = true } label: {
                             moreActionRow(icon: "plus.circle.fill", label: "Create Membership")
                         }
+                        .buttonStyle(.plain)
 
                         logoutButton
                     }
@@ -122,5 +124,6 @@ struct AdminTabView: View {
                 }
             }
         }
+        .buttonStyle(.plain)
     }
 }

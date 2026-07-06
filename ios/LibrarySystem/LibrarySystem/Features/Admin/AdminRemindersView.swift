@@ -92,6 +92,7 @@ struct AdminRemindersView: View {
             }
             .padding(.vertical, 10)
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Expiring Tab
@@ -126,6 +127,7 @@ struct AdminRemindersView: View {
                                 .clipShape(Capsule())
                                 .overlay(Capsule().stroke(selected ? Color.amber : Color.cardBorder))
                         }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -272,6 +274,7 @@ struct AdminRemindersView: View {
                                         .background(Color.emeraldFaint)
                                         .clipShape(Capsule())
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -367,6 +370,7 @@ struct AdminRemindersView: View {
                                         .background(Color.emeraldFaint)
                                         .clipShape(Capsule())
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -423,5 +427,6 @@ struct CheckboxToggleStyle: ToggleStyle {
                 configuration.label
             }
         }
+        .buttonStyle(.plain)
     }
 }

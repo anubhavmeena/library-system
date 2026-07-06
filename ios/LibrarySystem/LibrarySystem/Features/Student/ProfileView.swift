@@ -188,6 +188,7 @@ struct ProfileView: View {
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.redAlert.opacity(0.4)))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Actions

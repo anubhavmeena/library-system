@@ -54,6 +54,7 @@ struct FeedbackView: View {
                                 .clipShape(Capsule())
                                 .overlay(Capsule().stroke(type == t ? Color.amber : Color.cardBorder))
                         }
+                        .buttonStyle(.plain)
                     }
                 }
 

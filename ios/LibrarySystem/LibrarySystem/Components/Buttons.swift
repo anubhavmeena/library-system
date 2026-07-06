@@ -27,6 +27,7 @@ struct PrimaryButton: View {
         }
         .background(Color.amber)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .buttonStyle(.plain)
         .disabled(isLoading)
     }
 }
@@ -52,5 +53,6 @@ struct OutlineButton: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.amber, lineWidth: 1.5)
         )
+        .buttonStyle(.plain)
     }
 }

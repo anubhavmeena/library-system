@@ -87,6 +87,7 @@ struct SeatGridView: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 4))
         }
+        .buttonStyle(.plain)
         .disabled(readOnly || state == .booked)
     }
 

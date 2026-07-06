@@ -110,6 +110,7 @@ struct ContactAdminView: View {
                                 .background(action.color.opacity(0.15))
                                 .clipShape(Capsule())
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -153,6 +154,7 @@ struct ContactAdminView: View {
                         .background(vm.callAdminSent ? Color.blueSoft.opacity(0.5) : Color.blueSoft)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
+                    .buttonStyle(.plain)
                     .disabled(vm.callAdminSent)
                     .padding(.top, 4)
                 }

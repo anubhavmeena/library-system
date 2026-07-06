@@ -102,6 +102,7 @@ struct AdminRevenueView: View {
                         }
                     }
                 }
+                .buttonStyle(.plain)
             }
         }
     }

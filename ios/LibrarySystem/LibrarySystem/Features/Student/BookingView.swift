@@ -132,6 +132,7 @@ struct BookingView: View {
                 }
             }
         }
+        .buttonStyle(.plain)
     }
 
     private func shiftChip(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
@@ -145,6 +146,7 @@ struct BookingView: View {
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(selected ? Color.amber : Color.cardBorder))
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Step 2: Select Seat

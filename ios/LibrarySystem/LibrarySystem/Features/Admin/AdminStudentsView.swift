@@ -82,6 +82,7 @@ struct AdminStudentsView: View {
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(selected ? Color.amber : Color.cardBorder))
         }
+        .buttonStyle(.plain)
     }
 
     private var studentList: some View {
@@ -153,6 +154,7 @@ struct AdminStudentsView: View {
                 }
             }
         }
+        .buttonStyle(.plain)
     }
 
     private func loadStudents() {

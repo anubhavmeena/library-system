@@ -99,6 +99,7 @@ struct AdminFeedbackView: View {
                                             .clipShape(Capsule())
                                             .overlay(Capsule().stroke(selected ? Color.amber : Color.cardBorder))
                                     }
+                                    .buttonStyle(.plain)
                                 }
                             }
                         }

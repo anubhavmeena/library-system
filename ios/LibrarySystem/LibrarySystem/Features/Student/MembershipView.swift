@@ -285,6 +285,7 @@ struct MembershipView: View {
                                         }
                                     }
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
 

@@ -81,6 +81,7 @@ struct AdminInboxView: View {
                             }
                         }
                     }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(16)

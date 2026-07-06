@@ -56,6 +56,7 @@ struct AdminGalleryView: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.amber.opacity(0.5)))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             }
+            .buttonStyle(.plain)
 
             AppTextField(label: "Caption (optional)", text: $captionText,
                          placeholder: "Add a caption...", leadingIcon: "text.bubble")
@@ -86,6 +87,7 @@ struct AdminGalleryView: View {
                             Button { selected = photo } label: {
                                 photoTile(photo)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }

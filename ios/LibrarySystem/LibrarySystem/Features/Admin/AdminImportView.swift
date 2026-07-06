@@ -69,6 +69,7 @@ struct AdminImportView: View {
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.amber.opacity(0.4)))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
+                .buttonStyle(.plain)
                 .disabled(csvUploading)
 
                 if csvUploading {
