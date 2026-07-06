@@ -8,6 +8,9 @@ struct AdminSeatsView: View {
     @State private var showDatePicker = false
     @State private var tappedSeat:   SeatInfoItem?
     @State private var showSeatHistory = false
+    @State private var viewMode: SeatViewMode = .standard
+
+    private enum SeatViewMode { case standard, expiry }
 
     private let shifts = ["MORNING", "EVENING", "FULL_DAY"]
 
@@ -27,6 +30,24 @@ struct AdminSeatsView: View {
 
     private var dateString: String {
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: selectedDate)
+    }
+
+    // Negative = overdue (membership in GRACE, seat held but past its endDate),
+    // matching the web admin seat map's expiry-view semantics exactly.
+    private func daysToExpiry(_ membershipEnd: String?) -> Int? {
+        guard let membershipEnd else { return nil }
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        guard let end = f.date(from: membershipEnd) else { return nil }
+        let days = Calendar.current.dateComponents([.day], from: selectedDate, to: end).day ?? 0
+        return days
+    }
+
+    private func expiryColor(_ days: Int) -> Color {
+        if days < 0   { return .redDeep }
+        if days <= 3  { return .redAlert }
+        if days <= 7  { return .orange }
+        if days <= 15 { return .yellowWarn }
+        return .emerald
     }
 
     var body: some View {
@@ -77,17 +98,45 @@ struct AdminSeatsView: View {
                 .padding(.horizontal, 16)
             }
 
-            // Date picker button
-            Button { showDatePicker = true } label: {
-                HStack {
-                    Image(systemName: "calendar").foregroundColor(.amber)
-                    Text(dateString).font(.labelMedium).foregroundColor(.textPrimary)
-                    Image(systemName: "chevron.down").font(.caption).foregroundColor(.textMuted)
+            // Date picker + Refresh + Expiry View toggle
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    Button { showDatePicker = true } label: {
+                        HStack {
+                            Image(systemName: "calendar").foregroundColor(.amber)
+                            Text(dateString).font(.labelMedium).foregroundColor(.textPrimary)
+                            Image(systemName: "chevron.down").font(.caption).foregroundColor(.textMuted)
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 8)
+                        .background(Color.cardBg)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cardBorder))
+                    }
+
+                    Button {
+                        vm.loadSeatMap(shift: selectedShift, date: dateString)
+                    } label: {
+                        Text("↻ Refresh")
+                            .font(.labelMedium).foregroundColor(.textSub)
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(Color.cardBg)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cardBorder))
+                    }
+
+                    Button {
+                        viewMode = (viewMode == .expiry) ? .standard : .expiry
+                    } label: {
+                        Text("📅 Expiry View")
+                            .font(.labelMedium)
+                            .foregroundColor(viewMode == .expiry ? .amber : .textSub)
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(viewMode == .expiry ? Color.amberFaint : Color.cardBg)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(viewMode == .expiry ? Color.amber : Color.cardBorder))
+                    }
                 }
-                .padding(.horizontal, 16).padding(.vertical, 8)
-                .background(Color.cardBg)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cardBorder))
+                .padding(.horizontal, 16)
             }
         }
         .padding(.vertical, 10)
@@ -95,7 +144,9 @@ struct AdminSeatsView: View {
     }
 
     private func seatContent(_ map: SeatMapDto) -> some View {
-        ScrollView {
+        let pct = map.totalSeats > 0 ? Double(map.occupiedSeats) / Double(map.totalSeats) : 0
+
+        return ScrollView {
             VStack(spacing: 16) {
                 // Stats row
                 HStack(spacing: 10) {
@@ -105,13 +156,42 @@ struct AdminSeatsView: View {
                 }
                 .padding(.horizontal, 16)
 
+                // Occupancy bar
+                AppCard {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Occupancy").font(.labelMedium).foregroundColor(.textSub)
+                            Spacer()
+                            Text("\(Int(pct * 100))%").font(.labelLarge).foregroundColor(.textPrimary)
+                        }
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 4).fill(Color.navyLight).frame(height: 10)
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(LinearGradient(colors: [.emerald, .redAlert], startPoint: .leading, endPoint: .trailing))
+                                    .frame(width: geo.size.width * pct, height: 10)
+                            }
+                        }
+                        .frame(height: 10)
+                    }
+                }
+                .padding(.horizontal, 16)
+
                 // Seat grid (admin read-only version — tap to see occupant).
                 // Kept in its own horizontal scroll as a safety net for
                 // smaller devices/Dynamic Type, but the compact cell size
                 // below is sized to fit a full row on one screen normally.
-                ScrollView(.horizontal, showsIndicators: false) {
-                    adminSeatGrid(map)
-                        .padding(16)
+                VStack(spacing: 6) {
+                    floorPlanLabel("ENTRY")
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        adminSeatGrid(map)
+                            .padding(16)
+                    }
+                    HStack(spacing: 8) {
+                        floorPlanLabel("EXIT")
+                        floorPlanLabel("RO / PANTRY")
+                        floorPlanLabel("WASHROOM")
+                    }
                 }
             }
             .padding(.bottom, 24)
@@ -125,15 +205,26 @@ struct AdminSeatsView: View {
         let seatNumber = "\(row)\(number)"
         return rowSeats.first(where: { $0.seatNumber == seatNumber })
             ?? SeatInfoItem(seatNumber: seatNumber, isOccupied: false, studentName: nil,
-                            studentMobile: nil, shift: nil, membershipEnd: nil)
+                            studentMobile: nil, studentGender: nil, shift: nil, membershipEnd: nil)
     }
 
     private func adminSeatGrid(_ map: SeatMapDto) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             // Legend
-            HStack(spacing: 16) {
-                legendItem(color: .cardBg, border: .cardBorder, label: "Available")
-                legendItem(color: .redFaint, border: .redAlert, label: "Occupied")
+            if viewMode == .expiry {
+                HStack(spacing: 12) {
+                    legendItem(color: .redDeep, border: .redAlert.opacity(0.6), label: "Overdue")
+                    legendItem(color: .redFaint, border: .redAlert, label: "≤3d")
+                    legendItem(color: .orangeFaint, border: .orange, label: "≤7d")
+                    legendItem(color: .yellowFaint, border: .yellowWarn, label: "≤15d")
+                    legendItem(color: .emeraldFaint, border: .emerald, label: "Safe")
+                }
+            } else {
+                HStack(spacing: 16) {
+                    legendItem(color: .emeraldFaint, border: .emerald, label: "Available")
+                    legendItem(color: .redFaint, border: .redAlert, label: "Male")
+                    legendItem(color: .fuchsiaFaint, border: .fuchsia, label: "Female")
+                }
             }
 
             ForEach(seatMapRowLabels, id: \.self) { row in
@@ -178,18 +269,48 @@ struct AdminSeatsView: View {
         }
     }
 
+    @ViewBuilder
     private func adminSeatCell(_ seat: SeatInfoItem) -> some View {
-        Button { if seat.isOccupied { tappedSeat = seat } } label: {
-            Text(String(seat.seatNumber.dropFirst()))
-                .font(.system(size: 7, weight: .medium))
-                .foregroundColor(seat.isOccupied ? .redAlert : .textSub)
-                .frame(width: 22, height: 22)
-                .background(seat.isOccupied ? Color.redFaint : Color.cardBg)
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(
-                    seat.isOccupied ? Color.redAlert : Color.cardBorder, lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+        if viewMode == .expiry, seat.isOccupied, let days = daysToExpiry(seat.membershipEnd) {
+            let color = expiryColor(days)
+            Button { tappedSeat = seat } label: {
+                Text("\(days)")
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundColor(color)
+                    .frame(width: 22, height: 22)
+                    .background(color.opacity(0.18))
+                    .overlay(Circle().stroke(color, lineWidth: 1))
+                    .clipShape(Circle())
+            }
+        } else {
+            // Standard view: available seats are muted emerald, occupied seats
+            // are colored by gender (matching the web admin seat map) —
+            // female = fuchsia, male/unspecified = red.
+            let isFemale = seat.isOccupied && seat.studentGender?.caseInsensitiveCompare("Female") == .orderedSame
+            let fg: Color = seat.isOccupied ? (isFemale ? .fuchsia : .redAlert) : .emerald
+            let bg: Color = seat.isOccupied ? (isFemale ? Color.fuchsiaFaint : Color.redFaint) : Color.emeraldFaint
+            Button { if seat.isOccupied { tappedSeat = seat } } label: {
+                Text(viewMode == .expiry ? "" : String(seat.seatNumber.dropFirst()))
+                    .font(.system(size: 7, weight: .medium))
+                    .foregroundColor(fg)
+                    .frame(width: 22, height: 22)
+                    .background(bg)
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(fg, lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+            .disabled(!seat.isOccupied)
         }
-        .disabled(!seat.isOccupied)
+    }
+
+    private func floorPlanLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 9, weight: .medium))
+            .foregroundColor(.textMuted)
+            .tracking(1)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(Color.navyMid.opacity(0.4))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.cardBorder))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     private func legendItem(color: Color, border: Color, label: String) -> some View {
@@ -240,8 +361,12 @@ struct AdminSeatsView: View {
                                 Divider().background(Color.dividerColor)
                                 if let name = seat.studentName { InfoRow(label: "Student",  value: name) }
                                 if let mob  = seat.studentMobile { InfoRow(label: "Mobile",  value: mob) }
+                                if let gen  = seat.studentGender { InfoRow(label: "Gender", value: gen) }
                                 if let end  = seat.membershipEnd { InfoRow(label: "Expires", value: end) }
                                 if let sh   = seat.shift { InfoRow(label: "Shift", value: sh.capitalized) }
+                                if let days = daysToExpiry(seat.membershipEnd) {
+                                    InfoRow(label: "Days Left", value: "\(days)", valueColor: expiryColor(days))
+                                }
                             }
                         }
 

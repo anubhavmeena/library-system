@@ -161,6 +161,7 @@ struct SeatInfoItem: Codable {
     let isOccupied: Bool
     let studentName: String?
     let studentMobile: String?
+    let studentGender: String?
     let shift: String?
     let membershipEnd: String?
 }
