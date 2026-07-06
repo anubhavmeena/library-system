@@ -101,6 +101,7 @@ struct AdminSeatsView: View {
                                 .clipShape(Capsule())
                                 .overlay(Capsule().stroke(selected ? Color.amber : Color.cardBorder))
                         }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -120,6 +121,7 @@ struct AdminSeatsView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cardBorder))
                     }
+                    .buttonStyle(.plain)
 
                     Button {
                         vm.loadSeatMap(shift: selectedShift, date: dateString)
@@ -131,6 +133,7 @@ struct AdminSeatsView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cardBorder))
                     }
+                    .buttonStyle(.plain)
 
                     Button {
                         viewMode = (viewMode == .expiry) ? .standard : .expiry
@@ -143,6 +146,7 @@ struct AdminSeatsView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(viewMode == .expiry ? Color.amber : Color.cardBorder))
                     }
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 16)
             }
@@ -349,6 +353,7 @@ struct AdminSeatsView: View {
                     .overlay(Circle().stroke(color, lineWidth: 1))
                     .clipShape(Circle())
             }
+            .buttonStyle(.plain)
         } else {
             // Standard view: available seats are muted emerald, occupied seats
             // are colored by gender (matching the web admin seat map) —
@@ -365,6 +370,7 @@ struct AdminSeatsView: View {
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(fg, lineWidth: 1))
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             }
+            .buttonStyle(.plain)
             .disabled(!seat.isOccupied)
         }
     }
@@ -452,6 +458,7 @@ struct AdminSeatsView: View {
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.blueSoft.opacity(0.4)))
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
+                        .buttonStyle(.plain)
 
                         if showSeatHistory {
                             if vm.seatHistory.isEmpty {
