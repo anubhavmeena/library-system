@@ -108,7 +108,16 @@ struct AdminSeatsView: View {
     }
 
     private func adminSeatGrid(_ map: SeatMapDto) -> some View {
-        let rows: [(label: String, count: Int)] = [("A",28),("B",28),("C",28),("D",26)]
+        // Row labels/counts come from the real seatsByRow data the backend
+        // returns (derived from the active `seats` table), not a hardcoded
+        // "A28/B28/C28/D26 = 110" assumption — that literal has already drifted
+        // from the real, live seat layout at least once in production (see
+        // AdminService.getSeatMap()'s own comment about D27/D28 existing as
+        // active rows beyond the old hardcoded count), which silently hid any
+        // seats beyond the assumed count. Deriving from the actual data means
+        // this can never go stale again, regardless of how many seats/rows
+        // actually exist.
+        let rowLabels = map.seatsByRow.keys.sorted()
 
         return VStack(alignment: .leading, spacing: 8) {
             // Legend
@@ -117,20 +126,21 @@ struct AdminSeatsView: View {
                 legendItem(color: .redFaint, border: .redAlert, label: "Occupied")
             }
 
-            ForEach(rows, id: \.label) { row in
-                let rowSeats = map.seatsByRow[row.label] ?? []
-                let half = (row.count + 1) / 2
+            ForEach(rowLabels, id: \.self) { label in
+                let rowSeats = map.seatsByRow[label] ?? []
+                let count = rowSeats.count
+                let half = (count + 1) / 2
                 HStack(alignment: .top, spacing: 0) {
-                    Text(row.label).font(.labelSmall).foregroundColor(.textMuted).frame(width: 18).padding(.top, 4)
+                    Text(label).font(.labelSmall).foregroundColor(.textMuted).frame(width: 18).padding(.top, 4)
                     HStack(spacing: 4) {
                         ForEach(0..<half, id: \.self) { i in
-                            if i < rowSeats.count { adminSeatCell(rowSeats[i]) }
+                            adminSeatCell(rowSeats[i])
                         }
                     }
                     Rectangle().fill(Color.clear).frame(width: 20)
                     HStack(spacing: 4) {
-                        ForEach(half..<row.count, id: \.self) { i in
-                            if i < rowSeats.count { adminSeatCell(rowSeats[i]) }
+                        ForEach(half..<count, id: \.self) { i in
+                            adminSeatCell(rowSeats[i])
                         }
                     }
                 }
