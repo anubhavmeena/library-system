@@ -14,9 +14,15 @@ RUN --mount=type=cache,id=maven,target=/root/.m2 \
 
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
-RUN addgroup -S spring && adduser -S spring -G spring
-RUN mkdir -p /app/uploads && chown spring:spring /app/uploads
-USER spring
+# su-exec drops root privileges after the entrypoint fixes /app/uploads ownership.
+# UID/GID 1000 is pinned explicitly (rather than left to Alpine's auto-assigned
+# system UID) so it's guaranteed to match admin-service's "spring" user, since
+# both independently-built images share the same /app/uploads volume.
+RUN apk add --no-cache su-exec \
+    && addgroup -g 1000 -S spring && adduser -u 1000 -S spring -G spring \
+    && mkdir -p /app/uploads && chown -R spring:spring /app/uploads
 COPY --from=builder /build/user-service/target/*.jar app.jar
+COPY user-service/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 EXPOSE 8082
-ENTRYPOINT ["java", "-jar", "-Dspring.profiles.active=docker", "app.jar"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
