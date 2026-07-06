@@ -98,8 +98,16 @@ public class OtpService {
     }
 
     public void sendOtp(String contact, String contactType, String otp) {
+        sendOtp(contact, contactType, otp, null);
+    }
+
+    // channel = "SMS" skips the Meta WhatsApp attempt entirely and forces
+    // apitxt/Twilio SMS — used by the client's "Send via SMS instead" fallback
+    // after a WhatsApp OTP isn't received.
+    public void sendOtp(String contact, String contactType, String otp, String channel) {
         if ("MOBILE".equalsIgnoreCase(contactType)) {
-            if (!metaToken.isBlank() && !metaPhoneNumberId.isBlank()) {
+            boolean forceSms = "SMS".equalsIgnoreCase(channel);
+            if (!forceSms && !metaToken.isBlank() && !metaPhoneNumberId.isBlank()) {
                 try {
                     sendWhatsAppMeta(contact, otp);
                     return;

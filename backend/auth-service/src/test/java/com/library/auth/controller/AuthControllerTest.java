@@ -47,7 +47,7 @@ class AuthControllerTest {
         SendOtpRequest req = new SendOtpRequest();
         req.setContact("9876543210");
         req.setContactType("MOBILE");
-        doNothing().when(authService).sendOtp(any(), any());
+        doNothing().when(authService).sendOtp(any(), any(), any());
 
         mockMvc.perform(post("/api/auth/send-otp")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -56,7 +56,7 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.containsString("9876543210")));
 
-        verify(authService).sendOtp("9876543210", "MOBILE");
+        verify(authService).sendOtp("9876543210", "MOBILE", null);
     }
 
     @Test
@@ -88,7 +88,7 @@ class AuthControllerTest {
         SendOtpRequest req = new SendOtpRequest();
         req.setContact("9876543210");
         req.setContactType("MOBILE");
-        doThrow(new RuntimeException("OTP service unavailable")).when(authService).sendOtp(any(), any());
+        doThrow(new RuntimeException("OTP service unavailable")).when(authService).sendOtp(any(), any(), any());
 
         mockMvc.perform(post("/api/auth/send-otp")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -305,7 +305,7 @@ class AuthControllerTest {
 
     @Test
     void allEndpoints_returnJsonContentType() throws Exception {
-        doNothing().when(authService).sendOtp(any(), any());
+        doNothing().when(authService).sendOtp(any(), any(), any());
         SendOtpRequest req = new SendOtpRequest();
         req.setContact("9876543210");
         req.setContactType("MOBILE");

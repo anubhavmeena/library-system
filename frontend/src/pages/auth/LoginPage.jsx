@@ -44,29 +44,52 @@ export default function LoginPage() {
     const [contactType, setContactType] = useState('MOBILE')
     const [contact, setContact]         = useState('')
     const [otp, setOtp]                 = useState('')
-    const [resendCooldown, setResendCooldown] = useState(0)
     const [form, setForm]               = useState({ name:'', email:'', dateOfBirth:'', gender:'', address:'' })
 
+    // OTP resend / SMS-fallback timing — matches the backend's 10s resend
+    // cooldown (AuthService.checkCooldownAndGenerateOtp). otpSendCount tracks
+    // how many times an OTP has been (re)sent while on this screen; secondsSinceSend
+    // counts up from 0 each time it changes, driving both the "Resend OTP"
+    // availability (10s after any send) and the "Send via SMS instead" offer
+    // (10s after the first resend, i.e. the second attempt).
+    const [otpSendCount, setOtpSendCount]     = useState(0)
+    const [secondsSinceSend, setSecondsSinceSend] = useState(0)
+    const [smsOptionUsed, setSmsOptionUsed]   = useState(false)
+
     useEffect(() => {
-        if (step !== 2) return
-        setResendCooldown(30)
-        const timer = setInterval(() => {
-            setResendCooldown(prev => { if (prev <= 1) { clearInterval(timer); return 0 } return prev - 1 })
-        }, 1000)
+        if (step !== 2 || otpSendCount === 0) return
+        setSecondsSinceSend(0)
+        const timer = setInterval(() => setSecondsSinceSend(s => s + 1), 1000)
         return () => clearInterval(timer)
-    }, [step])
+    }, [step, otpSendCount])
+
+    const canResend     = secondsSinceSend >= 10
+    const secondsLeft    = Math.max(0, 10 - secondsSinceSend)
+    const showSmsOption = contactType === 'MOBILE' && !smsOptionUsed && otpSendCount >= 2 && canResend
 
     const handleSendOtp = async () => {
         if (!contact.trim()) return toast.error(t('auth.login.toasts.enterContact'))
         const res = await dispatch(sendOtp({ contact: contact.trim(), contactType }))
-        if (sendOtp.fulfilled.match(res)) { toast.success(t('auth.login.toasts.otpSent')); setStep(2) }
-        else toast.error(res.payload || t('auth.login.toasts.failedOtp'))
+        if (sendOtp.fulfilled.match(res)) {
+            toast.success(t('auth.login.toasts.otpSent'))
+            setStep(2)
+            setOtpSendCount(1)
+        } else toast.error(res.payload || t('auth.login.toasts.failedOtp'))
     }
 
     const handleResendOtp = async () => {
         const res = await dispatch(sendOtp({ contact: contact.trim(), contactType }))
-        if (sendOtp.fulfilled.match(res)) { toast.success(t('auth.login.toasts.otpSent')); setResendCooldown(30) }
+        if (sendOtp.fulfilled.match(res)) { toast.success(t('auth.login.toasts.otpSent')); setOtpSendCount(c => c + 1) }
         else toast.error(res.payload || t('auth.login.toasts.failedOtp'))
+    }
+
+    const handleSendViaSms = async () => {
+        const res = await dispatch(sendOtp({ contact: contact.trim(), contactType, channel: 'SMS' }))
+        if (sendOtp.fulfilled.match(res)) {
+            toast.success(t('auth.login.toasts.otpSentSms'))
+            setSmsOptionUsed(true)
+            setOtpSendCount(c => c + 1)
+        } else toast.error(res.payload || t('auth.login.toasts.failedOtp'))
     }
 
     const handleVerifyOtp = async () => {
@@ -153,11 +176,17 @@ export default function LoginPage() {
                                         className="text-primary-400 text-sm hover:text-white transition-colors">
                                     {t('auth.login.changeContact')}
                                 </button>
-                                <button onClick={handleResendOtp} disabled={resendCooldown > 0 || isLoading}
+                                <button onClick={handleResendOtp} disabled={!canResend || isLoading}
                                         className="text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-amber-400 hover:text-amber-300 disabled:text-primary-500">
-                                    {resendCooldown > 0 ? t('auth.login.resendIn', { seconds: resendCooldown }) : t('auth.login.resendOtp')}
+                                    {canResend ? t('auth.login.resendOtp') : t('auth.login.resendIn', { seconds: secondsLeft })}
                                 </button>
                             </div>
+                            {showSmsOption && (
+                                <button onClick={handleSendViaSms} disabled={isLoading}
+                                        className="w-full text-sm text-center text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                                    {t('auth.login.sendViaSms')}
+                                </button>
+                            )}
                         </div>
                     )}
 

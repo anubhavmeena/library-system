@@ -3,6 +3,10 @@ import Foundation
 struct SendOtpRequest: Codable {
     let contact: String
     let contactType: String = "MOBILE"
+    // nil = default routing (Meta WhatsApp -> apitxt -> Twilio SMS);
+    // "SMS" forces apitxt/Twilio SMS, skipping WhatsApp — used by the
+    // "Send via SMS instead" fallback after a WhatsApp OTP isn't received.
+    let channel: String? = nil
 }
 
 struct VerifyOtpRequest: Codable {

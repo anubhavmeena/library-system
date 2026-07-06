@@ -67,6 +67,7 @@
       "changeContact": "← संपर्क बदलें",
       "resendOtp": "OTP दोबारा भेजें",
       "resendIn": "{{seconds}} सेकंड में भेजें",
+      "sendViaSms": "फिर भी OTP नहीं मिला? SMS से भेजें",
       "newStudent": "नए छात्र?",
       "registerHere": "यहाँ रजिस्टर करें",
       "backHome": "← होम पर वापस",
@@ -74,6 +75,7 @@
         "enterContact": "अपना मोबाइल नंबर या ईमेल दर्ज करें",
         "enter6Otp": "6 अंकों का OTP दर्ज करें",
         "otpSent": "OTP भेजा गया!",
+        "otpSentSms": "OTP SMS द्वारा भेजा गया!",
         "welcomeBack": "वापस स्वागत है!",
         "failedOtp": "OTP भेजने में विफल",
         "notRegistered": "खाता नहीं मिला। कृपया पहले रजिस्टर करें।"

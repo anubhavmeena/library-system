@@ -9,6 +9,21 @@ final class AuthViewModel: ObservableObject {
     @Published var sessionToken: String?
     @Published var isNewUser = false
 
+    // OTP resend / SMS-fallback timing — mirrors the web LoginPage and the
+    // backend's 10s resend cooldown (AuthService.checkCooldownAndGenerateOtp).
+    // otpSendCount tracks how many times an OTP has been (re)sent;
+    // secondsSinceSend counts up to 10 after each send, driving both "Resend
+    // OTP" availability and the "Send via SMS instead" offer (shown once a
+    // resend has also gone 10s without verification).
+    @Published var otpSendCount = 0
+    @Published var secondsSinceSend = 0
+    @Published var smsOptionUsed = false
+    private var resendTimerTask: Task<Void, Never>?
+
+    var canResend: Bool { secondsSinceSend >= 10 }
+    var secondsLeft: Int { max(0, 10 - secondsSinceSend) }
+    var showSmsOption: Bool { !smsOptionUsed && otpSendCount >= 2 && canResend }
+
     private let repo = AuthRepository.shared
     private let tokenManager = TokenManager.shared
 
@@ -21,8 +36,47 @@ final class AuthViewModel: ObservableObject {
             do {
                 try await repo.sendOtp(contact: contact)
                 otpSent = true
+                otpSendCount = 1
+                startResendTimer()
             } catch { self.error = error.localizedDescription }
             isLoading = false
+        }
+    }
+
+    func resendOtp() {
+        isLoading = true; error = nil
+        Task {
+            do {
+                try await repo.sendOtp(contact: contact)
+                otpSendCount += 1
+                startResendTimer()
+            } catch { self.error = error.localizedDescription }
+            isLoading = false
+        }
+    }
+
+    func sendOtpViaSms() {
+        isLoading = true; error = nil
+        Task {
+            do {
+                try await repo.sendOtp(contact: contact, channel: "SMS")
+                smsOptionUsed = true
+                otpSendCount += 1
+                startResendTimer()
+            } catch { self.error = error.localizedDescription }
+            isLoading = false
+        }
+    }
+
+    private func startResendTimer() {
+        resendTimerTask?.cancel()
+        secondsSinceSend = 0
+        resendTimerTask = Task { [weak self] in
+            while let self = self, self.secondsSinceSend < 10 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled { return }
+                self.secondsSinceSend += 1
+            }
         }
     }
 
@@ -85,10 +139,14 @@ final class AuthViewModel: ObservableObject {
     }
 
     func resetOtpState() {
+        resendTimerTask?.cancel()
         otpSent = false
         sessionToken = nil
         isNewUser = false
         error = nil
         contact = ""
+        otpSendCount = 0
+        secondsSinceSend = 0
+        smsOptionUsed = false
     }
 }

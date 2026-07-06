@@ -12,9 +12,9 @@ const initialState = {
     isNewUser:    false,
 }
 
-export const sendOtp = createAsyncThunk('auth/sendOtp', async ({ contact, contactType }, { rejectWithValue }) => {
+export const sendOtp = createAsyncThunk('auth/sendOtp', async ({ contact, contactType, channel }, { rejectWithValue }) => {
     try {
-        await api.post('/auth/send-otp', { contact, contactType })
+        await api.post('/auth/send-otp', { contact, contactType, channel })
         return { contact, contactType }
     } catch (err) { return rejectWithValue(err.response?.data?.message || 'Failed to send OTP') }
 })

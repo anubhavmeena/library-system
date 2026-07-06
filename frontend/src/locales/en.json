@@ -71,6 +71,7 @@
       "changeContact": "← Change contact",
       "resendOtp": "Resend OTP",
       "resendIn": "Resend in {{seconds}}s",
+      "sendViaSms": "Still no OTP? Send via SMS instead",
       "newStudent": "New student?",
       "registerHere": "Register here",
       "backHome": "← Back to Home",
@@ -78,6 +79,7 @@
         "enterContact": "Enter your mobile number or email",
         "enter6Otp": "Enter the 6-digit OTP",
         "otpSent": "OTP sent!",
+        "otpSentSms": "OTP sent via SMS!",
         "welcomeBack": "Welcome back!",
         "failedOtp": "Failed to send OTP",
         "notRegistered": "No account found. Please register first."

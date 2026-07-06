@@ -51,6 +51,28 @@ public class AuthService {
     // ── OTP Flow ──────────────────────────────────────────────────────────────
 
     public void sendOtp(String contact, String contactType) {
+        String otp = checkCooldownAndGenerateOtp(contact);
+        otpService.sendOtp(contact, contactType, otp);
+        log.info("OTP sent to {} ({})", contact, contactType);
+    }
+
+    // channel = null routes through the default Meta WhatsApp → apitxt → Twilio
+    // chain; channel = "SMS" forces apitxt/Twilio, skipping WhatsApp — used by
+    // the client's "Send via SMS instead" fallback.
+    public void sendOtp(String contact, String contactType, String channel) {
+        if (channel == null) {
+            sendOtp(contact, contactType);
+            return;
+        }
+        String otp = checkCooldownAndGenerateOtp(contact);
+        otpService.sendOtp(contact, contactType, otp, channel);
+        log.info("OTP sent to {} ({}) via channel={}", contact, contactType, channel);
+    }
+
+    // Shared by both sendOtp overloads — the resend cooldown is intentionally
+    // short (10s, not the old 30s) so the frontend can offer a resend option
+    // ~10s after send, and a "send via SMS instead" option ~10s after that.
+    private String checkCooldownAndGenerateOtp(String contact) {
         String cooldownKey = "otp:cooldown:" + contact;
         Long ttl = redisTemplate.getExpire(cooldownKey, TimeUnit.SECONDS);
         if (ttl != null && ttl > 0) {
@@ -58,9 +80,8 @@ public class AuthService {
         }
         String otp = generateOtp();
         redisTemplate.opsForValue().set("otp:" + contact, otp, 5, TimeUnit.MINUTES);
-        redisTemplate.opsForValue().set(cooldownKey, "1", 30, TimeUnit.SECONDS);
-        otpService.sendOtp(contact, contactType, otp);
-        log.info("OTP sent to {} ({})", contact, contactType);
+        redisTemplate.opsForValue().set(cooldownKey, "1", 10, TimeUnit.SECONDS);
+        return otp;
     }
 
     public OtpVerifyResponse verifyOtp(String contact, String otp) {

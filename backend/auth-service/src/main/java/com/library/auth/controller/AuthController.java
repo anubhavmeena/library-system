@@ -18,7 +18,7 @@ public class AuthController {
 
     @PostMapping("/send-otp")
     public ResponseEntity<ApiResponse<String>> sendOtp(@Valid @RequestBody SendOtpRequest request) {
-        authService.sendOtp(request.getContact(), request.getContactType());
+        authService.sendOtp(request.getContact(), request.getContactType(), request.getChannel());
         return ResponseEntity.ok(ApiResponse.success("OTP sent successfully to " + request.getContact()));
     }
 
