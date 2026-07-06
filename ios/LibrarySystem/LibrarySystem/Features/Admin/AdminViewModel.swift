@@ -44,12 +44,12 @@ final class AdminViewModel: ObservableObject {
     }
 
     // MARK: - Students
-    func loadStudents(page: Int = 0, status: String? = nil,
+    func loadStudents(page: Int = 0, size: Int = 20, status: String? = nil,
                       membershipStatus: String? = nil, search: String? = nil) {
         isLoading = true
         Task {
             do {
-                let result = try await repo.getStudents(page: page, status: status,
+                let result = try await repo.getStudents(page: page, size: size, status: status,
                                                         membershipStatus: membershipStatus,
                                                         search: search)
                 students = result.students
