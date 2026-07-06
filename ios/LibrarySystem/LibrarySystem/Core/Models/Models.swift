@@ -119,7 +119,7 @@ struct Membership: Codable, Identifiable, Equatable {
 struct Plan: Codable, Identifiable {
     let id: String
     let name: String
-    let description: String
+    let description: String?   // DB column is nullable (TEXT, no NOT NULL constraint)
     let price: Double
     let planType: String
     let durationDays: Int

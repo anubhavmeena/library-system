@@ -21,6 +21,7 @@ struct AdminCreateMembershipView: View {
     @State private var selectedPlan:       Plan?
     @State private var selectedShift       = ""
     @State private var startDate           = AdminCreateMembershipView.today
+    @State private var plansError:         String?
 
     // Step 3 — seat
     @State private var seats:              [Seat] = []
@@ -68,7 +69,7 @@ struct AdminCreateMembershipView: View {
             }
         }
         .onAppear {
-            vm.loadPlans()
+            loadPlans()
             vm.loadStudents(page: 0, size: 200)
         }
         .onChange(of: vm.successMsg) { msg in
@@ -268,6 +269,22 @@ struct AdminCreateMembershipView: View {
                 set: { startDate = formatDate($0) })
     }
 
+    // Loads plans directly via the repo (rather than vm.loadPlans(), which only
+    // populates vm.plans on success and silently leaves it empty with no visible
+    // feedback on failure) so a failed fetch shows a retry affordance instead of
+    // an indefinite spinner — vm.plans stays empty forever with no way to tell
+    // "still loading" from "failed" otherwise.
+    private func loadPlans() {
+        plansError = nil
+        Task {
+            do {
+                vm.plans = try await repo.getPlans()
+            } catch {
+                plansError = error.localizedDescription
+            }
+        }
+    }
+
     private var step2Content: some View {
         VStack(alignment: .leading, spacing: 16) {
             selectedStudentHeader {
@@ -277,7 +294,14 @@ struct AdminCreateMembershipView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Select Plan").font(.labelMedium).foregroundColor(.textSub)
                 if vm.plans.isEmpty {
-                    ProgressView().tint(.amber)
+                    if let err = plansError {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ErrorBanner(message: err)
+                            OutlineButton("Retry") { loadPlans() }
+                        }
+                    } else {
+                        ProgressView().tint(.amber)
+                    }
                 } else {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         ForEach(vm.plans.filter { $0.isActive }) { plan in planCard(plan) }

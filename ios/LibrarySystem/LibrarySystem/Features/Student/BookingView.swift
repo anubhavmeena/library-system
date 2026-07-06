@@ -112,7 +112,7 @@ struct BookingView: View {
                         Text(plan.name)
                             .font(.headlineSmall)
                             .foregroundColor(.textPrimary)
-                        Text(plan.description)
+                        Text(plan.description ?? "")
                             .font(.bodySmall)
                             .foregroundColor(.textSub)
                         Text("\(plan.durationDays) days · \(plan.planType.replacingOccurrences(of: "_", with: " "))")

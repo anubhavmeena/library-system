@@ -277,7 +277,7 @@ struct MembershipView: View {
                                         HStack {
                                             VStack(alignment: .leading, spacing: 4) {
                                                 Text(plan.name).font(.headlineSmall).foregroundColor(.textPrimary)
-                                                Text(plan.description).font(.bodySmall).foregroundColor(.textSub)
+                                                Text(plan.description ?? "").font(.bodySmall).foregroundColor(.textSub)
                                             }
                                             Spacer()
                                             Text("₹\(String(format: "%.0f", plan.price))")
