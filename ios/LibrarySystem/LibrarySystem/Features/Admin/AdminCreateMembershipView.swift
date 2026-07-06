@@ -16,6 +16,8 @@ struct AdminCreateMembershipView: View {
     @State private var selectedStudent:    StudentSummary?
     @State private var bookingType:        String?   // nil | "renewal" | "new"
     @State private var renewalLoading      = false
+    @State private var studentsLoading     = false
+    @State private var studentsError:      String?
 
     // Step 2 — plan / shift / date
     @State private var selectedPlan:       Plan?
@@ -69,8 +71,12 @@ struct AdminCreateMembershipView: View {
             }
         }
         .onAppear {
+            // vm is shared across the whole admin session — clear out any error left
+            // over from an unrelated screen visited before this sheet was opened, so
+            // step 4's error banner can only ever reflect this wizard's own submit.
+            vm.clearError()
             loadPlans()
-            vm.loadStudents(page: 0, size: 200)
+            loadStudents()
         }
         .onChange(of: vm.successMsg) { msg in
             if msg != nil { vm.clearSuccess(); dismiss() }
@@ -117,6 +123,26 @@ struct AdminCreateMembershipView: View {
         }
     }
 
+    // Loads directly via the repo (rather than vm.loadStudents(), which writes any
+    // failure into the shared vm.error) so a failure here can't bleed into some
+    // later, unrelated step that also happens to display vm.error — e.g. this
+    // wizard's own step 4 was showing a stale error from this call days after it
+    // actually failed, with no visible connection to student search at all.
+    private func loadStudents() {
+        studentsError = nil
+        studentsLoading = true
+        Task {
+            do {
+                let result = try await repo.getStudents(page: 0, size: 200)
+                vm.students = result.students
+                vm.studentsTotal = result.total
+            } catch {
+                studentsError = error.localizedDescription
+            }
+            studentsLoading = false
+        }
+    }
+
     private var step1Content: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
@@ -134,8 +160,13 @@ struct AdminCreateMembershipView: View {
             .background(Color.navyMid.opacity(0.4))
             .clipShape(RoundedRectangle(cornerRadius: 10))
 
-            if vm.isLoading && vm.students.isEmpty {
+            if studentsLoading && vm.students.isEmpty {
                 LoadingView().frame(height: 200)
+            } else if let err = studentsError, vm.students.isEmpty {
+                VStack(spacing: 10) {
+                    ErrorBanner(message: err)
+                    OutlineButton("Retry") { loadStudents() }
+                }
             } else if filteredStudents.isEmpty {
                 Text("No students found").foregroundColor(.textMuted)
                     .frame(maxWidth: .infinity).padding(.vertical, 40)
