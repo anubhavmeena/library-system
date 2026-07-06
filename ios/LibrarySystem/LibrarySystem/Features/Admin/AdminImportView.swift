@@ -2,6 +2,15 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+// Camera capture and cropping are two different screens, but they must live under a
+// single .fullScreenCover — dismissing one fullScreenCover and presenting a second one
+// in the same state update races with UIKit's own presentation teardown and can leave
+// the screen black. Swapping content INSIDE one continuously-presented cover avoids that.
+private enum PhotoCaptureStage {
+    case camera
+    case cropping(UIImage)
+}
+
 struct AdminImportView: View {
     @State private var name       = ""
     @State private var phone      = ""
@@ -10,10 +19,9 @@ struct AdminImportView: View {
     @State private var error:     String?
     @State private var success:   String?
 
-    @State private var showCamera      = false
-    @State private var showCropper     = false
-    @State private var rawCapturedImage: UIImage?
-    @State private var croppedImage:     UIImage?
+    @State private var showPhotoCapture = false
+    @State private var captureStage: PhotoCaptureStage = .camera
+    @State private var croppedImage: UIImage?
 
     @State private var showFilePicker = false
     @State private var pickedFileName: String?
@@ -52,22 +60,20 @@ struct AdminImportView: View {
             case .failure(let err): csvError = err.localizedDescription
             }
         }
-        .fullScreenCover(isPresented: $showCamera) {
-            CameraCaptureView { image in
-                rawCapturedImage = image
-                showCamera = false
-                showCropper = true
-            } onCancel: {
-                showCamera = false
-            }
-        }
-        .fullScreenCover(isPresented: $showCropper) {
-            if let raw = rawCapturedImage {
+        .fullScreenCover(isPresented: $showPhotoCapture) {
+            switch captureStage {
+            case .camera:
+                CameraCaptureView { image in
+                    captureStage = .cropping(image)
+                } onCancel: {
+                    showPhotoCapture = false
+                }
+            case .cropping(let raw):
                 PassportCropView(image: raw) { cropped in
                     croppedImage = cropped
-                    showCropper = false
+                    showPhotoCapture = false
                 } onCancel: {
-                    showCropper = false
+                    showPhotoCapture = false
                 }
             }
         }
@@ -229,7 +235,8 @@ struct AdminImportView: View {
             error = "Camera not available on this device"
             return
         }
-        showCamera = true
+        captureStage = .camera
+        showPhotoCapture = true
     }
 
     private func submit() {
@@ -254,7 +261,7 @@ struct AdminImportView: View {
                     try await api.requestVoid(.importSingleStudent(req), token: token)
                 }
                 success = "\(trimmedName) has been registered successfully."
-                name = ""; phone = ""; rawCapturedImage = nil; croppedImage = nil
+                name = ""; phone = ""; croppedImage = nil
             } catch {
                 self.error = error.localizedDescription
             }
