@@ -11,6 +11,20 @@ struct AdminSeatsView: View {
 
     private let shifts = ["MORNING", "EVENING", "FULL_DAY"]
 
+    // Mirrors the web admin seat map (frontend/src/pages/admin/AdminSeatsPage.jsx)
+    // exactly: a fixed A-D row layout, each row split into a left block (seats
+    // 1-14) and a right block (15-28) with an aisle between them, and each
+    // block arranged as two stacked sub-rows of 7 (back-to-back desk pairs) —
+    // not one long row of 14, which is what made the previous layout too wide
+    // to fit a phone screen. Two seats are physically blocked (pillars) on
+    // both clients regardless of what the backend returns for them.
+    private let seatMapRowLabels = ["A", "B", "C", "D"]
+    private let inactiveSeatNumbers: Set<String> = ["B8", "B18"]
+    private let leftTopSeats     = [13, 11, 9, 7, 5, 3, 1]
+    private let leftBottomSeats  = [14, 12, 10, 8, 6, 4, 2]
+    private let rightTopSeats    = [15, 17, 19, 21, 23, 25, 27]
+    private let rightBottomSeats = [16, 18, 20, 22, 24, 26, 28]
+
     private var dateString: String {
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: selectedDate)
     }
@@ -92,13 +106,10 @@ struct AdminSeatsView: View {
                 .padding(.horizontal, 16)
 
                 // Seat grid (admin read-only version — tap to see occupant).
-                // A full row (row label + 14 seats + aisle + 14 seats) is
-                // ~900pt wide, far more than screen width — without its own
-                // horizontal scroll, the outer VStack's default center
-                // alignment clips it symmetrically on both sides instead of
-                // starting from the leading edge, hiding the row label and
-                // first several seats entirely.
-                ScrollView(.horizontal, showsIndicators: true) {
+                // Kept in its own horizontal scroll as a safety net for
+                // smaller devices/Dynamic Type, but the compact cell size
+                // below is sized to fit a full row on one screen normally.
+                ScrollView(.horizontal, showsIndicators: false) {
                     adminSeatGrid(map)
                         .padding(16)
                 }
@@ -107,40 +118,47 @@ struct AdminSeatsView: View {
         }
     }
 
-    private func adminSeatGrid(_ map: SeatMapDto) -> some View {
-        // Row labels/counts come from the real seatsByRow data the backend
-        // returns (derived from the active `seats` table), not a hardcoded
-        // "A28/B28/C28/D26 = 110" assumption — that literal has already drifted
-        // from the real, live seat layout at least once in production (see
-        // AdminService.getSeatMap()'s own comment about D27/D28 existing as
-        // active rows beyond the old hardcoded count), which silently hid any
-        // seats beyond the assumed count. Deriving from the actual data means
-        // this can never go stale again, regardless of how many seats/rows
-        // actually exist.
-        let rowLabels = map.seatsByRow.keys.sorted()
+    // Looks up a specific seat number in the row's data; any seat number the
+    // backend didn't return (shouldn't normally happen, but matches the web
+    // client's own fallback) is treated as available rather than omitted.
+    private func seat(row: String, number: Int, in rowSeats: [SeatInfoItem]) -> SeatInfoItem {
+        let seatNumber = "\(row)\(number)"
+        return rowSeats.first(where: { $0.seatNumber == seatNumber })
+            ?? SeatInfoItem(seatNumber: seatNumber, isOccupied: false, studentName: nil,
+                            studentMobile: nil, shift: nil, membershipEnd: nil)
+    }
 
-        return VStack(alignment: .leading, spacing: 8) {
+    private func adminSeatGrid(_ map: SeatMapDto) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
             // Legend
             HStack(spacing: 16) {
                 legendItem(color: .cardBg, border: .cardBorder, label: "Available")
                 legendItem(color: .redFaint, border: .redAlert, label: "Occupied")
             }
 
-            ForEach(rowLabels, id: \.self) { label in
-                let rowSeats = map.seatsByRow[label] ?? []
-                let count = rowSeats.count
-                let half = (count + 1) / 2
-                HStack(alignment: .top, spacing: 0) {
-                    Text(label).font(.labelSmall).foregroundColor(.textMuted).frame(width: 18).padding(.top, 4)
-                    HStack(spacing: 4) {
-                        ForEach(0..<half, id: \.self) { i in
-                            adminSeatCell(rowSeats[i])
+            ForEach(seatMapRowLabels, id: \.self) { row in
+                let rowSeats = map.seatsByRow[row] ?? []
+                HStack(alignment: .top, spacing: 6) {
+                    Text(row).font(.labelSmall).foregroundColor(.textMuted)
+                        .frame(width: 14).padding(.top, 4)
+
+                    VStack(spacing: 3) {
+                        HStack(spacing: 3) {
+                            ForEach(leftTopSeats, id: \.self) { n in seatCell(row: row, number: n, rowSeats: rowSeats) }
+                        }
+                        HStack(spacing: 3) {
+                            ForEach(leftBottomSeats, id: \.self) { n in seatCell(row: row, number: n, rowSeats: rowSeats) }
                         }
                     }
-                    Rectangle().fill(Color.clear).frame(width: 20)
-                    HStack(spacing: 4) {
-                        ForEach(half..<count, id: \.self) { i in
-                            adminSeatCell(rowSeats[i])
+
+                    Rectangle().fill(Color.clear).frame(width: 14)
+
+                    VStack(spacing: 3) {
+                        HStack(spacing: 3) {
+                            ForEach(rightTopSeats, id: \.self) { n in seatCell(row: row, number: n, rowSeats: rowSeats) }
+                        }
+                        HStack(spacing: 3) {
+                            ForEach(rightBottomSeats, id: \.self) { n in seatCell(row: row, number: n, rowSeats: rowSeats) }
                         }
                     }
                 }
@@ -148,12 +166,24 @@ struct AdminSeatsView: View {
         }
     }
 
+    @ViewBuilder
+    private func seatCell(row: String, number: Int, rowSeats: [SeatInfoItem]) -> some View {
+        let seatNumber = "\(row)\(number)"
+        if inactiveSeatNumbers.contains(seatNumber) {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.navyMid.opacity(0.5))
+                .frame(width: 22, height: 22)
+        } else {
+            adminSeatCell(seat(row: row, number: number, in: rowSeats))
+        }
+    }
+
     private func adminSeatCell(_ seat: SeatInfoItem) -> some View {
         Button { if seat.isOccupied { tappedSeat = seat } } label: {
             Text(String(seat.seatNumber.dropFirst()))
-                .font(.system(size: 8, weight: .medium))
+                .font(.system(size: 7, weight: .medium))
                 .foregroundColor(seat.isOccupied ? .redAlert : .textSub)
-                .frame(width: 28, height: 28)
+                .frame(width: 22, height: 22)
                 .background(seat.isOccupied ? Color.redFaint : Color.cardBg)
                 .overlay(RoundedRectangle(cornerRadius: 4).stroke(
                     seat.isOccupied ? Color.redAlert : Color.cardBorder, lineWidth: 1))
