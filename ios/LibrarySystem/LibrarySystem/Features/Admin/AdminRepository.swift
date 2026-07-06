@@ -57,6 +57,14 @@ struct AdminRepository {
                                              data: data, token: token)
     }
 
+    func importSingleStudentWithPhoto(name: String, phone: String, photoData: Data) async throws -> ManualImportWithPhotoResponse {
+        try await api.uploadMultipartWithFields(
+            path: "admin/students/import/single-with-photo",
+            fields: ["name": name, "phone": phone],
+            fileFieldName: "photo", fileName: "student.jpg", mimeType: "image/jpeg",
+            fileData: photoData, token: token)
+    }
+
     func clearPendingFees(userId: String, amountCleared: Double) async throws {
         let req = ClearAmountRequest(amountCleared: amountCleared)
         try await api.requestVoid(.clearPendingFees(userId: userId, req: req), token: token)

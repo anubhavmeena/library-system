@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		417F4B1C175206F1B23120EA /* PassportPhotoCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA3964EC5F6833C0EC13FF67 /* PassportPhotoCapture.swift */; };
 		DC256B0AE02A4A618D51AF66 /* LibrarySystemApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1923BEC4502E47038F8FB6DF /* LibrarySystemApp.swift */; };
 		8B9D2DE12316461CAFBE5326 /* AppNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD7A97ECC8047E2A0449337 /* AppNavigation.swift */; };
 		5AB2B6C8DA47472F9921D92A /* Colors.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED43718A1BD4514838DC88D /* Colors.swift */; };
@@ -112,6 +113,7 @@
 		B332C9050E5D4A398586AB66 /* StudentTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudentTabView.swift; sourceTree = "<group>"; };
 		9B529A70A0054E6994807B85 /* AdminTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminTabView.swift; sourceTree = "<group>"; };
 		6501E0B005DD4FE4A1ADE791 /* AppCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCard.swift; sourceTree = "<group>"; };
+		BA3964EC5F6833C0EC13FF67 /* PassportPhotoCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassportPhotoCapture.swift; sourceTree = "<group>"; };
 		0F2B26DDFD0A4AA0B4260E82 /* Buttons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Buttons.swift; sourceTree = "<group>"; };
 		8F1E243682784CC7A4E3AFF5 /* AppTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTextField.swift; sourceTree = "<group>"; };
 		5B1C4CF2C4DB4A1FBDA2D380 /* StatCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatCard.swift; sourceTree = "<group>"; };
@@ -317,6 +319,7 @@
 				EE35E55B89E24E8C90B4152A /* InfoRow.swift */,
 				54ACD5DC40FF4DE0A3C7276D /* SeatGridView.swift */,
 				29977CB9597F4948B4B8D622 /* LoadingView.swift */,
+				BA3964EC5F6833C0EC13FF67 /* PassportPhotoCapture.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -419,6 +422,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				417F4B1C175206F1B23120EA /* PassportPhotoCapture.swift in Sources */,
 				DC256B0AE02A4A618D51AF66 /* LibrarySystemApp.swift in Sources */,
 				8B9D2DE12316461CAFBE5326 /* AppNavigation.swift in Sources */,
 				5AB2B6C8DA47472F9921D92A /* Colors.swift in Sources */,

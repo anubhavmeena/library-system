@@ -50,3 +50,6 @@ admin:
 app:
   reminder:
     days-before: 7
+  upload:
+    dir: ${UPLOAD_DIR:/app/uploads}
+    allowed-types: image/jpeg,image/png,image/webp

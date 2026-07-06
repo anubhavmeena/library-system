@@ -327,6 +327,9 @@ services:
       ADMIN_IMAP_USER:  ${ADMIN_IMAP_USER:-admin}
       ADMIN_IMAP_PASS:  ${ADMIN_IMAP_PASS:-}
       ADMIN_EMAIL:      ${ADMIN_EMAIL:-admin@targetzone.co.in}
+      UPLOAD_DIR:       /app/uploads
+    volumes:
+      - uploads-data:/app/uploads
     networks:
       - library-network
     healthcheck:

@@ -2,6 +2,7 @@ package com.library.admin.service;
 
 import com.library.admin.dto.CreateCashMembershipRequest;
 import com.library.admin.dto.ImportResultDto;
+import com.library.admin.dto.ManualImportWithPhotoResponse;
 import com.library.admin.dto.ManualStudentImportRequest;
 import com.library.admin.entity.Plan;
 import com.library.admin.entity.User;
@@ -11,12 +12,19 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -31,6 +39,12 @@ public class ImportService {
     private final UserRepository          userRepository;
     private final PlanRepository          planRepository;
     private final AdminMembershipService  membershipService;
+
+    @Value("${app.upload.dir:/app/uploads}")
+    private String uploadDir;
+
+    @Value("${app.upload.allowed-types:image/jpeg,image/png,image/webp}")
+    private String allowedTypes;
 
     private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
             DateTimeFormatter.ofPattern("MM-dd-yyyy"),
@@ -50,10 +64,61 @@ public class ImportService {
     public void importSingleStudent(ManualStudentImportRequest req) {
         String phone = req.getPhone().replaceAll("[^0-9]", "");
         if (phone.isBlank()) throw new IllegalArgumentException("Phone number is invalid");
-        userRepository.findByMobile(phone).orElseGet(() -> {
+        findOrCreateUser(req.getName(), phone);
+    }
+
+    // Attaches an optional passport-style photo to the manually-imported student — a
+    // separate endpoint/method from importSingleStudent (rather than adding a photo param
+    // there) so the existing JSON contract used by the web frontend and Android app is
+    // untouched. Photo storage is handled natively here rather than via an HTTP call to
+    // user-service (which normally owns photoUrl/uploads) since admin-service already has
+    // direct read-write access to the same `users` table for this import flow.
+    @Transactional
+    public ManualImportWithPhotoResponse importSingleStudentWithPhoto(
+            String name, String phone, MultipartFile photo) throws IOException {
+        String cleanPhone = phone.replaceAll("[^0-9]", "");
+        if (cleanPhone.isBlank()) throw new IllegalArgumentException("Phone number is invalid");
+        User user = findOrCreateUser(name, cleanPhone);
+
+        String photoUrl = null;
+        if (photo != null && !photo.isEmpty()) {
+            photoUrl = storeStudentPhoto(user.getId().toString(), photo);
+            user.setPhotoUrl(photoUrl);
+            userRepository.save(user);
+        }
+        return ManualImportWithPhotoResponse.builder()
+                .message("Student added successfully")
+                .photoUrl(photoUrl)
+                .build();
+    }
+
+    private String storeStudentPhoto(String userId, MultipartFile file) throws IOException {
+        String contentType = file.getContentType();
+        if (contentType == null || !List.of(allowedTypes.split(",")).contains(contentType))
+            throw new IllegalArgumentException("Invalid file type. Only JPEG, PNG, WebP allowed.");
+        if (file.getSize() > 5_242_880)
+            throw new IllegalArgumentException("File must not exceed 5MB.");
+
+        Path uploadPath = Paths.get(uploadDir, "photos");
+        Files.createDirectories(uploadPath);
+
+        String ext      = getPhotoExtension(file.getOriginalFilename());
+        String fileName = "user_" + userId + "_" + UUID.randomUUID().toString().substring(0, 8) + ext;
+        Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+
+        return "/uploads/photos/" + fileName;
+    }
+
+    private String getPhotoExtension(String filename) {
+        if (filename == null || !filename.contains(".")) return ".jpg";
+        return filename.substring(filename.lastIndexOf(".")).toLowerCase();
+    }
+
+    private User findOrCreateUser(String name, String phone) {
+        return userRepository.findByMobile(phone).orElseGet(() -> {
             User u = User.builder()
                     .id(UUID.randomUUID())
-                    .name(req.getName().trim())
+                    .name(name.trim())
                     .mobile(phone)
                     .role(User.Role.STUDENT)
                     .isActive(true)
@@ -128,17 +193,7 @@ public class ImportService {
         LocalDate  startDate = parseDate(dateRaw, dateFormatter);
 
         // Find or create user
-        User user = userRepository.findByMobile(phone).orElseGet(() -> {
-            User u = User.builder()
-                    .id(UUID.randomUUID())
-                    .name(name)
-                    .mobile(phone)
-                    .role(User.Role.STUDENT)
-                    .isActive(true)
-                    .createdAt(LocalDateTime.now())
-                    .build();
-            return userRepository.save(u);
-        });
+        User user = findOrCreateUser(name, phone);
 
         // Match plan by closest price
         if (activePlans.isEmpty()) throw new IllegalArgumentException("No active plans configured");

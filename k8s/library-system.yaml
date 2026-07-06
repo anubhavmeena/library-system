@@ -441,6 +441,9 @@ spec:
                 name: library-config
             - secretRef:
                 name: library-secrets
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/uploads
           resources:
             requests:
               memory: "256Mi"
@@ -460,6 +463,10 @@ spec:
               port: 8086
             initialDelaySeconds: 50
             periodSeconds: 15
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: uploads-pvc
 ---
 apiVersion: v1
 kind: Service

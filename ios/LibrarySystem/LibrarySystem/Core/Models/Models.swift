@@ -584,6 +584,11 @@ struct ImportResult: Codable {
     }
 }
 
+struct ManualImportWithPhotoResponse: Decodable {
+    let message: String
+    let photoUrl: String?
+}
+
 // MARK: - Notification Settings
 
 struct NotificationSetting: Codable, Identifiable {

@@ -1,16 +1,19 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 struct AdminImportView: View {
     @State private var name       = ""
     @State private var phone      = ""
-    @State private var fees       = ""
-    @State private var date       = ""
-    @State private var seatNumber = ""
 
     @State private var isLoading  = false
     @State private var error:     String?
     @State private var success:   String?
+
+    @State private var showCamera      = false
+    @State private var showCropper     = false
+    @State private var rawCapturedImage: UIImage?
+    @State private var croppedImage:     UIImage?
 
     @State private var showFilePicker = false
     @State private var pickedFileName: String?
@@ -47,6 +50,25 @@ struct AdminImportView: View {
             switch result {
             case .success(let url): uploadCSV(url: url)
             case .failure(let err): csvError = err.localizedDescription
+            }
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraCaptureView { image in
+                rawCapturedImage = image
+                showCamera = false
+                showCropper = true
+            } onCancel: {
+                showCamera = false
+            }
+        }
+        .fullScreenCover(isPresented: $showCropper) {
+            if let raw = rawCapturedImage {
+                PassportCropView(image: raw) { cropped in
+                    croppedImage = cropped
+                    showCropper = false
+                } onCancel: {
+                    showCropper = false
+                }
             }
         }
     }
@@ -136,7 +158,7 @@ struct AdminImportView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Manual Student Entry")
                         .font(.labelLarge).foregroundColor(.textPrimary)
-                    Text("Register a student directly without the app. The seat and membership will be created based on the closest matching plan.")
+                    Text("Register a student directly by name and phone number, without going through the app. You can optionally take a passport-style photo with the camera.")
                         .font(.bodySmall).foregroundColor(.textSub)
                 }
             }
@@ -151,14 +173,8 @@ struct AdminImportView: View {
                 AppTextField(label: "Phone Number *", text: $phone,
                              placeholder: "10-digit mobile number", keyboardType: .phonePad,
                              leadingIcon: "phone")
-                AppTextField(label: "Seat Number *", text: $seatNumber,
-                             placeholder: "e.g. A1, B12", leadingIcon: "chair")
-                AppTextField(label: "Fees (optional)", text: $fees,
-                             placeholder: "Amount — matches nearest plan",
-                             keyboardType: .decimalPad, leadingIcon: "indianrupeesign")
-                AppTextField(label: "Start Date (optional)", text: $date,
-                             placeholder: "YYYY-MM-DD — defaults to today",
-                             leadingIcon: "calendar")
+
+                photoSection
 
                 if let err = error { ErrorBanner(message: err) }
                 if let suc = success {
@@ -177,6 +193,45 @@ struct AdminImportView: View {
         }
     }
 
+    private var photoSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let img = croppedImage {
+                HStack(spacing: 12) {
+                    Image(uiImage: img)
+                        .resizable().scaledToFill()
+                        .frame(width: 70, height: 90)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.amber.opacity(0.4)))
+                    Button("Retake Photo") { openCamera() }
+                        .font(.labelMedium).foregroundColor(.amber)
+                        .buttonStyle(.plain)
+                    Spacer()
+                }
+            } else {
+                Button { openCamera() } label: {
+                    HStack {
+                        Image(systemName: "camera")
+                        Text("Take Photo (optional)")
+                    }
+                    .font(.labelMedium).foregroundColor(.amber)
+                    .frame(maxWidth: .infinity).padding(12)
+                    .background(Color.amberFaint)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.amber.opacity(0.4)))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func openCamera() {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            error = "Camera not available on this device"
+            return
+        }
+        showCamera = true
+    }
+
     private func submit() {
         error = nil; success = nil
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else {
@@ -185,23 +240,21 @@ struct AdminImportView: View {
         guard !phone.trimmingCharacters(in: .whitespaces).isEmpty else {
             error = "Phone number is required"; return
         }
-        guard !seatNumber.trimmingCharacters(in: .whitespaces).isEmpty else {
-            error = "Seat number is required"; return
-        }
 
         isLoading = true
-        let req = ManualImportRequest(
-            name: name.trimmingCharacters(in: .whitespaces),
-            phone: phone.trimmingCharacters(in: .whitespaces),
-            fees: fees.isEmpty ? nil : fees.trimmingCharacters(in: .whitespaces),
-            date: date.isEmpty ? nil : date.trimmingCharacters(in: .whitespaces),
-            seatNumber: seatNumber.trimmingCharacters(in: .whitespaces).uppercased()
-        )
+        let trimmedName  = name.trimmingCharacters(in: .whitespaces)
+        let trimmedPhone = phone.trimmingCharacters(in: .whitespaces)
+
         Task {
             do {
-                try await api.requestVoid(.importSingleStudent(req), token: token)
-                success = "\(name) has been registered successfully."
-                name = ""; phone = ""; fees = ""; date = ""; seatNumber = ""
+                if let img = croppedImage, let jpeg = img.jpegData(compressionQuality: 0.8) {
+                    _ = try await repo.importSingleStudentWithPhoto(name: trimmedName, phone: trimmedPhone, photoData: jpeg)
+                } else {
+                    let req = ManualImportRequest(name: trimmedName, phone: trimmedPhone)
+                    try await api.requestVoid(.importSingleStudent(req), token: token)
+                }
+                success = "\(trimmedName) has been registered successfully."
+                name = ""; phone = ""; rawCapturedImage = nil; croppedImage = nil
             } catch {
                 self.error = error.localizedDescription
             }

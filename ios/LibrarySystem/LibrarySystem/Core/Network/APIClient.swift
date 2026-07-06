@@ -158,6 +158,57 @@ actor APIClient {
             throw APIError.decodingError(error)
         }
     }
+
+    // Multipart upload with extra text fields alongside a single optional file part
+    // (e.g. name/phone + optional photo). Unlike uploadMultipart/uploadMultipartDecoded
+    // above (file-only), this supports arbitrary text fields in the same request.
+    func uploadMultipartWithFields<T: Decodable>(path: String, fields: [String: String],
+                                                 fileFieldName: String, fileName: String,
+                                                 mimeType: String, fileData: Data?,
+                                                 token: String?) async throws -> T {
+        guard let url = URL(string: baseURL.absoluteString + path) else {
+            throw APIError.invalidURL
+        }
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var request = URLRequest(url: url, timeoutInterval: 60)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        var body = Data()
+        for (key, value) in fields {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"\(key)\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(value)\r\n".data(using: .utf8)!)
+        }
+        if let fileData {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"\(fileFieldName)\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+            body.append(fileData)
+            body.append("\r\n".data(using: .utf8)!)
+        }
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+
+        let (responseData, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+            throw APIError.unauthorized
+        }
+        do {
+            let envelope = try decoder.decode(ApiResponse<T>.self, from: responseData)
+            if let payload = envelope.data, envelope.success {
+                return payload
+            }
+            throw APIError.serverError(envelope.message ?? "Request failed")
+        } catch let e as APIError {
+            throw e
+        } catch {
+            throw APIError.decodingError(error)
+        }
+    }
 }
 
 // Placeholder for void responses

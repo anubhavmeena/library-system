@@ -7,9 +7,12 @@ import com.library.admin.service.ImportService;
 import com.library.common.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 
@@ -108,6 +111,18 @@ public class AdminController {
             @Valid @RequestBody ManualStudentImportRequest req) {
         importService.importSingleStudent(req);
         return ResponseEntity.ok(ApiResponse.success("Student added successfully"));
+    }
+
+    // Separate from importSingleStudent above (which the web frontend and Android app also
+    // call as plain JSON) so that contract stays untouched — this one is multipart to carry
+    // an optional passport-style photo alongside name/phone, used by the iOS app.
+    @PostMapping(value = "/students/import/single-with-photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<ManualImportWithPhotoResponse>> importSingleStudentWithPhoto(
+            @RequestParam("name")  String name,
+            @RequestParam("phone") String phone,
+            @RequestParam(value = "photo", required = false) MultipartFile photo) throws IOException {
+        return ResponseEntity.ok(ApiResponse.success(
+                importService.importSingleStudentWithPhoto(name, phone, photo)));
     }
 
     // ── Seat Map ──────────────────────────────────────────────────────────────

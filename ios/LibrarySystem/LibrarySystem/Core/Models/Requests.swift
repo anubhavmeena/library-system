@@ -143,9 +143,6 @@ struct ReplyRequest: Codable {
 struct ManualImportRequest: Codable {
     let name: String
     let phone: String
-    let fees: String?
-    let date: String?
-    let seatNumber: String
 }
 
 // Shared by clear-dues and clear-pending-fees — the admin enters how much is
