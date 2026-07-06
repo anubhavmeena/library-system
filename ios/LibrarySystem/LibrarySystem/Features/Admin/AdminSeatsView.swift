@@ -1,5 +1,15 @@
 import SwiftUI
 
+// Measures the seat grid's real, un-scaled content size so the fit-to-view
+// zoom scale can be computed from actual layout rather than guessed pixel
+// math (see zoomableSeatGrid below).
+private struct SeatGridSizeKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
+    }
+}
+
 struct AdminSeatsView: View {
     @ObservedObject var vm: AdminViewModel
 
@@ -11,12 +21,18 @@ struct AdminSeatsView: View {
     @State private var viewMode: SeatViewMode = .standard
 
     // Pinch-to-zoom / pan for the seat grid specifically (not the legend or
-    // the rest of the page) — scale is clamped to [1, 4] and offset resets to
-    // zero once zoomed back out to avoid getting "stuck" panned when small.
+    // the rest of the page). seatMapFitScale is computed at runtime from the
+    // grid's real measured size vs. the available width (see zoomableSeatGrid)
+    // so the map always *loads* zoomed out just enough to show all four rows
+    // at once, on any screen size — rather than assuming a hardcoded scale
+    // happens to fit. It doubles as the zoom-out floor and the double-tap
+    // reset target, so you can never pinch past "everything visible."
     @State private var seatMapScale: CGFloat = 1.0
     @State private var seatMapLastScale: CGFloat = 1.0
     @State private var seatMapOffset: CGSize = .zero
     @State private var seatMapLastOffset: CGSize = .zero
+    @State private var seatMapFitScale: CGFloat = 1.0
+    @State private var seatMapFitApplied = false
 
     private enum SeatViewMode { case standard, expiry }
 
@@ -193,8 +209,10 @@ struct AdminSeatsView: View {
                 // The grid itself lives in a fixed-height, pinch-to-zoom/pan
                 // region (zoomableSeatGrid) separate from the legend, which
                 // stays fixed size — zooming the legend text wouldn't be
-                // useful. Grid already fits at 1x zoom (see the compact cell
-                // sizing), so pinch/pan is purely an optional closer look.
+                // useful. The grid loads pre-scaled to a computed fit-to-view
+                // level so all four rows are visible immediately; pinching in
+                // zooms further for a closer look, and out only as far back
+                // as that same fit level.
                 VStack(spacing: 10) {
                     seatMapLegend
                     floorPlanLabel("ENTRY")
@@ -244,13 +262,24 @@ struct AdminSeatsView: View {
 
     // Pinch-to-zoom + drag-to-pan container for the seat grid. Fixed height
     // via GeometryReader so the scaled/offset content has well-defined
-    // clipping bounds instead of blowing out the page layout. Panning only
-    // takes effect once zoomed in, so a plain single-finger drag at the
-    // default 1x zoom doesn't fight the page's own vertical scroll.
+    // clipping bounds instead of blowing out the page layout. A hidden
+    // background GeometryReader measures the grid's real un-scaled size (via
+    // SeatGridSizeKey) so seatMapFitScale can be computed from actual layout —
+    // min(containerWidth/contentWidth, containerHeight/contentHeight, 1.0) —
+    // rather than assuming a fixed cell size happens to fit every screen.
+    // That fit scale is the load-time default, the pinch-out floor, and the
+    // double-tap reset target, so the whole grid is always visible without
+    // ever needing a manual zoom-out. Panning only takes effect once zoomed
+    // in past the fit level.
     private func zoomableSeatGrid(_ map: SeatMapDto) -> some View {
         GeometryReader { geo in
             adminSeatGrid(map)
                 .padding(16)
+                .background(
+                    GeometryReader { contentGeo in
+                        Color.clear.preference(key: SeatGridSizeKey.self, value: contentGeo.size)
+                    }
+                )
                 .frame(width: geo.size.width, height: geo.size.height)
                 .scaleEffect(seatMapScale)
                 .offset(seatMapOffset)
@@ -260,20 +289,20 @@ struct AdminSeatsView: View {
                     SimultaneousGesture(
                         MagnificationGesture()
                             .onChanged { value in
-                                seatMapScale = min(max(seatMapLastScale * value, 1.0), 4.0)
+                                seatMapScale = min(max(seatMapLastScale * value, seatMapFitScale), 4.0)
                             }
                             .onEnded { _ in
                                 seatMapLastScale = seatMapScale
-                                if seatMapScale <= 1.01 {
-                                    seatMapScale = 1.0
-                                    seatMapLastScale = 1.0
+                                if seatMapScale <= seatMapFitScale + 0.01 {
+                                    seatMapScale = seatMapFitScale
+                                    seatMapLastScale = seatMapFitScale
                                     seatMapOffset = .zero
                                     seatMapLastOffset = .zero
                                 }
                             },
                         DragGesture()
                             .onChanged { value in
-                                guard seatMapScale > 1.0 else { return }
+                                guard seatMapScale > seatMapFitScale else { return }
                                 seatMapOffset = CGSize(
                                     width: seatMapLastOffset.width + value.translation.width,
                                     height: seatMapLastOffset.height + value.translation.height
@@ -286,10 +315,25 @@ struct AdminSeatsView: View {
                 )
                 .onTapGesture(count: 2) {
                     withAnimation(.spring()) {
-                        seatMapScale = 1.0
-                        seatMapLastScale = 1.0
+                        seatMapScale = seatMapFitScale
+                        seatMapLastScale = seatMapFitScale
                         seatMapOffset = .zero
                         seatMapLastOffset = .zero
+                    }
+                }
+                .onPreferenceChange(SeatGridSizeKey.self) { size in
+                    guard size.width > 0, size.height > 0,
+                          geo.size.width > 0, geo.size.height > 0 else { return }
+                    let fit = min(geo.size.width / size.width, geo.size.height / size.height, 1.0)
+                    seatMapFitScale = fit
+                    // Only snap the actual displayed scale to the newly-measured
+                    // fit level once, on the very first measurement — after that,
+                    // this just keeps the zoom-out floor current without
+                    // fighting the user's own pinch/reset zoom level.
+                    if !seatMapFitApplied {
+                        seatMapScale = fit
+                        seatMapLastScale = fit
+                        seatMapFitApplied = true
                     }
                 }
         }
