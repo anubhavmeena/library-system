@@ -247,9 +247,36 @@ struct StudentSummary: Codable, Identifiable {
     let seatNumber: String?
     let shift: String?
     let membershipStart: String?
-    let endDate: String?
+    let membershipEnd: String?
     let planName: String?
     let pendingAmount: Double?
+
+    // Defensive decode: the backend's StudentDto (GET /admin/students) has no
+    // isActive field at all — the admin service has no student enable/disable
+    // concept (see backend/admin-service/CLAUDE.md). Decoding every student in
+    // the list against a non-optional isActive with no fallback failed the
+    // WHOLE array, so the students screen always showed "No students found."
+    enum CodingKeys: String, CodingKey {
+        case id, name, mobile, email, isActive, membershipId, membershipStatus
+        case seatNumber, shift, membershipStart, membershipEnd, planName, pendingAmount
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id               = try c.decode(String.self, forKey: .id)
+        name             = try c.decode(String.self, forKey: .name)
+        mobile           = try c.decode(String.self, forKey: .mobile)
+        email            = try c.decodeIfPresent(String.self, forKey: .email)
+        isActive         = try c.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
+        membershipId     = try c.decodeIfPresent(String.self, forKey: .membershipId)
+        membershipStatus = try c.decodeIfPresent(String.self, forKey: .membershipStatus)
+        seatNumber       = try c.decodeIfPresent(String.self, forKey: .seatNumber)
+        shift            = try c.decodeIfPresent(String.self, forKey: .shift)
+        membershipStart  = try c.decodeIfPresent(String.self, forKey: .membershipStart)
+        membershipEnd    = try c.decodeIfPresent(String.self, forKey: .membershipEnd)
+        planName         = try c.decodeIfPresent(String.self, forKey: .planName)
+        pendingAmount    = try c.decodeIfPresent(Double.self, forKey: .pendingAmount)
+    }
 }
 
 // Wrapper for the paginated students response from GET /admin/students
@@ -284,6 +311,45 @@ struct StudentDetail: Codable, Identifiable {
     let pendingAmount: Double?
     let duesAmount: Double? // overdue grace-period dues, distinct from pendingAmount above
     let displayStatus: String? // NEW | PAID | PENDING | GRACE | EXPIRED | RELEASED
+
+    // Defensive decode: same reason as StudentSummary — the backend's
+    // StudentDto (GET /admin/students/{id}) has no isActive field at all.
+    enum CodingKeys: String, CodingKey {
+        case id, name, mobile, email, address, gender, dateOfBirth, photoUrl
+        case aadhaarUrl, isActive, joinedAt, membershipId, membershipPlanId
+        case planName, planType, seatNumber, shift, membershipStart, membershipEnd
+        case membershipStatus, daysRemaining, paymentMode, pendingAmount
+        case duesAmount, displayStatus
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id               = try c.decode(String.self, forKey: .id)
+        name             = try c.decode(String.self, forKey: .name)
+        mobile           = try c.decode(String.self, forKey: .mobile)
+        email            = try c.decodeIfPresent(String.self, forKey: .email)
+        address          = try c.decodeIfPresent(String.self, forKey: .address)
+        gender           = try c.decodeIfPresent(String.self, forKey: .gender)
+        dateOfBirth      = try c.decodeIfPresent(String.self, forKey: .dateOfBirth)
+        photoUrl         = try c.decodeIfPresent(String.self, forKey: .photoUrl)
+        aadhaarUrl       = try c.decodeIfPresent(String.self, forKey: .aadhaarUrl)
+        isActive         = try c.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
+        joinedAt         = try c.decodeIfPresent(String.self, forKey: .joinedAt)
+        membershipId     = try c.decodeIfPresent(String.self, forKey: .membershipId)
+        membershipPlanId = try c.decodeIfPresent(String.self, forKey: .membershipPlanId)
+        planName         = try c.decodeIfPresent(String.self, forKey: .planName)
+        planType         = try c.decodeIfPresent(String.self, forKey: .planType)
+        seatNumber       = try c.decodeIfPresent(String.self, forKey: .seatNumber)
+        shift            = try c.decodeIfPresent(String.self, forKey: .shift)
+        membershipStart  = try c.decodeIfPresent(String.self, forKey: .membershipStart)
+        membershipEnd    = try c.decodeIfPresent(String.self, forKey: .membershipEnd)
+        membershipStatus = try c.decodeIfPresent(String.self, forKey: .membershipStatus)
+        daysRemaining    = try c.decodeIfPresent(Int.self, forKey: .daysRemaining) ?? 0
+        paymentMode      = try c.decodeIfPresent(String.self, forKey: .paymentMode)
+        pendingAmount    = try c.decodeIfPresent(Double.self, forKey: .pendingAmount)
+        duesAmount       = try c.decodeIfPresent(Double.self, forKey: .duesAmount)
+        displayStatus    = try c.decodeIfPresent(String.self, forKey: .displayStatus)
+    }
 }
 
 struct FeedbackItem: Codable, Identifiable {
