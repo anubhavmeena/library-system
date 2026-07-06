@@ -120,14 +120,23 @@ struct AdminRepository {
         try await api.request(.getExpiringMemberships(withinDays: withinDays), token: token)
     }
 
+    // admin-service's MembershipDto for this endpoint has no planType field (and
+    // none of the other callers of this method use the returned membership either
+    // — the response body is only ever a success/failure signal in practice), so
+    // decoding it against the full Membership model (which requires planType)
+    // failed every time: the membership was created successfully server-side, but
+    // the client-side decode of the response threw, surfacing as a "Data error"
+    // instead of the actual success message. requestVoid sidesteps the mismatch
+    // entirely rather than making Membership.planType optional for every other
+    // caller that genuinely relies on it being present.
     func createCashMembership(studentId: String, planId: String, seatNumber: String,
                               shift: String, startDate: String,
-                              paidAmount: Double?, pendingAmount: Double?) async throws -> Membership {
+                              paidAmount: Double?, pendingAmount: Double?) async throws {
         let req = CreateCashMembershipRequest(studentId: studentId, planId: planId,
                                               seatNumber: seatNumber, shift: shift,
                                               startDate: startDate, paidAmount: paidAmount,
                                               pendingAmount: pendingAmount)
-        return try await api.request(.createCashMembership(req), token: token)
+        try await api.requestVoid(.createCashMembership(req), token: token)
     }
 
     func getAdminSeatMap(shift: String, date: String? = nil) async throws -> SeatMapDto {

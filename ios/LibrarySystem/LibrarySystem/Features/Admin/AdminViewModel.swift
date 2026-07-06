@@ -408,7 +408,7 @@ final class AdminViewModel: ObservableObject {
         isLoading = true
         Task {
             do {
-                _ = try await repo.createCashMembership(
+                try await repo.createCashMembership(
                     studentId: studentId, planId: planId, seatNumber: seatNumber,
                     shift: shift, startDate: startDate,
                     paidAmount: paidAmount, pendingAmount: pendingAmount)
