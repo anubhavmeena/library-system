@@ -124,6 +124,15 @@ struct Plan: Codable, Identifiable {
     let planType: String
     let durationDays: Int
     let isActive: Bool
+
+    // PlanDto's `isActive` is a primitive `boolean`, so Lombok generates a plain
+    // `isActive()` getter (not `getIsActive()`) — Jackson strips the "is" prefix off
+    // boolean getters per JavaBean convention, so the JSON key is actually "active",
+    // not "isActive". Confirmed directly against the live GET /api/plans response.
+    enum CodingKeys: String, CodingKey {
+        case id, name, description, price, planType, durationDays
+        case isActive = "active"
+    }
 }
 
 struct Seat: Codable, Identifiable {
@@ -499,6 +508,11 @@ struct MonthlyExpense: Codable, Equatable {
 
 // MARK: - Inbox / Email
 
+// InboxSummaryDto/InboxMessageDto's `isRead` is a primitive `boolean` with no
+// @JsonProperty override, so Lombok's plain `isRead()` getter serializes to the
+// JSON key "read", not "isRead" — same Jackson boolean-getter stripping that broke
+// Plan.isActive ("active") above. Mapped explicitly rather than hitting the same
+// non-optional decode crash on every inbox open.
 struct InboxSummary: Codable, Identifiable, Hashable {
     var id: Int { messageNumber }
     let messageNumber: Int
@@ -506,6 +520,11 @@ struct InboxSummary: Codable, Identifiable, Hashable {
     let subject: String
     let date: String
     let isRead: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case messageNumber, from, subject, date
+        case isRead = "read"
+    }
 }
 
 struct InboxMessage: Codable {
@@ -515,6 +534,11 @@ struct InboxMessage: Codable {
     let date: String
     let isRead: Bool
     let body: String
+
+    enum CodingKeys: String, CodingKey {
+        case messageNumber, from, subject, date, body
+        case isRead = "read"
+    }
 }
 
 // MARK: - Gallery
