@@ -42,6 +42,35 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
             @Param("to")   LocalDateTime to
     );
 
+    // Revenue for FULL_DAY-shift memberships in a time window — used by getRevenueReport's
+    // "Full Day" breakdown card. Joins to Membership since shift lives there, not on Payment.
+    @Query("""
+        SELECT COALESCE(SUM(p.amount), 0) FROM Payment p, Membership m
+        WHERE p.membershipId = m.id
+          AND m.shift = 'FULL_DAY'
+          AND p.status = 'SUCCESS'
+          AND p.createdAt >= :from
+          AND p.createdAt <= :to
+        """)
+    BigDecimal sumFullDayRevenueForPeriod(
+            @Param("from") LocalDateTime from,
+            @Param("to")   LocalDateTime to
+    );
+
+    // Revenue for MORNING/EVENING-shift memberships in a time window — the "Half Day" counterpart.
+    @Query("""
+        SELECT COALESCE(SUM(p.amount), 0) FROM Payment p, Membership m
+        WHERE p.membershipId = m.id
+          AND m.shift <> 'FULL_DAY'
+          AND p.status = 'SUCCESS'
+          AND p.createdAt >= :from
+          AND p.createdAt <= :to
+        """)
+    BigDecimal sumHalfDayRevenueForPeriod(
+            @Param("from") LocalDateTime from,
+            @Param("to")   LocalDateTime to
+    );
+
     // Transaction count for a time window — used by dashboard paymentsThisMonth.
     // amount > 0 excludes "fully on credit" cash bookings (paidAmount = 0 at
     // creation time) — those aren't real payments, just a pending-balance record.

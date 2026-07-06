@@ -421,6 +421,24 @@ struct RevenueReport: Codable {
         fromDate = ""; toDate = ""; totalRevenue = 0; totalTransactions = 0
         halfDayRevenue = 0; fullDayRevenue = 0; dailyBreakdown = []
     }
+
+    // halfDayRevenue/fullDayRevenue can arrive as JSON null from older backend
+    // builds that never populated them — decodeIfPresent treats a null value the
+    // same as a missing key, so this defaults to 0 instead of failing the whole decode.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        fromDate           = try c.decode(String.self, forKey: .fromDate)
+        toDate             = try c.decode(String.self, forKey: .toDate)
+        totalRevenue       = try c.decode(Double.self, forKey: .totalRevenue)
+        totalTransactions  = try c.decode(Int.self, forKey: .totalTransactions)
+        halfDayRevenue     = try c.decodeIfPresent(Double.self, forKey: .halfDayRevenue) ?? 0
+        fullDayRevenue     = try c.decodeIfPresent(Double.self, forKey: .fullDayRevenue) ?? 0
+        dailyBreakdown     = try c.decode([DailyRevenue].self, forKey: .dailyBreakdown)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case fromDate, toDate, totalRevenue, totalTransactions, halfDayRevenue, fullDayRevenue, dailyBreakdown
+    }
 }
 
 struct DailyPayment: Codable {

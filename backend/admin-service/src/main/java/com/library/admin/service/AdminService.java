@@ -823,7 +823,9 @@ public class AdminService {
         LocalDateTime from = LocalDate.parse(fromStr).atStartOfDay();
         LocalDateTime to   = LocalDate.parse(toStr).atTime(23, 59, 59);
 
-        BigDecimal total = paymentRepository.sumRevenueForPeriod(from, to);
+        BigDecimal total   = paymentRepository.sumRevenueForPeriod(from, to);
+        BigDecimal fullDay = paymentRepository.sumFullDayRevenueForPeriod(from, to);
+        BigDecimal halfDay = paymentRepository.sumHalfDayRevenueForPeriod(from, to);
         long count       = paymentRepository.countSuccessfulPayments(from, to);
 
         // Build daily breakdown (only days with transactions)
@@ -852,6 +854,8 @@ public class AdminService {
                 .fromDate(fromStr)
                 .toDate(toStr)
                 .totalRevenue(total != null ? total : BigDecimal.ZERO)
+                .fullDayRevenue(fullDay != null ? fullDay : BigDecimal.ZERO)
+                .halfDayRevenue(halfDay != null ? halfDay : BigDecimal.ZERO)
                 .totalTransactions(count)
                 .dailyBreakdown(daily)
                 .build();
