@@ -10,6 +10,14 @@ struct AdminSeatsView: View {
     @State private var showSeatHistory = false
     @State private var viewMode: SeatViewMode = .standard
 
+    // Pinch-to-zoom / pan for the seat grid specifically (not the legend or
+    // the rest of the page) — scale is clamped to [1, 4] and offset resets to
+    // zero once zoomed back out to avoid getting "stuck" panned when small.
+    @State private var seatMapScale: CGFloat = 1.0
+    @State private var seatMapLastScale: CGFloat = 1.0
+    @State private var seatMapOffset: CGSize = .zero
+    @State private var seatMapLastOffset: CGSize = .zero
+
     private enum SeatViewMode { case standard, expiry }
 
     private let shifts = ["MORNING", "EVENING", "FULL_DAY"]
@@ -178,20 +186,23 @@ struct AdminSeatsView: View {
                 .padding(.horizontal, 16)
 
                 // Seat grid (admin read-only version — tap to see occupant).
-                // Kept in its own horizontal scroll as a safety net for
-                // smaller devices/Dynamic Type, but the compact cell size
-                // below is sized to fit a full row on one screen normally.
-                VStack(spacing: 6) {
+                // The grid itself lives in a fixed-height, pinch-to-zoom/pan
+                // region (zoomableSeatGrid) separate from the legend, which
+                // stays fixed size — zooming the legend text wouldn't be
+                // useful. Grid already fits at 1x zoom (see the compact cell
+                // sizing), so pinch/pan is purely an optional closer look.
+                VStack(spacing: 10) {
+                    seatMapLegend
                     floorPlanLabel("ENTRY")
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        adminSeatGrid(map)
-                            .padding(16)
-                    }
+                    zoomableSeatGrid(map)
                     HStack(spacing: 8) {
                         floorPlanLabel("EXIT")
                         floorPlanLabel("RO / PANTRY")
                         floorPlanLabel("WASHROOM")
                     }
+                    Text("Pinch to zoom · drag to pan · double-tap to reset")
+                        .font(.system(size: 10))
+                        .foregroundColor(.textMuted)
                 }
             }
             .padding(.bottom, 24)
@@ -208,25 +219,81 @@ struct AdminSeatsView: View {
                             studentMobile: nil, studentGender: nil, shift: nil, membershipEnd: nil)
     }
 
+    @ViewBuilder
+    private var seatMapLegend: some View {
+        if viewMode == .expiry {
+            HStack(spacing: 12) {
+                legendItem(color: .redDeep, border: .redAlert.opacity(0.6), label: "Overdue")
+                legendItem(color: .redFaint, border: .redAlert, label: "≤3d")
+                legendItem(color: .orangeFaint, border: .orange, label: "≤7d")
+                legendItem(color: .yellowFaint, border: .yellowWarn, label: "≤15d")
+                legendItem(color: .emeraldFaint, border: .emerald, label: "Safe")
+            }
+        } else {
+            HStack(spacing: 16) {
+                legendItem(color: .emeraldFaint, border: .emerald, label: "Available")
+                legendItem(color: .redFaint, border: .redAlert, label: "Male")
+                legendItem(color: .fuchsiaFaint, border: .fuchsia, label: "Female")
+            }
+        }
+    }
+
+    // Pinch-to-zoom + drag-to-pan container for the seat grid. Fixed height
+    // via GeometryReader so the scaled/offset content has well-defined
+    // clipping bounds instead of blowing out the page layout. Panning only
+    // takes effect once zoomed in, so a plain single-finger drag at the
+    // default 1x zoom doesn't fight the page's own vertical scroll.
+    private func zoomableSeatGrid(_ map: SeatMapDto) -> some View {
+        GeometryReader { geo in
+            adminSeatGrid(map)
+                .padding(16)
+                .frame(width: geo.size.width, height: geo.size.height)
+                .scaleEffect(seatMapScale)
+                .offset(seatMapOffset)
+                .clipped()
+                .contentShape(Rectangle())
+                .gesture(
+                    SimultaneousGesture(
+                        MagnificationGesture()
+                            .onChanged { value in
+                                seatMapScale = min(max(seatMapLastScale * value, 1.0), 4.0)
+                            }
+                            .onEnded { _ in
+                                seatMapLastScale = seatMapScale
+                                if seatMapScale <= 1.01 {
+                                    seatMapScale = 1.0
+                                    seatMapLastScale = 1.0
+                                    seatMapOffset = .zero
+                                    seatMapLastOffset = .zero
+                                }
+                            },
+                        DragGesture()
+                            .onChanged { value in
+                                guard seatMapScale > 1.0 else { return }
+                                seatMapOffset = CGSize(
+                                    width: seatMapLastOffset.width + value.translation.width,
+                                    height: seatMapLastOffset.height + value.translation.height
+                                )
+                            }
+                            .onEnded { _ in
+                                seatMapLastOffset = seatMapOffset
+                            }
+                    )
+                )
+                .onTapGesture(count: 2) {
+                    withAnimation(.spring()) {
+                        seatMapScale = 1.0
+                        seatMapLastScale = 1.0
+                        seatMapOffset = .zero
+                        seatMapLastOffset = .zero
+                    }
+                }
+        }
+        .frame(height: 340)
+    }
+
     private func adminSeatGrid(_ map: SeatMapDto) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Legend
-            if viewMode == .expiry {
-                HStack(spacing: 12) {
-                    legendItem(color: .redDeep, border: .redAlert.opacity(0.6), label: "Overdue")
-                    legendItem(color: .redFaint, border: .redAlert, label: "≤3d")
-                    legendItem(color: .orangeFaint, border: .orange, label: "≤7d")
-                    legendItem(color: .yellowFaint, border: .yellowWarn, label: "≤15d")
-                    legendItem(color: .emeraldFaint, border: .emerald, label: "Safe")
-                }
-            } else {
-                HStack(spacing: 16) {
-                    legendItem(color: .emeraldFaint, border: .emerald, label: "Available")
-                    legendItem(color: .redFaint, border: .redAlert, label: "Male")
-                    legendItem(color: .fuchsiaFaint, border: .fuchsia, label: "Female")
-                }
-            }
-
             ForEach(seatMapRowLabels, id: \.self) { row in
                 let rowSeats = map.seatsByRow[row] ?? []
                 HStack(alignment: .top, spacing: 6) {
