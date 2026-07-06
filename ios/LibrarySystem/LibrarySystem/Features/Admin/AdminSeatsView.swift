@@ -256,7 +256,7 @@ struct AdminSeatsView: View {
                 .offset(seatMapOffset)
                 .clipped()
                 .contentShape(Rectangle())
-                .gesture(
+                .simultaneousGesture(
                     SimultaneousGesture(
                         MagnificationGesture()
                             .onChanged { value in
