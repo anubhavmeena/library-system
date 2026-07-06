@@ -212,7 +212,11 @@ data class ReminderStudent(
 )
 
 // Request bodies
-data class SendOtpRequest(val contact: String, val contactType: String = "MOBILE")
+// channel: optional override for MOBILE contacts — null/omitted means the
+// default routing (Meta WhatsApp, then apitxt SMS, then Twilio SMS); "SMS"
+// forces apitxt/Twilio SMS, skipping WhatsApp — used by the "Send via SMS
+// instead" fallback after a WhatsApp OTP isn't received.
+data class SendOtpRequest(val contact: String, val contactType: String = "MOBILE", val channel: String? = null)
 data class VerifyOtpRequest(val contact: String, val otp: String)
 data class RegisterRequest(val name: String, val email: String?, val sessionToken: String, val dateOfBirth: String? = null, val gender: String? = null, val address: String? = null)
 data class LoginRequest(val sessionToken: String)

@@ -20,8 +20,9 @@ import com.targetzone.library.ui.theme.*
 @Composable
 fun AdminLoginScreen(vm: AuthViewModel, onSuccess: () -> Unit, onBack: () -> Unit) {
     val state by vm.state.collectAsState()
-    var contact by remember { mutableStateOf("") }
-    var otp     by remember { mutableStateOf("") }
+    var contact     by remember { mutableStateOf("") }
+    var otp         by remember { mutableStateOf("") }
+    var contactType by remember { mutableStateOf("MOBILE") }
 
     LaunchedEffect(state.isLoggedIn) { if (state.isLoggedIn) onSuccess() }
 
@@ -64,7 +65,7 @@ fun AdminLoginScreen(vm: AuthViewModel, onSuccess: () -> Unit, onBack: () -> Uni
                 text = if (state.isLoading) "Sending OTP…" else "Send OTP",
                 enabled = contact.isNotBlank() && !state.isLoading,
                 onClick = {
-                    val contactType = if (contact.contains("@")) "EMAIL" else "MOBILE"
+                    contactType = if (contact.contains("@")) "EMAIL" else "MOBILE"
                     vm.sendOtp(contact, contactType)
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -87,11 +88,24 @@ fun AdminLoginScreen(vm: AuthViewModel, onSuccess: () -> Unit, onBack: () -> Uni
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(12.dp))
-            TextButton(
-                onClick = { vm.resetOtpState(); otp = "" },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("← Change Contact", color = TextSub)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { vm.resetOtpState(); otp = "" }) {
+                    Text("← Change Contact", color = TextSub, fontSize = 13.sp)
+                }
+                val canResend = state.secondsSinceSend >= 10
+                TextButton(onClick = { vm.resendOtp(contact, contactType) }, enabled = canResend && !state.isLoading) {
+                    Text(
+                        if (canResend) "Resend OTP" else "Resend in ${10 - state.secondsSinceSend}s",
+                        color = if (canResend) Amber else TextMuted, fontSize = 13.sp
+                    )
+                }
+            }
+            val showSmsOption = contactType == "MOBILE" && state.secondsSinceSend >= 10 && state.otpSendCount >= 2 && !state.smsOptionUsed
+            if (showSmsOption) {
+                Spacer(Modifier.height(4.dp))
+                TextButton(onClick = { vm.sendOtpViaSms(contact, contactType) }, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth()) {
+                    Text("Still no OTP? Send via SMS instead", color = BlueSoft, fontSize = 13.sp)
+                }
             }
         }
 

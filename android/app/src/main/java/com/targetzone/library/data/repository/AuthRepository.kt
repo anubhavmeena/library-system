@@ -7,8 +7,8 @@ import com.targetzone.library.data.model.*
 class AuthRepository(private val tokenManager: TokenManager) {
     private val api = ApiClient.service
 
-    suspend fun sendOtp(contact: String, contactType: String = "MOBILE"): Result<Unit> = runCatching {
-        val res = api.sendOtp(SendOtpRequest(contact = contact, contactType = contactType))
+    suspend fun sendOtp(contact: String, contactType: String = "MOBILE", channel: String? = null): Result<Unit> = runCatching {
+        val res = api.sendOtp(SendOtpRequest(contact = contact, contactType = contactType, channel = channel))
         if (!res.isSuccessful) throw Exception(res.errorBody()?.string() ?: "Failed to send OTP")
     }
 

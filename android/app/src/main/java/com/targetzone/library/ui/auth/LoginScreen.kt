@@ -109,8 +109,24 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(12.dp))
-            TextButton(onClick = { vm.resetOtpState(); otp = "" }, modifier = Modifier.fillMaxWidth()) {
-                Text("← Change Number", color = TextSub)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { vm.resetOtpState(); otp = "" }) {
+                    Text("← Change Number", color = TextSub, fontSize = 13.sp)
+                }
+                val canResend = state.secondsSinceSend >= 10
+                TextButton(onClick = { vm.resendOtp(mobile) }, enabled = canResend && !state.isLoading) {
+                    Text(
+                        if (canResend) "Resend OTP" else "Resend in ${10 - state.secondsSinceSend}s",
+                        color = if (canResend) Amber else TextMuted, fontSize = 13.sp
+                    )
+                }
+            }
+            val showSmsOption = state.secondsSinceSend >= 10 && state.otpSendCount >= 2 && !state.smsOptionUsed
+            if (showSmsOption) {
+                Spacer(Modifier.height(4.dp))
+                TextButton(onClick = { vm.sendOtpViaSms(mobile) }, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth()) {
+                    Text("Still no OTP? Send via SMS instead", color = BlueSoft, fontSize = 13.sp)
+                }
             }
         }
 
