@@ -15,8 +15,6 @@ pub struct User {
     pub aadhaar_url: Option<String>,
     pub date_of_birth: Option<NaiveDate>,
     pub gender: Option<String>,
-    #[serde(skip_serializing)]
-    pub password_hash: Option<String>,
     pub is_active: bool,
     pub role: String,
     pub created_at: NaiveDateTime,
@@ -114,7 +112,6 @@ mod tests {
             aadhaar_url: Some("/uploads/aadhaar.pdf".to_string()),
             date_of_birth: NaiveDate::from_ymd_opt(1995, 6, 15),
             gender: Some("Female".to_string()),
-            password_hash: Some("$2b$hashed_password_value".to_string()),
             is_active: true,
             role: "STUDENT".to_string(),
             created_at: NaiveDateTime::parse_from_str("2025-01-01 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap(),
@@ -138,23 +135,6 @@ mod tests {
         assert_eq!(profile.gender, Some("Female".to_string()));
         assert!(profile.is_active);
         assert_eq!(profile.role, "STUDENT");
-    }
-
-    #[test]
-    fn user_serialization_excludes_password_hash() {
-        let user = sample_user();
-        let json = serde_json::to_string(&user).unwrap();
-        assert!(!json.contains("password_hash"));
-        assert!(!json.contains("hashed_password_value"));
-    }
-
-    #[test]
-    fn user_profile_does_not_expose_password_hash() {
-        let user = sample_user();
-        let profile = UserProfile::from(user);
-        let json = serde_json::to_string(&profile).unwrap();
-        assert!(!json.contains("password_hash"));
-        assert!(!json.contains("hashed_password_value"));
     }
 
     #[test]

@@ -42,5 +42,8 @@ tokio-cron-scheduler = "0.10"
 tower = "0.4"
 anyhow = "1"
 csv = "1"
-printpdf = "0.7"
-qrcode = "0.14"
+printpdf = { version = "0.7", features = ["embedded_images"] }
+base64 = "0.22"
+imageproc = "0.23"
+rusttype = "0.9"
+barcoders = { version = "2.0.0", default-features = false, features = ["std"] }

@@ -45,6 +45,14 @@ pub async fn get_my_queued_membership(
     Ok(ApiResponse::success("Queued membership retrieved", membership))
 }
 
+pub async fn get_my_status(
+    State(state): State<Arc<AppState>>,
+    user: AuthUser,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let status = svc::get_my_display_status(&state, user.user_id).await?;
+    Ok(ApiResponse::success("Status retrieved", status))
+}
+
 pub async fn call_admin(
     State(state): State<Arc<AppState>>,
     user: AuthUser,

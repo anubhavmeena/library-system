@@ -30,6 +30,15 @@ pub struct Membership {
     pub status: String,
     pub reminder_sent: bool,
     pub created_at: Option<NaiveDateTime>,
+    /// Set when the membership enters GRACE (= plan price at the moment of
+    /// transition); null otherwise. Never auto-cleared by the DB — only an
+    /// admin clear-dues / student dues-payment sets it back to 0.
+    pub dues_amount: Option<Decimal>,
+    /// In-flight checkout correlation key for `verify_dues_payment` — set at
+    /// `create_dues_order()` time, read back on verify.
+    pub gateway_order_id: Option<String>,
+    /// Amount snapshotted at dues-order-creation time, read back on verify.
+    pub checkout_amount: Option<Decimal>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -43,6 +52,7 @@ pub struct Payment {
     pub payment_gateway: Option<String>,
     pub gateway_order_id: Option<String>,
     pub gateway_payment_id: Option<String>,
+    pub invoice_id: Option<String>,
     pub status: String,
     #[serde(rename = "createdAt")]
     pub created_at: Option<NaiveDateTime>,
@@ -66,6 +76,18 @@ pub struct MembershipWithPlan {
     pub amount_paid: Option<Decimal>,
     pub plan_price: Option<Decimal>,
     pub created_at: Option<NaiveDateTime>,
+    pub dues_amount: Option<Decimal>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct VerifyDuesPaymentRequest {
+    #[serde(rename = "gatewayOrderId")]
+    pub order_id: String,
+    #[serde(rename = "gatewayPaymentId")]
+    pub payment_id: Option<String>,
+    pub signature: Option<String>,
+    #[serde(rename = "membershipId")]
+    pub membership_id: Uuid,
 }
 
 #[derive(Debug, Deserialize)]

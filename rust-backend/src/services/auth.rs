@@ -8,8 +8,8 @@ use chrono::NaiveDate;
 use sqlx::PgPool;
 use std::sync::Arc;
 
-pub async fn send_otp(state: &Arc<AppState>, contact: &str) -> crate::error::Result<()> {
-    otp::send_otp(state, contact).await
+pub async fn send_otp(state: &Arc<AppState>, contact: &str, channel: Option<&str>) -> crate::error::Result<()> {
+    otp::send_otp_channel(state, contact, channel).await
 }
 
 pub async fn verify_otp(
@@ -46,8 +46,8 @@ pub async fn register(
     };
 
     let user = sqlx::query_as::<_, User>(
-        "INSERT INTO users (mobile, email, name, address, gender, date_of_birth, role)
-         VALUES ($1, $2, $3, $4, $5, $6, 'STUDENT')
+        "INSERT INTO users (mobile, email, name, address, gender, date_of_birth, role, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 'STUDENT', NOW())
          RETURNING *",
     )
     .bind(mobile)

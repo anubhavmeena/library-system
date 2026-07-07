@@ -21,6 +21,14 @@ pub struct Config {
     pub meta_whatsapp_otp_template: String,
     pub meta_whatsapp_notif_template: String,
     pub meta_whatsapp_language: String,
+    pub meta_receipt_template_name: String,
+    pub meta_receipt_language: String,
+    pub meta_id_card_image_template_name: String,
+    pub meta_id_card_image_language: String,
+    // apitxt SMS (OTP fallback channel between Meta WhatsApp and Twilio)
+    pub apitxt_auth_key: String,
+    // Public base URL used to build links Meta's servers fetch (receipt/ID-card documents)
+    pub frontend_url: String,
     // Payment
     pub payment_gateway: String,
     pub razorpay_key_id: String,
@@ -73,6 +81,21 @@ impl Config {
                 .unwrap_or_else(|_| "tznallh".to_string()),
             meta_whatsapp_language: env::var("META_WHATSAPP_LANGUAGE")
                 .unwrap_or_else(|_| "en".to_string()),
+            // "payment_receipt" was approved under plain English ("en"), not
+            // English (US) ("en_US") like the notification template — Meta
+            // requires an exact language-code match per template, so this is
+            // deliberately a separate env var, not a reuse of meta_whatsapp_language.
+            meta_receipt_template_name: env::var("META_WHATSAPP_RECEIPT_TEMPLATE_NAME")
+                .unwrap_or_else(|_| "payment_receipt".to_string()),
+            meta_receipt_language: env::var("META_WHATSAPP_RECEIPT_LANGUAGE")
+                .unwrap_or_else(|_| "en".to_string()),
+            meta_id_card_image_template_name: env::var("META_WHATSAPP_ID_CARD_TEMPLATE_NAME")
+                .unwrap_or_else(|_| "id_card".to_string()),
+            meta_id_card_image_language: env::var("META_WHATSAPP_ID_CARD_LANGUAGE")
+                .unwrap_or_else(|_| "en".to_string()),
+            apitxt_auth_key: env::var("APITXT_AUTH_KEY").unwrap_or_default(),
+            frontend_url: env::var("FRONTEND_URL")
+                .unwrap_or_else(|_| "https://targetzone.co.in".to_string()),
             payment_gateway: env::var("PAYMENT_GATEWAY")
                 .unwrap_or_else(|_| "CASHFREE".to_string()),
             razorpay_key_id: env::var("RAZORPAY_KEY_ID").unwrap_or_default(),
@@ -132,6 +155,12 @@ mod tests {
             meta_whatsapp_otp_template: "otpvm".to_string(),
             meta_whatsapp_notif_template: "tznallh".to_string(),
             meta_whatsapp_language: "en".to_string(),
+            meta_receipt_template_name: "payment_receipt".to_string(),
+            meta_receipt_language: "en".to_string(),
+            meta_id_card_image_template_name: "id_card".to_string(),
+            meta_id_card_image_language: "en".to_string(),
+            apitxt_auth_key: "".to_string(),
+            frontend_url: "https://targetzone.co.in".to_string(),
             payment_gateway: "CASHFREE".to_string(),
             razorpay_key_id: "".to_string(),
             razorpay_key_secret: "".to_string(),

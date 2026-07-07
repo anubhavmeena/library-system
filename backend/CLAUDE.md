@@ -77,7 +77,7 @@ Admin login (`POST /api/auth/admin/login`) does **not** use OTP — it accepts t
 
 ## Seat Layout
 
-The library has **110 fixed seats**: rows A(28), B(28), C(28), D(26). Seat numbers are `<row><index>` e.g. `A1`, `D26`. This layout is hardcoded in `AdminService.getSeatMap()` and `SeatGrid` on the frontend — it is not stored in a config table.
+The library has **112 fixed seats**: rows A(28), B(28), C(28), D(28). Seat numbers are `<row><index>` e.g. `A1`, `D28`. The layout lives entirely in the `seats` table (seeded once via `common-lib/src/main/resources/db/seed.sql`), not a config table — `AdminService.getSeatMap()` reads the row/seat-index layout directly from that table rather than any hardcoded literal, specifically because an earlier hardcoded "D has 26 seats" assumption once hid two genuinely-occupied seats (D27/D28) that existed in the table but fell outside that literal's range.
 
 Shifts: `MORNING` (6AM–2PM), `EVENING` (2PM–10PM), `FULL_DAY` (6AM–10PM). A `FULL_DAY` booking occupies the seat for both sub-shifts. The unique constraint on `seat_bookings` is `(seat_id, shift, booking_date)`.
 

@@ -79,7 +79,7 @@ VALUES
     )
 ON CONFLICT (id) DO NOTHING;
 
--- ─── Seats (110 total: A×28, B×28, C×28, D×26) ───────────────────────────────
+-- ─── Seats (112 total: A×28, B×28, C×28, D×28) ───────────────────────────────
 INSERT INTO seats (id, seat_number, row_label, seat_index, is_active)
 SELECT gen_random_uuid(), 'A' || s, 'A', s, TRUE
 FROM generate_series(1, 28) s
@@ -97,5 +97,5 @@ ON CONFLICT (seat_number) DO NOTHING;
 
 INSERT INTO seats (id, seat_number, row_label, seat_index, is_active)
 SELECT gen_random_uuid(), 'D' || s, 'D', s, TRUE
-FROM generate_series(1, 26) s
+FROM generate_series(1, 28) s
 ON CONFLICT (seat_number) DO NOTHING;

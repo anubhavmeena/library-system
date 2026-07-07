@@ -206,6 +206,8 @@ pub async fn book_seat(
 
         if let (Ok(Some(user)), Ok(Some((plan_name, plan_type, plan_price)))) = (user, membership_plan) {
             let info = notification::BookingInfo {
+                user_id,
+                membership_id,
                 user_name: user.name,
                 user_mobile: user.mobile,
                 user_email: user.email,

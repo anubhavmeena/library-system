@@ -11,6 +11,7 @@ use std::sync::Arc;
 #[derive(Deserialize)]
 pub struct SendOtpRequest {
     pub contact: String,
+    pub channel: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -72,7 +73,7 @@ pub async fn send_otp(
     State(state): State<Arc<AppState>>,
     Json(req): Json<SendOtpRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    auth::send_otp(&state, &req.contact).await?;
+    auth::send_otp(&state, &req.contact, req.channel.as_deref()).await?;
     Ok(ApiResponse::ok("OTP sent successfully"))
 }
 

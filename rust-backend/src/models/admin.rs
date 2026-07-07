@@ -17,7 +17,7 @@ pub struct StudentListItem {
     pub gender: Option<String>,
     pub address: Option<String>,
     pub date_of_birth: Option<NaiveDate>,
-    pub joined_at: NaiveDateTime,
+    pub joined_at: Option<NaiveDateTime>,
     pub membership_id: Option<Uuid>,
     pub membership_plan_id: Option<Uuid>,
     pub plan_name: Option<String>,
@@ -29,6 +29,15 @@ pub struct StudentListItem {
     pub days_remaining: Option<i32>,
     pub payment_mode: Option<String>,
     pub pending_amount: Option<Decimal>,
+    pub dues_amount: Option<Decimal>,
+    #[serde(skip)]
+    pub current_status: Option<String>,
+    #[serde(skip)]
+    pub current_end_date: Option<NaiveDate>,
+    #[serde(skip)]
+    pub latest_ever_status: Option<String>,
+    #[sqlx(default)]
+    pub display_status: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
@@ -158,6 +167,7 @@ pub struct AdminMembershipSummary {
 pub struct SeatMapSeat {
     pub seat_number: String,
     pub is_occupied: bool,
+    pub student_id: Option<Uuid>,
     pub student_name: Option<String>,
     pub student_mobile: Option<String>,
     pub student_gender: Option<String>,
@@ -383,5 +393,61 @@ pub struct AdminUpdateStudentRequest {
     pub address: Option<String>,
     pub gender: Option<String>,
     pub date_of_birth: Option<NaiveDate>,
-    pub joined_at: Option<NaiveDateTime>,
+    /// Date-only — the frontend's `<input type="date">` sends "YYYY-MM-DD" with
+    /// no time component, which doesn't deserialize as NaiveDateTime.
+    pub joined_at: Option<NaiveDate>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseSeatRequest {
+    pub notify_student: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarkPendingRequest {
+    pub pending_amount: Decimal,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClearAmountRequest {
+    pub amount_cleared: Decimal,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct SeatHistoryEntryDto {
+    pub membership_id: Uuid,
+    pub student_name: String,
+    pub student_mobile: Option<String>,
+    pub shift: Option<String>,
+    pub start_date: NaiveDate,
+    pub end_date: NaiveDate,
+    pub status: String,
+    pub seat_number: Option<String>,
+    pub plan_name: Option<String>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct GraceDuesStudentItem {
+    pub id: Uuid,
+    pub name: String,
+    pub mobile: Option<String>,
+    pub email: Option<String>,
+    pub seat_number: Option<String>,
+    pub membership_end: NaiveDate,
+    pub dues_amount: Decimal,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct OrphanedSeatItem {
+    pub id: Uuid,
+    pub name: String,
+    pub mobile: Option<String>,
+    pub membership_id: Uuid,
+    pub membership_end: NaiveDate,
 }

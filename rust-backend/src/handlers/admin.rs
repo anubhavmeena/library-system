@@ -2,9 +2,9 @@ use crate::{
     app_state::AppState,
     error::AppError,
     middleware::AdminUser,
-    models::admin::*,
+    models::{admin::*, settings::{SaveAppSettingsRequest, UpdateNotificationSettingRequest}},
     response::ApiResponse,
-    services::admin as svc,
+    services::{admin as svc, settings as settings_svc},
 };
 use axum::{
     extract::{Path, Query, State},
@@ -335,4 +335,151 @@ pub async fn save_expense(
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let expense = svc::save_expense(&state, &req).await?;
     Ok(ApiResponse::success("Expense saved", expense))
+}
+
+// ── App / Notification settings ──────────────────────────────────────────────
+
+pub async fn get_app_settings(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let settings = settings_svc::get_app_settings(&state).await?;
+    Ok(ApiResponse::success("Settings retrieved", settings))
+}
+
+pub async fn save_app_settings(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Json(req): Json<SaveAppSettingsRequest>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let settings = settings_svc::save_app_settings(&state, &req).await?;
+    Ok(ApiResponse::success("Settings saved", settings))
+}
+
+pub async fn get_notification_settings(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let settings = settings_svc::get_notification_settings(&state).await?;
+    Ok(ApiResponse::success("Notification settings retrieved", settings))
+}
+
+pub async fn update_notification_setting(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(key): Path<String>,
+    Json(req): Json<UpdateNotificationSettingRequest>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let updated = settings_svc::update_notification_setting(&state, &key, &req).await?;
+    Ok(ApiResponse::success("Notification setting updated", updated))
+}
+
+// ── Grace / dues admin actions ───────────────────────────────────────────────
+
+pub async fn release_seat(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(membership_id): Path<Uuid>,
+    Json(req): Json<ReleaseSeatRequest>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    svc::release_seat(&state, membership_id, req.notify_student).await?;
+    Ok(ApiResponse::ok("Seat released"))
+}
+
+pub async fn renew_seat(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(membership_id): Path<Uuid>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let membership = svc::renew_seat(&state, membership_id).await?;
+    Ok(ApiResponse::success("Membership renewed", membership))
+}
+
+pub async fn mark_membership_pending(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(membership_id): Path<Uuid>,
+    Json(req): Json<MarkPendingRequest>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    svc::mark_membership_pending(&state, membership_id, req.pending_amount).await?;
+    Ok(ApiResponse::ok("Membership marked pending"))
+}
+
+pub async fn mark_membership_grace(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(membership_id): Path<Uuid>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    svc::mark_membership_grace(&state, membership_id).await?;
+    Ok(ApiResponse::ok("Membership marked grace"))
+}
+
+pub async fn clear_dues(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(membership_id): Path<Uuid>,
+    Json(req): Json<ClearAmountRequest>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    svc::clear_dues(&state, membership_id, req.amount_cleared).await?;
+    Ok(ApiResponse::ok("Dues cleared"))
+}
+
+pub async fn run_expiry_check(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let count = svc::run_expiry_check(&state).await?;
+    Ok(ApiResponse::success(
+        "Expiry check complete",
+        format!("{count} membership(s) transitioned to grace"),
+    ))
+}
+
+pub async fn orphaned_seats(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let data = svc::get_orphaned_seats(&state).await?;
+    Ok(ApiResponse::success("Orphaned seats retrieved", data))
+}
+
+pub async fn grace_dues_students(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let data = svc::get_grace_dues_students(&state).await?;
+    Ok(ApiResponse::success("Grace dues students retrieved", data))
+}
+
+pub async fn send_grace_dues_reminders(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    body: Option<Json<SendRemindersRequest>>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let user_ids = body.and_then(|Json(b)| b.user_ids);
+    let count = svc::send_grace_dues_reminders(&state, user_ids).await?;
+    Ok(ApiResponse::success(
+        "Grace dues reminders sent",
+        format!("Sent grace dues reminders to {count} student(s)"),
+    ))
+}
+
+// ── Seat / student history ────────────────────────────────────────────────────
+
+pub async fn seat_history(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(seat_number): Path<String>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let data = svc::get_seat_history(&state, &seat_number).await?;
+    Ok(ApiResponse::success("Seat history retrieved", data))
+}
+
+pub async fn student_seat_history(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(user_id): Path<Uuid>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let data = svc::get_student_seat_history(&state, user_id).await?;
+    Ok(ApiResponse::success("Student seat history retrieved", data))
 }

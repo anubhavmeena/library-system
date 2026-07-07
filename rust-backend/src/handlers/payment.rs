@@ -1,7 +1,7 @@
 use crate::{
     app_state::AppState,
     middleware::AuthUser,
-    models::membership::{CreateOrderRequest, VerifyPaymentRequest},
+    models::membership::{CreateOrderRequest, VerifyDuesPaymentRequest, VerifyPaymentRequest},
     response::ApiResponse,
     services::membership as svc,
 };
@@ -47,4 +47,29 @@ pub async fn verify_payment(
     )
     .await?;
     Ok(ApiResponse::success("Payment verified, membership activated", membership))
+}
+
+pub async fn create_dues_order(
+    State(state): State<Arc<AppState>>,
+    user: AuthUser,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let order = svc::create_dues_order(&state, user.user_id).await?;
+    Ok(ApiResponse::success("Dues order created", order))
+}
+
+pub async fn verify_dues_payment(
+    State(state): State<Arc<AppState>>,
+    user: AuthUser,
+    Json(req): Json<VerifyDuesPaymentRequest>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let membership = svc::verify_and_pay_dues(
+        &state,
+        user.user_id,
+        req.membership_id,
+        &req.order_id,
+        req.payment_id.as_deref(),
+        req.signature.as_deref(),
+    )
+    .await?;
+    Ok(ApiResponse::success("Dues cleared, membership active", membership))
 }

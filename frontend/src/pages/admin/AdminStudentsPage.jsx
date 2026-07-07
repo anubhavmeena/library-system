@@ -273,7 +273,12 @@ export default function AdminStudentsPage() {
         setChangeSeatGrid(null)
         setChangeSeatGridLoading(true)
         try {
-            const date = student.membershipStart || new Date().toISOString().split('T')[0]
+            // Check availability as of today, not the membership's start date — if that
+            // start date is in the past, checking it instead of today hides every seat
+            // booking that began after it, making currently-occupied seats look free.
+            // A membership that hasn't started yet still checks against its own start date.
+            const today = new Date().toISOString().split('T')[0]
+            const date = student.membershipStart && student.membershipStart > today ? student.membershipStart : today
             const res = await api.get(`/seats/availability?shift=${student.shift}&date=${date}`)
             setChangeSeatGrid(res.data.data)
         } catch {

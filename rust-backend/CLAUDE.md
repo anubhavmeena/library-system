@@ -90,14 +90,45 @@ Seat bookings use `(seat_id, shift, booking_date)` as a unique key — one recor
 | Razorpay | `RAZORPAY_KEY_ID` empty | `dev_order_*` IDs, HMAC skip |
 | Cashfree | `CASHFREE_APP_ID` empty | `dev_order_*` IDs, verify skip |
 | SendGrid | `SENDGRID_API_KEY` empty | email logged, not sent |
+| apitxt SMS | `APITXT_AUTH_KEY` empty | OTP falls through to Twilio SMS |
 
-### Scheduled job
+### Scheduled jobs
 
-`ExpiryReminderScheduler` runs at 09:00 daily via `tokio-cron-scheduler`. It calls `send_renewal_reminders` (same as the admin API endpoint) which sends WhatsApp/email reminders for memberships expiring in ≤ 7 days.
+Two daily `tokio-cron-scheduler` jobs, registered in `main.rs::start_scheduler`:
+- **09:00** — `run_expiry_reminder_job` → `send_renewal_reminders`: WhatsApp/email reminders for memberships expiring in ≤ 7 days.
+- **10:00** — `run_mark_expired_job` → `mark_expired_and_start_grace`: for every `ACTIVE` membership whose `end_date` has passed, either activates a queued renewal (happy path) or transitions the membership to `GRACE` with `dues_amount` set and the seat held via the far-future sentinel. Also reachable on demand via `POST /api/admin/memberships/run-expiry-check` (backs the admin "Cron Jobs" page).
+
+### Membership grace/dues workflow
+
+`memberships.status` can be `PENDING | ACTIVE | QUEUED | GRACE | EXPIRED | CANCELLED`. `GRACE` never auto-resolves in the DB — `services::membership::resolve_display_status` computes a *display* status (`NEW/PAID/PENDING/GRACE/EXPIRED/RELEASED`) from the DB status + `grace_days` (from `app_settings`, default 10): a `GRACE` row reads as `EXPIRED` once `today - end_date > grace_days`, but the row itself stays `GRACE` until an admin releases the seat or the dues are cleared.
+
+`services::membership::find_current_membership` orders `WHERE status IN ('ACTIVE','GRACE') ORDER BY CASE WHEN status='GRACE' THEN 0 ELSE 1 END, end_date DESC LIMIT 1` — **GRACE always outranks ACTIVE** regardless of date, so an unresolved dues row is never hidden behind a newer admin-created ACTIVE booking.
+
+A `GRACE` membership's linked `seat_bookings.end_date` is pushed to the sentinel `9999-12-31` to hold the seat indefinitely. **Never pass that sentinel as the upper bound to `seat::invalidate_seat_cache`** — it loops day-by-day and would hang. Always cap invalidation at `today` (or the real end date) when touching a GRACE-adjacent booking.
+
+Two distinct dues-clearing code paths intentionally differ (mirrors the Java backend): `admin::clear_dues` extends `end_date` by **+1 month from the membership's existing (stale) end_date**; `membership::verify_and_pay_dues` (student self-serve) extends by the **plan's `duration_days`** from that same stale end_date. Don't "fix" this inconsistency without checking both call sites' assumptions.
+
+`create_order`/`create_cash_membership` block if the user has an unresolved `GRACE` row or an existing `QUEUED` row. `create_cash_membership` also enforces `paid_amount + pending_amount == plan.price` exactly.
+
+### App / notification settings
+
+`app_settings` is a singleton row (`id = 1`, lazily created on first read). `notification_settings` has one row per key from the in-code catalog (`models::settings::NOTIFICATION_CATALOG`) — also lazily created. Both collapse what the Java backend had to duplicate across 2-3 services into one table + one module, since this is a single binary. `settings::setting_for(state, key)` is fail-open: if the row read fails, it falls back to catalog defaults rather than erroring.
+
+### PDF generation & WhatsApp document/image attachments
+
+ID cards (`services/idcard.rs`) and payment receipts (`services/receipt.rs`) are both rendered with `printpdf` (feature `embedded_images` enabled for photo embedding via `printpdf::image_crate`, re-exported `image` 0.24). Photos are cover-scaled (cropped to a centered square, then resized) — never letterboxed. Generated files are written directly under `UPLOAD_DIR/{receipts,id-cards}/` (served by the same `/uploads` `ServeDir` everything else uses) and referenced via `FRONTEND_URL + /uploads/...` links in Meta template messages — there's no pod-to-pod upload step like Java's, since this is one process.
+
+`notification::send_document_template`/`send_image_template` send Meta WhatsApp template messages with a `document`/`image` header `link` (not the `/media` upload endpoint). The receipt template's language code (`META_WHATSAPP_RECEIPT_LANGUAGE`, default `en`) is deliberately separate from the general notification template's language (`META_WHATSAPP_LANGUAGE`, default `en_US`) — Meta requires an exact match per approved template.
+
+### OTP channel routing
+
+`POST /api/auth/send-otp` accepts an optional `channel` field. `channel: "SMS"` skips Meta WhatsApp entirely; otherwise the chain is Meta WhatsApp → apitxt SMS → Twilio SMS, each falling through only on failure. The Redis cooldown key `otp:cooldown:<contact>` has a **10s** TTL (not 30s) — short enough for the frontend to offer both "Resend OTP" and, after a second wait, "Send via SMS instead".
 
 ## Key Invariants
 
 - `seat_bookings.booking_date` is the membership start date; `end_date` is the membership end date. The date range is **inclusive**. The seat map query uses `booking_date <= :date AND end_date >= :date`.
 - `change_membership_seat` and `update_membership_plan` must both update `seat_bookings` **and** invalidate the Redis cache — forgetting either causes the seat map to show stale data.
-- `STUDENT_SELECT` (admin student list) wraps `seat_number` in `CASE WHEN m.status = 'ACTIVE' THEN ... END` so PENDING memberships don't show a seat as claimed.
+- `STUDENT_SELECT` (admin student list) wraps `seat_number` in `CASE WHEN m.status IN ('ACTIVE', 'GRACE') THEN ... END` so PENDING memberships don't show a seat as claimed, while GRACE memberships (whose seat is still held) do.
 - The `uploads/` directory is in `.gitignore` — never commit user files.
+- Every timestamp column in `migrations/` is plain `TIMESTAMP`, not `TIMESTAMPTZ` — every corresponding Rust struct field is `NaiveDateTime`, and sqlx's chrono support only decodes that from `TIMESTAMP`. `001_initial.sql`/`003_add_broadcast_messages.sql` originally declared several columns `TIMESTAMPTZ`; `006_fix_timestamp_types.sql` corrects this. If you add a new timestamp column, keep it plain `TIMESTAMP` unless you also switch the Rust field to `DateTime<Utc>`.
+- Never call `seat::invalidate_seat_cache` with the `9999-12-31` GRACE sentinel as the upper bound — it iterates day-by-day and will hang. Cap at `today` for any GRACE-adjacent invalidation.

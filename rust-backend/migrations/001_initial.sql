@@ -30,7 +30,7 @@ CREATE TABLE membership_plans (
     is_active     BOOLEAN      NOT NULL DEFAULT true
 );
 
--- ── Seats (110 physical seats) ───────────────────────────────────────────────
+-- ── Seats (112 physical seats) ───────────────────────────────────────────────
 CREATE TABLE seats (
     id          UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
     seat_number TEXT    UNIQUE NOT NULL,
@@ -170,7 +170,7 @@ CREATE INDEX idx_payments_membership  ON payments(membership_id);
 CREATE INDEX idx_payments_user        ON payments(user_id);
 CREATE INDEX idx_feedbacks_user       ON feedbacks(user_id);
 
--- ── Seed: 110 seats ──────────────────────────────────────────────────────────
+-- ── Seed: 112 seats ──────────────────────────────────────────────────────────
 INSERT INTO seats (seat_number, row_label, seat_index, is_active) VALUES
   ('A1','A',1,true),('A2','A',2,true),('A3','A',3,true),('A4','A',4,true),
   ('A5','A',5,true),('A6','A',6,true),('A7','A',7,true),('A8','A',8,true),
@@ -199,7 +199,7 @@ INSERT INTO seats (seat_number, row_label, seat_index, is_active) VALUES
   ('D13','D',13,true),('D14','D',14,true),('D15','D',15,true),('D16','D',16,true),
   ('D17','D',17,true),('D18','D',18,true),('D19','D',19,true),('D20','D',20,true),
   ('D21','D',21,true),('D22','D',22,true),('D23','D',23,true),('D24','D',24,true),
-  ('D25','D',25,true),('D26','D',26,true);
+  ('D25','D',25,true),('D26','D',26,true),('D27','D',27,true),('D28','D',28,true);
 
 -- ── Seed: default membership plans ───────────────────────────────────────────
 INSERT INTO membership_plans (name, plan_type, price, duration_days, description, is_active) VALUES

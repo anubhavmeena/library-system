@@ -1,10 +1,13 @@
 pub mod admin;
 pub mod auth;
 pub mod idcard;
+pub mod ids;
 pub mod jwt;
 pub mod membership;
 pub mod notification;
 pub mod otp;
 pub mod payment;
+pub mod receipt;
 pub mod seat;
+pub mod settings;
 pub mod user;

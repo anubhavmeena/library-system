@@ -104,7 +104,7 @@ Three Kafka topics drive all notifications:
 `admin-service` intentionally runs at **replicas: 1** to prevent the daily scheduler from firing multiple times. If you scale it, add ShedLock.
 
 ### Seat Availability Caching (Redis)
-`SeatService.getAvailability()` caches the full seat grid per `(shift, date)` in Redis with a 5-minute TTL (key: `seats:availability:<SHIFT>:<date>`). Any `bookSeat()` or `releaseSeat()` call busts the cache for the affected date range. A `FULL_DAY` booking also invalidates `MORNING` and `EVENING` cache keys for the same dates. The library has **110 fixed seats**: rows A(28), B(28), C(28), D(26) — hardcoded, not stored in a config table.
+`SeatService.getAvailability()` caches the full seat grid per `(shift, date)` in Redis with a 5-minute TTL (key: `seats:availability:<SHIFT>:<date>`). Any `bookSeat()` or `releaseSeat()` call busts the cache for the affected date range. A `FULL_DAY` booking also invalidates `MORNING` and `EVENING` cache keys for the same dates. The library has **112 fixed seats**: rows A(28), B(28), C(28), D(28) — seeded once into the `seats` table (`common-lib/src/main/resources/db/seed.sql`), not stored in a config table.
 
 ### Database Strategy
 All services/backends share one **PostgreSQL** instance but use separate tables per domain — no cross-service foreign keys; `userId`, `membershipId`, etc. are bare UUIDs resolved in application code. The schema is created once by `backend/common-lib/src/main/resources/db/schema.sql` (executed by Postgres on first container init); the Java services' `ddl-auto: update` is a safe no-op after that, so schema changes should generally go through that file rather than relying on Hibernate to add columns.
