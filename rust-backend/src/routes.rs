@@ -110,6 +110,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/admin/inbox",                           get(mailbox::list_messages))
         .route("/api/admin/inbox/:messageNumber",             get(mailbox::get_message).delete(mailbox::delete_message))
         .route("/api/admin/inbox/:messageNumber/reply",       post(mailbox::reply))
+        .route("/api/admin/inbox/:messageNumber/attachments/:index", get(mailbox::get_attachment))
 
         // ── Visitor tracking (public) ─────────────────────────────────────────
         .route("/api/visitor/track", post(visitor::track))

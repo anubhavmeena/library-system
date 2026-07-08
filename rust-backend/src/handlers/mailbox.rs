@@ -2,7 +2,10 @@ use crate::{
     app_state::AppState, middleware::AdminUser, models::admin::ReplyRequest, response::ApiResponse,
     services::mailbox as svc,
 };
-use axum::extract::{Path, State};
+use axum::{
+    extract::{Path, State},
+    http::header,
+};
 use std::sync::Arc;
 
 pub async fn list_messages(
@@ -29,6 +32,27 @@ pub async fn delete_message(
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     svc::delete_message(state.config.clone(), message_number).await?;
     Ok(ApiResponse::ok("Message deleted"))
+}
+
+pub async fn get_attachment(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path((message_number, index)): Path<(u32, usize)>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let (filename, content_type, bytes) =
+        svc::get_attachment(state.config.clone(), message_number, index).await?;
+    // Sanitized the same way uploaded filenames are, to keep an
+    // attacker-controlled email filename from smuggling anything unexpected
+    // into the Content-Disposition header value.
+    let safe_name = crate::services::user::sanitize_filename(&filename);
+    let disposition = format!("attachment; filename=\"{safe_name}\"");
+    Ok((
+        [
+            (header::CONTENT_TYPE, content_type),
+            (header::CONTENT_DISPOSITION, disposition),
+        ],
+        bytes,
+    ))
 }
 
 pub async fn reply(

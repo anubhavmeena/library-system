@@ -19,6 +19,13 @@ function extractEmailAddress(from) {
     return m ? m[1] : from
 }
 
+function fmtBytes(size) {
+    if (!size && size !== 0) return ''
+    if (size < 1024) return `${size} B`
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
 export default function AdminMailboxPage() {
     const { t } = useTranslation()
     const iframeRef = useRef(null)
@@ -30,6 +37,7 @@ export default function AdminMailboxPage() {
     const [replyText,     setReplyText]     = useState('')
     const [showReply,     setShowReply]     = useState(false)
     const [replySending,  setReplySending]  = useState(false)
+    const [downloadingIdx, setDownloadingIdx] = useState(null)
 
     const fetchMessages = async () => {
         setLoading(true)
@@ -63,6 +71,28 @@ export default function AdminMailboxPage() {
             toast.error(t('adminMailbox.loadFailed'))
         } finally {
             setDetailLoading(false)
+        }
+    }
+
+    const downloadAttachment = async (attachment) => {
+        setDownloadingIdx(attachment.index)
+        try {
+            const res = await api.get(
+                `/admin/inbox/${selected.messageNumber}/attachments/${attachment.index}`,
+                { responseType: 'blob' }
+            )
+            const url = window.URL.createObjectURL(new Blob([res.data], { type: attachment.contentType }))
+            const link = document.createElement('a')
+            link.href = url
+            link.setAttribute('download', attachment.filename)
+            document.body.appendChild(link)
+            link.click()
+            link.remove()
+            window.URL.revokeObjectURL(url)
+        } catch {
+            toast.error(t('adminMailbox.attachmentDownloadFailed'))
+        } finally {
+            setDownloadingIdx(null)
         }
     }
 
@@ -202,6 +232,30 @@ export default function AdminMailboxPage() {
                                     }}
                                 />
                             </div>
+
+                            {/* Attachments */}
+                            {selected.attachments?.length > 0 && (
+                                <div className="px-6 py-4 border-t border-primary-800/60 flex-shrink-0">
+                                    <p className="text-primary-500 text-xs uppercase tracking-wide mb-2">
+                                        {t('adminMailbox.attachments')} ({selected.attachments.length})
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selected.attachments.map(att => (
+                                            <button
+                                                key={att.index}
+                                                onClick={() => downloadAttachment(att)}
+                                                disabled={downloadingIdx === att.index}
+                                                className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-primary-800/60 border border-primary-700/60 hover:bg-primary-800 transition-colors disabled:opacity-50"
+                                            >
+                                                <span>📎</span>
+                                                <span className="text-primary-100 truncate max-w-[180px]">{att.filename}</span>
+                                                <span className="text-primary-500 text-xs">{fmtBytes(att.size)}</span>
+                                                {downloadingIdx === att.index && <span>⟳</span>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Action bar */}
                             <div className="px-6 py-4 border-t border-primary-800/60 flex-shrink-0 space-y-3">

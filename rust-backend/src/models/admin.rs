@@ -495,6 +495,20 @@ pub struct InboxMessage {
     pub date: String,
     pub is_read: bool,
     pub body: String,
+    pub attachments: Vec<AttachmentInfo>,
+}
+
+/// `index` is the attachment's position within its message, re-derived the
+/// same deterministic way on both list and download — there's no persisted
+/// attachment store, so `GET .../attachments/:index` just re-walks the MIME
+/// tree and picks the Nth one again.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttachmentInfo {
+    pub index: usize,
+    pub filename: String,
+    pub content_type: String,
+    pub size: usize,
 }
 
 #[derive(Debug, Deserialize)]

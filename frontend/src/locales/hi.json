@@ -964,6 +964,8 @@
     "replySent": "उत्तर भेजा गया",
     "loadFailed": "इनबॉक्स लोड नहीं हो सका",
     "deleteFailed": "संदेश हटाने में विफल",
-    "replyFailed": "उत्तर भेजने में विफल"
+    "replyFailed": "उत्तर भेजने में विफल",
+    "attachments": "अटैचमेंट",
+    "attachmentDownloadFailed": "अटैचमेंट डाउनलोड नहीं हो सका"
   }
 }

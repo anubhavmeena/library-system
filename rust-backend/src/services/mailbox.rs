@@ -1,7 +1,7 @@
 use crate::{
     config::Config,
     error::AppError,
-    models::admin::{InboxMessage, InboxSummary},
+    models::admin::{AttachmentInfo, InboxMessage, InboxSummary},
 };
 use lettre::message::header::{Header, HeaderName, HeaderValue};
 use std::io::{Read, Write};
@@ -42,10 +42,33 @@ fn escape_html(text: &str) -> String {
     text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }
 
+/// A part counts as an attachment when it's explicitly marked
+/// `Content-Disposition: attachment` or carries a filename (via
+/// `Content-Disposition: ...; filename=` or `Content-Type: ...; name=`) —
+/// covers both PDFs/images sent as real attachments (see
+/// `notification::send_email_with_attachment`, which sets
+/// `"disposition": "attachment"`) and the rarer named-but-inline case.
+fn attachment_filename(part: &mailparse::ParsedMail) -> Option<String> {
+    let disposition = part.get_content_disposition();
+    let named = disposition
+        .params
+        .get("filename")
+        .cloned()
+        .or_else(|| part.ctype.params.get("name").cloned());
+    let is_explicit_attachment = matches!(disposition.disposition, mailparse::DispositionType::Attachment);
+    if is_explicit_attachment || named.is_some() {
+        Some(named.unwrap_or_else(|| "attachment".to_string()))
+    } else {
+        None
+    }
+}
+
 /// Mirrors Java's `MailboxService.extractBody`: prefer text/html, fall back to
 /// text/plain wrapped in a `<pre>` so it renders sanely in the admin's HTML
 /// preview iframe, recurse into nested multipart parts, otherwise a
-/// "nothing readable" placeholder.
+/// "nothing readable" placeholder. Parts that are actually attachments (a
+/// named PDF/image, or even a named text/plain file) are skipped here — see
+/// `collect_attachments` — so they're surfaced once, not folded into the body.
 fn extract_body(part: &mailparse::ParsedMail) -> String {
     let mimetype = part.ctype.mimetype.to_ascii_lowercase();
     if mimetype == "text/html" {
@@ -61,6 +84,9 @@ fn extract_body(part: &mailparse::ParsedMail) -> String {
     if mimetype.starts_with("multipart/") {
         let mut plain: Option<String> = None;
         for sub in &part.subparts {
+            if attachment_filename(sub).is_some() {
+                continue;
+            }
             let sub_type = sub.ctype.mimetype.to_ascii_lowercase();
             if sub_type == "text/html" {
                 return extract_body(sub);
@@ -78,6 +104,39 @@ fn extract_body(part: &mailparse::ParsedMail) -> String {
         return plain.unwrap_or_default();
     }
     "<em style='color:#888'>(No readable content)</em>".to_string()
+}
+
+/// Walks the MIME tree collecting every attachment part in a fixed,
+/// deterministic left-to-right order — both the metadata listed in
+/// `InboxMessage.attachments` and the later `.../attachments/:index` download
+/// re-derive this same order from scratch, so the index stays meaningful
+/// across two separate IMAP fetches of the same message.
+fn collect_attachments(part: &mailparse::ParsedMail, out: &mut Vec<(String, String, Vec<u8>)>) {
+    if part.ctype.mimetype.to_ascii_lowercase().starts_with("multipart/") {
+        for sub in &part.subparts {
+            collect_attachments(sub, out);
+        }
+        return;
+    }
+    if let Some(filename) = attachment_filename(part) {
+        if let Ok(content) = part.get_body_raw() {
+            out.push((filename, part.ctype.mimetype.clone(), content));
+        }
+    }
+}
+
+fn attachment_infos(parsed: &mailparse::ParsedMail) -> Vec<AttachmentInfo> {
+    let mut raw = Vec::new();
+    collect_attachments(parsed, &mut raw);
+    raw.into_iter()
+        .enumerate()
+        .map(|(index, (filename, content_type, content))| AttachmentInfo {
+            index,
+            filename,
+            content_type,
+            size: content.len(),
+        })
+        .collect()
 }
 
 fn summary_from_raw(message_number: u32, is_read: bool, raw: &[u8]) -> InboxSummary {
@@ -150,7 +209,36 @@ fn get_message_blocking(cfg: &Config, message_number: u32) -> anyhow::Result<Inb
         date: header_value(&parsed, "Date", ""),
         is_read: true,
         body: extract_body(&parsed),
+        attachments: attachment_infos(&parsed),
     })
+}
+
+fn get_attachment_blocking(
+    cfg: &Config,
+    message_number: u32,
+    index: usize,
+) -> anyhow::Result<(String, String, Vec<u8>)> {
+    let mut session = open_session(cfg)?;
+    session.select("INBOX")?;
+    let seq = message_number.to_string();
+    // .PEEK — the message was already marked read (or not) by the earlier
+    // get_message call; downloading an attachment shouldn't independently
+    // affect that flag.
+    let fetches = session.fetch(&seq, "BODY.PEEK[]")?;
+    let raw = fetches
+        .iter()
+        .next()
+        .and_then(|f| f.body())
+        .ok_or_else(|| anyhow::anyhow!("Message not found"))?;
+    session.logout().ok();
+
+    let parsed = mailparse::parse_mail(raw)?;
+    let mut attachments = Vec::new();
+    collect_attachments(&parsed, &mut attachments);
+    attachments
+        .into_iter()
+        .nth(index)
+        .ok_or_else(|| anyhow::anyhow!("Attachment not found"))
 }
 
 fn delete_message_blocking(cfg: &Config, message_number: u32) -> anyhow::Result<()> {
@@ -266,6 +354,19 @@ pub async fn delete_message(cfg: Config, message_number: u32) -> crate::error::R
         .map_err(|e| AppError::Internal(format!("Failed to delete message: {e}")))
 }
 
+/// Returns `(filename, content_type, bytes)` for the attachment at `index`,
+/// in the same order `InboxMessage.attachments` lists them.
+pub async fn get_attachment(
+    cfg: Config,
+    message_number: u32,
+    index: usize,
+) -> crate::error::Result<(String, String, Vec<u8>)> {
+    tokio::task::spawn_blocking(move || get_attachment_blocking(&cfg, message_number, index))
+        .await
+        .map_err(|e| AppError::Internal(format!("Mailbox task failed: {e}")))?
+        .map_err(|e| AppError::NotFound(format!("Attachment not found: {e}")))
+}
+
 pub async fn reply_to_message(
     cfg: Config,
     message_number: u32,
@@ -335,5 +436,64 @@ mod tests {
         let raw = raw_email("Content-Type: application/octet-stream", "binary junk");
         let parsed = mailparse::parse_mail(&raw).unwrap();
         assert!(extract_body(&parsed).contains("No readable content"));
+    }
+
+    fn multipart_with_pdf_attachment() -> Vec<u8> {
+        let boundary = "XYZBOUNDARY";
+        format!(
+            "Content-Type: multipart/mixed; boundary={boundary}\r\n\
+             Subject: Payment Receipt\r\n\r\n\
+             --{boundary}\r\n\
+             Content-Type: text/plain\r\n\r\n\
+             Please find your receipt attached.\r\n\
+             --{boundary}\r\n\
+             Content-Type: application/pdf; name=\"receipt.pdf\"\r\n\
+             Content-Disposition: attachment; filename=\"receipt.pdf\"\r\n\
+             Content-Transfer-Encoding: base64\r\n\r\n\
+             e30=\r\n\
+             --{boundary}--\r\n"
+        )
+        .into_bytes()
+    }
+
+    #[test]
+    fn attachment_infos_finds_named_pdf_part() {
+        let raw = multipart_with_pdf_attachment();
+        let parsed = mailparse::parse_mail(&raw).unwrap();
+        let infos = attachment_infos(&parsed);
+        assert_eq!(infos.len(), 1);
+        assert_eq!(infos[0].index, 0);
+        assert_eq!(infos[0].filename, "receipt.pdf");
+        assert_eq!(infos[0].content_type, "application/pdf");
+        assert_eq!(infos[0].size, 2); // decoded base64 "e30=" -> "{}" (2 bytes)
+    }
+
+    #[test]
+    fn extract_body_skips_the_attachment_part() {
+        let raw = multipart_with_pdf_attachment();
+        let parsed = mailparse::parse_mail(&raw).unwrap();
+        let body = extract_body(&parsed);
+        assert!(body.contains("Please find your receipt attached"));
+        assert!(!body.contains("PDF") && !body.to_ascii_lowercase().contains("base64"));
+    }
+
+    #[test]
+    fn attachment_infos_empty_for_plain_message() {
+        let raw = raw_email("Content-Type: text/plain", "just text, no attachment");
+        let parsed = mailparse::parse_mail(&raw).unwrap();
+        assert!(attachment_infos(&parsed).is_empty());
+    }
+
+    #[test]
+    fn collect_attachments_returns_decoded_bytes_by_index() {
+        let raw = multipart_with_pdf_attachment();
+        let parsed = mailparse::parse_mail(&raw).unwrap();
+        let mut out = Vec::new();
+        collect_attachments(&parsed, &mut out);
+        assert_eq!(out.len(), 1);
+        let (filename, content_type, bytes) = &out[0];
+        assert_eq!(filename, "receipt.pdf");
+        assert_eq!(content_type, "application/pdf");
+        assert_eq!(bytes, b"{}");
     }
 }

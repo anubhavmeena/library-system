@@ -985,6 +985,8 @@
     "replySent": "Reply sent",
     "loadFailed": "Failed to load mailbox",
     "deleteFailed": "Failed to delete message",
-    "replyFailed": "Failed to send reply"
+    "replyFailed": "Failed to send reply",
+    "attachments": "Attachments",
+    "attachmentDownloadFailed": "Failed to download attachment"
   }
 }
