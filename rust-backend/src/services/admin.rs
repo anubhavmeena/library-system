@@ -449,13 +449,98 @@ pub async fn get_pending_fees(
 pub async fn clear_pending_fees(
     state: &Arc<AppState>,
     user_id: Uuid,
+    amount_cleared: Decimal,
 ) -> crate::error::Result<()> {
-    sqlx::query(
-        "UPDATE payments SET pending_amount = 0, updated_at = NOW() WHERE user_id = $1",
+    if amount_cleared <= Decimal::ZERO {
+        return Err(AppError::BadRequest("Amount to clear must be positive".into()));
+    }
+
+    let rows = sqlx::query_as::<_, (Uuid, Uuid, Decimal)>(
+        "SELECT id, membership_id, pending_amount FROM payments
+         WHERE user_id = $1 AND status = 'SUCCESS' AND pending_amount > 0
+         ORDER BY created_at ASC",
     )
     .bind(user_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let total_pending: Decimal = rows.iter().map(|(_, _, p)| *p).sum();
+    if amount_cleared > total_pending {
+        return Err(AppError::BadRequest(
+            "Amount to clear exceeds the outstanding pending balance".into(),
+        ));
+    }
+    let remainder = total_pending - amount_cleared;
+
+    // Zero out every existing pending row, then record this clearance as its own
+    // cash payment (with the leftover as its pending_amount) — same mechanism as
+    // clear_dues, giving this transaction a real invoice_id for the receipt below.
+    let membership_id = rows.first().map(|(_, m, _)| *m).ok_or_else(|| {
+        AppError::BadRequest("No outstanding pending balance for this student".into())
+    })?;
+    for (payment_id, _, _) in &rows {
+        sqlx::query("UPDATE payments SET pending_amount = 0, updated_at = NOW() WHERE id = $1")
+            .bind(payment_id)
+            .execute(&state.db)
+            .await?;
+    }
+
+    let invoice_id = ids::generate_invoice_id();
+    sqlx::query(
+        "INSERT INTO payments (membership_id, user_id, amount, pending_amount, payment_gateway, invoice_id, status)
+         VALUES ($1, $2, $3, $4, 'CASH', $5, 'SUCCESS')",
+    )
+    .bind(membership_id)
+    .bind(user_id)
+    .bind(amount_cleared)
+    .bind(remainder)
+    .bind(&invoice_id)
     .execute(&state.db)
     .await?;
+
+    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_one(&state.db)
+        .await?;
+    let membership = crate::services::membership::get_active_membership(state, user_id).await?;
+
+    let pf_setting = settings::setting_for(state, "PENDING_FEE_CLEARED").await;
+    if pf_setting.send_to_student {
+        let msg = settings::apply_hindi(
+            &format!("Your pending library fee of Rs.{amount_cleared:.0} has been cleared. Thank you! - Target Zone Library Team"),
+            &pf_setting, true,
+        );
+        notification::send_direct_message(state, user.mobile.as_deref(), user.email.as_deref(), &msg).await;
+    }
+    if pf_setting.send_to_admin {
+        let seat = membership.as_ref().and_then(|m| m.seat_number.as_deref()).unwrap_or("\u{2014}");
+        let admin_msg = format!(
+            "Pending Fee Cleared\nStudent: {}\nSeat: {seat}\nAmount: Rs.{amount_cleared:.0}", user.name
+        );
+        if !state.config.admin_whatsapp.is_empty() {
+            notification::send_direct_message(state, Some(&state.config.admin_whatsapp.clone()), None, &admin_msg).await;
+        }
+        notification::send_direct_message(state, None, Some(&state.config.admin_email.clone()), &admin_msg).await;
+    }
+
+    let s = state.clone();
+    let receipt_event = notification::PaymentReceiptInfo {
+        user_id,
+        user_name: user.name.clone(),
+        user_mobile: user.mobile.clone(),
+        user_email: user.email.clone(),
+        invoice_id,
+        amount_paid: amount_cleared,
+        amount_pending: remainder,
+        plan_name: membership.as_ref().map(|m| m.plan_name.clone()).unwrap_or_default(),
+        seat_number: membership.as_ref().and_then(|m| m.seat_number.clone()),
+        valid_upto: membership.as_ref().map(|m| m.end_date),
+        payment_method: "CASH".into(),
+    };
+    tokio::spawn(async move {
+        notification::send_payment_receipt_typed(&s, &receipt_event, "DUES_CLEARED").await
+    });
+
     Ok(())
 }
 

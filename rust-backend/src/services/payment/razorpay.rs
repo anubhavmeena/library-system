@@ -23,10 +23,7 @@ pub async fn create_order(
         });
     }
 
-    let amount_paise = (amount * Decimal::from(100))
-        .to_string()
-        .parse::<u64>()
-        .map_err(|_| AppError::Internal("Invalid amount".into()))?;
+    let amount_paise = to_paise(amount).ok_or_else(|| AppError::Internal("Invalid amount".into()))?;
 
     let body = json!({
         "amount": amount_paise,
@@ -89,6 +86,14 @@ pub(crate) fn verify_hmac_signature(secret: &str, order_id: &str, payment_id: &s
     let Ok(mut mac) = HmacSha256::new_from_slice(secret.as_bytes()) else { return false };
     mac.update(payload.as_bytes());
     hex::encode(mac.finalize().into_bytes()) == signature
+}
+
+/// Converts a rupee amount to whole paise. `round_dp(0)` collapses the scale
+/// to zero decimal places first — without it, multiplying preserves the
+/// original scale (e.g. `400.00 * 100` stays `"40000.00"`), and parsing that
+/// string as a `u64` always fails on the decimal point.
+fn to_paise(amount: Decimal) -> Option<u64> {
+    (amount * Decimal::from(100)).round_dp(0).to_string().parse::<u64>().ok()
 }
 
 fn random_suffix() -> String {
@@ -158,5 +163,27 @@ mod tests {
         // Dev-mode orders start with "dev_"; verify_payment checks this before HMAC
         assert!("dev_order_AbCdEfGh".starts_with("dev_"));
         assert!(!"order_live_123".starts_with("dev_"));
+    }
+
+    #[test]
+    fn to_paise_handles_typical_two_decimal_amounts() {
+        use super::to_paise;
+        use rust_decimal::Decimal;
+        use std::str::FromStr;
+
+        assert_eq!(to_paise(Decimal::from_str("400.00").unwrap()), Some(40_000));
+        assert_eq!(to_paise(Decimal::from_str("1.00").unwrap()), Some(100));
+        assert_eq!(to_paise(Decimal::from_str("599.50").unwrap()), Some(59_950));
+        assert_eq!(to_paise(Decimal::from_str("0.00").unwrap()), Some(0));
+    }
+
+    #[test]
+    fn to_paise_rounds_sub_paise_fractions() {
+        use super::to_paise;
+        use rust_decimal::Decimal;
+        use std::str::FromStr;
+
+        // A third decimal place (fractional paise) must round, not fail to parse.
+        assert_eq!(to_paise(Decimal::from_str("400.006").unwrap()), Some(40_001));
     }
 }

@@ -47,3 +47,5 @@ base64 = "0.22"
 imageproc = "0.23"
 rusttype = "0.9"
 barcoders = { version = "2.0.0", default-features = false, features = ["std"] }
+regex = "1.12.4"
+calamine = "0.36.0"

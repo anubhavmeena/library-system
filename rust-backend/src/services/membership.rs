@@ -196,7 +196,7 @@ pub async fn create_order(
     state: &Arc<AppState>,
     user_id: Uuid,
     plan_id: Uuid,
-    shift: &str,
+    shift: Option<&str>,
     seat_number: Option<&str>,
 ) -> crate::error::Result<CreateOrderResponse> {
     let has_grace: bool = sqlx::query_scalar(
@@ -236,10 +236,27 @@ pub async fn create_order(
         .ok_or_else(|| AppError::NotFound("User not found".into()))?;
 
     let today = chrono::Local::now().date_naive();
-    let (start_date, status) = determine_start_date(state, user_id, today).await?;
+    let (start_date, status, inherited_shift, inherited_seat) =
+        determine_start_date(state, user_id, today).await?;
     let end_date = start_date + chrono::Duration::days(plan.duration_days as i64 - 1);
 
     let membership_status = if status == "QUEUED" { "QUEUED" } else { "PENDING" };
+
+    // Queued renewal: inherit seat/shift from the current membership regardless
+    // of what the request sent. Fresh booking: the request must supply a shift.
+    let (resolved_shift, resolved_seat) = if membership_status == "QUEUED" {
+        (
+            inherited_shift.ok_or_else(|| {
+                AppError::Internal("Active membership missing shift while queuing renewal".into())
+            })?,
+            inherited_seat,
+        )
+    } else {
+        (
+            shift.ok_or_else(|| AppError::BadRequest("Shift is required".into()))?.to_string(),
+            seat_number.map(|s| s.to_string()),
+        )
+    };
 
     let membership = sqlx::query_as::<_, Membership>(
         "INSERT INTO memberships (user_id, plan_id, seat_number, shift, start_date, end_date, status)
@@ -247,8 +264,8 @@ pub async fn create_order(
     )
     .bind(user_id)
     .bind(plan_id)
-    .bind(seat_number)
-    .bind(shift)
+    .bind(&resolved_seat)
+    .bind(&resolved_shift)
     .bind(start_date)
     .bind(end_date)
     .bind(membership_status)
@@ -647,24 +664,31 @@ pub async fn get_payment_history(
     .map_err(AppError::Database)
 }
 
+/// Resolves the start date/status for a new order, and — when this is a queued
+/// renewal (an ACTIVE membership not yet past its end date exists) — the
+/// seat/shift to inherit from that membership, ignoring whatever the request
+/// supplied. Mirrors Java's PaymentService.createOrder, which does the same
+/// inheritance since the frontend's "Renew" button only ever sends `planId`.
 async fn determine_start_date(
     state: &Arc<AppState>,
     user_id: Uuid,
     today: NaiveDate,
-) -> crate::error::Result<(NaiveDate, String)> {
-    let active: Option<NaiveDate> = sqlx::query_scalar(
-        "SELECT end_date FROM memberships WHERE user_id = $1 AND status = 'ACTIVE'
+) -> crate::error::Result<(NaiveDate, String, Option<String>, Option<String>)> {
+    let active: Option<(NaiveDate, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT end_date, seat_number, shift FROM memberships
+         WHERE user_id = $1 AND status = 'ACTIVE' AND end_date >= $2
          ORDER BY end_date DESC LIMIT 1",
     )
     .bind(user_id)
+    .bind(today)
     .fetch_optional(&state.db)
     .await?;
 
-    if let Some(active_end) = active {
+    if let Some((active_end, active_seat, active_shift)) = active {
         let start = active_end + chrono::Duration::days(1);
-        Ok((start, "QUEUED".into()))
+        Ok((start, "QUEUED".into(), active_shift, active_seat))
     } else {
-        Ok((today, "PENDING".into()))
+        Ok((today, "PENDING".into(), None, None))
     }
 }
 

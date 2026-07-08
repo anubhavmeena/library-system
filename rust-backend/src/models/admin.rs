@@ -363,7 +363,9 @@ pub struct RevenueQuery {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ClearPendingFeesRequest {
+    pub amount_cleared: Decimal,
     pub note: Option<String>,
 }
 

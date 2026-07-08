@@ -94,7 +94,9 @@ pub struct VerifyDuesPaymentRequest {
 #[serde(rename_all = "camelCase")]
 pub struct CreateOrderRequest {
     pub plan_id: Uuid,
-    pub shift: String,
+    /// Absent when queuing a renewal — the current membership's own shift is
+    /// inherited server-side. Required for a fresh (non-renewal) booking.
+    pub shift: Option<String>,
     pub seat_number: Option<String>,
 }
 
@@ -150,8 +152,16 @@ mod tests {
             Uuid::new_v4()
         );
         let req: CreateOrderRequest = serde_json::from_str(&json).unwrap();
-        assert_eq!(req.shift, "MORNING");
+        assert_eq!(req.shift, Some("MORNING".to_string()));
         assert_eq!(req.seat_number, Some("A1".to_string()));
+    }
+
+    #[test]
+    fn create_order_request_shift_is_optional_for_renewals() {
+        let json = format!(r#"{{"planId": "{}"}}"#, Uuid::new_v4());
+        let req: CreateOrderRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(req.shift, None);
+        assert_eq!(req.seat_number, None);
     }
 
     #[test]

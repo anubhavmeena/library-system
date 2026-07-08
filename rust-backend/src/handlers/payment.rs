@@ -25,7 +25,7 @@ pub async fn create_order(
         &state,
         user.user_id,
         req.plan_id,
-        &req.shift,
+        req.shift.as_deref(),
         req.seat_number.as_deref(),
     )
     .await?;

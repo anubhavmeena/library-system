@@ -25,7 +25,10 @@ pub async fn get_my_membership(
     State(state): State<Arc<AppState>>,
     user: AuthUser,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    let membership = svc::get_active_membership(&state, user.user_id).await?;
+    // Falls back to a GRACE membership when there's no ACTIVE one — the
+    // frontend's "pay your dues" banner depends on this endpoint returning
+    // the GRACE row rather than nothing.
+    let membership = svc::find_current_membership(&state, user.user_id).await?;
     Ok(ApiResponse::success("Membership retrieved", membership))
 }
 
@@ -57,7 +60,7 @@ pub async fn call_admin(
     State(state): State<Arc<AppState>>,
     user: AuthUser,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    let membership = svc::get_active_membership(&state, user.user_id)
+    let membership = svc::find_current_membership(&state, user.user_id)
         .await?
         .ok_or_else(|| AppError::BadRequest("No active membership found".into()))?;
 

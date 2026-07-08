@@ -1,4 +1,5 @@
 use crate::{app_state::AppState, error::AppError};
+use rand::Rng;
 use redis::AsyncCommands;
 use std::sync::Arc;
 
@@ -38,12 +39,32 @@ pub async fn send_otp_channel(
 
     let is_email = contact.contains('@');
     let force_sms = channel.map(|c| c.eq_ignore_ascii_case("SMS")).unwrap_or(false);
-    let use_meta = !force_sms && !state.config.meta_whatsapp_token.is_empty() && !is_email;
-    let use_apitxt = !is_email && !state.config.apitxt_auth_key.is_empty();
-    let has_twilio = !state.config.is_twilio_dev();
+    let meta_configured = !state.config.meta_whatsapp_token.is_empty();
+    let apitxt_configured = !state.config.apitxt_auth_key.is_empty();
+    let twilio_configured = !state.config.is_twilio_dev();
+    let use_meta = !force_sms && meta_configured && !is_email;
+    let use_apitxt = !is_email && apitxt_configured;
+    let has_twilio = twilio_configured;
 
-    let otp = "123456".to_string();
-    tracing::info!("DEV OTP for {contact}: {otp}");
+    // Dev mode only when there's genuinely no live channel to deliver a real
+    // code through — same credential-gated fallback Java uses, not an
+    // unconditional constant. Independent of `force_sms`/`channel`, which only
+    // pick *which* configured channel to try first.
+    let is_dev_mode = if is_email {
+        state.config.sendgrid_api_key.is_empty()
+    } else {
+        !meta_configured && !apitxt_configured && !twilio_configured
+    };
+
+    let otp = if is_dev_mode {
+        "123456".to_string()
+    } else {
+        format!("{:06}", rand::thread_rng().gen_range(0..1_000_000))
+    };
+
+    if is_dev_mode {
+        tracing::info!("DEV OTP for {contact}: {otp}");
+    }
 
     c.set_ex::<_, _, ()>(&otp_key, &otp, OTP_TTL_SECS).await?;
     c.set_ex::<_, _, ()>(&cooldown_key, "1", COOLDOWN_TTL_SECS).await?;

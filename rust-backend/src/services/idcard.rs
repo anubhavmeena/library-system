@@ -2,7 +2,7 @@ use crate::app_state::AppState;
 use crate::error::{AppError, Result};
 use crate::models::membership::MembershipWithPlan;
 use crate::models::user::User;
-use crate::services::membership::get_active_membership;
+use crate::services::membership::find_current_membership;
 use crate::services::ids;
 use barcoders::sym::code128::Code128;
 use imageproc::drawing::{draw_text_mut, text_size};
@@ -105,7 +105,9 @@ async fn load_card_data(
         .fetch_one(&state.db)
         .await?;
 
-    let membership = get_active_membership(state, user_id)
+    // GRACE falls back correctly here too — a student mid-grace-period still
+    // holds their seat and should still be able to download their ID card.
+    let membership = find_current_membership(state, user_id)
         .await?
         .ok_or_else(|| {
             AppError::BadRequest(

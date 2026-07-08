@@ -105,9 +105,9 @@ pub async fn clear_pending_fees(
     State(state): State<Arc<AppState>>,
     _admin: AdminUser,
     Path(user_id): Path<Uuid>,
-    Json(_req): Json<ClearPendingFeesRequest>,
+    Json(req): Json<ClearPendingFeesRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    svc::clear_pending_fees(&state, user_id).await?;
+    svc::clear_pending_fees(&state, user_id, req.amount_cleared).await?;
     Ok(ApiResponse::ok("Pending fees cleared"))
 }
 
