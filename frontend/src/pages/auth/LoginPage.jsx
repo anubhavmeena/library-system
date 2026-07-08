@@ -97,9 +97,10 @@ export default function LoginPage() {
         const verifyRes = await dispatch(verifyOtp({ contact: contact.trim(), otp }))
         if (!verifyOtp.fulfilled.match(verifyRes)) return toast.error(verifyRes.payload || 'Invalid OTP')
 
-        // API returns this as "newUser" (Jackson strips the "is" prefix off the
-        // Lombok-generated isNewUser() getter) — see authSlice.js's verifyOtp case.
-        if (verifyRes.payload.newUser) {
+        // Java returns this as "newUser" (Jackson strips the "is" prefix off the
+        // Lombok-generated isNewUser() getter); Rust/Go send "isNewUser" — see
+        // authSlice.js's verifyOtp case for the same either-key handling.
+        if (verifyRes.payload.isNewUser ?? verifyRes.payload.newUser) {
             setStep(3)
         } else {
             const loginRes = await dispatch(loginUser({ sessionToken: verifyRes.payload.sessionToken }))
