@@ -140,8 +140,15 @@ const STUDENT_SELECT: &str = "
         le.status AS latest_ever_status
     FROM users u
     LEFT JOIN LATERAL (
-        SELECT * FROM memberships WHERE user_id = u.id
-        ORDER BY CASE WHEN status = 'ACTIVE' THEN 0 ELSE 1 END, created_at DESC
+        -- Never PENDING: an abandoned/never-paid-for checkout must not read as
+        -- \"has a membership\" — matches Java's getAllStudents (mem is only
+        -- ACTIVE/GRACE, falling back to the latest non-PENDING row otherwise).
+        -- GRACE outranks ACTIVE, mirroring the `cur` lateral below.
+        SELECT * FROM memberships WHERE user_id = u.id AND status != 'PENDING'
+        ORDER BY
+            CASE WHEN status = 'GRACE' THEN 0 WHEN status = 'ACTIVE' THEN 1 ELSE 2 END,
+            CASE WHEN status IN ('ACTIVE', 'GRACE') THEN end_date END DESC,
+            created_at DESC
         LIMIT 1
     ) m ON true
     LEFT JOIN membership_plans mp ON mp.id = m.plan_id
@@ -169,8 +176,11 @@ const STUDENT_SELECT: &str = "
 const STUDENT_COUNT_FROM: &str = "
     SELECT COUNT(*) FROM users u
     LEFT JOIN LATERAL (
-        SELECT status FROM memberships WHERE user_id = u.id
-        ORDER BY CASE WHEN status = 'ACTIVE' THEN 0 ELSE 1 END, created_at DESC
+        SELECT status FROM memberships WHERE user_id = u.id AND status != 'PENDING'
+        ORDER BY
+            CASE WHEN status = 'GRACE' THEN 0 WHEN status = 'ACTIVE' THEN 1 ELSE 2 END,
+            CASE WHEN status IN ('ACTIVE', 'GRACE') THEN end_date END DESC,
+            created_at DESC
         LIMIT 1
     ) m ON true
     LEFT JOIN LATERAL (
@@ -445,8 +455,11 @@ pub async fn get_pending_fees(
            JOIN payments p ON p.user_id = u.id
            LEFT JOIN LATERAL (
                SELECT id AS membership_id, seat_number, end_date FROM memberships
-               WHERE user_id = u.id
-               ORDER BY CASE WHEN status = 'ACTIVE' THEN 0 ELSE 1 END, created_at DESC
+               WHERE user_id = u.id AND status != 'PENDING'
+               ORDER BY
+                   CASE WHEN status = 'GRACE' THEN 0 WHEN status = 'ACTIVE' THEN 1 ELSE 2 END,
+                   CASE WHEN status IN ('ACTIVE', 'GRACE') THEN end_date END DESC,
+                   created_at DESC
                LIMIT 1
            ) m ON true
            WHERE p.pending_amount > 0 AND p.status = 'SUCCESS'
