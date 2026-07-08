@@ -1,6 +1,6 @@
 use crate::{
     app_state::AppState,
-    handlers::{admin, auth, gallery, membership, payment, seat, user, visitor},
+    handlers::{admin, auth, gallery, mailbox, membership, payment, seat, user, visitor},
 };
 use axum::{
     extract::DefaultBodyLimit,
@@ -105,6 +105,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/admin/settings",                        get(admin::get_app_settings).post(admin::save_app_settings))
         .route("/api/admin/notification-settings",           get(admin::get_notification_settings))
         .route("/api/admin/notification-settings/:key",      patch(admin::update_notification_setting))
+
+        // ── Admin mailbox (IMAP) ──────────────────────────────────────────────
+        .route("/api/admin/inbox",                           get(mailbox::list_messages))
+        .route("/api/admin/inbox/:messageNumber",             get(mailbox::get_message).delete(mailbox::delete_message))
+        .route("/api/admin/inbox/:messageNumber/reply",       post(mailbox::reply))
 
         // ── Visitor tracking (public) ─────────────────────────────────────────
         .route("/api/visitor/track", post(visitor::track))

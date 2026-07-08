@@ -124,6 +124,16 @@ ID cards (`services/idcard.rs`) and payment receipts (`services/receipt.rs`) are
 
 `POST /api/auth/send-otp` accepts an optional `channel` field. `channel: "SMS"` skips Meta WhatsApp entirely; otherwise the chain is Meta WhatsApp → apitxt SMS → Twilio SMS, each falling through only on failure. The Redis cooldown key `otp:cooldown:<contact>` has a **10s** TTL (not 30s) — short enough for the frontend to offer both "Resend OTP" and, after a second wait, "Send via SMS instead".
 
+### Admin mailbox (IMAP)
+
+`services/mailbox.rs` backs the admin "Inbox" page (`GET/DELETE /api/admin/inbox/:messageNumber`, `POST .../reply`) — a thin IMAP client reading the same mailbox Java's `MailboxService` (JavaMail) reads, so both must point at the same account. All IMAP/SMTP calls are synchronous (the `imap`/`lettre` crates are blocking) and run inside `tokio::task::spawn_blocking`; nothing here is async internally.
+
+- **Message numbers are IMAP sequence numbers**, not UIDs — stable only within one mailbox session as long as nothing gets expunged concurrently. Each request opens a fresh `Session`, matching Java's per-call `openStore()`.
+- **List vs. read** use different fetch items on purpose: list uses `BODY.PEEK[]` (never marks read), the single-message getter uses `BODY[]` plus an explicit `+FLAGS (\Seen)` STORE — mirrors Java relying on JavaMail's implicit read-marks-seen behavior while also setting it explicitly.
+- Body extraction prefers `text/html`, falls back to `text/plain` wrapped in a `<pre>` (for the admin's sandboxed iframe preview), recurses into `multipart/*`, otherwise a "no readable content" placeholder — see `extract_body`.
+- Replies go out over `SMTP_HOST:SMTP_PORT` via `lettre`'s `builder_dangerous` (no TLS, no auth) — this assumes a **trusted local relay** (Postfix on the same host in production), exactly like Java's plain `spring.mail.*` config. Don't add TLS/auth here without changing that assumption on both backends.
+- Config env vars (`IMAP_HOST`, `IMAP_PORT`, `IMAP_SSL`, `ADMIN_IMAP_USER`, `ADMIN_IMAP_PASS`, `SMTP_HOST`, `SMTP_PORT`, `FROM_EMAIL`, `FROM_NAME`) share the exact same names as the Java stack's `.env` — copy them through as-is rather than renaming.
+
 ## Key Invariants
 
 - `seat_bookings.booking_date` is the membership start date; `end_date` is the membership end date. The date range is **inclusive**. The seat map query uses `booking_date <= :date AND end_date >= :date`.

@@ -49,3 +49,7 @@ rusttype = "0.9"
 barcoders = { version = "2.0.0", default-features = false, features = ["std"] }
 regex = "1.12.4"
 calamine = "0.36.0"
+imap = "2"
+native-tls = "0.2"
+mailparse = "0.15"
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport"] }

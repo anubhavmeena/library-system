@@ -41,6 +41,16 @@ pub struct Config {
     pub admin_email: String,
     pub admin_whatsapp: String,
     pub admin_phones: Vec<String>,
+    // Admin mailbox (IMAP read + SMTP reply) — powers the admin "Inbox" page
+    pub imap_host: String,
+    pub imap_port: u16,
+    pub imap_use_ssl: bool,
+    pub admin_imap_user: String,
+    pub admin_imap_pass: String,
+    pub smtp_host: String,
+    pub smtp_port: u16,
+    pub from_email: String,
+    pub from_name: String,
 }
 
 impl Config {
@@ -113,6 +123,24 @@ impl Config {
                 .filter(|s| !s.trim().is_empty())
                 .map(|s| s.trim().to_string())
                 .collect(),
+            imap_host: env::var("IMAP_HOST").unwrap_or_else(|_| "localhost".to_string()),
+            imap_port: env::var("IMAP_PORT")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(143),
+            imap_use_ssl: env::var("IMAP_SSL")
+                .map(|s| s.eq_ignore_ascii_case("true"))
+                .unwrap_or(false),
+            admin_imap_user: env::var("ADMIN_IMAP_USER").unwrap_or_else(|_| "admin".to_string()),
+            admin_imap_pass: env::var("ADMIN_IMAP_PASS").unwrap_or_default(),
+            smtp_host: env::var("SMTP_HOST").unwrap_or_else(|_| "localhost".to_string()),
+            smtp_port: env::var("SMTP_PORT")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(25),
+            from_email: env::var("FROM_EMAIL")
+                .unwrap_or_else(|_| "admin@targetzone.co.in".to_string()),
+            from_name: env::var("FROM_NAME").unwrap_or_else(|_| "Target Zone Library".to_string()),
         }
     }
 
@@ -168,6 +196,15 @@ pub(crate) fn test_config() -> Config {
         admin_email: "admin@test.com".to_string(),
         admin_whatsapp: "".to_string(),
         admin_phones: vec![],
+        imap_host: "localhost".to_string(),
+        imap_port: 143,
+        imap_use_ssl: false,
+        admin_imap_user: "admin".to_string(),
+        admin_imap_pass: "".to_string(),
+        smtp_host: "localhost".to_string(),
+        smtp_port: 25,
+        from_email: "admin@test.com".to_string(),
+        from_name: "Test Library".to_string(),
     }
 }
 

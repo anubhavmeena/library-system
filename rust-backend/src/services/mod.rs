@@ -3,6 +3,7 @@ pub mod auth;
 pub mod idcard;
 pub mod ids;
 pub mod jwt;
+pub mod mailbox;
 pub mod membership;
 pub mod notification;
 pub mod otp;

@@ -473,3 +473,31 @@ pub struct OrphanedSeatItem {
     pub membership_id: Uuid,
     pub membership_end: NaiveDate,
 }
+
+// ── Admin Mailbox (IMAP) ──────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InboxSummary {
+    pub message_number: u32,
+    pub from: String,
+    pub subject: String,
+    pub date: String,
+    pub is_read: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InboxMessage {
+    pub message_number: u32,
+    pub from: String,
+    pub subject: String,
+    pub date: String,
+    pub is_read: bool,
+    pub body: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReplyRequest {
+    pub body: String,
+}
