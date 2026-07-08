@@ -5,6 +5,7 @@ use crate::{
 };
 use lettre::message::header::{Header, HeaderName, HeaderValue};
 use std::io::{Read, Write};
+use std::sync::Arc;
 
 /// A message body has to be readable and writable regardless of whether it
 /// came in over plain TCP or TLS — `imap::Session` is generic over the stream
@@ -13,12 +14,31 @@ use std::io::{Read, Write};
 trait MailStream: Read + Write + Send {}
 impl<T: Read + Write + Send> MailStream for T {}
 
+/// Pure-Rust TLS (rustls + the bundled Mozilla root list) instead of
+/// native-tls/OpenSSL — this whole binary is meant to cross-compile cleanly
+/// to a static musl target, which a system OpenSSL dependency makes painful.
+/// Dead code in production today (`IMAP_SSL=false`), but must still compile
+/// and work correctly if that's ever turned on.
+fn tls_connect(host: &str, port: u16) -> anyhow::Result<rustls::StreamOwned<rustls::ClientConnection, std::net::TcpStream>> {
+    let mut root_store = rustls::RootCertStore::empty();
+    root_store.add_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
+        rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(ta.subject, ta.spki, ta.name_constraints)
+    }));
+    let config = rustls::ClientConfig::builder()
+        .with_safe_defaults()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
+    let server_name = rustls::ServerName::try_from(host)
+        .map_err(|_| anyhow::anyhow!("Invalid IMAP host name for TLS: {host}"))?;
+    let conn = rustls::ClientConnection::new(Arc::new(config), server_name)?;
+    let tcp = std::net::TcpStream::connect((host, port))?;
+    Ok(rustls::StreamOwned::new(conn, tcp))
+}
+
 fn open_session(cfg: &Config) -> anyhow::Result<imap::Session<Box<dyn MailStream>>> {
     let addr = (cfg.imap_host.as_str(), cfg.imap_port);
     let stream: Box<dyn MailStream> = if cfg.imap_use_ssl {
-        let tls = native_tls::TlsConnector::builder().build()?;
-        let tcp = std::net::TcpStream::connect(addr)?;
-        Box::new(tls.connect(&cfg.imap_host, tcp)?)
+        Box::new(tls_connect(&cfg.imap_host, cfg.imap_port)?)
     } else {
         Box::new(std::net::TcpStream::connect(addr)?)
     };
