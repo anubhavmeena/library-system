@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+import { formatCurrency } from '../../utils/currency'
 
 export default function AdminRemindersPage() {
     const [students, setStudents] = useState([])
@@ -312,7 +313,7 @@ export default function AdminRemindersPage() {
                                         <td className="p-4 text-primary-300 font-mono">{s.seatNumber || '—'}</td>
                                         <td className="p-4 text-primary-300">{s.membershipEnd || '—'}</td>
                                         <td className="p-4">
-                                            <span className="text-red-400 font-bold text-sm">₹{s.pendingAmount}</span>
+                                            <span className="text-red-400 font-bold text-sm">{formatCurrency(s.pendingAmount)}</span>
                                         </td>
                                     </tr>
                                 ))}
@@ -408,7 +409,7 @@ export default function AdminRemindersPage() {
                                             </span>
                                         </td>
                                         <td className="p-4">
-                                            <span className="text-red-400 font-bold text-sm">₹{s.duesAmount}</span>
+                                            <span className="text-red-400 font-bold text-sm">{formatCurrency(s.duesAmount)}</span>
                                         </td>
                                     </tr>
                                 ))}

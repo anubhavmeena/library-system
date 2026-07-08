@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+import { formatCurrency, formatNumber } from '../../utils/currency'
 
 const ROWS = ['A', 'B', 'C', 'D']
 const INACTIVE_SEATS = new Set(['B8', 'B18'])
@@ -147,7 +148,7 @@ export default function AdminStudentsPage() {
         const activeWarning = student.membershipStatus === 'ACTIVE'
             ? `${student.name}'s membership is currently ACTIVE and paid — releasing will immediately free their seat and mark them Released. `
             : `Release seat ${student.seatNumber} for ${student.name}? `
-        if (!window.confirm(`${activeWarning}Dues of ₹${student.duesAmount ?? 0} remain on record. This cannot be undone.`)) return
+        if (!window.confirm(`${activeWarning}Dues of ${formatCurrency(student.duesAmount ?? 0)} remain on record. This cannot be undone.`)) return
 
         const notifyStudent = window.confirm(
             `Send ${student.name} a notification that their seat has expired due to non-payment and been released?\n\n` +
@@ -445,14 +446,14 @@ export default function AdminStudentsPage() {
                                     </td>
                                     <td className="p-4">
                                         {s.pendingAmount > 0 ? (
-                                            <span className="text-red-400 font-semibold text-sm">₹{s.pendingAmount}</span>
+                                            <span className="text-red-400 font-semibold text-sm">{formatCurrency(s.pendingAmount)}</span>
                                         ) : (
                                             <span className="text-primary-600 text-xs">—</span>
                                         )}
                                     </td>
                                     <td className="p-4">
                                         {s.duesAmount > 0 ? (
-                                            <span className="text-red-400 font-semibold text-sm">₹{s.duesAmount}</span>
+                                            <span className="text-red-400 font-semibold text-sm">{formatCurrency(s.duesAmount)}</span>
                                         ) : (
                                             <span className="text-primary-600 text-xs">—</span>
                                         )}
@@ -926,7 +927,7 @@ export default function AdminStudentsPage() {
                             on record as a pending balance.
                         </p>
 
-                        <label className="label">Amount to Clear (₹) — outstanding: ₹{clearDuesFor.duesAmount ?? 0}</label>
+                        <label className="label">Amount to Clear (₹) — outstanding: {formatCurrency(clearDuesFor.duesAmount ?? 0)}</label>
                         <input
                             type="number" min="0" step="1" max={clearDuesFor.duesAmount ?? 0}
                             autoFocus
@@ -936,7 +937,7 @@ export default function AdminStudentsPage() {
                         />
                         {Number(clearDuesAmountInput) > 0 && Number(clearDuesAmountInput) < Number(clearDuesFor.duesAmount ?? 0) && (
                             <p className="text-xs text-amber-400 mb-3">
-                                ₹{(Number(clearDuesFor.duesAmount ?? 0) - Number(clearDuesAmountInput)).toFixed(2)} will remain as a pending amount.
+                                ₹{formatNumber(Number(clearDuesFor.duesAmount ?? 0) - Number(clearDuesAmountInput))} will remain as a pending amount.
                             </p>
                         )}
 
@@ -966,7 +967,7 @@ export default function AdminStudentsPage() {
                             Any amount not cleared here stays on record as a pending balance.
                         </p>
 
-                        <label className="label">Amount to Clear (₹) — outstanding: ₹{clearFeesFor.pendingAmount ?? 0}</label>
+                        <label className="label">Amount to Clear (₹) — outstanding: {formatCurrency(clearFeesFor.pendingAmount ?? 0)}</label>
                         <input
                             type="number" min="0" step="1" max={clearFeesFor.pendingAmount ?? 0}
                             autoFocus
@@ -976,7 +977,7 @@ export default function AdminStudentsPage() {
                         />
                         {Number(clearFeesAmountInput) > 0 && Number(clearFeesAmountInput) < Number(clearFeesFor.pendingAmount ?? 0) && (
                             <p className="text-xs text-amber-400 mb-3">
-                                ₹{(Number(clearFeesFor.pendingAmount ?? 0) - Number(clearFeesAmountInput)).toFixed(2)} will remain as a pending amount.
+                                ₹{formatNumber(Number(clearFeesFor.pendingAmount ?? 0) - Number(clearFeesAmountInput))} will remain as a pending amount.
                             </p>
                         )}
 

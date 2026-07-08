@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { useTranslation } from 'react-i18next'
 import { fetchSeatAvailability, selectSeat, bookSeat } from '../../store/slices/seatSlice'
 import { fetchMyMembership, fetchPlans, createPaymentOrder, verifyPayment } from '../../store/slices/membershipSlice'
+import { formatCurrency, formatNumber } from '../../utils/currency'
 
 // Physical obstructions — not bookable seats
 const INACTIVE_SEATS = new Set(['B8', 'B18'])
@@ -324,7 +325,7 @@ export default function BookingPage() {
                                     <p className="text-primary-400 text-sm mt-1">{plan.description}</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-3xl font-bold text-amber-400">₹{plan.price}</p>
+                                    <p className="text-3xl font-bold text-amber-400">{formatCurrency(plan.price)}</p>
                                     <p className="text-primary-500 text-xs">{t('booking.plan.perMonth')}</p>
                                 </div>
                             </div>
@@ -394,7 +395,7 @@ export default function BookingPage() {
                             ))}
                             <div className="flex justify-between items-center pt-2">
                                 <span className="text-white font-semibold">{t('booking.summary.totalAmount')}</span>
-                                <span className="text-2xl font-bold text-amber-400">₹{selectedPlan.price + (selectedPlan.convenienceFee || 0)}</span>
+                                <span className="text-2xl font-bold text-amber-400">{formatCurrency(Number(selectedPlan.price) + Number(selectedPlan.convenienceFee || 0))}</span>
                             </div>
                         </div>
                     </div>
@@ -402,7 +403,7 @@ export default function BookingPage() {
                         {t('booking.summary.disclaimer')}
                     </div>
                     <button onClick={handlePayment} disabled={paying} className="btn-primary w-full py-4 text-base mb-3">
-                        {paying ? t('booking.summary.processing') : t('booking.summary.payBtn', { amount: selectedPlan.price + (selectedPlan.convenienceFee || 0) })}
+                        {paying ? t('booking.summary.processing') : t('booking.summary.payBtn', { amount: formatNumber(Number(selectedPlan.price) + Number(selectedPlan.convenienceFee || 0)) })}
                     </button>
                     <button onClick={()=>setStep(2)} className="w-full text-primary-400 text-sm hover:text-white transition-colors">{t('booking.summary.changeSeat')}</button>
                 </div>

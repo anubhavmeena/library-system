@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+import { formatCurrency } from '../../utils/currency'
 
 const MONTHS = [
     'January','February','March','April','May','June',
@@ -44,7 +45,7 @@ export default function AdminExpensesPage() {
     const waterSubtotal = tankerQty * num(tankerPrice)
     const miscTotal     = miscItems.reduce((s, it) => s + num(it.amount), 0)
     const total         = waterSubtotal + num(electricity) + num(internet) + miscTotal
-    const currency = n => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    const currency = formatCurrency
 
     const load = async () => {
         setLoading(true)

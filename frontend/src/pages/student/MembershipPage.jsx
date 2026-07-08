@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { fetchMyMembership, fetchQueuedMembership, fetchPlans, fetchMyDisplayStatus, createPaymentOrder, verifyPayment, createDuesOrder, verifyDuesPayment } from '../../store/slices/membershipSlice'
 import api from '../../services/api'
+import { formatCurrency } from '../../utils/currency'
 
 function InfoRow({ label, value, highlight }) {
     return (
@@ -300,10 +301,10 @@ export default function MembershipPage() {
                             Your plan expired, but we're holding seat <span className="text-white font-mono">{membership.seatNumber}</span> for you.
                         </p>
                         <p className="text-red-400 font-semibold text-sm mb-4">
-                            Pay ₹{membership.duesAmount ?? membership.planPrice} to continue your plan — your seat may be released by the library if it remains unpaid.
+                            Pay {formatCurrency(membership.duesAmount ?? membership.planPrice)} to continue your plan — your seat may be released by the library if it remains unpaid.
                         </p>
                         <button onClick={handlePayDues} disabled={payingDues} className="btn-primary text-sm px-6 py-2.5">
-                            {payingDues ? 'Processing...' : `Pay Fee Due (₹${membership.duesAmount ?? membership.planPrice})`}
+                            {payingDues ? 'Processing...' : `Pay Fee Due (${formatCurrency(membership.duesAmount ?? membership.planPrice)})`}
                         </button>
                     </div>
                 </div>
@@ -352,7 +353,7 @@ export default function MembershipPage() {
                                         : 'border-primary-700/40 hover:border-primary-600/60'}`}>
                                 <div className="flex justify-between items-start mb-1">
                                     <p className="text-white font-semibold text-sm">{plan.name}</p>
-                                    <p className="text-amber-400 font-bold">₹{plan.price}</p>
+                                    <p className="text-amber-400 font-bold">{formatCurrency(plan.price)}</p>
                                 </div>
                                 <p className="text-primary-400 text-xs">{plan.description}</p>
                             </button>
@@ -366,7 +367,7 @@ export default function MembershipPage() {
                             </div>
                             <button onClick={handleQueuePayment} disabled={queuePaying}
                                     className="btn-primary text-sm px-6 py-2.5">
-                                {queuePaying ? 'Processing...' : `Pay ₹${selectedQueuePlan.price + (selectedQueuePlan.convenienceFee || 0)}`}
+                                {queuePaying ? 'Processing...' : `Pay ${formatCurrency(Number(selectedQueuePlan.price) + Number(selectedQueuePlan.convenienceFee || 0))}`}
                             </button>
                         </div>
                     )}
@@ -384,7 +385,7 @@ export default function MembershipPage() {
                                     <p className="text-primary-400 text-sm mt-0.5">{plan.description}</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-2xl font-bold text-amber-400">₹{plan.price}</p>
+                                    <p className="text-2xl font-bold text-amber-400">{formatCurrency(plan.price)}</p>
                                     <p className="text-primary-500 text-xs">{t('membership.plans.perMonth')}</p>
                                 </div>
                             </div>

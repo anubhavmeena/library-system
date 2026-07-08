@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+import { formatCurrency } from '../../utils/currency'
 
 const PIE_COLORS = ['#f59e0b','#10b981','#3b82f6','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316']
 
@@ -43,7 +44,7 @@ export default function AdminRevenuePage() {
     const [dayLoading, setDayLoading]   = useState(false)
     const [breakdown, setBreakdown]     = useState([])
 
-    const currency = (n) => `₹${Number(n ?? 0).toLocaleString('en-IN')}`
+    const currency = formatCurrency
     const fmt      = (n) => (n ?? 0).toLocaleString('en-IN')
 
     const exportToExcel = () => {

@@ -7,6 +7,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3'
 import { parseISO, format, addDays } from 'date-fns'
+import { formatCurrency } from '../../utils/currency'
 
 const DATE_PICKER_SX = {
     '& .MuiOutlinedInput-root': {
@@ -316,7 +317,7 @@ export default function AdminCreateMembershipPage() {
                                                 ? 'bg-red-500/15 border-red-500/50 text-white'
                                                 : 'border-primary-700/30 text-primary-300 hover:border-red-500/30 hover:bg-red-500/5'}`}>
                                         <p className="font-semibold text-base mb-1">{p.name}</p>
-                                        <p className="text-amber-400 text-lg font-bold">₹{p.price}</p>
+                                        <p className="text-amber-400 text-lg font-bold">{formatCurrency(p.price)}</p>
                                         <p className="text-xs text-primary-500 mt-1">
                                             {p.durationDays} {t('adminNewMembership.step2.days')} · {p.planType === 'FULL_DAY' ? t('adminNewMembership.step2.fullDay') : t('adminNewMembership.step2.halfDay')}
                                         </p>
@@ -519,7 +520,7 @@ export default function AdminCreateMembershipPage() {
                                 { l: t('adminNewMembership.summary.seat'),     v: selectedSeat?.seatNumber },
                                 { l: t('adminNewMembership.summary.start'),    v: startDate },
                                 { l: t('adminNewMembership.summary.end'),      v: endDate },
-                                { l: t('adminNewMembership.summary.amount'),   v: `₹${selectedPlan?.price}` },
+                                { l: t('adminNewMembership.summary.amount'),   v: selectedPlan ? formatCurrency(selectedPlan.price) : '' },
                             ].map(({ l, v }) => (
                                 <div key={l} className="flex justify-between py-2 border-b border-primary-700/20 last:border-0 text-sm">
                                     <span className="text-primary-400">{l}</span>

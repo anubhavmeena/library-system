@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+import { formatCurrency } from '../../utils/currency'
 
 function StatCard({ icon, label, value, sub, color = 'amber', to, onClick }) {
     const colors = {
@@ -44,7 +45,7 @@ export default function AdminDashboardPage() {
     useEffect(() => { fetchStats() }, [])
 
     const fmt      = (n) => (n ?? 0).toLocaleString('en-IN')
-    const currency = (n) => `₹${Number(n ?? 0).toLocaleString('en-IN')}`
+    const currency = formatCurrency
 
 
     if (loading) return (
