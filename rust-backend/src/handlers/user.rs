@@ -53,7 +53,15 @@ pub async fn upload_photo(
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     while let Some(field) = multipart.next_field().await.map_err(|e| AppError::BadRequest(e.to_string()))? {
         let filename = field.file_name().unwrap_or("photo.jpg").to_string();
+        let content_type = field.content_type().map(|s| s.to_string());
         let data = field.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
+
+        svc::validate_upload(
+            content_type.as_deref(),
+            &data,
+            svc::IMAGE_CONTENT_TYPES,
+            "Invalid file type. Only JPEG, PNG, WebP allowed.",
+        )?;
 
         let url = svc::save_file(&state.config.upload_dir, user.user_id, "photo", &filename, &data).await?;
         svc::update_photo_url(&state, user.user_id, &url).await?;
@@ -77,7 +85,15 @@ pub async fn upload_aadhaar(
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     while let Some(field) = multipart.next_field().await.map_err(|e| AppError::BadRequest(e.to_string()))? {
         let filename = field.file_name().unwrap_or("aadhaar.pdf").to_string();
+        let content_type = field.content_type().map(|s| s.to_string());
         let data = field.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
+
+        svc::validate_upload(
+            content_type.as_deref(),
+            &data,
+            svc::AADHAAR_CONTENT_TYPES,
+            "Invalid file type. Only JPEG, PNG, WebP, or PDF allowed.",
+        )?;
 
         let url = svc::save_file(&state.config.upload_dir, user.user_id, "aadhaar", &filename, &data).await?;
         svc::update_aadhaar_url(&state, user.user_id, &url).await?;

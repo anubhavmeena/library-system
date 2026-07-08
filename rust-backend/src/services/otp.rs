@@ -82,8 +82,13 @@ pub async fn send_otp_channel(
     }
     if has_twilio {
         crate::services::notification::send_otp_sms(state, contact, &otp).await;
-    } else {
+    } else if is_dev_mode {
         tracing::info!("DEV MODE — OTP for {contact}: {otp}");
+    } else {
+        // A real channel was configured but every send attempt above still
+        // failed — this OTP never reached the user. Not dev mode; a real
+        // delivery failure worth flagging distinctly in the logs.
+        tracing::warn!("OTP delivery failed on every configured channel for {contact}");
     }
 
     Ok(())

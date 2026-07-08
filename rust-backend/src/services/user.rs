@@ -19,6 +19,30 @@ pub async fn update_profile(
     user_id: Uuid,
     req: &UpdateProfileRequest,
 ) -> crate::error::Result<User> {
+    // Normalize + pre-check email uniqueness ourselves so a clash surfaces as
+    // a clean 400 instead of the unique-constraint violation bubbling up as a
+    // generic 500 — mirrors Java's UserService.updateProfile.
+    let normalized_email = req
+        .email
+        .as_deref()
+        .map(str::trim)
+        .filter(|e| !e.is_empty())
+        .map(|e| e.to_lowercase());
+
+    if let Some(ref email) = normalized_email {
+        let existing: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE email = $1")
+            .bind(email)
+            .fetch_optional(&state.db)
+            .await?;
+        if let Some(existing_id) = existing {
+            if existing_id != user_id {
+                return Err(AppError::BadRequest(
+                    "Email already in use by another account".into(),
+                ));
+            }
+        }
+    }
+
     sqlx::query_as::<_, User>(
         "UPDATE users SET
             name          = COALESCE($2, name),
@@ -36,7 +60,7 @@ pub async fn update_profile(
     .bind(&req.father_name)
     .bind(&req.gender)
     .bind(req.date_of_birth)
-    .bind(&req.email)
+    .bind(normalized_email)
     .fetch_one(&state.db)
     .await
     .map_err(AppError::Database)
@@ -56,11 +80,36 @@ pub async fn update_photo_url(
 }
 
 pub async fn delete_photo(state: &Arc<AppState>, user_id: Uuid) -> crate::error::Result<()> {
+    let current: Option<String> = sqlx::query_scalar("SELECT photo_url FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await?
+        .flatten();
+    let url = current.ok_or_else(|| AppError::BadRequest("No photo to delete.".into()))?;
+
+    remove_uploaded_file(&state.config.upload_dir, &url).await;
+
     sqlx::query("UPDATE users SET photo_url = NULL, updated_at = NOW() WHERE id = $1")
         .bind(user_id)
         .execute(&state.db)
         .await?;
     Ok(())
+}
+
+pub(crate) fn uploaded_file_path(upload_dir: &str, url: &str) -> Option<String> {
+    let relative = url.strip_prefix("/uploads/")?;
+    Some(format!("{}/{relative}", upload_dir.trim_end_matches('/')))
+}
+
+/// Best-effort disk cleanup for a stored `/uploads/...` URL — mirrors Java's
+/// `Files.deleteIfExists`, which never fails the request over a missing file.
+pub async fn remove_uploaded_file(upload_dir: &str, url: &str) {
+    let Some(path) = uploaded_file_path(upload_dir, url) else { return };
+    if let Err(e) = tokio::fs::remove_file(&path).await {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            tracing::warn!("Could not delete uploaded file {path}: {e}");
+        }
+    }
 }
 
 pub async fn update_aadhaar_url(
@@ -77,6 +126,15 @@ pub async fn update_aadhaar_url(
 }
 
 pub async fn delete_aadhaar(state: &Arc<AppState>, user_id: Uuid) -> crate::error::Result<()> {
+    let current: Option<String> = sqlx::query_scalar("SELECT aadhaar_url FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await?
+        .flatten();
+    let url = current.ok_or_else(|| AppError::BadRequest("No Aadhaar card on file.".into()))?;
+
+    remove_uploaded_file(&state.config.upload_dir, &url).await;
+
     sqlx::query("UPDATE users SET aadhaar_url = NULL, updated_at = NOW() WHERE id = $1")
         .bind(user_id)
         .execute(&state.db)
@@ -117,12 +175,46 @@ pub async fn get_my_feedback(
     .map_err(AppError::Database)
 }
 
+/// Mirrors Java's `UserService.getAdminContact` — reads the first ADMIN-role
+/// user from the DB (real contact details an admin actually set up their
+/// account with), not the `ADMIN_EMAIL`/`ADMIN_WHATSAPP`/`ADMIN_PHONES` env
+/// vars, which are just the OTP-less-login allowlist and notification
+/// destinations, not necessarily a student-facing contact.
 pub async fn get_admin_contact(state: &Arc<AppState>) -> serde_json::Value {
-    serde_json::json!({
-        "email": state.config.admin_email,
-        "whatsapp": state.config.admin_whatsapp,
-        "phones": state.config.admin_phones,
-    })
+    let row: Option<(String, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT name, mobile, email FROM users WHERE role = 'ADMIN' ORDER BY created_at LIMIT 1",
+    )
+    .fetch_optional(&state.db)
+    .await
+    .ok()
+    .flatten();
+
+    match row {
+        Some((name, mobile, email)) => serde_json::json!({ "name": name, "mobile": mobile, "email": email }),
+        None => serde_json::json!({ "name": "Admin", "mobile": null, "email": null }),
+    }
+}
+
+pub const MAX_UPLOAD_BYTES: usize = 5_242_880; // 5 MB — matches Java's UserService/GalleryService
+pub const IMAGE_CONTENT_TYPES: &[&str] = &["image/jpeg", "image/png", "image/webp"];
+pub const AADHAAR_CONTENT_TYPES: &[&str] = &["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+/// Rejects the upload up front — matches Java's `UserService`/`GalleryService`
+/// content-type allowlist + 5MB cap, checked before any file ever touches disk.
+pub fn validate_upload(
+    content_type: Option<&str>,
+    data: &[u8],
+    allowed: &[&str],
+    type_error: &str,
+) -> crate::error::Result<()> {
+    match content_type {
+        Some(ct) if allowed.contains(&ct) => {}
+        _ => return Err(AppError::BadRequest(type_error.to_string())),
+    }
+    if data.len() > MAX_UPLOAD_BYTES {
+        return Err(AppError::BadRequest("File must not exceed 5MB.".into()));
+    }
+    Ok(())
 }
 
 pub async fn save_file(
@@ -155,7 +247,10 @@ pub(crate) fn sanitize_filename(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::sanitize_filename;
+    use super::{
+        sanitize_filename, uploaded_file_path, validate_upload, AADHAAR_CONTENT_TYPES,
+        IMAGE_CONTENT_TYPES, MAX_UPLOAD_BYTES,
+    };
 
     #[test]
     fn alphanumeric_dot_hyphen_pass_through() {
@@ -200,6 +295,59 @@ mod tests {
             assert!(!result.contains(' '), "space in result for: {input}");
             assert!(!result.contains('/'), "slash in result for: {input}");
         }
+    }
+
+    #[test]
+    fn validate_upload_accepts_allowed_image_type_under_size_cap() {
+        assert!(validate_upload(Some("image/png"), &[0u8; 100], IMAGE_CONTENT_TYPES, "bad type").is_ok());
+    }
+
+    #[test]
+    fn validate_upload_rejects_missing_content_type() {
+        assert!(validate_upload(None, &[0u8; 100], IMAGE_CONTENT_TYPES, "bad type").is_err());
+    }
+
+    #[test]
+    fn validate_upload_rejects_disallowed_content_type() {
+        assert!(validate_upload(Some("application/pdf"), &[0u8; 100], IMAGE_CONTENT_TYPES, "bad type").is_err());
+    }
+
+    #[test]
+    fn validate_upload_allows_pdf_for_aadhaar_but_not_image_set() {
+        assert!(validate_upload(Some("application/pdf"), &[0u8; 100], AADHAAR_CONTENT_TYPES, "bad type").is_ok());
+    }
+
+    #[test]
+    fn validate_upload_rejects_oversized_file() {
+        let data = vec![0u8; MAX_UPLOAD_BYTES + 1];
+        assert!(validate_upload(Some("image/jpeg"), &data, IMAGE_CONTENT_TYPES, "bad type").is_err());
+    }
+
+    #[test]
+    fn validate_upload_accepts_file_exactly_at_size_cap() {
+        let data = vec![0u8; MAX_UPLOAD_BYTES];
+        assert!(validate_upload(Some("image/jpeg"), &data, IMAGE_CONTENT_TYPES, "bad type").is_ok());
+    }
+
+    #[test]
+    fn uploaded_file_path_joins_dir_and_relative_path() {
+        assert_eq!(
+            uploaded_file_path("/data/uploads", "/uploads/user123/photo_a.jpg"),
+            Some("/data/uploads/user123/photo_a.jpg".to_string())
+        );
+    }
+
+    #[test]
+    fn uploaded_file_path_strips_trailing_slash_on_dir() {
+        assert_eq!(
+            uploaded_file_path("/data/uploads/", "/uploads/gallery/g1.png"),
+            Some("/data/uploads/gallery/g1.png".to_string())
+        );
+    }
+
+    #[test]
+    fn uploaded_file_path_rejects_url_without_uploads_prefix() {
+        assert_eq!(uploaded_file_path("/data/uploads", "https://evil.com/x"), None);
     }
 
     #[test]

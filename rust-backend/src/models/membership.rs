@@ -16,6 +16,18 @@ pub struct MembershipPlan {
     pub is_active: bool,
 }
 
+/// `GET /api/plans` response shape — the admin-configured convenience fee
+/// (added on top of `price` when paying via the gateway) isn't a plan
+/// column, so it's flattened onto each plan here rather than living on
+/// `MembershipPlan` itself. Mirrors Java's `PlanDto`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanWithFee {
+    #[serde(flatten)]
+    pub plan: MembershipPlan,
+    pub convenience_fee: Decimal,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct Membership {

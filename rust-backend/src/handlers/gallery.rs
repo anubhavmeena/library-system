@@ -4,7 +4,7 @@ use crate::{
     middleware::AdminUser,
     models::admin::GalleryPhoto,
     response::ApiResponse,
-    services::user::save_file,
+    services::user::{remove_uploaded_file, save_file, validate_upload, IMAGE_CONTENT_TYPES},
 };
 use axum::extract::{Multipart, Path, State};
 use std::sync::Arc;
@@ -36,7 +36,16 @@ pub async fn upload_gallery_photo(
             caption = Some(field.text().await.map_err(|e| AppError::BadRequest(e.to_string()))?);
         } else {
             let filename = field.file_name().unwrap_or("gallery.jpg").to_string();
+            let content_type = field.content_type().map(|s| s.to_string());
             let data = field.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
+
+            validate_upload(
+                content_type.as_deref(),
+                &data,
+                IMAGE_CONTENT_TYPES,
+                "Invalid file type. Only JPEG, PNG, WebP allowed.",
+            )?;
+
             let url = save_file(&state.config.upload_dir, admin.0.user_id, "gallery", &filename, &data).await?;
             file_url = Some(url);
         }
@@ -45,11 +54,11 @@ pub async fn upload_gallery_photo(
     let url = file_url.ok_or_else(|| AppError::BadRequest("No file provided".into()))?;
 
     let photo = sqlx::query_as::<_, GalleryPhoto>(
-        "INSERT INTO gallery_photos (url, caption, uploaded_by) VALUES ($1, $2, $3) RETURNING *",
+        "INSERT INTO gallery_photos (id, url, caption, uploaded_by, uploaded_at) VALUES (gen_random_uuid(), $1, $2, $3, NOW()) RETURNING *",
     )
     .bind(&url)
     .bind(&caption)
-    .bind(admin.0.user_id)
+    .bind(admin.0.user_id.to_string())
     .fetch_one(&state.db)
     .await?;
 
@@ -61,14 +70,18 @@ pub async fn delete_gallery_photo(
     _admin: AdminUser,
     Path(id): Path<Uuid>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    let deleted = sqlx::query("DELETE FROM gallery_photos WHERE id = $1")
+    let url: String = sqlx::query_scalar("SELECT url FROM gallery_photos WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Photo not found".into()))?;
+
+    sqlx::query("DELETE FROM gallery_photos WHERE id = $1")
         .bind(id)
         .execute(&state.db)
         .await?;
 
-    if deleted.rows_affected() == 0 {
-        return Err(AppError::NotFound("Photo not found".into()));
-    }
+    remove_uploaded_file(&state.config.upload_dir, &url).await;
 
     Ok(ApiResponse::ok("Photo deleted"))
 }

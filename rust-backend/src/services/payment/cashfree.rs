@@ -42,7 +42,7 @@ pub async fn create_order(
     let resp = state
         .http
         .post(&url)
-        .header("x-api-version", "2023-08-01")
+        .header("x-api-version", "2025-01-01")
         .header("x-client-id", &state.config.cashfree_app_id)
         .header("x-client-secret", &state.config.cashfree_secret_key)
         .json(&body)
@@ -89,7 +89,7 @@ pub async fn verify_payment(
     let resp = state
         .http
         .get(&url)
-        .header("x-api-version", "2023-08-01")
+        .header("x-api-version", "2025-01-01")
         .header("x-client-id", &state.config.cashfree_app_id)
         .header("x-client-secret", &state.config.cashfree_secret_key)
         .send()

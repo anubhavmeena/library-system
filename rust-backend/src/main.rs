@@ -75,8 +75,12 @@ async fn start_scheduler(state: Arc<AppState>) {
     })
     .expect("Failed to create reminder cron job");
 
+    // India has no DST, so a fixed +5:30 offset is IST year-round — matches
+    // Java's `markExpiredAndStartGrace` which pins `zone = "Asia/Kolkata"`
+    // explicitly rather than relying on the container's (UTC) default.
+    let ist = chrono::FixedOffset::east_opt(5 * 3600 + 30 * 60).expect("valid IST offset");
     let s2 = state.clone();
-    let expiry_job = Job::new_async("0 0 10 * * *", move |_uuid, _lock| {
+    let expiry_job = Job::new_async_tz("0 0 5 * * *", ist, move |_uuid, _lock| {
         let s = s2.clone();
         Box::pin(async move {
             services::admin::run_mark_expired_job(s).await;

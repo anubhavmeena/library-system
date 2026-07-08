@@ -134,44 +134,49 @@ impl Config {
 }
 
 #[cfg(test)]
+pub(crate) fn test_config() -> Config {
+    Config {
+        database_url: "postgres://test:test@localhost:5432/testdb".to_string(),
+        redis_url: "redis://localhost:6379".to_string(),
+        jwt_secret: "test-secret-key-at-least-32-bytes-long!".to_string(),
+        jwt_expiry_ms: 86_400_000,
+        upload_dir: "/tmp/uploads".to_string(),
+        port: 8080,
+        twilio_account_sid: "".to_string(),
+        twilio_auth_token: "".to_string(),
+        twilio_phone_number: "".to_string(),
+        twilio_whatsapp_from: "whatsapp:+14155238886".to_string(),
+        sendgrid_api_key: "".to_string(),
+        meta_whatsapp_token: "".to_string(),
+        meta_whatsapp_phone_id: "".to_string(),
+        meta_whatsapp_otp_template: "otpvm".to_string(),
+        meta_whatsapp_notif_template: "tznallh".to_string(),
+        meta_whatsapp_language: "en".to_string(),
+        meta_receipt_template_name: "payment_receipt".to_string(),
+        meta_receipt_language: "en".to_string(),
+        meta_id_card_image_template_name: "id_card".to_string(),
+        meta_id_card_image_language: "en".to_string(),
+        apitxt_auth_key: "".to_string(),
+        frontend_url: "https://targetzone.co.in".to_string(),
+        payment_gateway: "CASHFREE".to_string(),
+        razorpay_key_id: "".to_string(),
+        razorpay_key_secret: "".to_string(),
+        cashfree_app_id: "".to_string(),
+        cashfree_secret_key: "".to_string(),
+        cashfree_env: "sandbox".to_string(),
+        cashfree_base_url: "https://sandbox.cashfree.com".to_string(),
+        admin_email: "admin@test.com".to_string(),
+        admin_whatsapp: "".to_string(),
+        admin_phones: vec![],
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
     fn base_config() -> Config {
-        Config {
-            database_url: "postgres://test:test@localhost:5432/testdb".to_string(),
-            redis_url: "redis://localhost:6379".to_string(),
-            jwt_secret: "test-secret-key-at-least-32-bytes-long!".to_string(),
-            jwt_expiry_ms: 86_400_000,
-            upload_dir: "/tmp/uploads".to_string(),
-            port: 8080,
-            twilio_account_sid: "".to_string(),
-            twilio_auth_token: "".to_string(),
-            twilio_phone_number: "".to_string(),
-            twilio_whatsapp_from: "whatsapp:+14155238886".to_string(),
-            sendgrid_api_key: "".to_string(),
-            meta_whatsapp_token: "".to_string(),
-            meta_whatsapp_phone_id: "".to_string(),
-            meta_whatsapp_otp_template: "otpvm".to_string(),
-            meta_whatsapp_notif_template: "tznallh".to_string(),
-            meta_whatsapp_language: "en".to_string(),
-            meta_receipt_template_name: "payment_receipt".to_string(),
-            meta_receipt_language: "en".to_string(),
-            meta_id_card_image_template_name: "id_card".to_string(),
-            meta_id_card_image_language: "en".to_string(),
-            apitxt_auth_key: "".to_string(),
-            frontend_url: "https://targetzone.co.in".to_string(),
-            payment_gateway: "CASHFREE".to_string(),
-            razorpay_key_id: "".to_string(),
-            razorpay_key_secret: "".to_string(),
-            cashfree_app_id: "".to_string(),
-            cashfree_secret_key: "".to_string(),
-            cashfree_env: "sandbox".to_string(),
-            cashfree_base_url: "https://sandbox.cashfree.com".to_string(),
-            admin_email: "admin@test.com".to_string(),
-            admin_whatsapp: "".to_string(),
-            admin_phones: vec![],
-        }
+        test_config()
     }
 
     #[test]

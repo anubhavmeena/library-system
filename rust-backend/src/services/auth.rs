@@ -28,6 +28,19 @@ pub async fn verify_otp(
     Ok((session_token, !is_new_user))
 }
 
+/// Mirrors Java's `AuthService.effectiveRole`: a user whose mobile is in the
+/// `ADMIN_PHONES` allowlist is treated as ADMIN regardless of their stored
+/// `role` column — the allowlist is a superset grant, never a downgrade.
+fn effective_role(user: &User, config: &crate::config::Config) -> String {
+    if user.role == "ADMIN" {
+        return "ADMIN".to_string();
+    }
+    match &user.mobile {
+        Some(mobile) if config.admin_phones.iter().any(|p| p == mobile) => "ADMIN".to_string(),
+        _ => user.role.clone(),
+    }
+}
+
 pub async fn register(
     state: &Arc<AppState>,
     session_token: &str,
@@ -66,9 +79,10 @@ pub async fn register(
         }
     })?;
 
+    let role = effective_role(&user, &state.config);
     let token = jwt::create_token(
         user.id,
-        &user.role,
+        &role,
         &user.name,
         user.email.as_deref(),
         user.mobile.as_deref(),
@@ -82,7 +96,7 @@ pub async fn register(
         notification::send_welcome(&s, &u.name, u.mobile.as_deref(), u.email.as_deref()).await;
     });
 
-    Ok((token, user))
+    Ok((token, User { role, ..user }))
 }
 
 pub async fn login(
@@ -101,9 +115,10 @@ pub async fn login(
         return Err(AppError::Forbidden);
     }
 
+    let role = effective_role(&user, &state.config);
     let token = jwt::create_token(
         user.id,
-        "STUDENT",
+        &role,
         &user.name,
         user.email.as_deref(),
         user.mobile.as_deref(),
@@ -111,7 +126,7 @@ pub async fn login(
         state.config.jwt_expiry_ms,
     )?;
 
-    Ok((token, User { role: "STUDENT".to_string(), ..user }))
+    Ok((token, User { role, ..user }))
 }
 
 pub async fn admin_login(
@@ -134,7 +149,11 @@ pub async fn admin_login(
     }
     .ok_or_else(|| AppError::NotFound("User not found".into()))?;
 
-    if user.role != "ADMIN" {
+    let is_admin_phone = user
+        .mobile
+        .as_deref()
+        .is_some_and(|m| state.config.admin_phones.iter().any(|p| p == m));
+    if user.role != "ADMIN" && !is_admin_phone {
         return Err(AppError::Forbidden);
     }
 
@@ -142,9 +161,10 @@ pub async fn admin_login(
         return Err(AppError::Forbidden);
     }
 
+    let role = effective_role(&user, &state.config);
     let token = jwt::create_token(
         user.id,
-        &user.role,
+        &role,
         &user.name,
         user.email.as_deref(),
         user.mobile.as_deref(),
@@ -152,7 +172,7 @@ pub async fn admin_login(
         state.config.jwt_expiry_ms,
     )?;
 
-    Ok((token, user))
+    Ok((token, User { role, ..user }))
 }
 
 async fn user_exists_by_mobile(db: &PgPool, mobile: &str) -> crate::error::Result<bool> {
@@ -185,4 +205,62 @@ async fn find_user_by_email(db: &PgPool, email: &str) -> crate::error::Result<Us
         .fetch_optional(db)
         .await?
         .ok_or_else(|| AppError::NotFound("User not found".into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    fn student(mobile: Option<&str>) -> User {
+        User {
+            id: Uuid::new_v4(),
+            mobile: mobile.map(|m| m.to_string()),
+            email: None,
+            name: "Test User".to_string(),
+            address: None,
+            father_name: None,
+            photo_url: None,
+            aadhaar_url: None,
+            date_of_birth: None,
+            gender: None,
+            is_active: true,
+            role: "STUDENT".to_string(),
+            created_at: chrono::Local::now().naive_local(),
+            updated_at: None,
+        }
+    }
+
+    #[test]
+    fn effective_role_keeps_db_admin_role() {
+        let mut config = crate::config::test_config();
+        config.admin_phones = vec![];
+        let mut user = student(Some("9000000000"));
+        user.role = "ADMIN".to_string();
+        assert_eq!(effective_role(&user, &config), "ADMIN");
+    }
+
+    #[test]
+    fn effective_role_grants_admin_via_allowlisted_mobile() {
+        let mut config = crate::config::test_config();
+        config.admin_phones = vec!["9000000000".to_string()];
+        let user = student(Some("9000000000"));
+        assert_eq!(effective_role(&user, &config), "ADMIN");
+    }
+
+    #[test]
+    fn effective_role_is_student_when_not_allowlisted() {
+        let mut config = crate::config::test_config();
+        config.admin_phones = vec!["9111111111".to_string()];
+        let user = student(Some("9000000000"));
+        assert_eq!(effective_role(&user, &config), "STUDENT");
+    }
+
+    #[test]
+    fn effective_role_handles_missing_mobile() {
+        let mut config = crate::config::test_config();
+        config.admin_phones = vec!["9000000000".to_string()];
+        let user = student(None);
+        assert_eq!(effective_role(&user, &config), "STUDENT");
+    }
 }

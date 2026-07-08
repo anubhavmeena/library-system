@@ -43,9 +43,20 @@ pub async fn get_dashboard(state: &Arc<AppState>) -> crate::error::Result<Dashbo
             .fetch_one(&state.db)
             .await?;
 
-    let occupied_seats: i64 = sqlx::query_scalar(
-        "SELECT COUNT(DISTINCT seat_id) FROM seat_bookings WHERE status = 'ACTIVE'
-         AND booking_date <= CURRENT_DATE AND end_date >= CURRENT_DATE",
+    // Matches Java's `occupiedSeats = activeMem` exactly — the dashboard counts
+    // occupancy by membership, not by actual seat_bookings rows, which is
+    // exactly why `orphaned_seat_memberships` (an ACTIVE membership with no
+    // matching seat_bookings row — see `get_orphaned_seats`) is tracked as
+    // its own separate metric rather than folded into this count.
+    let occupied_seats = active_memberships;
+
+    let orphaned_seat_memberships: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM memberships m
+         WHERE m.status = 'ACTIVE'
+           AND NOT EXISTS (
+               SELECT 1 FROM seat_bookings sb
+               WHERE sb.membership_id = m.id AND sb.status = 'ACTIVE'
+           )",
     )
     .fetch_one(&state.db)
     .await?;
@@ -92,9 +103,10 @@ pub async fn get_dashboard(state: &Arc<AppState>) -> crate::error::Result<Dashbo
         active_memberships,
         expired_memberships,
         expiring_this_week,
+        orphaned_seat_memberships,
         total_seats,
         occupied_seats,
-        available_seats: total_seats - occupied_seats,
+        available_seats: (total_seats - occupied_seats).max(0),
         revenue_today: revenue_today.unwrap_or_default(),
         revenue_this_month: revenue_this_month.unwrap_or_default(),
         payments_this_month,
@@ -544,16 +556,38 @@ pub async fn clear_pending_fees(
     Ok(())
 }
 
+/// Find-or-create by mobile — mirrors Java's `ImportService.findOrCreateUser`.
+/// Calling this twice with the same phone must not throw a conflict: the
+/// second call is a no-op that just returns the already-imported student.
 pub async fn import_student(
     state: &Arc<AppState>,
     req: &ImportStudentRequest,
 ) -> crate::error::Result<User> {
+    let phone: String = req
+        .mobile
+        .as_deref()
+        .unwrap_or("")
+        .chars()
+        .filter(|c| c.is_ascii_digit())
+        .collect();
+    if phone.is_empty() {
+        return Err(AppError::BadRequest("Phone number is invalid".into()));
+    }
+
+    if let Some(existing) = sqlx::query_as::<_, User>("SELECT * FROM users WHERE mobile = $1")
+        .bind(&phone)
+        .fetch_optional(&state.db)
+        .await?
+    {
+        return Ok(existing);
+    }
+
     sqlx::query_as::<_, User>(
         "INSERT INTO users (name, mobile, email, address, gender, date_of_birth, role, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, 'STUDENT', NOW()) RETURNING *",
     )
-    .bind(&req.name)
-    .bind(&req.mobile)
+    .bind(req.name.trim())
+    .bind(&phone)
     .bind(&req.email)
     .bind(&req.address)
     .bind(&req.gender)
@@ -569,62 +603,368 @@ pub async fn import_student(
     })
 }
 
+/// Separate from `import_student` above (matching Java's separate
+/// `importSingleStudentWithPhoto`) so the existing JSON contract used by the
+/// web frontend and Android app is untouched — this one is multipart with an
+/// optional photo attached to the same find-or-create-by-mobile student.
+pub async fn import_student_with_photo(
+    state: &Arc<AppState>,
+    name: &str,
+    phone: &str,
+    photo: Option<(Option<String>, Vec<u8>)>,
+) -> crate::error::Result<crate::models::admin::ImportWithPhotoResponse> {
+    let clean_phone: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+    if clean_phone.is_empty() {
+        return Err(AppError::BadRequest("Phone number is invalid".into()));
+    }
+
+    let user = if let Some(existing) = sqlx::query_as::<_, User>("SELECT * FROM users WHERE mobile = $1")
+        .bind(&clean_phone)
+        .fetch_optional(&state.db)
+        .await?
+    {
+        existing
+    } else {
+        sqlx::query_as::<_, User>(
+            "INSERT INTO users (name, mobile, role, created_at) VALUES ($1, $2, 'STUDENT', NOW()) RETURNING *",
+        )
+        .bind(name.trim())
+        .bind(&clean_phone)
+        .fetch_one(&state.db)
+        .await?
+    };
+
+    let mut photo_url = None;
+    if let Some((content_type, data)) = photo {
+        if !data.is_empty() {
+            crate::services::user::validate_upload(
+                content_type.as_deref(),
+                &data,
+                crate::services::user::IMAGE_CONTENT_TYPES,
+                "Invalid file type. Only JPEG, PNG, WebP allowed.",
+            )?;
+            let url = crate::services::user::save_file(
+                &state.config.upload_dir,
+                user.id,
+                "photo",
+                "photo.jpg",
+                &data,
+            )
+            .await?;
+            sqlx::query("UPDATE users SET photo_url = $2 WHERE id = $1")
+                .bind(user.id)
+                .bind(&url)
+                .execute(&state.db)
+                .await?;
+            photo_url = Some(url);
+        }
+    }
+
+    Ok(crate::models::admin::ImportWithPhotoResponse {
+        message: "Student added successfully".to_string(),
+        photo_url,
+    })
+}
+
+// Bulk import is a cash-enrollment pipeline, not a contact-list import: each
+// row produces a real User + Membership + Payment + seat booking, matching
+// Java's ImportService.processRow. Column layout is fixed-position (matching
+// the Java-generated template), not header-name-based:
+//   [1]=name [2]=phone [3]=fees [4]=join date [5]=seat number
+const IMPORT_DATE_FORMATS: &[&str] = &[
+    "%m-%d-%Y",
+    "%d-%m-%Y",
+    "%d/%m/%Y",
+    "%Y-%m-%d",
+    "%m/%d/%Y",
+    "%d/%m/%y",
+    "%m/%d/%y",
+];
+
 pub async fn bulk_import_students(
     state: &Arc<AppState>,
     data: &[u8],
+    filename: &str,
 ) -> crate::error::Result<ImportResult> {
+    let lower = filename.to_lowercase();
+    let rows: Vec<Vec<String>> = if lower.ends_with(".xlsx") {
+        parse_excel_rows(data, false)?
+    } else if lower.ends_with(".xls") {
+        parse_excel_rows(data, true)?
+    } else {
+        parse_csv_rows(data)?
+    };
+
+    let mut total_rows = rows.len().saturating_sub(1) as i32;
+    let date_hint = rows
+        .first()
+        .and_then(|header| header.get(4))
+        .and_then(|h| extract_date_format_hint(h));
+
+    let active_plans: Vec<MembershipPlan> = sqlx::query_as::<_, MembershipPlan>(
+        "SELECT * FROM membership_plans WHERE is_active = true",
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    let mut imported = 0i32;
+    let mut errors: Vec<ImportRowError> = Vec::new();
+
+    for (i, cols) in rows.iter().enumerate().skip(1) {
+        let get = |idx: usize| cols.get(idx).map(|s| s.trim()).unwrap_or("");
+        let name = get(1).to_string();
+        let phone: String = get(2).chars().filter(|c| c.is_ascii_digit()).collect();
+
+        if name.is_empty() && phone.is_empty() {
+            total_rows -= 1;
+            continue;
+        }
+
+        match process_import_row(state, cols, &active_plans, date_hint.as_deref()).await {
+            Ok(()) => imported += 1,
+            Err(e) => errors.push(ImportRowError {
+                row: (i + 1) as i32,
+                name,
+                phone,
+                reason: strip_error_prefix(&e.to_string()),
+            }),
+        }
+    }
+
+    Ok(ImportResult {
+        imported,
+        skipped: total_rows - imported,
+        total_rows,
+        errors,
+    })
+}
+
+async fn process_import_row(
+    state: &Arc<AppState>,
+    cols: &[String],
+    active_plans: &[MembershipPlan],
+    date_hint: Option<&str>,
+) -> crate::error::Result<()> {
+    let get = |idx: usize| cols.get(idx).map(|s| s.trim()).unwrap_or("");
+    let name = get(1).to_string();
+    let phone: String = get(2).chars().filter(|c| c.is_ascii_digit()).collect();
+    let fees = parse_import_fees(get(3));
+    let seat_number = normalize_seat_number(get(5));
+
+    if name.is_empty() {
+        return Err(AppError::BadRequest("Name is blank".into()));
+    }
+    if phone.is_empty() {
+        return Err(AppError::BadRequest("Phone is blank".into()));
+    }
+    if seat_number.is_empty() {
+        return Err(AppError::BadRequest("Seat is blank".into()));
+    }
+
+    let mut start_date = parse_import_date(get(4), date_hint)?;
+
+    if active_plans.is_empty() {
+        return Err(AppError::BadRequest("No active plans configured".into()));
+    }
+    let plan = active_plans
+        .iter()
+        .min_by(|a, b| (a.price - fees).abs().cmp(&(b.price - fees).abs()))
+        .unwrap();
+
+    let shift = if plan.plan_type == "FULL_DAY" { "FULL_DAY" } else { "MORNING" };
+
+    // If the sheet's date is so far in the past the membership would already
+    // be expired, start from today so the student appears active on the seat map.
+    let today = chrono::Local::now().date_naive();
+    if start_date + chrono::Duration::days(plan.duration_days as i64) < today {
+        start_date = today;
+    }
+
+    let user_id = find_or_create_user_by_mobile(state, &name, &phone).await?;
+
+    let req = CashMembershipRequest {
+        user_id,
+        plan_id: plan.id,
+        shift: shift.to_string(),
+        seat_number: Some(seat_number),
+        start_date,
+        amount: plan.price,
+        pending_amount: Some(Decimal::ZERO),
+    };
+    create_cash_membership(state, &req).await?;
+    Ok(())
+}
+
+/// Idempotent find-or-create by mobile — re-importing an already-registered
+/// phone number is a no-op success, matching Java's findOrCreateUser, rather
+/// than the unique-constraint 409 a plain INSERT would raise.
+async fn find_or_create_user_by_mobile(
+    state: &Arc<AppState>,
+    name: &str,
+    mobile: &str,
+) -> crate::error::Result<Uuid> {
+    if let Some(id) = sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE mobile = $1")
+        .bind(mobile)
+        .fetch_optional(&state.db)
+        .await?
+    {
+        return Ok(id);
+    }
+    let id: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (name, mobile, role, created_at) VALUES ($1, $2, 'STUDENT', NOW()) RETURNING id",
+    )
+    .bind(name.trim())
+    .bind(mobile)
+    .fetch_one(&state.db)
+    .await?;
+    Ok(id)
+}
+
+fn strip_error_prefix(msg: &str) -> String {
+    for prefix in ["Not found: ", "Bad request: ", "Conflict: ", "Internal error: "] {
+        if let Some(rest) = msg.strip_prefix(prefix) {
+            return rest.to_string();
+        }
+    }
+    msg.to_string()
+}
+
+fn parse_import_fees(raw: &str) -> Decimal {
+    let cleaned: String = raw.chars().filter(|c| c.is_ascii_digit() || *c == '.').collect();
+    if cleaned.is_empty() {
+        Decimal::ZERO
+    } else {
+        cleaned.parse::<Decimal>().unwrap_or(Decimal::ZERO)
+    }
+}
+
+/// Uppercase, strip whitespace/hyphens, then collapse a zero-padded numeric
+/// suffix ("A007" -> "A7") — matches Java's `[A-Z]+0+(\d)` -> `$1$2` regex.
+fn normalize_seat_number(raw: &str) -> String {
+    let cleaned: String = raw
+        .trim()
+        .to_uppercase()
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '-')
+        .collect();
+    let re = regex::Regex::new(r"([A-Z]+)0+(\d)").unwrap();
+    re.replace(&cleaned, "$1$2").to_string()
+}
+
+fn parse_import_date(raw: &str, hint: Option<&str>) -> crate::error::Result<NaiveDate> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return Ok(chrono::Local::now().date_naive());
+    }
+    if let Some(fmt) = hint {
+        if let Ok(d) = NaiveDate::parse_from_str(raw, fmt) {
+            return Ok(d);
+        }
+    }
+    for fmt in IMPORT_DATE_FORMATS {
+        if let Ok(d) = NaiveDate::parse_from_str(raw, fmt) {
+            return Ok(d);
+        }
+    }
+    Err(AppError::BadRequest(format!("Cannot parse date: {raw}")))
+}
+
+/// Extracts a date pattern hinted in a header cell like `"Date (dd/MM/yyyy)"`,
+/// translating the Java-style tokens to chrono's strftime specifiers.
+/// Best-effort — falls back silently to `IMPORT_DATE_FORMATS` on any failure.
+fn extract_date_format_hint(header_cell: &str) -> Option<String> {
+    let open = header_cell.find('(')?;
+    let close = header_cell.rfind(')')?;
+    if close <= open {
+        return None;
+    }
+    let pattern = header_cell[open + 1..close].trim();
+    if pattern.is_empty() {
+        return None;
+    }
+    Some(translate_java_date_pattern(pattern))
+}
+
+fn translate_java_date_pattern(pattern: &str) -> String {
+    let chars: Vec<char> = pattern.chars().collect();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < chars.len() {
+        match chars[i] {
+            'y' => {
+                let start = i;
+                while i < chars.len() && chars[i] == 'y' {
+                    i += 1;
+                }
+                out.push_str(if i - start >= 4 { "%Y" } else { "%y" });
+            }
+            'M' => {
+                while i < chars.len() && chars[i] == 'M' {
+                    i += 1;
+                }
+                out.push_str("%m");
+            }
+            'd' => {
+                while i < chars.len() && chars[i] == 'd' {
+                    i += 1;
+                }
+                out.push_str("%d");
+            }
+            other => {
+                out.push(other);
+                i += 1;
+            }
+        }
+    }
+    out
+}
+
+fn parse_csv_rows(data: &[u8]) -> crate::error::Result<Vec<Vec<String>>> {
     let mut reader = csv::ReaderBuilder::new()
-        .has_headers(true)
+        .has_headers(false)
         .flexible(true)
         .trim(csv::Trim::All)
         .from_reader(data);
 
-    let headers = reader.headers().map_err(|e| AppError::BadRequest(e.to_string()))?.clone();
-    let col = |name: &str| -> Option<usize> {
-        headers.iter().position(|h| h.to_lowercase() == name)
+    reader
+        .records()
+        .map(|r| {
+            r.map(|record| record.iter().map(|s| s.to_string()).collect())
+                .map_err(|e| AppError::BadRequest(format!("Invalid CSV row: {e}")))
+        })
+        .collect()
+}
+
+fn parse_excel_rows(data: &[u8], is_xls: bool) -> crate::error::Result<Vec<Vec<String>>> {
+    use calamine::Reader;
+
+    let cursor = std::io::Cursor::new(data);
+    let range = if is_xls {
+        let mut wb = calamine::Xls::new(cursor)
+            .map_err(|e| AppError::BadRequest(format!("Cannot read .xls file: {e:?}")))?;
+        let sheet = wb
+            .sheet_names()
+            .into_iter()
+            .next()
+            .ok_or_else(|| AppError::BadRequest("Excel file has no sheets".into()))?;
+        wb.worksheet_range(&sheet)
+            .map_err(|e| AppError::BadRequest(format!("Cannot read sheet: {e:?}")))?
+    } else {
+        let mut wb = calamine::Xlsx::new(cursor)
+            .map_err(|e| AppError::BadRequest(format!("Cannot read .xlsx file: {e:?}")))?;
+        let sheet = wb
+            .sheet_names()
+            .into_iter()
+            .next()
+            .ok_or_else(|| AppError::BadRequest("Excel file has no sheets".into()))?;
+        wb.worksheet_range(&sheet)
+            .map_err(|e| AppError::BadRequest(format!("Cannot read sheet: {e:?}")))?
     };
-    let name_col   = col("name");
-    let phone_col  = col("phone").or_else(|| col("mobile"));
-    let email_col  = col("email");
-    let gender_col = col("gender");
 
-    let mut imported = 0i32;
-    let mut skipped  = 0i32;
-    let mut total    = 0i32;
-
-    for record in reader.records() {
-        let record = match record {
-            Ok(r) => r,
-            Err(_) => { skipped += 1; total += 1; continue }
-        };
-        total += 1;
-
-        let name = name_col.and_then(|i| record.get(i)).unwrap_or("").trim().to_string();
-        if name.is_empty() { skipped += 1; continue; }
-
-        let mobile = phone_col.and_then(|i| record.get(i)).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
-        let email  = email_col.and_then(|i| record.get(i)).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
-        let gender = gender_col.and_then(|i| record.get(i)).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
-
-        let result = sqlx::query(
-            "INSERT INTO users (name, mobile, email, gender, role, created_at)
-             VALUES ($1, $2, $3, $4, 'STUDENT', NOW())
-             ON CONFLICT DO NOTHING",
-        )
-        .bind(&name)
-        .bind(&mobile)
-        .bind(&email)
-        .bind(&gender)
-        .execute(&state.db)
-        .await;
-
-        match result {
-            Ok(r) if r.rows_affected() > 0 => imported += 1,
-            _ => skipped += 1,
-        }
-    }
-
-    Ok(ImportResult { imported, skipped, total_rows: total })
+    Ok(range
+        .rows()
+        .map(|row| row.iter().map(|cell| cell.to_string().trim().to_string()).collect())
+        .collect())
 }
 
 // ── Seat map ──────────────────────────────────────────────────────────────────
@@ -803,9 +1143,13 @@ pub async fn send_renewal_reminders(
     // Treat empty vec the same as None (send to all) — matches frontend behaviour
     let user_ids = user_ids.filter(|v| !v.is_empty());
 
-    let rows: Vec<(Uuid, String, Option<String>, Option<String>, NaiveDate, bool)> = if let Some(ids) = &user_ids {
+    // This is the manual admin override, not the scheduler — it intentionally
+    // ignores `reminder_sent` (empty/no ids sends to everyone expiring within
+    // 7 days regardless of the flag, matching Java's `sendBulkReminders`) and
+    // never sets `reminder_sent` itself; only the daily scheduler job does.
+    let rows: Vec<(Uuid, String, Option<String>, Option<String>, NaiveDate)> = if let Some(ids) = &user_ids {
         sqlx::query_as(
-            "SELECT m.id, u.name, u.mobile, u.email, m.end_date, m.reminder_sent
+            "SELECT m.id, u.name, u.mobile, u.email, m.end_date
              FROM memberships m JOIN users u ON u.id = m.user_id
              WHERE m.status = 'ACTIVE' AND m.user_id = ANY($1::uuid[])",
         )
@@ -814,11 +1158,10 @@ pub async fn send_renewal_reminders(
         .await?
     } else {
         sqlx::query_as(
-            "SELECT m.id, u.name, u.mobile, u.email, m.end_date, m.reminder_sent
+            "SELECT m.id, u.name, u.mobile, u.email, m.end_date
              FROM memberships m JOIN users u ON u.id = m.user_id
              WHERE m.status = 'ACTIVE'
-               AND m.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
-               AND m.reminder_sent = false",
+               AND m.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'",
         )
         .fetch_all(&state.db)
         .await?
@@ -827,28 +1170,17 @@ pub async fn send_renewal_reminders(
     let mut count = 0i64;
     let today = chrono::Local::now().date_naive();
 
-    for (mid, name, mobile, email, end_date, _) in &rows {
-        let days_left = (*end_date - today).num_days();
-        if user_ids.is_some() || days_left == 7 || days_left == 3 {
-            let s = state.clone();
-            let n = name.clone();
-            let m = mobile.clone();
-            let e = email.clone();
-            let ed = *end_date;
-            let dl = days_left;
-            tokio::spawn(async move {
-                notification::send_renewal_reminder(&s, &n, m.as_deref(), e.as_deref(), dl, ed).await;
-            });
-
-            if user_ids.is_none() {
-                sqlx::query("UPDATE memberships SET reminder_sent = true WHERE id = $1")
-                    .bind(mid)
-                    .execute(&state.db)
-                    .await
-                    .ok();
-            }
-            count += 1;
-        }
+    for (_mid, name, mobile, email, end_date) in &rows {
+        let days_left = (*end_date - today).num_days().max(0);
+        let s = state.clone();
+        let n = name.clone();
+        let m = mobile.clone();
+        let e = email.clone();
+        let ed = *end_date;
+        tokio::spawn(async move {
+            notification::send_renewal_reminder(&s, &n, m.as_deref(), e.as_deref(), days_left, ed).await;
+        });
+        count += 1;
     }
 
     if count > 0 {
@@ -1044,10 +1376,21 @@ pub async fn broadcast(
     state: &Arc<AppState>,
     message: &str,
 ) -> crate::error::Result<BroadcastMessage> {
+    // Matches Java's `findStudentsWithActiveMemberships` exactly: STUDENT role,
+    // a mobile on file, and an EXISTS check (not a JOIN) so a student is
+    // never targeted twice even if they somehow hold more than one ACTIVE
+    // membership row. `end_date >= CURRENT_DATE` additionally excludes a
+    // membership that's ACTIVE in name only because today's grace-transition
+    // cron hasn't run yet.
     let users: Vec<(Option<String>, Option<String>)> = sqlx::query_as(
         "SELECT u.mobile, u.email FROM users u
-         JOIN memberships m ON m.user_id = u.id
-         WHERE m.status = 'ACTIVE' AND u.is_active = true",
+         WHERE u.role = 'STUDENT'
+           AND u.mobile IS NOT NULL
+           AND EXISTS (
+               SELECT 1 FROM memberships m
+               WHERE m.user_id = u.id AND m.status = 'ACTIVE' AND m.end_date >= CURRENT_DATE
+           )
+         ORDER BY u.name",
     )
     .fetch_all(&state.db)
     .await?;
@@ -1055,7 +1398,7 @@ pub async fn broadcast(
     let recipient_count = users.iter().filter(|(m, _)| m.is_some()).count() as i32;
 
     let bcast = sqlx::query_as::<_, BroadcastMessage>(
-        "INSERT INTO broadcast_messages (id, message, recipient_count) VALUES (gen_random_uuid(), $1, $2) RETURNING *",
+        "INSERT INTO broadcast_messages (id, message, recipient_count, sent_at) VALUES (gen_random_uuid(), $1, $2, NOW()) RETURNING *",
     )
     .bind(message)
     .bind(recipient_count)
@@ -1075,7 +1418,7 @@ pub async fn get_broadcast_history(
     state: &Arc<AppState>,
 ) -> crate::error::Result<Vec<BroadcastMessage>> {
     sqlx::query_as::<_, BroadcastMessage>(
-        "SELECT * FROM broadcast_messages ORDER BY sent_at DESC",
+        "SELECT * FROM broadcast_messages ORDER BY sent_at DESC LIMIT 5",
     )
     .fetch_all(&state.db)
     .await
@@ -1285,6 +1628,12 @@ pub async fn change_membership_seat(
     .await?
     .ok_or_else(|| AppError::NotFound("Membership not found".into()))?;
 
+    if membership.status != "ACTIVE" {
+        return Err(AppError::BadRequest(
+            "Seat can only be changed for an ACTIVE membership".into(),
+        ));
+    }
+
     let new_seat = sqlx::query_as::<_, crate::models::seat::Seat>(
         "SELECT * FROM seats WHERE seat_number = $1 AND is_active = true",
     )
@@ -1373,6 +1722,12 @@ pub async fn update_membership_plan(
     membership_id: Uuid,
     req: &UpdatePlanRequest,
 ) -> crate::error::Result<Membership> {
+    let before = sqlx::query_as::<_, Membership>("SELECT * FROM memberships WHERE id = $1")
+        .bind(membership_id)
+        .fetch_one(&state.db)
+        .await
+        .map_err(AppError::Database)?;
+
     if let Some(new_plan_id) = req.plan_id {
         sqlx::query("UPDATE memberships SET plan_id = $2 WHERE id = $1")
             .bind(membership_id)
@@ -1412,11 +1767,27 @@ pub async fn update_membership_plan(
         .await?;
     }
 
-    sqlx::query_as::<_, Membership>("SELECT * FROM memberships WHERE id = $1")
+    let after = sqlx::query_as::<_, Membership>("SELECT * FROM memberships WHERE id = $1")
         .bind(membership_id)
         .fetch_one(&state.db)
         .await
-        .map_err(AppError::Database)
+        .map_err(AppError::Database)?;
+
+    // Busting the cache is what keeps the seat map from showing stale
+    // occupancy after an admin extends/shortens a booking here — same pattern
+    // as change_membership_seat/clear_dues just above and below.
+    // `memberships.end_date` is always a real, finite date — even while
+    // GRACE (it's `seat_bookings.end_date` that carries the far-future
+    // sentinel) — so no capping is needed here.
+    if after.end_date != before.end_date {
+        if let Some(ref shift) = after.shift {
+            let from = before.end_date.min(after.end_date);
+            let to = before.end_date.max(after.end_date);
+            crate::services::seat::invalidate_seat_cache(state, shift, from, to).await;
+        }
+    }
+
+    Ok(after)
 }
 
 // ── Grace / dues admin actions ───────────────────────────────────────────────
@@ -1456,12 +1827,16 @@ pub async fn release_seat(
         .unwrap_or_else(|| "Unknown".to_string());
 
     for b in &bookings {
-        // Bounded invalidation only — a GRACE booking's end_date may be the
-        // far-future sentinel, which would hang the day-by-day cache-busting
-        // loop, so cap it at "today" instead of trusting the stored value.
+        // A released seat becomes bookable again for upcoming dates, so the
+        // invalidation must look forward, not just at/before today — matches
+        // Java's `releaseSeat` (`today` .. `today + 14 days`). A GRACE
+        // booking's end_date may be the far-future sentinel, which would hang
+        // the day-by-day cache-busting loop if ever used as the upper bound,
+        // so the window here is hardcoded rather than derived from it.
         let today = chrono::Local::now().date_naive();
-        let capped_end = b.end_date.min(today);
-        crate::services::seat::invalidate_seat_cache(state, &b.shift, b.booking_date.min(capped_end), capped_end).await;
+        let from = b.booking_date.min(today);
+        let to = today + chrono::Duration::days(14);
+        crate::services::seat::invalidate_seat_cache(state, &b.shift, from, to).await;
 
         let s = state.clone();
         let uname = user_name.clone();
@@ -1536,10 +1911,23 @@ pub async fn mark_membership_pending(
         .await?
         .ok_or_else(|| AppError::NotFound("Membership not found".into()))?;
 
+    if membership.status != "ACTIVE" {
+        return Err(AppError::BadRequest(
+            "Only an ACTIVE membership can be marked Pending".into(),
+        ));
+    }
+
     let plan = sqlx::query_as::<_, MembershipPlan>("SELECT * FROM membership_plans WHERE id = $1")
         .bind(membership.plan_id)
         .fetch_one(&state.db)
         .await?;
+
+    if pending_amount > plan.price {
+        return Err(AppError::BadRequest(format!(
+            "Pending amount (₹{pending_amount}) cannot exceed the plan price (₹{})",
+            plan.price
+        )));
+    }
 
     let latest_gateway: Option<String> = sqlx::query_scalar(
         "DELETE FROM payments WHERE id = (
@@ -1578,6 +1966,12 @@ pub async fn mark_membership_grace(state: &Arc<AppState>, membership_id: Uuid) -
         .fetch_optional(&state.db)
         .await?
         .ok_or_else(|| AppError::NotFound("Membership not found".into()))?;
+
+    if membership.status != "ACTIVE" {
+        return Err(AppError::BadRequest(
+            "Only an ACTIVE membership can be marked Grace".into(),
+        ));
+    }
 
     let plan = sqlx::query_as::<_, MembershipPlan>("SELECT * FROM membership_plans WHERE id = $1")
         .bind(membership.plan_id)
@@ -1627,8 +2021,10 @@ pub async fn mark_membership_grace(state: &Arc<AppState>, membership_id: Uuid) -
     .await?;
 
     if let Some(ref shift) = membership.shift {
-        // Bounded invalidation — never the sentinel as an upper bound.
-        crate::services::seat::invalidate_seat_cache(state, shift, today, today).await;
+        // Bounded (never the far-future sentinel as an upper bound) but wide
+        // enough forward to actually cover the held-indefinitely seat map —
+        // matches Java's markMembershipGrace (`today` .. `today + 60 days`).
+        crate::services::seat::invalidate_seat_cache(state, shift, today, today + chrono::Duration::days(60)).await;
     }
 
     Ok(())
@@ -1757,11 +2153,51 @@ pub async fn get_all_feedback(
     .map_err(AppError::Database)
 }
 
+/// Feedback progresses OPEN → UNDER_REVIEW → RESOLVED and never backward —
+/// mirrors Java's `FeedbackAdminService.validateStatusTransition`.
+fn validate_feedback_status_transition(current: &str, next: &str) -> crate::error::Result<()> {
+    let valid = match current {
+        "OPEN" => true,
+        "UNDER_REVIEW" => matches!(next, "UNDER_REVIEW" | "RESOLVED"),
+        "RESOLVED" => next == "RESOLVED",
+        _ => false,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(AppError::BadRequest(format!(
+            "Invalid status transition: {current} → {next}"
+        )))
+    }
+}
+
 pub async fn update_feedback(
     state: &Arc<AppState>,
     feedback_id: Uuid,
     req: &UpdateFeedbackRequest,
 ) -> crate::error::Result<crate::models::user::Feedback> {
+    let normalized_status = match req.status.as_deref().map(str::trim) {
+        Some(s) if !s.is_empty() => {
+            let upper = s.to_uppercase();
+            if !matches!(upper.as_str(), "OPEN" | "UNDER_REVIEW" | "RESOLVED") {
+                return Err(AppError::BadRequest(
+                    "Invalid status. Must be OPEN, UNDER_REVIEW, or RESOLVED".into(),
+                ));
+            }
+            Some(upper)
+        }
+        _ => None,
+    };
+
+    if let Some(ref next) = normalized_status {
+        let current: String = sqlx::query_scalar("SELECT status FROM feedbacks WHERE id = $1")
+            .bind(feedback_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Feedback not found".into()))?;
+        validate_feedback_status_transition(&current, next)?;
+    }
+
     sqlx::query_as::<_, crate::models::user::Feedback>(
         "UPDATE feedbacks SET
             status     = COALESCE($2, status),
@@ -1770,8 +2206,8 @@ pub async fn update_feedback(
          WHERE id = $1 RETURNING *",
     )
     .bind(feedback_id)
-    .bind(&req.status)
-    .bind(&req.admin_notes)
+    .bind(normalized_status)
+    .bind(req.admin_notes.as_deref().map(str::trim))
     .fetch_one(&state.db)
     .await
     .map_err(AppError::Database)
@@ -1781,12 +2217,9 @@ pub async fn update_feedback(
 
 pub async fn get_revenue(
     state: &Arc<AppState>,
-    from: Option<NaiveDate>,
-    to: Option<NaiveDate>,
+    from: NaiveDate,
+    to: NaiveDate,
 ) -> crate::error::Result<RevenueReport> {
-    let from = from.unwrap_or_else(|| chrono::Local::now().date_naive() - chrono::Duration::days(30));
-    let to = to.unwrap_or_else(|| chrono::Local::now().date_naive());
-
     let total: Option<Decimal> = sqlx::query_scalar(
         "SELECT SUM(amount) FROM payments WHERE status = 'SUCCESS'
          AND DATE(created_at) BETWEEN $1 AND $2",
@@ -1853,12 +2286,9 @@ pub async fn get_revenue(
 
 pub async fn get_payment_breakdown(
     state: &Arc<AppState>,
-    from: Option<NaiveDate>,
-    to: Option<NaiveDate>,
+    from: NaiveDate,
+    to: NaiveDate,
 ) -> crate::error::Result<Vec<PaymentBreakdownItem>> {
-    let from = from.unwrap_or_else(|| chrono::Local::now().date_naive() - chrono::Duration::days(30));
-    let to = to.unwrap_or_else(|| chrono::Local::now().date_naive());
-
     sqlx::query_as::<_, PaymentBreakdownItem>(
         "SELECT payment_gateway AS gateway, SUM(amount) AS amount, COUNT(*)::bigint AS count
          FROM payments WHERE status = 'SUCCESS'
@@ -1890,17 +2320,34 @@ pub async fn get_expenses(
         return Ok(None);
     };
 
-    let misc_items = sqlx::query_as::<_, MiscExpenseItem>(
+    let mut misc_items = sqlx::query_as::<_, MiscExpenseItem>(
         "SELECT * FROM misc_expense_items WHERE monthly_expense_id = $1 ORDER BY sort_order",
     )
     .bind(expense.id)
     .fetch_all(&state.db)
     .await?;
 
+    // Migration fallback: a record saved before the itemized-breakdown feature
+    // existed has a nonzero `miscellaneous` total but no misc_expense_items
+    // rows — synthesize a single "General" line so the breakdown isn't just
+    // empty. Matches Java's ExpenseService.toDto.
+    if misc_items.is_empty() && expense.miscellaneous > Decimal::ZERO {
+        misc_items.push(MiscExpenseItem {
+            id: Uuid::nil(),
+            monthly_expense_id: expense.id,
+            description: "General".to_string(),
+            amount: expense.miscellaneous,
+            sort_order: None,
+        });
+    }
+
+    // Matches Java's toDto: water cost is price × qty, and the misc total
+    // comes only from `misc_items` (real breakdown or the synthesized legacy
+    // fallback above) — `expense.miscellaneous` is a denormalized cache of
+    // that same sum, not a separate line, so it must not also be added here.
     let total = expense.electricity_bill
         + expense.internet_bill
-        + expense.water_tanker_price
-        + expense.miscellaneous
+        + expense.water_tanker_price * Decimal::from(expense.water_tanker_qty)
         + misc_items.iter().map(|i| i.amount).sum::<Decimal>();
 
     Ok(Some(MonthlyExpenseWithItems { expense, misc_items, total }))
@@ -1946,8 +2393,8 @@ pub async fn save_expense(
     if let Some(ref req_items) = req.misc_items {
         for (i, item) in req_items.iter().enumerate() {
             let inserted = sqlx::query_as::<_, MiscExpenseItem>(
-                "INSERT INTO misc_expense_items (monthly_expense_id, description, amount, sort_order)
-                 VALUES ($1, $2, $3, $4) RETURNING *",
+                "INSERT INTO misc_expense_items (id, monthly_expense_id, description, amount, sort_order)
+                 VALUES (gen_random_uuid(), $1, $2, $3, $4) RETURNING *",
             )
             .bind(expense.id)
             .bind(&item.description)
@@ -1961,8 +2408,7 @@ pub async fn save_expense(
 
     let total = expense.electricity_bill
         + expense.internet_bill
-        + expense.water_tanker_price
-        + expense.miscellaneous
+        + expense.water_tanker_price * Decimal::from(expense.water_tanker_qty)
         + misc_items.iter().map(|i| i.amount).sum::<Decimal>();
 
     Ok(MonthlyExpenseWithItems { expense, misc_items, total })
@@ -2058,7 +2504,11 @@ pub async fn mark_expired_and_start_grace(state: &Arc<AppState>) -> crate::error
             .await?;
 
         if let Some(shift) = shift {
-            crate::services::seat::invalidate_seat_cache(state, shift, today, today).await;
+            // Matches Java's ExpiryReminderScheduler.markExpiredAndStartGrace
+            // (`today` .. `today + 14 days`) — the seat is now held
+            // indefinitely, so nearby upcoming dates need busting too, not
+            // just today.
+            crate::services::seat::invalidate_seat_cache(state, shift, today, today + chrono::Duration::days(14)).await;
         }
 
         graced += 1;
@@ -2095,4 +2545,111 @@ You have {grace_days} day(s) grace period to clear your dues before your seat is
 
     tracing::info!("grace_transition: {graced} membership(s) moved to GRACE out of {} overdue", overdue.len());
     Ok(graced)
+}
+
+#[cfg(test)]
+mod import_tests {
+    use super::*;
+
+    #[test]
+    fn normalize_seat_number_strips_leading_zeros_after_letters() {
+        assert_eq!(normalize_seat_number("A007"), "A7");
+        assert_eq!(normalize_seat_number("b-14"), "B14");
+        assert_eq!(normalize_seat_number(" c 3 "), "C3");
+        assert_eq!(normalize_seat_number("D26"), "D26");
+    }
+
+    #[test]
+    fn parse_import_fees_strips_non_numeric_characters() {
+        assert_eq!(parse_import_fees("Rs 400.00"), Decimal::new(40000, 2));
+        assert_eq!(parse_import_fees("400"), Decimal::new(400, 0));
+        assert_eq!(parse_import_fees(""), Decimal::ZERO);
+        assert_eq!(parse_import_fees("₹1,200"), Decimal::new(1200, 0));
+    }
+
+    #[test]
+    fn translate_java_date_pattern_maps_common_tokens() {
+        assert_eq!(translate_java_date_pattern("dd/MM/yyyy"), "%d/%m/%Y");
+        assert_eq!(translate_java_date_pattern("M-d-yyyy"), "%m-%d-%Y");
+        assert_eq!(translate_java_date_pattern("yy/MM/dd"), "%y/%m/%d");
+    }
+
+    #[test]
+    fn extract_date_format_hint_reads_parenthesized_pattern() {
+        assert_eq!(
+            extract_date_format_hint("Date (dd/MM/yyyy)").as_deref(),
+            Some("%d/%m/%Y")
+        );
+        assert_eq!(extract_date_format_hint("Join Date"), None);
+    }
+
+    #[test]
+    fn parse_import_date_falls_back_across_formats() {
+        assert_eq!(
+            parse_import_date("15/06/2026", None).unwrap(),
+            NaiveDate::from_ymd_opt(2026, 6, 15).unwrap()
+        );
+        assert_eq!(
+            parse_import_date("2026-06-15", None).unwrap(),
+            NaiveDate::from_ymd_opt(2026, 6, 15).unwrap()
+        );
+        assert_eq!(
+            parse_import_date("06-15-2026", None).unwrap(),
+            NaiveDate::from_ymd_opt(2026, 6, 15).unwrap()
+        );
+    }
+
+    #[test]
+    fn parse_import_date_blank_defaults_to_today() {
+        let today = chrono::Local::now().date_naive();
+        assert_eq!(parse_import_date("", None).unwrap(), today);
+    }
+
+    #[test]
+    fn parse_import_date_uses_header_hint_first() {
+        // "05/06/2026" is ambiguous (day/month or month/day); the hint must win.
+        let d = parse_import_date("05/06/2026", Some("%d/%m/%Y")).unwrap();
+        assert_eq!(d, NaiveDate::from_ymd_opt(2026, 6, 5).unwrap());
+    }
+
+    #[test]
+    fn parse_import_date_unparseable_is_an_error() {
+        assert!(parse_import_date("not-a-date", None).is_err());
+    }
+
+    #[test]
+    fn parse_csv_rows_splits_fixed_columns() {
+        let csv = "S.No,Name,Phone,Fees,Date,Seat\n1,Ravi Kumar,9876543210,400,15/06/2026,A7\n";
+        let rows = parse_csv_rows(csv.as_bytes()).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[1][1], "Ravi Kumar");
+        assert_eq!(rows[1][2], "9876543210");
+        assert_eq!(rows[1][5], "A7");
+    }
+}
+
+#[cfg(test)]
+mod feedback_status_tests {
+    use super::validate_feedback_status_transition;
+
+    #[test]
+    fn open_can_transition_to_any_status() {
+        assert!(validate_feedback_status_transition("OPEN", "OPEN").is_ok());
+        assert!(validate_feedback_status_transition("OPEN", "UNDER_REVIEW").is_ok());
+        assert!(validate_feedback_status_transition("OPEN", "RESOLVED").is_ok());
+    }
+
+    #[test]
+    fn under_review_can_stay_or_resolve_but_not_reopen() {
+        assert!(validate_feedback_status_transition("UNDER_REVIEW", "UNDER_REVIEW").is_ok());
+        assert!(validate_feedback_status_transition("UNDER_REVIEW", "RESOLVED").is_ok());
+        assert!(validate_feedback_status_transition("UNDER_REVIEW", "OPEN").is_err());
+    }
+
+    #[test]
+    fn resolved_is_terminal() {
+        assert!(validate_feedback_status_transition("RESOLVED", "RESOLVED").is_ok());
+        assert!(validate_feedback_status_transition("RESOLVED", "OPEN").is_err());
+        assert!(validate_feedback_status_transition("RESOLVED", "UNDER_REVIEW").is_err());
+    }
 }

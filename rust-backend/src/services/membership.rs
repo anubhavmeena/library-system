@@ -2,7 +2,7 @@ use crate::{
     app_state::AppState,
     error::AppError,
     models::membership::{
-        CreateOrderResponse, Membership, MembershipPlan, MembershipWithPlan, Payment,
+        CreateOrderResponse, Membership, MembershipPlan, MembershipWithPlan, Payment, PlanWithFee,
     },
     services::{ids, notification, payment, settings},
 };
@@ -13,13 +13,19 @@ use uuid::Uuid;
 
 pub async fn list_active_plans(
     state: &Arc<AppState>,
-) -> crate::error::Result<Vec<MembershipPlan>> {
-    sqlx::query_as::<_, MembershipPlan>(
+) -> crate::error::Result<Vec<PlanWithFee>> {
+    let plans = sqlx::query_as::<_, MembershipPlan>(
         "SELECT * FROM membership_plans WHERE is_active = true ORDER BY price",
     )
     .fetch_all(&state.db)
     .await
-    .map_err(AppError::Database)
+    .map_err(AppError::Database)?;
+
+    let convenience_fee = settings::get_app_settings(state).await?.convenience_fee;
+    Ok(plans
+        .into_iter()
+        .map(|plan| PlanWithFee { plan, convenience_fee })
+        .collect())
 }
 
 const MEMBERSHIP_WITH_PLAN_SELECT: &str = "
@@ -655,8 +661,10 @@ pub async fn get_payment_history(
     state: &Arc<AppState>,
     user_id: Uuid,
 ) -> crate::error::Result<Vec<Payment>> {
+    // ₹0 rows (e.g. a dues-correction placeholder) aren't real payments —
+    // nothing to show the student. Matches Java's getUserPayments filter.
     sqlx::query_as::<_, Payment>(
-        "SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC",
+        "SELECT * FROM payments WHERE user_id = $1 AND amount > 0 ORDER BY created_at DESC",
     )
     .bind(user_id)
     .fetch_all(&state.db)

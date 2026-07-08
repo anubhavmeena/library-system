@@ -120,6 +120,35 @@ pub async fn import_student(
     Ok(ApiResponse::success("Student imported", user))
 }
 
+pub async fn import_student_with_photo(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    mut multipart: axum::extract::Multipart,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let mut name: Option<String> = None;
+    let mut phone: Option<String> = None;
+    let mut photo: Option<(Option<String>, Vec<u8>)> = None;
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| AppError::BadRequest(e.to_string()))? {
+        match field.name().unwrap_or("") {
+            "name" => name = Some(field.text().await.map_err(|e| AppError::BadRequest(e.to_string()))?),
+            "phone" => phone = Some(field.text().await.map_err(|e| AppError::BadRequest(e.to_string()))?),
+            "photo" => {
+                let content_type = field.content_type().map(|s| s.to_string());
+                let data = field.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
+                photo = Some((content_type, data.to_vec()));
+            }
+            _ => {}
+        }
+    }
+
+    let name = name.ok_or_else(|| AppError::BadRequest("Name is required".into()))?;
+    let phone = phone.ok_or_else(|| AppError::BadRequest("Phone is required".into()))?;
+
+    let result = svc::import_student_with_photo(&state, &name, &phone, photo).await?;
+    Ok(ApiResponse::success("Student added successfully", result))
+}
+
 // ── Seat map ──────────────────────────────────────────────────────────────────
 
 pub async fn seat_map(
@@ -255,12 +284,23 @@ pub async fn update_feedback(
 
 // ── Revenue ───────────────────────────────────────────────────────────────────
 
+/// Java's revenue/breakdown/daily-payments endpoints declare `from`/`to`/`date`
+/// as required `@RequestParam String` — Spring 400s automatically if they're
+/// absent. Rust's `Query` extractor treats them as optional, so this restores
+/// the same required-param strictness instead of silently defaulting to a
+/// trailing-30-day (or "today") window the frontend never actually relies on.
+fn require_date(value: Option<chrono::NaiveDate>, field: &str) -> crate::error::Result<chrono::NaiveDate> {
+    value.ok_or_else(|| AppError::BadRequest(format!("Missing required parameter: {field}")))
+}
+
 pub async fn revenue_report(
     State(state): State<Arc<AppState>>,
     _admin: AdminUser,
     Query(q): Query<RevenueQuery>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    let report = svc::get_revenue(&state, q.from, q.to).await?;
+    let from = require_date(q.from, "from")?;
+    let to = require_date(q.to, "to")?;
+    let report = svc::get_revenue(&state, from, to).await?;
     Ok(ApiResponse::success("Revenue report", report))
 }
 
@@ -269,7 +309,9 @@ pub async fn payment_breakdown(
     _admin: AdminUser,
     Query(q): Query<RevenueQuery>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    let breakdown = svc::get_payment_breakdown(&state, q.from, q.to).await?;
+    let from = require_date(q.from, "from")?;
+    let to = require_date(q.to, "to")?;
+    let breakdown = svc::get_payment_breakdown(&state, from, to).await?;
     Ok(ApiResponse::success("Payment breakdown", breakdown))
 }
 
@@ -281,7 +323,7 @@ pub async fn daily_payments(
     let date_str = q.get("date").map(|s| s.as_str()).unwrap_or("");
     let date: chrono::NaiveDate = date_str
         .parse()
-        .unwrap_or_else(|_| chrono::Local::now().date_naive());
+        .map_err(|_| AppError::BadRequest("Missing required parameter: date".into()))?;
 
     let payments = sqlx::query_as::<_, DailyPaymentItem>(
         r#"SELECT u.name AS student_name,
@@ -321,8 +363,9 @@ pub async fn bulk_import(
     while let Some(field) = multipart.next_field().await.map_err(|e| AppError::BadRequest(e.to_string()))? {
         let name = field.name().unwrap_or("").to_string();
         if name != "file" { continue; }
+        let filename = field.file_name().unwrap_or("import.csv").to_string();
         let data = field.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
-        let result = svc::bulk_import_students(&state, &data).await?;
+        let result = svc::bulk_import_students(&state, &data, &filename).await?;
         return Ok(ApiResponse::success("Import complete", result));
     }
     Err(AppError::BadRequest("No file provided".into()))

@@ -45,7 +45,7 @@ pub struct GalleryPhoto {
     pub id: Uuid,
     pub url: String,
     pub caption: Option<String>,
-    pub uploaded_by: Option<Uuid>,
+    pub uploaded_by: Option<String>,
     pub uploaded_at: Option<NaiveDateTime>,
 }
 
@@ -109,6 +109,16 @@ pub struct ImportResult {
     pub imported: i32,
     pub skipped: i32,
     pub total_rows: i32,
+    pub errors: Vec<ImportRowError>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportRowError {
+    pub row: i32,
+    pub name: String,
+    pub phone: String,
+    pub reason: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
@@ -128,6 +138,7 @@ pub struct DashboardStats {
     pub active_memberships: i64,
     pub expired_memberships: i64,
     pub expiring_this_week: i64,
+    pub orphaned_seat_memberships: i64,
     pub total_seats: i64,
     pub occupied_seats: i64,
     pub available_seats: i64,
@@ -384,6 +395,15 @@ pub struct ImportStudentRequest {
     pub address: Option<String>,
     pub gender: Option<String>,
     pub date_of_birth: Option<NaiveDate>,
+}
+
+/// Response for `POST /api/admin/students/import/single-with-photo` — mirrors
+/// Java's `ManualImportWithPhotoResponse`.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportWithPhotoResponse {
+    pub message: String,
+    pub photo_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

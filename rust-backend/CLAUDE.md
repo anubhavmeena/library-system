@@ -95,8 +95,8 @@ Seat bookings use `(seat_id, shift, booking_date)` as a unique key — one recor
 ### Scheduled jobs
 
 Two daily `tokio-cron-scheduler` jobs, registered in `main.rs::start_scheduler`:
-- **09:00** — `run_expiry_reminder_job` → `send_renewal_reminders`: WhatsApp/email reminders for memberships expiring in ≤ 7 days.
-- **10:00** — `run_mark_expired_job` → `mark_expired_and_start_grace`: for every `ACTIVE` membership whose `end_date` has passed, either activates a queued renewal (happy path) or transitions the membership to `GRACE` with `dues_amount` set and the seat held via the far-future sentinel. Also reachable on demand via `POST /api/admin/memberships/run-expiry-check` (backs the admin "Cron Jobs" page).
+- **09:00 UTC** — `run_expiry_reminder_job` → `send_renewal_reminders`: WhatsApp/email reminders for memberships expiring in ≤ 7 days. Uses the scheduler's default UTC timezone deliberately — matches Java's `sendExpiryReminders`, which runs in the JVM-default (container) timezone, itself UTC.
+- **05:00 IST** (`Asia/Kolkata`, fixed `+05:30` offset via `Job::new_async_tz` — India has no DST) — `run_mark_expired_job` → `mark_expired_and_start_grace`: for every `ACTIVE` membership whose `end_date` has passed, either activates a queued renewal (happy path) or transitions the membership to `GRACE` with `dues_amount` set and the seat held via the far-future sentinel. Matches Java's `markExpiredAndStartGrace`, which pins `zone = "Asia/Kolkata"` explicitly rather than trusting the container's default. Also reachable on demand via `POST /api/admin/memberships/run-expiry-check` (backs the admin "Cron Jobs" page).
 
 ### Membership grace/dues workflow
 

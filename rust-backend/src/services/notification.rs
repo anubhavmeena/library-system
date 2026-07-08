@@ -44,18 +44,19 @@ fn format_shift(shift: &str) -> &'static str {
 }
 
 pub async fn send_booking_confirmed(state: &Arc<AppState>, info: &BookingInfo) {
+    let settings = settings::setting_for(state, "BOOKING_CONFIRMED").await;
     let name = if info.user_name.is_empty() { "Student" } else { &info.user_name };
     let shift_label = format_shift(&info.shift);
     let seat = info.seat_number.as_deref().unwrap_or("N/A");
 
-    let whatsapp_msg = format!(
+    let whatsapp_msg = settings::apply_hindi(&format!(
         "Booking Confirmed! Hi {}, Target Zone Library - Membership Details: \
 Plan: {} | Seat: {} | Shift: {} | From: {} | To: {} | Paid: Rs.{:.0}. \
 Please carry a valid ID on your first visit. Happy studying! - Target Zone Library",
         name, info.plan_name, seat, shift_label, info.start_date, info.end_date, info.amount_paid
-    );
+    ), &settings, true);
 
-    let email_body = format!(
+    let email_body = settings::apply_hindi(&format!(
         "Dear {},\n\nYour library membership has been confirmed!\n\n\
 MEMBERSHIP DETAILS\n\
 ------------------\n\
@@ -73,28 +74,32 @@ Best regards,\n\
 Target Zone Library Team\n\
 https://targetzone.co.in",
         name, info.plan_name, seat, shift_label, info.start_date, info.end_date, info.amount_paid
-    );
+    ), &settings, true);
 
-    if let Some(ref mobile) = info.user_mobile {
-        send_whatsapp(state, mobile, &whatsapp_msg).await;
-    }
-    if let Some(ref email) = info.user_email {
-        send_email(state, email, "Your Library Seat is Confirmed!", &email_body).await;
+    if settings.send_to_student {
+        if let Some(ref mobile) = info.user_mobile {
+            send_whatsapp(state, mobile, &whatsapp_msg).await;
+        }
+        if let Some(ref email) = info.user_email {
+            send_email(state, email, "Your Library Seat is Confirmed!", &email_body).await;
+        }
     }
 
-    let admin_msg = format!(
+    let admin_msg = settings::apply_hindi(&format!(
         "New Booking! Student: {} | Seat: {} | Plan: {} | Shift: {} | Amount: Rs.{:.0}",
         name, seat, info.plan_name, shift_label, info.amount_paid
-    );
-    if !state.config.admin_whatsapp.is_empty() {
-        send_whatsapp(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
+    ), &settings, false);
+    if settings.send_to_admin {
+        if !state.config.admin_whatsapp.is_empty() {
+            send_whatsapp(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
+        }
+        send_email(
+            state,
+            &state.config.admin_email.clone(),
+            &format!("New Booking - {} | Seat {}", name, seat),
+            &admin_msg,
+        ).await;
     }
-    send_email(
-        state,
-        &state.config.admin_email.clone(),
-        &format!("New Booking - {} | Seat {}", name, seat),
-        &admin_msg,
-    ).await;
 
     // Best-effort — a rendering/upload/Meta-template failure here must never
     // affect the plain-text booking confirmation the student already got above.
@@ -370,27 +375,32 @@ fn sanitize_param(param: &str) -> String {
 }
 
 pub async fn send_welcome(state: &Arc<AppState>, name: &str, mobile: Option<&str>, email: Option<&str>) {
-    let msg = format!(
+    let settings = settings::setting_for(state, "USER_REGISTERED").await;
+    let msg = settings::apply_hindi(&format!(
         "👋 Welcome to Target Zone, {}!\nYour account has been created. Start your study journey today!",
         name
-    );
-    if let Some(m) = mobile {
-        send_whatsapp(state, m, &msg).await;
-    }
-    if let Some(e) = email {
-        send_email(state, e, "Welcome to Target Zone", &msg).await;
+    ), &settings, true);
+    if settings.send_to_student {
+        if let Some(m) = mobile {
+            send_whatsapp(state, m, &msg).await;
+        }
+        if let Some(e) = email {
+            send_email(state, e, "Welcome to Target Zone", &msg).await;
+        }
     }
 
-    let admin_msg = format!(
+    let admin_msg = settings::apply_hindi(&format!(
         "🆕 New Student Registered!\nName: {}\nMobile: {}\nEmail: {}",
         name,
         mobile.unwrap_or("N/A"),
         email.unwrap_or("N/A"),
-    );
-    if !state.config.admin_whatsapp.is_empty() {
-        send_whatsapp(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
+    ), &settings, false);
+    if settings.send_to_admin {
+        if !state.config.admin_whatsapp.is_empty() {
+            send_whatsapp(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
+        }
+        send_email(state, &state.config.admin_email.clone(), &format!("New Registration — {name}"), &admin_msg).await;
     }
-    send_email(state, &state.config.admin_email.clone(), &format!("New Registration — {name}"), &admin_msg).await;
 }
 
 pub async fn send_seat_assistance(
@@ -416,16 +426,19 @@ pub async fn send_renewal_reminder(
     days_left: i64,
     end_date: NaiveDate,
 ) {
+    let settings = settings::setting_for(state, "RENEWAL_REMINDER").await;
     let urgency = if days_left <= 3 { "⚠️ URGENT" } else { "⏰ Reminder" };
-    let msg = format!(
+    let msg = settings::apply_hindi(&format!(
         "{} — Hi {}! Your library membership expires on {}. Only {} day(s) left. Please renew to keep your seat.",
         urgency, name, end_date, days_left
-    );
-    if let Some(m) = mobile {
-        send_whatsapp(state, m, &msg).await;
-    }
-    if let Some(e) = email {
-        send_email(state, e, "Membership Renewal Reminder", &msg).await;
+    ), &settings, true);
+    if settings.send_to_student {
+        if let Some(m) = mobile {
+            send_whatsapp(state, m, &msg).await;
+        }
+        if let Some(e) = email {
+            send_email(state, e, "Membership Renewal Reminder", &msg).await;
+        }
     }
 }
 
@@ -459,14 +472,19 @@ pub async fn send_broadcast(
     recipients: &[(Option<String>, Option<String>)],
     message: &str,
 ) -> usize {
+    let settings = settings::setting_for(state, "ADMIN_BROADCAST").await;
+    let body = settings::apply_hindi(message, &settings, true);
+
     let mut count = 0;
-    for (mobile, email) in recipients {
-        if let Some(ref m) = mobile {
-            send_whatsapp(state, m, message).await;
-            count += 1;
-        }
-        if let Some(ref e) = email {
-            send_email(state, e, "Announcement from Target Zone", message).await;
+    if settings.send_to_student {
+        for (mobile, email) in recipients {
+            if let Some(ref m) = mobile {
+                send_whatsapp(state, m, &body).await;
+                count += 1;
+            }
+            if let Some(ref e) = email {
+                send_email(state, e, "Announcement from Target Zone", &body).await;
+            }
         }
     }
 
