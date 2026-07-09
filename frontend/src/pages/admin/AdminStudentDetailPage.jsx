@@ -20,6 +20,7 @@ export default function AdminStudentDetailPage() {
     const { t } = useTranslation()
 
     const [student, setStudent] = useState(null)
+    const [showPhotoPreview, setShowPhotoPreview] = useState(false)
     const [loading, setLoading] = useState(true)
     const [editForm, setEditForm] = useState({})
     const [saving, setSaving]   = useState(false)
@@ -113,7 +114,9 @@ export default function AdminStudentDetailPage() {
             <div className="mb-6 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4 min-w-0">
                     {student.photoUrl
-                        ? <img src={student.photoUrl} alt={student.name} className="w-16 h-16 rounded-full object-cover flex-shrink-0" />
+                        ? <img src={student.photoUrl} alt={student.name}
+                               onClick={() => setShowPhotoPreview(true)}
+                               className="w-16 h-16 rounded-full object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" />
                         : <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-400 to-primary-600 flex items-center justify-center text-2xl font-bold text-white flex-shrink-0">
                             {student.name?.[0]?.toUpperCase()}
                         </div>
@@ -278,6 +281,27 @@ export default function AdminStudentDetailPage() {
                     </div>
                 )}
             </div>
+
+            {showPhotoPreview && student.photoUrl && (
+                <div
+                    className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+                    onClick={() => setShowPhotoPreview(false)}
+                >
+                    <div className="relative max-w-lg w-full" onClick={e => e.stopPropagation()}>
+                        <img
+                            src={student.photoUrl}
+                            alt={student.name}
+                            className="w-full max-h-[80vh] object-contain rounded-xl"
+                        />
+                        <button
+                            onClick={() => setShowPhotoPreview(false)}
+                            className="btn-outline px-4 py-2 text-sm mt-4 mx-auto block"
+                        >
+                            ✕ Close
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
