@@ -389,7 +389,16 @@ export default function AdminStudentsPage() {
                             </tr>
                             </thead>
                             <tbody className="divide-y divide-primary-700/20">
-                            {students.map(s => (
+                            {students.map(s => {
+                                const canRenew = s.membershipId && s.displayStatus === 'PAID'
+                                const canChangeSeat = s.membershipId && s.membershipStatus === 'ACTIVE'
+                                const canReleaseSeat = s.membershipId && (s.membershipStatus === 'ACTIVE' || s.membershipStatus === 'GRACE')
+                                const canClearDues = s.membershipId && s.membershipStatus === 'GRACE'
+                                const canClearFees = s.pendingAmount > 0
+                                const canChangeStatus = s.membershipId && s.membershipStatus === 'ACTIVE'
+                                const showSeatGroup = canRenew || canChangeSeat || canReleaseSeat
+                                const showBillingGroup = canClearDues || canClearFees
+                                return (
                                 <tr key={s.id} className="hover:bg-primary-800/30 transition-colors">
                                     <td className="p-4">
                                         <div className="flex items-center gap-3">
@@ -478,61 +487,68 @@ export default function AdminStudentsPage() {
                                                     Actions <span className="text-[10px]">▾</span>
                                                 </button>
                                                 {openDropdown === s.id && (
-                                                    <div className="absolute right-0 mt-1 w-36 bg-primary-800 border border-primary-700/60 rounded-xl shadow-xl z-20 overflow-hidden">
-                                                        {s.membershipId && s.displayStatus === 'PAID' && (
+                                                    <div className="absolute right-0 mt-1 w-40 bg-primary-800 border border-primary-700/60 rounded-xl shadow-xl z-20 overflow-hidden">
+                                                        {showSeatGroup && (
+                                                            <p className="text-[10px] uppercase tracking-wide text-primary-500 px-3 pt-2 pb-1">Seat</p>
+                                                        )}
+                                                        {canRenew && (
                                                             <button
                                                                 disabled={renewingSeat === s.id}
                                                                 onClick={() => { handleRenewSeat(s); setOpenDropdown(null) }}
-                                                                className="w-full text-left text-xs px-3 py-2.5 text-blue-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40 disabled:opacity-50">
+                                                                className="w-full text-left text-xs px-3 py-2.5 text-blue-400 hover:bg-primary-700/60 transition-colors disabled:opacity-50">
                                                                 {renewingSeat === s.id ? 'Renewing…' : 'Renew Seat'}
                                                             </button>
                                                         )}
-                                                        {s.membershipId && s.membershipStatus === 'ACTIVE' && (
+                                                        {canChangeSeat && (
                                                             <button
                                                                 onClick={() => { openChangeSeat(s); setOpenDropdown(null) }}
-                                                                className="w-full text-left text-xs px-3 py-2.5 text-indigo-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40">
+                                                                className="w-full text-left text-xs px-3 py-2.5 text-indigo-400 hover:bg-primary-700/60 transition-colors">
                                                                 {t('adminStudents.changeSeat')}
                                                             </button>
                                                         )}
-                                                        {s.membershipId && (s.membershipStatus === 'ACTIVE' || s.membershipStatus === 'GRACE') && (
+                                                        {canReleaseSeat && (
                                                             <button
                                                                 disabled={releasingSeat === s.id}
                                                                 onClick={() => { handleReleaseSeat(s); setOpenDropdown(null) }}
-                                                                className="w-full text-left text-xs px-3 py-2.5 text-red-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40 disabled:opacity-50">
+                                                                className="w-full text-left text-xs px-3 py-2.5 text-red-400 hover:bg-primary-700/60 transition-colors disabled:opacity-50">
                                                                 {releasingSeat === s.id ? 'Releasing…' : 'Release Seat'}
                                                             </button>
                                                         )}
-                                                        {s.membershipId && s.membershipStatus === 'GRACE' && (
+                                                        {showBillingGroup && (
+                                                            <p className={`text-[10px] uppercase tracking-wide text-primary-500 px-3 pt-2 pb-1 ${showSeatGroup ? 'border-t border-primary-700/40' : ''}`}>Billing</p>
+                                                        )}
+                                                        {canClearDues && (
                                                             <button
                                                                 disabled={clearingDues === s.id}
                                                                 onClick={() => { setClearDuesFor(s); setClearDuesAmountInput(String(s.duesAmount ?? 0)); setOpenDropdown(null) }}
-                                                                className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40 disabled:opacity-50">
+                                                                className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors disabled:opacity-50">
                                                                 {clearingDues === s.id ? 'Clearing…' : 'Clear Dues'}
                                                             </button>
                                                         )}
-                                                        {s.pendingAmount > 0 && (
+                                                        {canClearFees && (
                                                             <button
                                                                 disabled={clearingFees === s.id}
                                                                 onClick={() => { setClearFeesFor(s); setClearFeesAmountInput(String(s.pendingAmount ?? 0)); setOpenDropdown(null) }}
-                                                                className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40 disabled:opacity-50">
+                                                                className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors disabled:opacity-50">
                                                                 {clearingFees === s.id ? 'Clearing…' : 'Clear Pending Fees'}
                                                             </button>
                                                         )}
-                                                        {s.membershipId && s.membershipStatus === 'ACTIVE' && (
+                                                        <p className={`text-[10px] uppercase tracking-wide text-primary-500 px-3 pt-2 pb-1 ${showSeatGroup || showBillingGroup ? 'border-t border-primary-700/40' : ''}`}>Account</p>
+                                                        {canChangeStatus && (
                                                             <button
                                                                 onClick={() => { setChangeStatusFor(s); setChangeStatusTarget('PENDING'); setPendingAmountInput(''); setOpenDropdown(null) }}
-                                                                className="w-full text-left text-xs px-3 py-2.5 text-yellow-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40">
+                                                                className="w-full text-left text-xs px-3 py-2.5 text-yellow-400 hover:bg-primary-700/60 transition-colors">
                                                                 Change Status
                                                             </button>
                                                         )}
                                                         <button
                                                             onClick={() => { setMsgTarget(s); setOpenDropdown(null) }}
-                                                            className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors border-b border-primary-700/40">
+                                                            className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors">
                                                             Message
                                                         </button>
                                                         <button
                                                             onClick={() => { setDeleteTarget(s); setOpenDropdown(null) }}
-                                                            className="w-full text-left text-xs px-3 py-2.5 text-red-400 hover:bg-primary-700/60 transition-colors">
+                                                            className="w-full text-left text-xs px-3 py-2.5 text-red-400 hover:bg-primary-700/60 transition-colors border-t border-red-900/40 mt-1">
                                                             Delete
                                                         </button>
                                                     </div>
@@ -541,7 +557,8 @@ export default function AdminStudentsPage() {
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                                )
+                            })}
                             </tbody>
                         </table>
                     </div>
