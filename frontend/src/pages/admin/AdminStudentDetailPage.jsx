@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+import StudentActionsMenu from '../../components/admin/StudentActionsMenu'
 
 const STATUS_BADGE_CLASSES = {
     NEW:      'bg-blue-500/20 text-blue-400 border-blue-500/30',
@@ -15,6 +16,7 @@ const STATUS_BADGE_CLASSES = {
 
 export default function AdminStudentDetailPage() {
     const { userId } = useParams()
+    const navigate = useNavigate()
     const { t } = useTranslation()
 
     const [student, setStudent] = useState(null)
@@ -48,21 +50,25 @@ export default function AdminStudentDetailPage() {
 
     useEffect(() => { fetchStudent() }, [userId])
 
-    useEffect(() => {
+    const fetchPayments = () => {
         setPaymentsLoading(true)
         api.get(`/admin/students/${userId}/payments`)
             .then(r => setPayments(r.data.data || []))
             .catch(() => setPayments([]))
             .finally(() => setPaymentsLoading(false))
-    }, [userId])
+    }
 
-    useEffect(() => {
+    useEffect(fetchPayments, [userId])
+
+    const fetchSeatHistory = () => {
         setSeatHistoryLoading(true)
         api.get(`/admin/students/${userId}/seat-history`)
             .then(r => setSeatHistory(r.data.data || []))
             .catch(() => setSeatHistory([]))
             .finally(() => setSeatHistoryLoading(false))
-    }, [userId])
+    }
+
+    useEffect(fetchSeatHistory, [userId])
 
     const handleSave = async () => {
         setSaving(true)
@@ -104,23 +110,32 @@ export default function AdminStudentDetailPage() {
                 ← {t('adminStudentDetail.back')}
             </Link>
 
-            <div className="mb-6 flex items-center gap-4">
-                {student.photoUrl
-                    ? <img src={student.photoUrl} alt={student.name} className="w-16 h-16 rounded-full object-cover flex-shrink-0" />
-                    : <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-400 to-primary-600 flex items-center justify-center text-2xl font-bold text-white flex-shrink-0">
-                        {student.name?.[0]?.toUpperCase()}
+            <div className="mb-6 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 min-w-0">
+                    {student.photoUrl
+                        ? <img src={student.photoUrl} alt={student.name} className="w-16 h-16 rounded-full object-cover flex-shrink-0" />
+                        : <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-400 to-primary-600 flex items-center justify-center text-2xl font-bold text-white flex-shrink-0">
+                            {student.name?.[0]?.toUpperCase()}
+                        </div>
+                    }
+                    <div className="min-w-0">
+                        <h1 className="page-header truncate">{student.name}</h1>
+                        <div className="flex items-center gap-2 mt-1">
+                            <p className="text-primary-400">{student.mobile}</p>
+                            {student.displayStatus && (
+                                <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_BADGE_CLASSES[student.displayStatus] || 'bg-primary-700/30 text-primary-400 border-primary-700/40'}`}>
+                                    {t(`adminStudents.statusLabels.${student.displayStatus}`)}
+                                </span>
+                            )}
+                        </div>
                     </div>
-                }
-                <div className="min-w-0">
-                    <h1 className="page-header truncate">{student.name}</h1>
-                    <div className="flex items-center gap-2 mt-1">
-                        <p className="text-primary-400">{student.mobile}</p>
-                        {student.displayStatus && (
-                            <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_BADGE_CLASSES[student.displayStatus] || 'bg-primary-700/30 text-primary-400 border-primary-700/40'}`}>
-                                {t(`adminStudents.statusLabels.${student.displayStatus}`)}
-                            </span>
-                        )}
-                    </div>
+                </div>
+                <div className="flex-shrink-0">
+                    <StudentActionsMenu
+                        student={student}
+                        onMutated={() => { fetchStudent(); fetchSeatHistory(); fetchPayments() }}
+                        onDeleted={() => navigate('/admin/students')}
+                    />
                 </div>
             </div>
 
@@ -180,7 +195,7 @@ export default function AdminStudentDetailPage() {
                 </div>
             </div>
 
-            {/* Current membership summary (read-only — use the Actions dropdown on the Students list to change seat/plan/release) */}
+            {/* Current membership summary (read-only — use the Actions menu above to change seat/plan/release) */}
             <div className="card p-6 mb-6">
                 <h2 className="section-title text-lg mb-4">{t('adminStudentDetail.membershipTitle')}</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
