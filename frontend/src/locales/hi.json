@@ -512,7 +512,7 @@
     "title": "छात्र",
     "subtitle": "{{total}} में से {{count}} छात्र लोड हुए",
     "refresh": "रिफ्रेश",
-    "searchPlaceholder": "🔍 नाम, मोबाइल, ईमेल खोजें...",
+    "searchPlaceholder": "🔍 नाम, मोबाइल, ईमेल, सीट खोजें...",
     "filters": {
       "membershipLabel": "स्थिति:",
       "membershipAll": "सभी"

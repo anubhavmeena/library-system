@@ -516,7 +516,7 @@
     "title": "Students",
     "subtitle": "{{count}} students loaded of {{total}} students",
     "refresh": "Refresh",
-    "searchPlaceholder": "🔍 Search name, mobile, email...",
+    "searchPlaceholder": "🔍 Search name, mobile, email, seat...",
     "filters": {
       "membershipLabel": "Status:",
       "membershipAll": "All"

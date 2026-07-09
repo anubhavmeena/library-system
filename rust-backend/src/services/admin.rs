@@ -176,7 +176,9 @@ const STUDENT_SELECT: &str = "
 const STUDENT_COUNT_FROM: &str = "
     SELECT COUNT(*) FROM users u
     LEFT JOIN LATERAL (
-        SELECT status FROM memberships WHERE user_id = u.id AND status != 'PENDING'
+        -- SELECT * (not just status) so the seat-number search predicate below
+        -- can read m.seat_number/m.id, matching STUDENT_SELECT's `m` lateral.
+        SELECT * FROM memberships WHERE user_id = u.id AND status != 'PENDING'
         ORDER BY
             CASE WHEN status = 'GRACE' THEN 0 WHEN status = 'ACTIVE' THEN 1 ELSE 2 END,
             CASE WHEN status IN ('ACTIVE', 'GRACE') THEN end_date END DESC,
@@ -198,6 +200,16 @@ const STUDENT_COUNT_FROM: &str = "
         WHERE user_id = u.id AND status != 'PENDING'
         ORDER BY created_at DESC LIMIT 1
     ) le ON true";
+
+// Mirrors the `seat_number` projection in STUDENT_SELECT so seat-based search
+// matches exactly what the admin sees in the Seat & Shift column — only a
+// currently-held (ACTIVE/GRACE) seat is searchable, not a released one.
+const SEAT_NUMBER_EXPR: &str = "CASE WHEN m.status IN ('ACTIVE', 'GRACE') THEN COALESCE(m.seat_number, (
+        SELECT s.seat_number FROM seat_bookings sb
+        JOIN seats s ON s.id = sb.seat_id
+        WHERE sb.membership_id = m.id AND sb.status = 'ACTIVE'
+        LIMIT 1
+    )) END";
 
 pub async fn list_students(
     state: &Arc<AppState>,
@@ -246,21 +258,30 @@ pub async fn list_students(
     let filter = if extra.is_empty() { String::new() } else { format!("AND {}", extra.join(" AND ")) };
 
     if let Some(ref pat) = pattern {
+        // Seat search accepts "a1", "B15", "D-10", "d 10" etc — strip
+        // everything but letters/digits and uppercase before matching, since
+        // stored seat numbers are plain "A1".."D28" with no separators.
+        let raw = search.expect("pattern is Some only when search is Some");
+        let seat_cleaned: String = raw.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+        let seat_pat = format!("%{}%", seat_cleaned.to_uppercase());
+
         let sql = format!(
             "{STUDENT_SELECT} WHERE u.role = 'STUDENT' {filter}
-             AND (u.name ILIKE $3 OR u.mobile ILIKE $3 OR u.email ILIKE $3)
+             AND (u.name ILIKE $3 OR u.mobile ILIKE $3 OR u.email ILIKE $3
+                  OR UPPER(COALESCE({SEAT_NUMBER_EXPR}, '')) LIKE $4)
              ORDER BY {order_col} {order_dir} NULLS LAST LIMIT $1 OFFSET $2"
         );
         let mut users = sqlx::query_as::<_, StudentListItem>(&sql)
-            .bind(size).bind(offset).bind(pat)
+            .bind(size).bind(offset).bind(pat).bind(&seat_pat)
             .fetch_all(&state.db).await?;
 
         let count_sql = format!(
             "{STUDENT_COUNT_FROM} WHERE u.role = 'STUDENT' {filter}
-             AND (u.name ILIKE $1 OR u.mobile ILIKE $1 OR u.email ILIKE $1)"
+             AND (u.name ILIKE $1 OR u.mobile ILIKE $1 OR u.email ILIKE $1
+                  OR UPPER(COALESCE({SEAT_NUMBER_EXPR}, '')) LIKE $2)"
         );
         let total: i64 = sqlx::query_scalar(&count_sql)
-            .bind(pat).fetch_one(&state.db).await?;
+            .bind(pat).bind(&seat_pat).fetch_one(&state.db).await?;
 
         attach_display_status(state, &mut users).await;
         Ok((users, total))
