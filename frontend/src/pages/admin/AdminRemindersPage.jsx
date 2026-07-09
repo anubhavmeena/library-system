@@ -5,7 +5,15 @@ import api from '../../services/api'
 import toast from 'react-hot-toast'
 import { formatCurrency } from '../../utils/currency'
 
+const TABS = [
+    { key: 'renewal',    label: 'Renewal' },
+    { key: 'pendingFee', label: 'Pending Fee' },
+    { key: 'graceDues',  label: 'Grace Period Dues' },
+    { key: 'needsSeat',  label: 'Needs Seat' },
+]
+
 export default function AdminRemindersPage() {
+    const [activeTab, setActiveTab] = useState('renewal')
     const [students, setStudents] = useState([])
     const [loading, setLoading]   = useState(true)
     const [sending, setSending]   = useState(false)
@@ -130,15 +138,27 @@ export default function AdminRemindersPage() {
             : t('adminReminders.sendAll')
 
     return (
-        <div className="space-y-10">
+        <div>
+            <div className="mb-6">
+                <h1 className="page-header">{t('adminReminders.title')}</h1>
+                <p className="text-primary-400">{t('adminReminders.subtitle')}</p>
+            </div>
 
-            {/* ── Section 1: Renewal Reminders ── */}
+            <div className="flex flex-wrap gap-2 mb-8 border-b border-primary-700/30">
+                {TABS.map(tab => (
+                    <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all
+                                ${activeTab === tab.key
+                                    ? 'border-red-500 text-white'
+                                    : 'border-transparent text-primary-400 hover:text-white'}`}>
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* ── Renewal Reminders ── */}
+            {activeTab === 'renewal' && (
             <div>
-                <div className="mb-6">
-                    <h1 className="page-header">{t('adminReminders.title')}</h1>
-                    <p className="text-primary-400">{t('adminReminders.subtitle')}</p>
-                </div>
-
                 <div className="flex flex-wrap items-center gap-3 mb-6">
                     <div className="flex items-center gap-2">
                         <span className="text-primary-400 text-sm">{t('adminReminders.showWithin')}</span>
@@ -233,13 +253,12 @@ export default function AdminRemindersPage() {
                     </div>
                 )}
             </div>
+            )}
 
-            {/* ── Section 2: Pending Fee Reminders ── */}
+            {/* ── Pending Fee Reminders ── */}
+            {activeTab === 'pendingFee' && (
             <div>
-                <div className="mb-6">
-                    <h2 className="section-title">Pending Fee Reminders</h2>
-                    <p className="text-primary-400 text-sm mt-1">Students with outstanding cash fee balance</p>
-                </div>
+                <p className="text-primary-400 text-sm mb-6">Students with outstanding cash fee balance</p>
 
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
@@ -323,13 +342,12 @@ export default function AdminRemindersPage() {
                     </div>
                 )}
             </div>
+            )}
 
-            {/* ── Section 3: Grace Period Dues Reminders ── */}
+            {/* ── Grace Period Dues Reminders ── */}
+            {activeTab === 'graceDues' && (
             <div>
-                <div className="mb-6">
-                    <h2 className="section-title">Grace Period Dues Reminders</h2>
-                    <p className="text-primary-400 text-sm mt-1">Students in grace period who still owe dues to keep their seat</p>
-                </div>
+                <p className="text-primary-400 text-sm mb-6">Students in grace period who still owe dues to keep their seat</p>
 
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
@@ -419,16 +437,15 @@ export default function AdminRemindersPage() {
                     </div>
                 )}
             </div>
+            )}
 
-            {/* ── Section 4: Students Needing a Seat ── */}
+            {/* ── Students Needing a Seat ── */}
+            {activeTab === 'needsSeat' && (
             <div>
-                <div className="mb-6">
-                    <h2 className="section-title">Students Needing a Seat</h2>
-                    <p className="text-primary-400 text-sm mt-1">
-                        Paid, active memberships with no seat actually reserved — usually because the seat-reservation
-                        step failed right after payment. Assign a seat via the student's detail page.
-                    </p>
-                </div>
+                <p className="text-primary-400 text-sm mb-6">
+                    Paid, active memberships with no seat actually reserved — usually because the seat-reservation
+                    step failed right after payment. Assign a seat via the student's detail page.
+                </p>
 
                 <div className="flex items-center gap-2 mb-4">
                     <span className="text-sm text-primary-400">
@@ -492,6 +509,7 @@ export default function AdminRemindersPage() {
                     </div>
                 )}
             </div>
+            )}
         </div>
     )
 }
