@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { fetchMyMembership, fetchMyDisplayStatus, createPendingOrder, verifyPendingPayment } from '../../store/slices/membershipSlice'
-import { formatCurrency } from '../../utils/currency'
+import { formatCurrency, withConvenienceFee } from '../../utils/currency'
 import StatusBadge from '../../components/StatusBadge'
 
 function StatCard({ label, value, sub, color = 'amber' }) {
@@ -201,7 +201,7 @@ export default function DashboardPage() {
                         <span className="text-2xl">💳</span>
                         <div>
                             <p className="text-amber-400 font-semibold">{t('dashboard.pendingBanner.title')}</p>
-                            <p className="text-primary-400 text-sm">{t('dashboard.pendingBanner.desc', { amount: formatCurrency(membership.pendingAmount) })}</p>
+                            <p className="text-primary-400 text-sm">{t('dashboard.pendingBanner.desc', { amount: formatCurrency(withConvenienceFee(membership.pendingAmount)) })}</p>
                         </div>
                         <button onClick={handlePayPending} disabled={payingPending}
                                 className="ml-auto btn-primary text-sm px-4 py-2 whitespace-nowrap disabled:opacity-50">

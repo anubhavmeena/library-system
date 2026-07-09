@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { fetchMyMembership, fetchQueuedMembership, fetchPlans, fetchMyDisplayStatus, createPaymentOrder, verifyPayment, createDuesOrder, verifyDuesPayment } from '../../store/slices/membershipSlice'
 import api from '../../services/api'
-import { formatCurrency } from '../../utils/currency'
+import { formatCurrency, withConvenienceFee } from '../../utils/currency'
 
 function InfoRow({ label, value, highlight }) {
     return (
@@ -301,10 +301,10 @@ export default function MembershipPage() {
                             Your plan expired, but we're holding seat <span className="text-white font-mono">{membership.seatNumber}</span> for you.
                         </p>
                         <p className="text-red-400 font-semibold text-sm mb-4">
-                            Pay {formatCurrency(membership.duesAmount ?? membership.planPrice)} to continue your plan — your seat may be released by the library if it remains unpaid.
+                            Pay {formatCurrency(withConvenienceFee(membership.duesAmount ?? membership.planPrice))} (incl. 2.5% convenience fee) to continue your plan — your seat may be released by the library if it remains unpaid.
                         </p>
                         <button onClick={handlePayDues} disabled={payingDues} className="btn-primary text-sm px-6 py-2.5">
-                            {payingDues ? 'Processing...' : `Pay Fee Due (${formatCurrency(membership.duesAmount ?? membership.planPrice)})`}
+                            {payingDues ? 'Processing...' : `Pay Fee Due (${formatCurrency(withConvenienceFee(membership.duesAmount ?? membership.planPrice))})`}
                         </button>
                     </div>
                 </div>

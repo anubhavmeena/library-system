@@ -85,6 +85,16 @@ async fn sum_pending_amount(state: &Arc<AppState>, user_id: Uuid) -> crate::erro
     Ok(sum)
 }
 
+/// 2.5% surcharge for clearing dues/pending amount via the payment gateway,
+/// rounded to the nearest whole rupee (matches this app's whole-rupee pricing
+/// convention — see migrations/004_plan_price_whole_rupees.sql). Distinct from
+/// the flat, admin-configured `app_settings.convenience_fee` added to regular
+/// plan purchases — this one is a fixed percentage, specific to the self-serve
+/// dues/pending-amount checkouts.
+fn with_convenience_fee(amount: Decimal) -> Decimal {
+    (amount * Decimal::new(1025, 3)).round()
+}
+
 pub async fn get_active_membership(
     state: &Arc<AppState>,
     user_id: Uuid,
@@ -534,6 +544,7 @@ pub async fn create_dues_order(
     if dues <= Decimal::ZERO {
         return Err(AppError::BadRequest("No outstanding dues found".into()));
     }
+    let charge_amount = with_convenience_fee(dues);
 
     let user = sqlx::query_as::<_, crate::models::user::User>("SELECT * FROM users WHERE id = $1")
         .bind(user_id)
@@ -547,7 +558,7 @@ pub async fn create_dues_order(
         user.mobile.as_deref(),
         user.email.as_deref(),
         &user.name,
-        dues,
+        charge_amount,
     )
     .await?;
 
@@ -556,7 +567,7 @@ pub async fn create_dues_order(
     )
     .bind(membership.id)
     .bind(&order.order_id)
-    .bind(dues)
+    .bind(charge_amount)
     .execute(&state.db)
     .await?;
 
@@ -683,8 +694,8 @@ pub async fn verify_and_pay_dues(
 /// Pending-amount checkout — clears the sum of the user's outstanding
 /// payments.pending_amount rows (across every membership they've ever had),
 /// the same aggregate `admin::get_pending_fees`/`clear_pending_fees` use, so
-/// self-clearing here resolves the same total an admin would see. No
-/// convenience fee, same as dues.
+/// self-clearing here resolves the same total an admin would see (plus the
+/// gateway convenience fee, same as dues).
 pub async fn create_pending_order(
     state: &Arc<AppState>,
     user_id: Uuid,
@@ -707,6 +718,7 @@ pub async fn create_pending_order(
     // the in-flight gateway checkout; not necessarily the student's current
     // membership.
     let membership_id = rows[0].0;
+    let charge_amount = with_convenience_fee(total_pending);
 
     let user = sqlx::query_as::<_, crate::models::user::User>("SELECT * FROM users WHERE id = $1")
         .bind(user_id)
@@ -720,14 +732,14 @@ pub async fn create_pending_order(
         user.mobile.as_deref(),
         user.email.as_deref(),
         &user.name,
-        total_pending,
+        charge_amount,
     )
     .await?;
 
     sqlx::query("UPDATE memberships SET gateway_order_id = $2, checkout_amount = $3 WHERE id = $1")
         .bind(membership_id)
         .bind(&order.order_id)
-        .bind(total_pending)
+        .bind(charge_amount)
         .execute(&state.db)
         .await?;
 
@@ -769,11 +781,14 @@ pub async fn verify_and_pay_pending(
     .fetch_all(&state.db)
     .await?;
     let total_pending: Decimal = rows.iter().map(|(_, p)| *p).sum();
-    let amount_cleared = membership.checkout_amount.unwrap_or_default().min(total_pending);
-    if amount_cleared <= Decimal::ZERO {
+    let charge_amount = membership.checkout_amount.unwrap_or_default();
+    if total_pending <= Decimal::ZERO || charge_amount <= Decimal::ZERO {
         return Err(AppError::BadRequest("No outstanding pending amount found".into()));
     }
-    let remainder = total_pending - amount_cleared;
+    // This flow never does partial payments — the order was always created for
+    // the full then-current total_pending (plus fee), so a verified payment
+    // clears the whole outstanding balance, whatever it is right now.
+    let remainder = Decimal::ZERO;
 
     for (payment_row_id, _) in &rows {
         sqlx::query("UPDATE payments SET pending_amount = 0, updated_at = NOW() WHERE id = $1")
@@ -789,7 +804,7 @@ pub async fn verify_and_pay_pending(
     )
     .bind(membership_id)
     .bind(user_id)
-    .bind(amount_cleared)
+    .bind(charge_amount)
     .bind(remainder)
     .bind(&state.config.payment_gateway)
     .bind(order_id)
@@ -807,7 +822,7 @@ pub async fn verify_and_pay_pending(
     let pf_setting = settings::setting_for(state, "PENDING_FEE_CLEARED").await;
     if pf_setting.send_to_student {
         let msg = settings::apply_hindi(
-            &format!("Your pending library fee of Rs.{amount_cleared:.0} has been cleared. Thank you! - Target Zone Library Team"),
+            &format!("Your pending library fee of Rs.{charge_amount:.0} has been cleared. Thank you! - Target Zone Library Team"),
             &pf_setting, true,
         );
         notification::send_direct_message(state, user.mobile.as_deref(), user.email.as_deref(), &msg).await;
@@ -815,7 +830,7 @@ pub async fn verify_and_pay_pending(
     if pf_setting.send_to_admin {
         let seat = current.as_ref().and_then(|m| m.seat_number.as_deref()).unwrap_or("—");
         let admin_msg = format!(
-            "Pending Fee Cleared (self-service)\nStudent: {}\nSeat: {seat}\nAmount: Rs.{amount_cleared:.0}",
+            "Pending Fee Cleared (self-service)\nStudent: {}\nSeat: {seat}\nAmount: Rs.{charge_amount:.0}",
             user.name
         );
         if !state.config.admin_whatsapp.is_empty() {
@@ -831,7 +846,7 @@ pub async fn verify_and_pay_pending(
         user_mobile: user.mobile.clone(),
         user_email: user.email.clone(),
         invoice_id,
-        amount_paid: amount_cleared,
+        amount_paid: charge_amount,
         amount_pending: remainder,
         plan_name: current.as_ref().map(|m| m.plan_name.clone()).unwrap_or_default(),
         seat_number: current.as_ref().and_then(|m| m.seat_number.clone()),
@@ -894,6 +909,20 @@ mod tests {
 
     fn today() -> NaiveDate {
         chrono::Local::now().date_naive()
+    }
+
+    #[test]
+    fn convenience_fee_rounds_down_below_midpoint() {
+        // 80 * 1.025 = 82.00 exactly
+        assert_eq!(with_convenience_fee(Decimal::from(80)), Decimal::from(82));
+        // 50 * 1.025 = 51.25 -> rounds to 51
+        assert_eq!(with_convenience_fee(Decimal::from(50)), Decimal::from(51));
+    }
+
+    #[test]
+    fn convenience_fee_rounds_up_above_midpoint() {
+        // 33 * 1.025 = 33.825 -> rounds to 34
+        assert_eq!(with_convenience_fee(Decimal::from(33)), Decimal::from(34));
     }
 
     #[test]

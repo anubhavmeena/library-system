@@ -233,7 +233,7 @@
     },
     "pendingBanner": {
       "title": "You have a pending balance",
-      "desc": "Clear your pending amount of {{amount}} to stay fully paid up",
+      "desc": "Clear your pending amount of {{amount}} (incl. 2.5% convenience fee) to stay fully paid up",
       "cta": "Pay Now",
       "processing": "Processing...",
       "cleared": "Pending amount cleared — thank you!",
