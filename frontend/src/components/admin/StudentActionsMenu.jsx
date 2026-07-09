@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
@@ -388,7 +389,17 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
                 )}
             </div>
 
-            {changeSeatOpen && (
+            {/* Portaled to document.body: a `fixed inset-0` modal must always be
+                viewport-relative, but this component can be mounted anywhere,
+                including inside ancestors with backdrop-blur/transform (e.g. the
+                `.card` wrapping the Students list table) — such ancestors create
+                a new CSS containing block for `position: fixed`, silently
+                re-scoping "cover the viewport" to "cover that ancestor's box"
+                instead. Escaping via a portal sidesteps that regardless of
+                where this component ends up nested. */}
+            {createPortal(
+                <>
+                {changeSeatOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setChangeSeatOpen(false)}>
                     <div className="card p-6 w-full max-w-2xl border-indigo-900/30 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-4">
@@ -683,6 +694,9 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
                         </div>
                     </div>
                 </div>
+            )}
+                </>,
+                document.body
             )}
         </>
     )
