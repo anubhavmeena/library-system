@@ -417,7 +417,9 @@ export default function AdminStudentsPage() {
                                         <p className="text-primary-500 text-xs">{shiftLabel(s.shift)}</p>
                                     </td>
                                     <td className="p-4">
-                                        {s.membershipStatus === 'GRACE' ? (
+                                        {s.displayStatus === 'RELEASED' ? (
+                                            <span className="text-primary-600 text-xs">{t('adminStudents.noPlan')}</span>
+                                        ) : s.membershipStatus === 'GRACE' ? (
                                             <>
                                                 <p className="text-primary-300 text-xs">{t('adminStudents.expires')} {s.membershipEnd}</p>
                                                 <p className="text-xs font-semibold text-red-400">
@@ -431,9 +433,9 @@ export default function AdminStudentsPage() {
                                                     {t('adminStudents.daysLeft', { count: s.daysRemaining })}
                                                 </p>
                                             </>
-                                        ) : s.membershipStatus === 'EXPIRED'
-                                            ? <span className="text-red-400 text-xs font-semibold">{t('adminStudents.expired')}</span>
-                                            : <span className="text-primary-600 text-xs">{t('adminStudents.noPlan')}</span>}
+                                        ) : (
+                                            <span className="text-primary-600 text-xs">{t('adminStudents.noPlan')}</span>
+                                        )}
                                     </td>
                                     <td className="p-4">
                                         {s.paymentMode === 'CASH' ? (
