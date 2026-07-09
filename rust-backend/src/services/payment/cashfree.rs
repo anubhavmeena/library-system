@@ -27,8 +27,18 @@ pub async fn create_order(
 
     let url = format!("{}/pg/orders", state.config.cashfree_base_url);
 
+    // Cashfree requires the caller to supply a unique order_id and rejects a
+    // repeat with "order_already_exists" — unlike Razorpay, which mints its own
+    // fresh id server-side regardless of what reference we pass. Using the bare
+    // membership_id meant any retry for the same membership (an abandoned
+    // checkout, a dues/pending-amount payment attempted twice) reused the exact
+    // same order_id and got permanently rejected. Appending a fresh random
+    // suffix per attempt fixes this for all three flows that share this
+    // function (regular booking, dues, pending-amount) — order_id is just an
+    // opaque string end-to-end (stored on gateway_order_id, read back at
+    // verify time), so the format change needs no other code to change.
     let body = json!({
-        "order_id": membership_id.to_string(),
+        "order_id": format!("{membership_id}_{}", random_suffix()),
         "order_amount": amount,
         "order_currency": "INR",
         "customer_details": {
