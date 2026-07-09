@@ -22,8 +22,13 @@
 # Frontend:
 #   1. Builds the frontend locally (same t3.micro-memory reasoning as above —
 #      `vite build` directly on the server has also crashed it once)
-#   2. Backs up the server's old dist/, transfers a clean new one, syncs it
-#      into /var/www/library-frontend (served directly by Nginx — see
+#   2. Syncs dist/ to the server with `rsync --checksum` (not scp) — vite
+#      resets mtimes on every build even for byte-identical files, so a
+#      plain mtime-based sync would re-upload the whole (multi-MB) gallery
+#      every time; checksum comparison actually skips unchanged files while
+#      still catching genuinely new ones (content-hashed JS/CSS bundles).
+#      Backs up the live webroot (cheap hardlink copy) before syncing into
+#      /var/www/library-frontend (served directly by Nginx — see
 #      /etc/nginx/sites-enabled/targetzone.co.in), fixes ownership
 #   3. Verifies the live site is serving the freshly built JS bundle
 #
@@ -115,9 +120,13 @@ if (( DO_FRONTEND )); then
     BUNDLE=$(ls "$FRONTEND_DIR/dist/assets" | grep -E '^index-.*\.js$')
     log "Built $BUNDLE"
 
-    step "Frontend — transferring dist/ and syncing into $REMOTE_WEBROOT"
-    ssh_cmd "mv $REMOTE_REPO/frontend/dist $REMOTE_REPO/frontend/dist.bak.\$(date +%Y%m%d%H%M%S) 2>/dev/null || true"
-    scp -i "$SSH_KEY" -r "$FRONTEND_DIR/dist" "$SSH_HOST:$REMOTE_REPO/frontend/"
+    step "Frontend — syncing dist/ to the server (checksum-based, skips unchanged files like gallery photos)"
+    rsync -az --checksum --delete -e "ssh -i $SSH_KEY -o ConnectTimeout=15" \
+        "$FRONTEND_DIR/dist/" "$SSH_HOST:$REMOTE_REPO/frontend/dist/"
+    log "Synced dist/ to server."
+
+    step "Frontend — backing up live webroot and syncing into $REMOTE_WEBROOT"
+    ssh_cmd "sudo cp -al $REMOTE_WEBROOT ${REMOTE_WEBROOT}.bak.\$(date +%Y%m%d%H%M%S) 2>/dev/null || true"
     ssh_cmd "sudo rsync -a --delete $REMOTE_REPO/frontend/dist/ $REMOTE_WEBROOT/ && sudo chown -R www-data:www-data $REMOTE_WEBROOT"
     log "Synced into $REMOTE_WEBROOT."
 
