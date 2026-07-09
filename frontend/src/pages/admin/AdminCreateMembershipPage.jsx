@@ -221,7 +221,7 @@ export default function AdminCreateMembershipPage() {
                                 <button
                                     key={s.id}
                                     onClick={() => {
-                                        if (s.membershipStatus === 'EXPIRED') {
+                                        if (s.displayStatus === 'RELEASED') {
                                             setSelectedStudent(s)
                                             setBookingType(null)
                                         } else {
@@ -242,16 +242,16 @@ export default function AdminCreateMembershipPage() {
                                         <p className="text-primary-400 text-xs">{s.mobile || s.email || '—'}</p>
                                     </div>
                                     <span className={`text-xs px-2 py-1 rounded-full border flex-shrink-0
-                                        ${s.membershipEnd
-                                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                                            : s.membershipStatus === 'EXPIRED'
-                                                ? 'bg-red-500/20 text-red-400 border-red-500/30'
-                                                : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}>
-                                        {s.membershipEnd
-                                            ? t('adminNewMembership.hasMembership')
-                                            : s.membershipStatus === 'EXPIRED'
-                                                ? t('adminStudents.expired')
-                                                : t('adminNewMembership.noPlan')}
+                                        ${s.displayStatus === 'RELEASED'
+                                            ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                                            : s.displayStatus === 'NEW'
+                                                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                                : 'bg-amber-500/20 text-amber-400 border-amber-500/30'}`}>
+                                        {s.displayStatus === 'RELEASED'
+                                            ? t('adminStudents.statusLabels.RELEASED')
+                                            : s.displayStatus === 'NEW'
+                                                ? t('adminNewMembership.noPlan')
+                                                : t('adminNewMembership.hasMembership')}
                                     </span>
                                 </button>
                             ))}
@@ -259,11 +259,11 @@ export default function AdminCreateMembershipPage() {
                     )}
 
                     {/* Renewal / New Booking prompt */}
-                    {selectedStudent?.membershipStatus === 'EXPIRED' && bookingType === null && (
+                    {selectedStudent?.displayStatus === 'RELEASED' && bookingType === null && (
                         <div className="mt-4 p-5 rounded-xl border border-amber-500/30 bg-amber-500/5">
                             <p className="text-sm text-amber-300 font-medium mb-1">Previous membership found</p>
                             <p className="text-xs text-primary-400 mb-4">
-                                <span className="text-white">{selectedStudent.name}</span> had a membership that expired. How would you like to proceed?
+                                <span className="text-white">{selectedStudent.name}</span> had a membership that ended. How would you like to proceed?
                             </p>
                             <div className="flex gap-3">
                                 <button
