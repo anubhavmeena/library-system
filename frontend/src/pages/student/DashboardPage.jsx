@@ -35,9 +35,9 @@ export default function DashboardPage() {
     const STATUS_META = {
         PAID:     { color: 'emerald', sub: t('dashboard.stats.activeMembership') },
         PENDING:  { color: 'amber',   sub: t('dashboard.stats.duesPending') },
-        GRACE:    { color: 'amber',   sub: t('dashboard.stats.gracePeriod') },
-        EXPIRED:  { color: 'amber',   sub: t('dashboard.stats.membershipExpired') },
-        RELEASED: { color: 'amber',   sub: t('dashboard.stats.seatReleased') },
+        GRACE:         { color: 'amber',   sub: t('dashboard.stats.gracePeriod') },
+        GRACE_OVERDUE: { color: 'amber',   sub: t('dashboard.stats.membershipExpired') },
+        RELEASED:      { color: 'amber',   sub: t('dashboard.stats.seatReleased') },
         NEW:      { color: 'blue',    sub: t('dashboard.stats.getPlan') },
     }
     const statusMeta = STATUS_META[displayStatus] || { color: 'amber', sub: t('dashboard.stats.getPlan') }
@@ -111,7 +111,7 @@ export default function DashboardPage() {
                 </div>
             )}
 
-            {(displayStatus === 'GRACE' || displayStatus === 'EXPIRED') && (
+            {(displayStatus === 'GRACE' || displayStatus === 'GRACE_OVERDUE') && (
                 <div className="card p-5 mb-8 border-red-500/30 bg-red-500/10">
                     <div className="flex items-center gap-3">
                         <span className="text-2xl">🔒</span>

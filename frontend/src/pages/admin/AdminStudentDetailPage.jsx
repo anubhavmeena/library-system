@@ -8,9 +8,9 @@ const STATUS_BADGE_CLASSES = {
     NEW:      'bg-blue-500/20 text-blue-400 border-blue-500/30',
     PAID:     'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
     PENDING:  'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    GRACE:    'bg-orange-500/20 text-orange-400 border-orange-500/30',
-    EXPIRED:  'bg-red-500/20 text-red-400 border-red-500/30',
-    RELEASED: 'bg-red-950/70 text-red-300 border-red-900',
+    GRACE:         'bg-orange-500/20 text-orange-400 border-orange-500/30',
+    GRACE_OVERDUE: 'bg-red-500/20 text-red-400 border-red-500/30',
+    RELEASED:      'bg-red-950/70 text-red-300 border-red-900',
 }
 
 export default function AdminStudentDetailPage() {

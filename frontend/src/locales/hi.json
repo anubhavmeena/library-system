@@ -522,7 +522,7 @@
       "PAID": "भुगतान हुआ",
       "PENDING": "लंबित",
       "GRACE": "छूट अवधि",
-      "EXPIRED": "समाप्त",
+      "GRACE_OVERDUE": "समाप्त",
       "RELEASED": "रिलीज़ हुई"
     },
     "table": {

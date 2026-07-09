@@ -286,11 +286,11 @@ export default function MembershipPage() {
                 <div className="card p-6 mb-6 border-red-500/30 bg-gradient-to-br from-red-500/5 to-transparent">
                     <div className="flex items-start justify-between mb-4">
                         <div>
-                            <h2 className="section-title">{displayStatus === 'EXPIRED' ? 'Grace Period Expired' : 'Membership in Grace Period'}</h2>
+                            <h2 className="section-title">{displayStatus === 'GRACE_OVERDUE' ? 'Grace Period Expired' : 'Membership in Grace Period'}</h2>
                             <p className="text-primary-400 text-sm mt-1">{membership.planName}</p>
                         </div>
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border bg-red-500/20 text-red-400 border-red-500/30">
-                            <span className="w-1.5 h-1.5 rounded-full bg-current" /> {displayStatus === 'EXPIRED' ? 'EXPIRED' : 'GRACE'}
+                            <span className="w-1.5 h-1.5 rounded-full bg-current" /> {displayStatus === 'GRACE_OVERDUE' ? 'EXPIRED' : 'GRACE'}
                         </span>
                     </div>
                     <InfoRow label={t('membership.seatNumber')} value={membership.seatNumber} highlight />

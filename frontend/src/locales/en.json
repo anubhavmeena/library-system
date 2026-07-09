@@ -526,7 +526,7 @@
       "PAID": "Paid",
       "PENDING": "Pending",
       "GRACE": "Grace",
-      "EXPIRED": "Expired",
+      "GRACE_OVERDUE": "Expired",
       "RELEASED": "Released"
     },
     "table": {

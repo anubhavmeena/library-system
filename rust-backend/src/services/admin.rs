@@ -237,7 +237,7 @@ pub async fn list_students(
         Some("NEW") => extra.push("cur.status IS NULL AND (le.status IS NULL OR le.status NOT IN ('EXPIRED', 'CANCELLED'))".into()),
         Some("RELEASED") => extra.push("cur.status IS NULL AND le.status IN ('EXPIRED', 'CANCELLED')".into()),
         Some("GRACE") => extra.push(format!("cur.status = 'GRACE' AND (CURRENT_DATE - cur.end_date) <= {grace_days}")),
-        Some("EXPIRED") => extra.push(format!("cur.status = 'GRACE' AND (CURRENT_DATE - cur.end_date) > {grace_days}")),
+        Some("GRACE_OVERDUE") => extra.push(format!("cur.status = 'GRACE' AND (CURRENT_DATE - cur.end_date) > {grace_days}")),
         Some("PENDING") => extra.push("cur.status IS NOT NULL AND cur.status != 'GRACE' AND COALESCE(ps.pending_amount, 0) > 0".into()),
         Some("PAID") => extra.push("cur.status IS NOT NULL AND cur.status != 'GRACE' AND COALESCE(ps.pending_amount, 0) <= 0".into()),
         _ => {}

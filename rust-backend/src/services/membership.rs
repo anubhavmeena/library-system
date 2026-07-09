@@ -147,7 +147,7 @@ pub fn resolve_display_status(
         Some("GRACE") => {
             let today = chrono::Local::now().date_naive();
             let days_overdue = current_end_date.map(|d| (today - d).num_days()).unwrap_or(0);
-            if days_overdue > grace_days as i64 { "EXPIRED" } else { "GRACE" }
+            if days_overdue > grace_days as i64 { "GRACE_OVERDUE" } else { "GRACE" }
         }
         Some(_) => {
             if current_pending_amount.map(|p| p > Decimal::ZERO).unwrap_or(false) { "PENDING" } else { "PAID" }
@@ -718,18 +718,18 @@ mod tests {
     }
 
     #[test]
-    fn grace_past_threshold_becomes_expired() {
+    fn grace_past_threshold_becomes_overdue() {
         let end = today() - chrono::Duration::days(11);
         assert_eq!(
             resolve_display_status(Some("GRACE"), Some(end), None, None, 10),
-            "EXPIRED"
+            "GRACE_OVERDUE"
         );
     }
 
     #[test]
     fn grace_exactly_at_threshold_stays_grace() {
         // days_overdue > grace_days is the boundary — exactly grace_days
-        // overdue must still read GRACE, not EXPIRED.
+        // overdue must still read GRACE, not GRACE_OVERDUE.
         let end = today() - chrono::Duration::days(10);
         assert_eq!(
             resolve_display_status(Some("GRACE"), Some(end), None, None, 10),
