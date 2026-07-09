@@ -10,7 +10,7 @@
 const STATUS_STYLES = {
     PAID:          'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
     PENDING:       'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    GRACE:         'bg-amber-500/20 text-amber-400 border-amber-500/30',
+    GRACE:         'bg-red-500/20 text-red-400 border-red-500/30',
     GRACE_OVERDUE: 'bg-red-500/20 text-red-400 border-red-500/30',
     RELEASED:      'bg-primary-700/40 text-primary-400 border-primary-600/30',
     NEW:           'bg-blue-500/20 text-blue-400 border-blue-500/30',

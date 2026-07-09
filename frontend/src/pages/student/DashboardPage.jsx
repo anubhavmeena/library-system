@@ -12,8 +12,9 @@ function StatCard({ label, value, sub, color = 'amber' }) {
         amber:   'from-amber-500/20 to-amber-600/5 border-amber-500/20',
         emerald: 'from-emerald-500/20 to-emerald-600/5 border-emerald-500/20',
         blue:    'from-blue-500/20 to-blue-600/5 border-blue-500/20',
+        red:     'from-red-500/20 to-red-600/5 border-red-500/20',
     }
-    const textColors = { amber: 'text-amber-400', emerald: 'text-emerald-400', blue: 'text-blue-400' }
+    const textColors = { amber: 'text-amber-400', emerald: 'text-emerald-400', blue: 'text-blue-400', red: 'text-red-400' }
     return (
         <div className={`card bg-gradient-to-br ${colors[color]} p-5`}>
             <p className="text-primary-400 text-sm mb-1">{label}</p>
@@ -98,8 +99,8 @@ export default function DashboardPage() {
     const STATUS_META = {
         PAID:     { color: 'emerald', sub: t('dashboard.stats.activeMembership') },
         PENDING:  { color: 'amber',   sub: t('dashboard.stats.duesPending') },
-        GRACE:         { color: 'amber',   sub: t('dashboard.stats.gracePeriod') },
-        GRACE_OVERDUE: { color: 'amber',   sub: t('dashboard.stats.membershipExpired') },
+        GRACE:         { color: 'red',   sub: t('dashboard.stats.gracePeriod') },
+        GRACE_OVERDUE: { color: 'red',   sub: t('dashboard.stats.membershipExpired') },
         RELEASED:      { color: 'amber',   sub: t('dashboard.stats.seatReleased') },
         NEW:      { color: 'blue',    sub: t('dashboard.stats.getPlan') },
     }
@@ -144,7 +145,7 @@ export default function DashboardPage() {
                     label={t('dashboard.stats.daysLeft')}
                     value={daysLeft ?? '—'}
                     sub={membership ? t('dashboard.stats.expires', { date: membership.endDate }) : t('dashboard.stats.noMembership')}
-                    color={daysLeft !== null && daysLeft <= 5 ? 'amber' : 'emerald'} />
+                    color={daysLeft !== null && daysLeft < 0 ? 'red' : daysLeft !== null && daysLeft <= 5 ? 'amber' : 'emerald'} />
                 <StatCard
                     label={t('dashboard.stats.status')}
                     value={
