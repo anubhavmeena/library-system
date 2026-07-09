@@ -37,15 +37,19 @@ const MEMBERSHIP_WITH_PLAN_SELECT: &str = "
                LIMIT 1
            )) AS seat_number,
            m.shift, m.start_date, m.end_date, m.status, pay.amount, m.created_at, p.price,
-           m.dues_amount
+           m.dues_amount, pf.pending_amount
     FROM memberships m
     JOIN membership_plans p ON p.id = m.plan_id
-    LEFT JOIN payments pay ON pay.membership_id = m.id AND pay.status = 'SUCCESS'";
+    LEFT JOIN payments pay ON pay.membership_id = m.id AND pay.status = 'SUCCESS'
+    LEFT JOIN LATERAL (
+        SELECT COALESCE(SUM(pending_amount), 0)::numeric AS pending_amount
+        FROM payments WHERE user_id = m.user_id AND status = 'SUCCESS'
+    ) pf ON true";
 
 type MembershipRow = (
     Uuid, Uuid, Uuid, String, String, Option<Uuid>, Option<String>,
     Option<String>, NaiveDate, NaiveDate, String, Option<Decimal>, Option<chrono::NaiveDateTime>,
-    Option<Decimal>, Option<Decimal>,
+    Option<Decimal>, Option<Decimal>, Option<Decimal>,
 );
 
 fn map_row(r: MembershipRow) -> MembershipWithPlan {
@@ -65,7 +69,20 @@ fn map_row(r: MembershipRow) -> MembershipWithPlan {
         created_at: r.12,
         plan_price: r.13,
         dues_amount: r.14,
+        pending_amount: r.15,
     }
+}
+
+/// Same aggregate as `MEMBERSHIP_WITH_PLAN_SELECT`'s `pf` lateral join, for the
+/// call sites that build `MembershipWithPlan` by hand instead of via `map_row`.
+async fn sum_pending_amount(state: &Arc<AppState>, user_id: Uuid) -> crate::error::Result<Decimal> {
+    let sum: Decimal = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(pending_amount), 0) FROM payments WHERE user_id = $1 AND status = 'SUCCESS'",
+    )
+    .bind(user_id)
+    .fetch_one(&state.db)
+    .await?;
+    Ok(sum)
 }
 
 pub async fn get_active_membership(
@@ -477,6 +494,8 @@ pub async fn verify_payment(
     };
     tokio::spawn(async move { notification::send_payment_receipt(&state3, &receipt_event).await });
 
+    let pending_amount = sum_pending_amount(state, user_id).await?;
+
     Ok(MembershipWithPlan {
         id: membership.id,
         user_id: membership.user_id,
@@ -493,6 +512,7 @@ pub async fn verify_payment(
         plan_price: Some(plan.price),
         created_at: membership.created_at,
         dues_amount: membership.dues_amount,
+        pending_amount: Some(pending_amount),
     })
 }
 
@@ -638,6 +658,8 @@ pub async fn verify_and_pay_dues(
         notification::send_payment_receipt_typed(&state2, &receipt_event, "GRACE_DUES_CLEARED").await
     });
 
+    let pending_amount = sum_pending_amount(state, user_id).await?;
+
     Ok(MembershipWithPlan {
         id: updated.id,
         user_id: updated.user_id,
@@ -654,7 +676,173 @@ pub async fn verify_and_pay_dues(
         plan_price: Some(plan.price),
         created_at: updated.created_at,
         dues_amount: updated.dues_amount,
+        pending_amount: Some(pending_amount),
     })
+}
+
+/// Pending-amount checkout — clears the sum of the user's outstanding
+/// payments.pending_amount rows (across every membership they've ever had),
+/// the same aggregate `admin::get_pending_fees`/`clear_pending_fees` use, so
+/// self-clearing here resolves the same total an admin would see. No
+/// convenience fee, same as dues.
+pub async fn create_pending_order(
+    state: &Arc<AppState>,
+    user_id: Uuid,
+) -> crate::error::Result<CreateOrderResponse> {
+    let rows = sqlx::query_as::<_, (Uuid, Decimal)>(
+        "SELECT membership_id, pending_amount FROM payments
+         WHERE user_id = $1 AND status = 'SUCCESS' AND pending_amount > 0
+         ORDER BY created_at ASC",
+    )
+    .bind(user_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let total_pending: Decimal = rows.iter().map(|(_, p)| *p).sum();
+    if total_pending <= Decimal::ZERO {
+        return Err(AppError::BadRequest("No outstanding pending amount found".into()));
+    }
+    // Anchor the order on the oldest pending row's membership — same anchor
+    // admin::clear_pending_fees uses (rows.first()) — purely for correlating
+    // the in-flight gateway checkout; not necessarily the student's current
+    // membership.
+    let membership_id = rows[0].0;
+
+    let user = sqlx::query_as::<_, crate::models::user::User>("SELECT * FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_one(&state.db)
+        .await?;
+
+    let order = payment::create_order(
+        state,
+        membership_id,
+        user_id,
+        user.mobile.as_deref(),
+        user.email.as_deref(),
+        &user.name,
+        total_pending,
+    )
+    .await?;
+
+    sqlx::query("UPDATE memberships SET gateway_order_id = $2, checkout_amount = $3 WHERE id = $1")
+        .bind(membership_id)
+        .bind(&order.order_id)
+        .bind(total_pending)
+        .execute(&state.db)
+        .await?;
+
+    Ok(order)
+}
+
+pub async fn verify_and_pay_pending(
+    state: &Arc<AppState>,
+    user_id: Uuid,
+    membership_id: Uuid,
+    order_id: &str,
+    payment_id: Option<&str>,
+    signature: Option<&str>,
+) -> crate::error::Result<MembershipWithPlan> {
+    let membership = sqlx::query_as::<_, Membership>(
+        "SELECT * FROM memberships WHERE id = $1 AND user_id = $2",
+    )
+    .bind(membership_id)
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Membership not found".into()))?;
+
+    if membership.gateway_order_id.as_deref() != Some(order_id) {
+        return Err(AppError::BadRequest("Order does not match this membership".into()));
+    }
+
+    let paid = payment::verify_payment(state, order_id, payment_id, signature).await?;
+    if !paid {
+        return Err(AppError::BadRequest("Payment verification failed".into()));
+    }
+
+    let rows = sqlx::query_as::<_, (Uuid, Decimal)>(
+        "SELECT id, pending_amount FROM payments
+         WHERE user_id = $1 AND status = 'SUCCESS' AND pending_amount > 0
+         ORDER BY created_at ASC",
+    )
+    .bind(user_id)
+    .fetch_all(&state.db)
+    .await?;
+    let total_pending: Decimal = rows.iter().map(|(_, p)| *p).sum();
+    let amount_cleared = membership.checkout_amount.unwrap_or_default().min(total_pending);
+    if amount_cleared <= Decimal::ZERO {
+        return Err(AppError::BadRequest("No outstanding pending amount found".into()));
+    }
+    let remainder = total_pending - amount_cleared;
+
+    for (payment_row_id, _) in &rows {
+        sqlx::query("UPDATE payments SET pending_amount = 0, updated_at = NOW() WHERE id = $1")
+            .bind(payment_row_id)
+            .execute(&state.db)
+            .await?;
+    }
+
+    let invoice_id = ids::generate_invoice_id();
+    sqlx::query(
+        "INSERT INTO payments (membership_id, user_id, amount, pending_amount, payment_gateway, gateway_order_id, gateway_payment_id, invoice_id, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'SUCCESS')",
+    )
+    .bind(membership_id)
+    .bind(user_id)
+    .bind(amount_cleared)
+    .bind(remainder)
+    .bind(&state.config.payment_gateway)
+    .bind(order_id)
+    .bind(payment_id)
+    .bind(&invoice_id)
+    .execute(&state.db)
+    .await?;
+
+    let user = sqlx::query_as::<_, crate::models::user::User>("SELECT * FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_one(&state.db)
+        .await?;
+    let current = find_current_membership(state, user_id).await?;
+
+    let pf_setting = settings::setting_for(state, "PENDING_FEE_CLEARED").await;
+    if pf_setting.send_to_student {
+        let msg = settings::apply_hindi(
+            &format!("Your pending library fee of Rs.{amount_cleared:.0} has been cleared. Thank you! - Target Zone Library Team"),
+            &pf_setting, true,
+        );
+        notification::send_direct_message(state, user.mobile.as_deref(), user.email.as_deref(), &msg).await;
+    }
+    if pf_setting.send_to_admin {
+        let seat = current.as_ref().and_then(|m| m.seat_number.as_deref()).unwrap_or("—");
+        let admin_msg = format!(
+            "Pending Fee Cleared (self-service)\nStudent: {}\nSeat: {seat}\nAmount: Rs.{amount_cleared:.0}",
+            user.name
+        );
+        if !state.config.admin_whatsapp.is_empty() {
+            notification::send_direct_message(state, Some(&state.config.admin_whatsapp.clone()), None, &admin_msg).await;
+        }
+        notification::send_direct_message(state, None, Some(&state.config.admin_email.clone()), &admin_msg).await;
+    }
+
+    let s = state.clone();
+    let receipt_event = notification::PaymentReceiptInfo {
+        user_id,
+        user_name: user.name.clone(),
+        user_mobile: user.mobile.clone(),
+        user_email: user.email.clone(),
+        invoice_id,
+        amount_paid: amount_cleared,
+        amount_pending: remainder,
+        plan_name: current.as_ref().map(|m| m.plan_name.clone()).unwrap_or_default(),
+        seat_number: current.as_ref().and_then(|m| m.seat_number.clone()),
+        valid_upto: current.as_ref().map(|m| m.end_date),
+        payment_method: state.config.payment_gateway.clone(),
+    };
+    tokio::spawn(async move {
+        notification::send_payment_receipt_typed(&s, &receipt_event, "PENDING_FEE_CLEARED").await
+    });
+
+    current.ok_or_else(|| AppError::Internal("Membership not found after clearing pending amount".into()))
 }
 
 pub async fn get_payment_history(

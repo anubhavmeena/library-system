@@ -41,6 +41,16 @@ export const verifyDuesPayment = createAsyncThunk('membership/verifyDuesPayment'
     catch (err) { return rejectWithValue(err.response?.data?.message) }
 })
 
+export const createPendingOrder = createAsyncThunk('membership/createPendingOrder', async (_, { rejectWithValue }) => {
+    try { const res = await api.post('/payments/pending/create-order'); return res.data.data }
+    catch (err) { return rejectWithValue(err.response?.data?.message) }
+})
+
+export const verifyPendingPayment = createAsyncThunk('membership/verifyPendingPayment', async (data, { rejectWithValue }) => {
+    try { const res = await api.post('/payments/pending/verify', data); return res.data.data }
+    catch (err) { return rejectWithValue(err.response?.data?.message) }
+})
+
 const membershipSlice = createSlice({
     name: 'membership',
     initialState: { current: null, queued: null, plans: [], isLoading: false, order: null, error: null, displayStatus: null },
@@ -60,6 +70,8 @@ const membershipSlice = createSlice({
             })
             .addCase(createDuesOrder.fulfilled,     (state, a) => { state.order   = a.payload })
             .addCase(verifyDuesPayment.fulfilled,   (state, a) => { state.current = a.payload })
+            .addCase(createPendingOrder.fulfilled,   (state, a) => { state.order   = a.payload })
+            .addCase(verifyPendingPayment.fulfilled, (state, a) => { state.current = a.payload })
     }
 })
 

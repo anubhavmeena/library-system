@@ -600,6 +600,7 @@ mod tests {
             plan_price: Some(rust_decimal::Decimal::from(1800)),
             created_at: None,
             dues_amount: None,
+            pending_amount: None,
         };
         (user, membership)
     }

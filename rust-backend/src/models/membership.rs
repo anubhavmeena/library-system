@@ -89,10 +89,26 @@ pub struct MembershipWithPlan {
     pub plan_price: Option<Decimal>,
     pub created_at: Option<NaiveDateTime>,
     pub dues_amount: Option<Decimal>,
+    /// Sum of `payments.pending_amount` (SUCCESS rows) across every membership
+    /// this user has ever had — same aggregate `admin::get_pending_fees` uses,
+    /// so a student clearing "their" pending amount clears the same total an
+    /// admin would see and clear via the admin Students list.
+    pub pending_amount: Option<Decimal>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct VerifyDuesPaymentRequest {
+    #[serde(rename = "gatewayOrderId")]
+    pub order_id: String,
+    #[serde(rename = "gatewayPaymentId")]
+    pub payment_id: Option<String>,
+    pub signature: Option<String>,
+    #[serde(rename = "membershipId")]
+    pub membership_id: Uuid,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct VerifyPendingPaymentRequest {
     #[serde(rename = "gatewayOrderId")]
     pub order_id: String,
     #[serde(rename = "gatewayPaymentId")]

@@ -55,6 +55,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/payments/verify",             post(payment::verify_payment))
         .route("/api/payments/dues/create-order",  post(payment::create_dues_order))
         .route("/api/payments/dues/verify",        post(payment::verify_dues_payment))
+        .route("/api/payments/pending/create-order", post(payment::create_pending_order))
+        .route("/api/payments/pending/verify",       post(payment::verify_pending_payment))
 
         // ── Seats ─────────────────────────────────────────────────────────────
         .route("/api/seats/availability",       get(seat::get_availability))

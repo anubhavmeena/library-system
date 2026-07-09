@@ -231,6 +231,15 @@
       "desc": "Clear your pending dues to keep your seat {{seatNumber}}",
       "cta": "Pay Fee Due"
     },
+    "pendingBanner": {
+      "title": "You have a pending balance",
+      "desc": "Clear your pending amount of {{amount}} to stay fully paid up",
+      "cta": "Pay Now",
+      "processing": "Processing...",
+      "cleared": "Pending amount cleared — thank you!",
+      "verifyFailed": "Payment verification failed",
+      "payFailed": "Payment failed"
+    },
     "quickActions": {
       "title": "Quick Actions",
       "booking": { "label": "Book / Change Seat", "desc": "Select your preferred seat" },

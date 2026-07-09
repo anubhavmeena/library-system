@@ -1,8 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { fetchMyMembership, fetchMyDisplayStatus } from '../../store/slices/membershipSlice'
+import toast from 'react-hot-toast'
+import { fetchMyMembership, fetchMyDisplayStatus, createPendingOrder, verifyPendingPayment } from '../../store/slices/membershipSlice'
+import { formatCurrency } from '../../utils/currency'
 import StatusBadge from '../../components/StatusBadge'
 
 function StatCard({ label, value, sub, color = 'amber' }) {
@@ -26,11 +28,72 @@ export default function DashboardPage() {
     const { t } = useTranslation()
     const { user } = useSelector(s => s.auth)
     const { current: membership, displayStatus } = useSelector(s => s.membership)
+    const [payingPending, setPayingPending] = useState(false)
 
     useEffect(() => {
         dispatch(fetchMyMembership())
         dispatch(fetchMyDisplayStatus())
     }, [])
+
+    const handlePayPending = async () => {
+        setPayingPending(true)
+        try {
+            const orderRes = await dispatch(createPendingOrder())
+            if (!createPendingOrder.fulfilled.match(orderRes)) throw new Error(orderRes.payload)
+            const order = orderRes.payload
+
+            const onSuccess = async () => {
+                toast.success(t('dashboard.pendingBanner.cleared'))
+                dispatch(fetchMyMembership())
+                dispatch(fetchMyDisplayStatus())
+            }
+
+            if (order.orderId?.startsWith('dev_')) {
+                const verifyRes = await dispatch(verifyPendingPayment({
+                    gatewayOrderId: order.orderId, gatewayPaymentId: 'dev_pay_' + Date.now(),
+                    signature: 'dev_sig', membershipId: order.membershipId,
+                }))
+                if (verifyPendingPayment.fulfilled.match(verifyRes)) await onSuccess()
+                else toast.error(t('dashboard.pendingBanner.verifyFailed'))
+            } else if (order.gateway === 'CASHFREE') {
+                const { load } = await import('@cashfreepayments/cashfree-js')
+                const cashfree = await load({ mode: import.meta.env.VITE_CASHFREE_ENV || 'sandbox' })
+                const result = await cashfree.checkout({
+                    paymentSessionId: order.paymentSessionId,
+                    redirectTarget: '_modal',
+                    components: ['upi-qr', 'upi-collect', 'app', 'card', 'netbanking', 'paylater'],
+                })
+                if (result.error) throw new Error(result.error.message || 'Payment failed')
+                const verifyRes = await dispatch(verifyPendingPayment({
+                    gatewayOrderId: order.orderId, gatewayPaymentId: order.orderId,
+                    signature: null, membershipId: order.membershipId,
+                }))
+                if (verifyPendingPayment.fulfilled.match(verifyRes)) await onSuccess()
+                else toast.error(t('dashboard.pendingBanner.verifyFailed'))
+            } else {
+                const options = {
+                    key: order.razorpayKeyId, amount: order.amount * 100, currency: 'INR',
+                    name: 'Target Zone Library',
+                    description: 'Clear pending amount',
+                    order_id: order.orderId,
+                    handler: async (response) => {
+                        const verifyRes = await dispatch(verifyPendingPayment({
+                            gatewayOrderId: response.razorpay_order_id,
+                            gatewayPaymentId: response.razorpay_payment_id,
+                            signature: response.razorpay_signature,
+                            membershipId: order.membershipId,
+                        }))
+                        if (verifyPendingPayment.fulfilled.match(verifyRes)) await onSuccess()
+                        else toast.error(t('dashboard.pendingBanner.verifyFailed'))
+                    },
+                    theme: { color: '#f59e0b' },
+                }
+                new window.Razorpay(options).open()
+            }
+        } catch (e) {
+            toast.error(e.message || t('dashboard.pendingBanner.payFailed'))
+        } finally { setPayingPending(false) }
+    }
 
     const STATUS_META = {
         PAID:     { color: 'emerald', sub: t('dashboard.stats.activeMembership') },
@@ -120,6 +183,22 @@ export default function DashboardPage() {
                             <p className="text-primary-400 text-sm">{t('dashboard.duesBanner.desc', { seatNumber: membership?.seatNumber })}</p>
                         </div>
                         <Link to="/student/membership" className="ml-auto btn-primary text-sm px-4 py-2 whitespace-nowrap">{t('dashboard.duesBanner.cta')}</Link>
+                    </div>
+                </div>
+            )}
+
+            {displayStatus === 'PENDING' && membership?.pendingAmount > 0 && (
+                <div className="card p-5 mb-8 border-amber-500/30 bg-amber-500/10">
+                    <div className="flex items-center gap-3">
+                        <span className="text-2xl">💳</span>
+                        <div>
+                            <p className="text-amber-400 font-semibold">{t('dashboard.pendingBanner.title')}</p>
+                            <p className="text-primary-400 text-sm">{t('dashboard.pendingBanner.desc', { amount: formatCurrency(membership.pendingAmount) })}</p>
+                        </div>
+                        <button onClick={handlePayPending} disabled={payingPending}
+                                className="ml-auto btn-primary text-sm px-4 py-2 whitespace-nowrap disabled:opacity-50">
+                            {payingPending ? t('dashboard.pendingBanner.processing') : t('dashboard.pendingBanner.cta')}
+                        </button>
                     </div>
                 </div>
             )}
