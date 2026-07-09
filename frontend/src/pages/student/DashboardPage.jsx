@@ -17,7 +17,7 @@ function StatCard({ label, value, sub, color = 'amber' }) {
     return (
         <div className={`card bg-gradient-to-br ${colors[color]} p-5`}>
             <p className="text-primary-400 text-sm mb-1">{label}</p>
-            <p className={`text-2xl font-bold ${textColors[color]}`}>{value}</p>
+            <div className={`text-2xl font-bold ${textColors[color]}`}>{value}</div>
             {sub && <p className="text-primary-500 text-xs mt-1">{sub}</p>}
         </div>
     )
@@ -147,7 +147,14 @@ export default function DashboardPage() {
                     color={daysLeft !== null && daysLeft <= 5 ? 'amber' : 'emerald'} />
                 <StatCard
                     label={t('dashboard.stats.status')}
-                    value={<StatusBadge status={displayStatus} />}
+                    value={
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <StatusBadge status={displayStatus} />
+                            {displayStatus === 'PENDING' && membership?.pendingAmount > 0 && (
+                                <span>{formatCurrency(membership.pendingAmount)}</span>
+                            )}
+                        </div>
+                    }
                     sub={statusMeta.sub}
                     color={statusMeta.color} />
             </div>
