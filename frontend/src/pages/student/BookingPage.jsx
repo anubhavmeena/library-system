@@ -281,6 +281,29 @@ export default function BookingPage() {
         )
     }
 
+    // A GRACE membership means dues are outstanding on a lapsed plan — the
+    // backend rejects create-order in this state (see PaymentService), so
+    // block it here too rather than letting the student pick a plan/seat
+    // only to hit an error at the payment step.
+    if (current?.status === 'GRACE') {
+        return (
+            <div>
+                <div className="mb-6">
+                    <h1 className="page-header">{t('booking.title')}</h1>
+                    <p className="text-primary-400">{t('booking.subtitle')}</p>
+                </div>
+                <div className="card p-8 max-w-lg border-red-500/30 bg-red-500/5">
+                    <div className="text-4xl mb-4">⚠️</div>
+                    <h2 className="section-title mb-2">{t('booking.graceMembership.title')}</h2>
+                    <p className="text-primary-300 mb-6">
+                        {t('booking.graceMembership.desc', { amount: formatCurrency(current.duesAmount ?? current.planPrice) })}
+                    </p>
+                    <a href="/student/membership" className="btn-outline text-sm px-5 py-2.5 inline-block">{t('booking.graceMembership.clearDues')}</a>
+                </div>
+            </div>
+        )
+    }
+
     if (current?.status === 'ACTIVE') {
         const expiry = new Date(current.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
         return (

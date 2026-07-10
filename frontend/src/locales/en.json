@@ -268,6 +268,11 @@
       "expiresOn": "Expires on",
       "viewMembership": "View Membership"
     },
+    "graceMembership": {
+      "title": "Dues Pending",
+      "desc": "Your previous membership has lapsed with pending dues of {{amount}}. Please clear your dues before booking a new plan.",
+      "clearDues": "Clear Dues"
+    },
     "plan": {
       "perMonth": "per month",
       "halfDayFeatures": ["Choose morning or evening shift", "110 seats available", "30 day validity"],

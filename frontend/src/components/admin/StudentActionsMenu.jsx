@@ -31,6 +31,13 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
     const [newSeat, setNewSeat]                           = useState(null)
     const [changeSeatSubmitting, setChangeSeatSubmitting] = useState(false)
 
+    const [exchangeSeatOpen, setExchangeSeatOpen]         = useState(false)
+    const [exchangeSearch, setExchangeSearch]             = useState('')
+    const [exchangeCandidates, setExchangeCandidates]     = useState([])
+    const [exchangeLoading, setExchangeLoading]           = useState(false)
+    const [exchangeTarget, setExchangeTarget]             = useState(null)
+    const [exchangeSubmitting, setExchangeSubmitting]     = useState(false)
+
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [deleting, setDeleting]     = useState(false)
 
@@ -66,14 +73,54 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
 
     const canRenew = student.membershipId && student.displayStatus === 'PAID'
     const canChangeSeat = student.membershipId && student.membershipStatus === 'ACTIVE'
+    const canExchangeSeat = student.membershipId && student.membershipStatus === 'ACTIVE'
     const canReleaseSeat = student.membershipId && (student.membershipStatus === 'ACTIVE' || student.membershipStatus === 'GRACE')
     const canClearDues = student.membershipId && student.membershipStatus === 'GRACE'
     const canClearFees = student.pendingAmount > 0
     const canChangeStatus = student.membershipId && student.membershipStatus === 'ACTIVE'
-    const showSeatGroup = canRenew || canChangeSeat || canReleaseSeat
+    const showSeatGroup = canRenew || canChangeSeat || canExchangeSeat || canReleaseSeat
     const showBillingGroup = canClearDues || canClearFees
 
     const closeMenu = () => { setOpen(false); setSubmenu(null) }
+
+    const openExchangeSeat = () => {
+        setExchangeSeatOpen(true)
+        setExchangeSearch('')
+        setExchangeTarget(null)
+        setExchangeCandidates([])
+    }
+
+    // Debounced search — only while the dialog is open, and re-runs whenever
+    // the search text changes (matches AdminStudentsPage's debounce pattern).
+    useEffect(() => {
+        if (!exchangeSeatOpen) return
+        setExchangeLoading(true)
+        const timeout = setTimeout(() => {
+            api.get(`/admin/students?page=0&size=200&membershipStatus=ACTIVE${exchangeSearch ? `&search=${encodeURIComponent(exchangeSearch)}` : ''}`)
+                .then(r => {
+                    const list = r.data.data?.students || []
+                    setExchangeCandidates(list.filter(s => s.id !== student.id && s.seatNumber))
+                })
+                .catch(() => toast.error('Failed to search students'))
+                .finally(() => setExchangeLoading(false))
+        }, 300)
+        return () => clearTimeout(timeout)
+    }, [exchangeSearch, exchangeSeatOpen])
+
+    const handleExchangeSeat = async () => {
+        if (!exchangeTarget) return
+        setExchangeSubmitting(true)
+        try {
+            await api.post(`/admin/memberships/${student.membershipId}/swap-seat`, { otherUserId: exchangeTarget.id })
+            toast.success(`Seat exchanged with ${exchangeTarget.name}`)
+            setExchangeSeatOpen(false)
+            onMutated()
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Failed to exchange seat')
+        } finally {
+            setExchangeSubmitting(false)
+        }
+    }
 
     const handleRenewSeat = async () => {
         if (!window.confirm(`Renew ${student.name}'s seat by one month?`)) return
@@ -329,6 +376,13 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
                                         {t('adminStudents.changeSeat')}
                                     </button>
                                 )}
+                                {canExchangeSeat && (
+                                    <button
+                                        onClick={() => { openExchangeSeat(); closeMenu() }}
+                                        className="w-full text-left text-xs px-3 py-2.5 text-indigo-400 hover:bg-primary-700/60 transition-colors">
+                                        Exchange Seat
+                                    </button>
+                                )}
                                 {canReleaseSeat && (
                                     <button
                                         disabled={releasingSeat}
@@ -506,6 +560,71 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
                                 {changeSeatSubmitting
                                     ? t('adminStudents.changeSeatModal.confirming')
                                     : t('adminStudents.changeSeatModal.confirm')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {exchangeSeatOpen && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setExchangeSeatOpen(false)}>
+                    <div className="card p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-semibold text-white mb-1">Exchange Seat</h3>
+                        <p className="text-sm text-primary-400 mb-4">
+                            Swap physical seats between <span className="text-white">{student.name}</span> (seat {student.seatNumber}) and
+                            another active student — plans and shifts stay unchanged.
+                        </p>
+
+                        {exchangeTarget ? (
+                            <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 mb-4">
+                                <div>
+                                    <p className="text-sm text-white font-medium">{exchangeTarget.name}</p>
+                                    <p className="text-xs text-primary-400">Seat {exchangeTarget.seatNumber} · {exchangeTarget.mobile}</p>
+                                </div>
+                                <button onClick={() => setExchangeTarget(null)} className="text-xs text-amber-400 hover:text-amber-300">
+                                    Change
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    value={exchangeSearch}
+                                    onChange={e => setExchangeSearch(e.target.value)}
+                                    placeholder="Search name or mobile…"
+                                    className="input w-full text-sm mb-3"
+                                />
+                                <div className="max-h-64 overflow-y-auto space-y-2">
+                                    {exchangeLoading ? (
+                                        <div className="shimmer h-12 rounded-xl" />
+                                    ) : exchangeCandidates.length === 0 ? (
+                                        <p className="text-xs text-primary-500 py-2">No active seated students found</p>
+                                    ) : exchangeCandidates.map(s => (
+                                        <button
+                                            key={s.id}
+                                            onClick={() => setExchangeTarget(s)}
+                                            className="w-full flex items-center justify-between text-left border border-primary-700/40 rounded-xl px-3 py-2 hover:border-amber-500/40 hover:bg-primary-700/30 transition-colors">
+                                            <div>
+                                                <p className="text-sm text-white">{s.name}</p>
+                                                <p className="text-xs text-primary-400">{s.mobile}</p>
+                                            </div>
+                                            <span className="text-xs text-amber-400">Seat {s.seatNumber}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+
+                        <div className="flex gap-3 justify-end mt-5 pt-4 border-t border-primary-700/30">
+                            <button onClick={() => setExchangeSeatOpen(false)} className="btn-outline text-sm px-4 py-2">
+                                Cancel
+                            </button>
+                            <button
+                                disabled={!exchangeTarget || exchangeSubmitting}
+                                onClick={handleExchangeSeat}
+                                className="btn-primary px-5 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                                {exchangeSubmitting ? 'Exchanging…' : 'Exchange'}
                             </button>
                         </div>
                     </div>
