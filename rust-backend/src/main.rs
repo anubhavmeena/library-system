@@ -32,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Connecting to database…");
     let db = sqlx::postgres::PgPoolOptions::new()
-        .max_connections(10)
+        .max_connections(20)
         .connect(&config.database_url)
         .await
         .expect("Failed to connect to PostgreSQL");
