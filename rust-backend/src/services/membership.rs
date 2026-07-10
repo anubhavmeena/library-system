@@ -192,29 +192,33 @@ pub async fn get_my_display_status(
 ) -> crate::error::Result<String> {
     let current = find_current_membership(state, user_id).await?;
 
-    let pending_amount: Option<Decimal> = if let Some(ref m) = current {
-        sqlx::query_scalar(
-            "SELECT pending_amount FROM payments
-             WHERE membership_id = $1 AND status = 'SUCCESS'
-             ORDER BY created_at DESC LIMIT 1",
+    // pending_amount, latest_ever status, and grace_days are three independent
+    // lookups with no data dependency on each other, previously issued as three
+    // separate sequential pool checkouts — under connection-pool contention this
+    // handler had to win the pool queue 3x (4x counting find_current_membership
+    // above) instead of once, making it disproportionately likely to stall under
+    // load compared to single-query sibling endpoints. Batched into one round trip
+    // via independent scalar subqueries (each still NULL-safe on no match, exactly
+    // as the original three queries were).
+    let (pending_amount, latest_ever, grace_days): (Option<Decimal>, Option<String>, i32) =
+        sqlx::query_as(
+            "SELECT
+                (SELECT pending_amount FROM payments
+                 WHERE membership_id = $1 AND status = 'SUCCESS'
+                 ORDER BY created_at DESC LIMIT 1) AS pending_amount,
+                (SELECT status FROM memberships
+                 WHERE user_id = $2 AND status != 'PENDING'
+                 ORDER BY created_at DESC LIMIT 1) AS latest_ever_status,
+                COALESCE(
+                    (SELECT grace_days FROM app_settings WHERE id = 1),
+                    $3
+                ) AS grace_days",
         )
-        .bind(m.id)
-        .fetch_optional(&state.db)
-        .await?
-        .flatten()
-    } else {
-        None
-    };
-
-    let latest_ever: Option<String> = sqlx::query_scalar(
-        "SELECT status FROM memberships WHERE user_id = $1 AND status != 'PENDING'
-         ORDER BY created_at DESC LIMIT 1",
-    )
-    .bind(user_id)
-    .fetch_optional(&state.db)
-    .await?;
-
-    let grace_days = settings::grace_days(state).await;
+        .bind(current.as_ref().map(|m| m.id))
+        .bind(user_id)
+        .bind(settings::DEFAULT_GRACE_DAYS)
+        .fetch_one(&state.db)
+        .await?;
 
     Ok(resolve_display_status(
         current.as_ref().map(|m| m.status.as_str()),
