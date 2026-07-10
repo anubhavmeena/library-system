@@ -340,6 +340,12 @@ pub struct ChangeSeatRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SwapSeatRequest {
+    pub other_user_id: Uuid,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdatePlanRequest {
     pub plan_id: Option<Uuid>,
     pub additional_days: Option<i32>,

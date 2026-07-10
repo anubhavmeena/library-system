@@ -251,6 +251,16 @@ pub async fn change_membership_seat(
     Ok(ApiResponse::ok("Seat changed"))
 }
 
+pub async fn swap_membership_seat(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(membership_id): Path<Uuid>,
+    Json(req): Json<SwapSeatRequest>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    svc::swap_membership_seats(&state, membership_id, req.other_user_id).await?;
+    Ok(ApiResponse::ok("Seats exchanged"))
+}
+
 pub async fn update_membership_plan(
     State(state): State<Arc<AppState>>,
     _admin: AdminUser,

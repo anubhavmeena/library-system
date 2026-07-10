@@ -1751,6 +1751,128 @@ pub async fn change_membership_seat(
     Ok(())
 }
 
+/// Swaps the physical seat between two ACTIVE memberships — each student keeps
+/// their own plan/shift/date range, only the seat_number/seat_id trade places.
+/// Unlike `change_membership_seat`, no pre-flight conflict check against a third
+/// party is needed: both seats are already legitimately held by exactly these
+/// two memberships, so releasing both before reassigning (all in one transaction)
+/// can't collide with anyone else's booking.
+pub async fn swap_membership_seats(
+    state: &Arc<AppState>,
+    membership_id: Uuid,
+    other_user_id: Uuid,
+) -> crate::error::Result<()> {
+    let membership_a = sqlx::query_as::<_, Membership>("SELECT * FROM memberships WHERE id = $1")
+        .bind(membership_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Membership not found".into()))?;
+
+    let membership_b = sqlx::query_as::<_, Membership>(
+        "SELECT * FROM memberships WHERE user_id = $1 AND status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(other_user_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::BadRequest("The other student doesn't have an active membership".into()))?;
+
+    if membership_a.id == membership_b.id {
+        return Err(AppError::BadRequest("Cannot exchange a seat with the same student".into()));
+    }
+    if membership_a.status != "ACTIVE" {
+        return Err(AppError::BadRequest("This student's membership must be ACTIVE to exchange seats".into()));
+    }
+
+    let (seat_id_a, seat_number_a) = match (membership_a.seat_id, membership_a.seat_number.clone()) {
+        (Some(id), Some(num)) => (id, num),
+        _ => return Err(AppError::BadRequest("This student doesn't currently have a seat".into())),
+    };
+    let (seat_id_b, seat_number_b) = match (membership_b.seat_id, membership_b.seat_number.clone()) {
+        (Some(id), Some(num)) => (id, num),
+        _ => return Err(AppError::BadRequest("The other student doesn't currently have a seat".into())),
+    };
+
+    let mut tx = state.db.begin().await.map_err(AppError::Database)?;
+
+    // Release both current bookings first so the unique (seat_id, shift, booking_date)
+    // constraint never has to reconcile two ACTIVE rows for the same seat at once.
+    sqlx::query("UPDATE seat_bookings SET status = 'RELEASED' WHERE membership_id = $1 AND status = 'ACTIVE'")
+        .bind(membership_a.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::Database)?;
+    sqlx::query("UPDATE seat_bookings SET status = 'RELEASED' WHERE membership_id = $1 AND status = 'ACTIVE'")
+        .bind(membership_b.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::Database)?;
+
+    // A takes B's old seat, keeping A's own shift/date range; reclaims the slot
+    // just released above if the (seat, shift, date) key matches exactly.
+    sqlx::query(
+        "INSERT INTO seat_bookings (seat_id, user_id, membership_id, shift, booking_date, end_date)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (seat_id, shift, booking_date) DO UPDATE SET
+             status = 'ACTIVE', user_id = EXCLUDED.user_id,
+             membership_id = EXCLUDED.membership_id, end_date = EXCLUDED.end_date
+         WHERE seat_bookings.status != 'ACTIVE'",
+    )
+    .bind(seat_id_b)
+    .bind(membership_a.user_id)
+    .bind(membership_a.id)
+    .bind(&membership_a.shift)
+    .bind(membership_a.start_date)
+    .bind(membership_a.end_date)
+    .execute(&mut *tx)
+    .await
+    .map_err(AppError::Database)?;
+
+    // B takes A's old seat.
+    sqlx::query(
+        "INSERT INTO seat_bookings (seat_id, user_id, membership_id, shift, booking_date, end_date)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (seat_id, shift, booking_date) DO UPDATE SET
+             status = 'ACTIVE', user_id = EXCLUDED.user_id,
+             membership_id = EXCLUDED.membership_id, end_date = EXCLUDED.end_date
+         WHERE seat_bookings.status != 'ACTIVE'",
+    )
+    .bind(seat_id_a)
+    .bind(membership_b.user_id)
+    .bind(membership_b.id)
+    .bind(&membership_b.shift)
+    .bind(membership_b.start_date)
+    .bind(membership_b.end_date)
+    .execute(&mut *tx)
+    .await
+    .map_err(AppError::Database)?;
+
+    sqlx::query("UPDATE memberships SET seat_id = $2, seat_number = $3 WHERE id = $1")
+        .bind(membership_a.id)
+        .bind(seat_id_b)
+        .bind(&seat_number_b)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::Database)?;
+    sqlx::query("UPDATE memberships SET seat_id = $2, seat_number = $3 WHERE id = $1")
+        .bind(membership_b.id)
+        .bind(seat_id_a)
+        .bind(&seat_number_a)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::Database)?;
+
+    tx.commit().await.map_err(AppError::Database)?;
+
+    if let Some(ref shift) = membership_a.shift {
+        crate::services::seat::invalidate_seat_cache(state, shift, membership_a.start_date, membership_a.end_date).await;
+    }
+    if let Some(ref shift) = membership_b.shift {
+        crate::services::seat::invalidate_seat_cache(state, shift, membership_b.start_date, membership_b.end_date).await;
+    }
+
+    Ok(())
+}
+
 pub async fn update_membership_plan(
     state: &Arc<AppState>,
     membership_id: Uuid,
