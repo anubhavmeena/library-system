@@ -7,13 +7,51 @@ use crate::{
     services::{ids, notification, payment, settings},
 };
 use chrono::NaiveDate;
+use redis::AsyncCommands;
 use rust_decimal::Decimal;
 use std::sync::Arc;
 use uuid::Uuid;
 
+/// `/api/plans` barely changes (admin-edited convenience fee aside) and is
+/// hit on every page load — cached whole-response like `seat::get_availability`.
+const PLANS_CACHE_KEY: &str = "plans:active";
+const PLANS_CACHE_TTL_SECS: u64 = 300;
+
+/// Per-user, short-lived — this reflects live membership/payment state, so
+/// unlike the plans cache the TTL is the primary safety net (kept short
+/// deliberately) rather than something invalidation is expected to fully
+/// cover; see `invalidate_status_cache` for the one high-value spot
+/// (the student's own payment verification) it's paired with.
+const STATUS_CACHE_TTL_SECS: u64 = 15;
+
+fn status_cache_key(user_id: Uuid) -> String {
+    format!("membership:status:{user_id}")
+}
+
+/// Clears a user's cached display status. Call after any action that changes
+/// what `get_my_display_status` would return for them. Currently wired into
+/// the student's own payment-verification paths (verify_payment,
+/// verify_and_pay_dues, verify_and_pay_pending) — the highest-traffic moment
+/// someone immediately re-checks their status. Admin-driven mutations
+/// (clear dues, change status, release seat, etc.) rely on the short TTL
+/// above instead, rather than being wired individually.
+pub async fn invalidate_status_cache(state: &Arc<AppState>, user_id: Uuid) {
+    if let Ok(mut conn) = state.redis.get_multiplexed_async_connection().await {
+        let _: Result<(), _> = conn.del(&status_cache_key(user_id)).await;
+    }
+}
+
 pub async fn list_active_plans(
     state: &Arc<AppState>,
 ) -> crate::error::Result<Vec<PlanWithFee>> {
+    if let Ok(mut conn) = state.redis.get_multiplexed_async_connection().await {
+        if let Ok(cached) = conn.get::<_, String>(PLANS_CACHE_KEY).await {
+            if let Ok(plans) = serde_json::from_str::<Vec<PlanWithFee>>(&cached) {
+                return Ok(plans);
+            }
+        }
+    }
+
     let plans = sqlx::query_as::<_, MembershipPlan>(
         "SELECT * FROM membership_plans WHERE is_active = true ORDER BY price",
     )
@@ -22,10 +60,18 @@ pub async fn list_active_plans(
     .map_err(AppError::Database)?;
 
     let convenience_fee = settings::get_app_settings(state).await?.convenience_fee;
-    Ok(plans
+    let result: Vec<PlanWithFee> = plans
         .into_iter()
         .map(|plan| PlanWithFee { plan, convenience_fee })
-        .collect())
+        .collect();
+
+    if let Ok(json) = serde_json::to_string(&result) {
+        if let Ok(mut conn) = state.redis.get_multiplexed_async_connection().await {
+            let _ = conn.set_ex::<_, _, ()>(PLANS_CACHE_KEY, &json, PLANS_CACHE_TTL_SECS).await;
+        }
+    }
+
+    Ok(result)
 }
 
 const MEMBERSHIP_WITH_PLAN_SELECT: &str = "
@@ -190,6 +236,13 @@ pub async fn get_my_display_status(
     state: &Arc<AppState>,
     user_id: Uuid,
 ) -> crate::error::Result<String> {
+    let cache_key = status_cache_key(user_id);
+    if let Ok(mut conn) = state.redis.get_multiplexed_async_connection().await {
+        if let Ok(cached) = conn.get::<_, String>(&cache_key).await {
+            return Ok(cached);
+        }
+    }
+
     let current = find_current_membership(state, user_id).await?;
 
     // pending_amount, latest_ever status, and grace_days are three independent
@@ -220,13 +273,19 @@ pub async fn get_my_display_status(
         .fetch_one(&state.db)
         .await?;
 
-    Ok(resolve_display_status(
+    let status = resolve_display_status(
         current.as_ref().map(|m| m.status.as_str()),
         current.as_ref().map(|m| m.end_date),
         pending_amount,
         latest_ever.as_deref(),
         grace_days,
-    ).to_string())
+    ).to_string();
+
+    if let Ok(mut conn) = state.redis.get_multiplexed_async_connection().await {
+        let _ = conn.set_ex::<_, _, ()>(&cache_key, &status, STATUS_CACHE_TTL_SECS).await;
+    }
+
+    Ok(status)
 }
 
 pub async fn create_order(
@@ -388,6 +447,7 @@ pub async fn verify_payment(
     .bind(user_id)
     .fetch_one(&state.db)
     .await?;
+    invalidate_status_cache(state, user_id).await;
 
     // Auto-assign seat if seat_number is present. The payment has already been charged
     // by this point, so a conflict here can't fail the request outright — instead we
@@ -637,6 +697,7 @@ pub async fn verify_and_pay_dues(
     .bind(new_end_date)
     .fetch_one(&state.db)
     .await?;
+    invalidate_status_cache(state, user_id).await;
 
     // Un-hold the seat from the far-future sentinel back to the real end date.
     sqlx::query(
@@ -800,6 +861,7 @@ pub async fn verify_and_pay_pending(
             .execute(&state.db)
             .await?;
     }
+    invalidate_status_cache(state, user_id).await;
 
     let invoice_id = ids::generate_invoice_id();
     sqlx::query(

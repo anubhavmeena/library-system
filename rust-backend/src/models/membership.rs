@@ -20,7 +20,7 @@ pub struct MembershipPlan {
 /// (added on top of `price` when paying via the gateway) isn't a plan
 /// column, so it's flattened onto each plan here rather than living on
 /// `MembershipPlan` itself. Mirrors Java's `PlanDto`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanWithFee {
     #[serde(flatten)]
