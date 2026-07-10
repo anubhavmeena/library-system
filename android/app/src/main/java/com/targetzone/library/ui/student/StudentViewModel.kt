@@ -1,8 +1,12 @@
 package com.targetzone.library.ui.student
 
 import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -43,10 +47,16 @@ class StudentViewModel(
 
     val isLoading     = MutableStateFlow(false)
     val error         = MutableStateFlow<String?>(null)
+    val downloadStatus = MutableStateFlow<String?>(null)
 
     // Payment flow: emit PaymentOrder when ready, MainActivity triggers Razorpay
     private val _paymentOrder = MutableSharedFlow<PaymentOrder>()
     val paymentOrder = _paymentOrder.asSharedFlow()
+
+    // GRACE dues payment flow — separate from booking's since it verifies
+    // against /payments/dues/verify, not /payments/verify.
+    private val _duesPaymentOrder = MutableSharedFlow<PaymentOrder>()
+    val duesPaymentOrder = _duesPaymentOrder.asSharedFlow()
 
     val bookingSuccess = MutableStateFlow(false)
 
@@ -101,6 +111,31 @@ class StudentViewModel(
             .onFailure { isLoading.value = false; error.value = it.message }
     }
 
+    fun startDuesPayment() = viewModelScope.launch {
+        isLoading.value = true
+        error.value = null
+        membershipRepo.createDuesOrder()
+            .onSuccess { order ->
+                isLoading.value = false
+                if (order.orderId.startsWith("dev_")) {
+                    verifyDuesPayment(order.orderId, "dev_pay_${System.currentTimeMillis()}", "dev_sig", order.membershipId)
+                } else {
+                    _duesPaymentOrder.emit(order)
+                }
+            }
+            .onFailure { isLoading.value = false; error.value = it.message }
+    }
+
+    fun verifyDuesPayment(gatewayOrderId: String, paymentId: String, signature: String, membershipId: String) = viewModelScope.launch {
+        isLoading.value = true
+        membershipRepo.verifyDuesPayment(VerifyPaymentRequest(gatewayOrderId, paymentId, signature, membershipId))
+            .onSuccess { m ->
+                membership.value = m
+                isLoading.value = false
+            }
+            .onFailure { isLoading.value = false; error.value = it.message }
+    }
+
     fun loadProfile() = viewModelScope.launch {
         userRepo.getProfile().onSuccess { profile.value = it }
     }
@@ -126,16 +161,59 @@ class StudentViewModel(
             .onFailure { error.value = it.message; isLoading.value = false }
     }
 
+    // Previously fire-and-forget: enqueue() and nothing else, so a missing/expired
+    // token, a network failure, or a server error all looked identical to success
+    // — no toast, no notification fallback, nothing. Now tracks the actual
+    // DownloadManager outcome via its completion broadcast and reports it.
     fun downloadIdCard(context: Context) = viewModelScope.launch {
-        val token = tokenManager?.getTokenBlocking() ?: return@launch
-        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val token = tokenManager?.getTokenBlocking()
+        if (token.isNullOrBlank()) {
+            downloadStatus.value = "Not signed in — please log in again"
+            return@launch
+        }
+        val appContext = context.applicationContext
+        val dm = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val request = DownloadManager.Request(Uri.parse("${BASE_URL}memberships/my/id-card"))
             .addRequestHeader("Authorization", "Bearer $token")
             .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "library-id-card.pdf")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setMimeType("application/pdf")
-        dm.enqueue(request)
+
+        val downloadId = try {
+            dm.enqueue(request)
+        } catch (e: Exception) {
+            downloadStatus.value = "Couldn't start download: ${e.message}"
+            return@launch
+        }
+        downloadStatus.value = "Downloading…"
+
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                if (intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1) != downloadId) return
+                dm.query(DownloadManager.Query().setFilterById(downloadId))?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                        downloadStatus.value = if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                            "ID card saved to Downloads"
+                        } else {
+                            val reason = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+                            "Download failed (code $reason) — check you're online and signed in"
+                        }
+                    }
+                }
+                try { appContext.unregisterReceiver(this) } catch (e: Exception) { /* already unregistered */ }
+            }
+        }
+        val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            appContext.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            appContext.registerReceiver(receiver, filter)
+        }
     }
+
+    fun clearDownloadStatus() { downloadStatus.value = null }
 
     fun loadFeedback() = viewModelScope.launch {
         membershipRepo.getMyFeedback().onSuccess { myFeedback.value = it }

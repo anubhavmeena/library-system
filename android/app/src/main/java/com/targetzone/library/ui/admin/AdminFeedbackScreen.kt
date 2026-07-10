@@ -11,9 +11,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.targetzone.library.data.model.FeedbackItem
 import com.targetzone.library.ui.components.AppCard
+import com.targetzone.library.ui.components.ConfirmDialog
+import com.targetzone.library.ui.components.OutlineButton
 import com.targetzone.library.ui.theme.*
 
 @Composable
@@ -86,11 +87,7 @@ private fun FeedbackCard(item: FeedbackItem, onRespond: () -> Unit) {
             }
         }
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(
-            onClick = onRespond,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
-            modifier = Modifier.height(34.dp)
-        ) { Text("Respond", fontSize = 12.sp) }
+        OutlineButton(text = "Respond", onClick = onRespond, height = 34.dp)
     }
 }
 
@@ -99,50 +96,38 @@ private fun RespondDialog(item: FeedbackItem, onDismiss: () -> Unit, onSave: (St
     var status     by remember { mutableStateOf(item.status.ifBlank { "OPEN" }) }
     var adminNotes by remember { mutableStateOf(item.adminNotes ?: "") }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(16.dp), color = NavyMid) {
-            Column(Modifier.padding(20.dp)) {
-                Text("Respond to Feedback", style = MaterialTheme.typography.titleMedium)
-                Text(item.subject, color = TextSub, fontSize = 12.sp)
-                Spacer(Modifier.height(14.dp))
-
-                Text("Status", color = TextSub, fontSize = 12.sp)
-                Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("OPEN" to "Open", "UNDER_REVIEW" to "Under Review", "RESOLVED" to "Resolved").forEach { (v, l) ->
-                        FilterChip(
-                            selected = status == v,
-                            onClick = { status = v },
-                            label = { Text(l, fontSize = 11.sp) },
-                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AmberFaint, selectedLabelColor = Amber)
-                        )
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = adminNotes,
-                    onValueChange = { adminNotes = it },
-                    label = { Text("Admin notes (optional)", color = TextMuted, fontSize = 12.sp) },
-                    minLines = 3,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Amber, unfocusedBorderColor = DividerColor,
-                        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary, cursorColor = Amber
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+    ConfirmDialog(
+        title = "Respond to Feedback",
+        subtitle = item.subject,
+        onDismiss = onDismiss,
+        onConfirm = { onSave(status, adminNotes.takeIf { it.isNotBlank() }) },
+        confirmLabel = "Save"
+    ) {
+        Text("Status", color = TextSub, fontSize = 12.sp)
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("OPEN" to "Open", "UNDER_REVIEW" to "Under Review", "RESOLVED" to "Resolved").forEach { (v, l) ->
+                FilterChip(
+                    selected = status == v,
+                    onClick = { status = v },
+                    label = { Text(l, fontSize = 11.sp) },
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AmberFaint, selectedLabelColor = Amber)
                 )
-                Spacer(Modifier.height(16.dp))
-
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("Cancel", color = TextSub) }
-                    Spacer(Modifier.width(8.dp))
-                    Button(
-                        onClick = { onSave(status, adminNotes.takeIf { it.isNotBlank() }) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = NavyDeep)
-                    ) { Text("Save") }
-                }
             }
         }
+        Spacer(Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = adminNotes,
+            onValueChange = { adminNotes = it },
+            label = { Text("Admin notes (optional)", color = TextMuted, fontSize = 12.sp) },
+            minLines = 3,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Amber, unfocusedBorderColor = DividerColor,
+                focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary, cursorColor = Amber
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 

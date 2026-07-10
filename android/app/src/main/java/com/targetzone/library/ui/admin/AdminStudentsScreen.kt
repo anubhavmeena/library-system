@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.targetzone.library.data.model.StudentSummary
 import com.targetzone.library.ui.components.*
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -30,14 +31,15 @@ import java.util.Locale
 import kotlin.math.ceil
 
 // Single membership-status filter mirroring the web admin students page
-// (frontend/src/pages/admin/AdminStudentsPage.jsx) exactly. The previous
-// statusFilter (""/"ACTIVE"/"INACTIVE" tied to a nonexistent isActive concept)
-// and mStatusFilter (""/"ACTIVE"/"EXPIRED", neither a real displayStatus value)
-// were both silent no-ops against the real backend, which only understands
-// membershipStatus = NEW/PAID/PENDING/GRACE/EXPIRED/RELEASED.
+// (frontend/src/pages/admin/AdminStudentsPage.jsx) exactly. The backend's
+// displayStatus never returns the literal "EXPIRED" — an overdue-grace
+// student is "GRACE_OVERDUE" (see resolve_display_status in
+// rust-backend/src/services/membership.rs). Sending "EXPIRED" as
+// membershipStatus hits the backend's unmatched `_ => {}` filter arm, which
+// applies no WHERE clause at all — that's why "Expired" was showing everyone.
 private val MEMBERSHIP_FILTERS = listOf(
     "" to "All", "NEW" to "New", "PAID" to "Paid", "PENDING" to "Pending",
-    "GRACE" to "Grace", "EXPIRED" to "Expired", "RELEASED" to "Released"
+    "GRACE" to "Grace", "GRACE_OVERDUE" to "Expired", "RELEASED" to "Released"
 )
 
 @Composable
@@ -51,6 +53,7 @@ fun AdminStudentsScreen(vm: AdminViewModel, onViewDetails: (String) -> Unit = {}
     var debouncedSearch  by remember { mutableStateOf("") }
     var membershipFilter by remember { mutableStateOf("") }
     var page             by remember { mutableIntStateOf(0) }
+    val haptics = rememberLibraryHaptics()
 
     // Debounced live search, matching the web page's 300ms debounce — the
     // search box previously only filtered the already-loaded page client-side
@@ -74,6 +77,7 @@ fun AdminStudentsScreen(vm: AdminViewModel, onViewDetails: (String) -> Unit = {}
                     Text("${students.size} of $totalStudents students", color = TextSub, fontSize = 12.sp)
                 }
                 TextButton(onClick = {
+                    haptics.tick()
                     vm.loadStudents(page, membershipStatus = membershipFilter.takeIf { it.isNotBlank() }, search = debouncedSearch.takeIf { it.isNotBlank() })
                 }) { Text("↻ Refresh", color = TextSub, fontSize = 13.sp) }
             }
@@ -90,7 +94,7 @@ fun AdminStudentsScreen(vm: AdminViewModel, onViewDetails: (String) -> Unit = {}
             Spacer(Modifier.height(8.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(MEMBERSHIP_FILTERS) { (v, l) ->
-                    FilterChip(selected = membershipFilter == v, onClick = { membershipFilter = v; page = 0 }, label = { Text(l, fontSize = 12.sp) },
+                    FilterChip(selected = membershipFilter == v, onClick = { haptics.tick(); membershipFilter = v; page = 0 }, label = { Text(l, fontSize = 12.sp) },
                         colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AmberFaint, selectedLabelColor = Amber))
                 }
             }
@@ -101,7 +105,7 @@ fun AdminStudentsScreen(vm: AdminViewModel, onViewDetails: (String) -> Unit = {}
         }
 
         if (isLoading && students.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Amber) }
+            LoadingScreen()
         } else if (students.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No students found", color = TextMuted) }
         } else {
@@ -112,9 +116,9 @@ fun AdminStudentsScreen(vm: AdminViewModel, onViewDetails: (String) -> Unit = {}
                 }
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        if (page > 0) TextButton(onClick = { page-- }) { Text("← Prev", color = Amber) }
+                        if (page > 0) TextButton(onClick = { haptics.tick(); page-- }) { Text("← Prev", color = Amber) }
                         else Spacer(Modifier.weight(1f))
-                        if (students.size == 20) TextButton(onClick = { page++ }) { Text("Next →", color = Amber) }
+                        if (students.size == 20) TextButton(onClick = { haptics.tick(); page++ }) { Text("Next →", color = Amber) }
                     }
                     Spacer(Modifier.height(16.dp))
                 }
@@ -127,13 +131,13 @@ fun AdminStudentsScreen(vm: AdminViewModel, onViewDetails: (String) -> Unit = {}
 // AdminStudentsPage.jsx) — the shared StatusChip only maps 3 coarse colors
 // (ACTIVE/PENDING/EXPIRED) and would collapse NEW/GRACE/RELEASED into gray.
 private fun displayStatusColor(status: String?): Color = when (status) {
-    "NEW"      -> BlueSoft
-    "PAID"     -> Emerald
-    "PENDING"  -> YellowWarn
-    "GRACE"    -> Orange
-    "EXPIRED"  -> RedAlert
-    "RELEASED" -> RedDeep
-    else       -> TextMuted
+    "NEW"           -> BlueSoft
+    "PAID"          -> Emerald
+    "PENDING"       -> YellowWarn
+    "GRACE"         -> Orange
+    "GRACE_OVERDUE" -> RedAlert
+    "RELEASED"      -> RedDeep
+    else            -> TextMuted
 }
 
 private fun shiftLabel(shift: String?): String = when (shift) {
@@ -150,14 +154,17 @@ private fun parseDate(s: String?): java.util.Date? {
 
 @Composable
 private fun StudentCard(student: StudentSummary, onClick: () -> Unit) {
-    AppCard(Modifier.fillMaxWidth().clickable { onClick() }) {
+    AppCard(Modifier.fillMaxWidth(), onClick = onClick) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
             Box(
                 Modifier.size(44.dp).clip(CircleShape).background(NavyLight),
                 contentAlignment = Alignment.Center
             ) {
                 if (!student.photoUrl.isNullOrBlank()) {
-                    AsyncImage(model = student.photoUrl, contentDescription = student.name, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                    // Backend returns a bare "/uploads/..." path, not an absolute
+                    // URL — Coil can't resolve that without a host prefix.
+                    val fullUrl = student.photoUrl.let { if (it.startsWith("http")) it else "https://targetzone.co.in$it" }
+                    AsyncImage(model = fullUrl, contentDescription = student.name, modifier = Modifier.fillMaxSize().clip(CircleShape))
                 } else {
                     Text(student.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?", color = Amber, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
@@ -217,7 +224,7 @@ private fun MembershipLine(s: StudentSummary) {
             Column {
                 Text("Expires ${s.membershipEnd}", color = TextSub, fontSize = 11.sp)
                 Text(
-                    "${overdue}d overdue — ${if (s.displayStatus == "EXPIRED") "expired" else "grace"}",
+                    "${overdue}d overdue — ${if (s.displayStatus == "GRACE_OVERDUE") "expired" else "grace"}",
                     color = RedAlert, fontSize = 11.sp, fontWeight = FontWeight.SemiBold
                 )
             }
@@ -229,7 +236,6 @@ private fun MembershipLine(s: StudentSummary) {
                 Text("${s.daysRemaining} days left", color = color, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
         }
-        s.displayStatus == "EXPIRED" -> Text("Expired", color = RedAlert, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
         else -> Text("No plan", color = TextMuted, fontSize = 11.sp)
     }
 }

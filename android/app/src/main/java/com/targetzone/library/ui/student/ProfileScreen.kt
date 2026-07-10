@@ -33,6 +33,11 @@ import coil.compose.AsyncImage
 import com.targetzone.library.data.model.UpdateProfileRequest
 import com.targetzone.library.ui.components.AppCard
 import com.targetzone.library.ui.components.AppTextField
+import com.targetzone.library.ui.components.BannerTone
+import com.targetzone.library.ui.components.ButtonTone
+import com.targetzone.library.ui.components.MessageBanner
+import com.targetzone.library.ui.components.OutlineButton
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 import com.yalantis.ucrop.UCrop
 import java.io.File
@@ -45,6 +50,7 @@ fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
     val context   = LocalContext.current
     var editing       by remember { mutableStateOf(false) }
     var pendingCropFile by remember { mutableStateOf<File?>(null) }
+    val haptics = rememberLibraryHaptics()
 
     var name       by remember(profile) { mutableStateOf(profile?.name ?: "") }
     var fatherName by remember(profile) { mutableStateOf(profile?.fatherName ?: "") }
@@ -99,6 +105,7 @@ fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Profile", style = MaterialTheme.typography.headlineMedium)
             IconButton(onClick = {
+                haptics.tick()
                 if (editing) {
                     vm.updateProfile(UpdateProfileRequest(name = name, fatherName = fatherName.takeIf { it.isNotBlank() }, address = address.takeIf { it.isNotBlank() }, gender = profile?.gender, dateOfBirth = dob.takeIf { it.isNotBlank() }, email = email.takeIf { it.isNotBlank() }))
                     editing = false
@@ -128,7 +135,7 @@ fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
             }
             Box(
                 Modifier.size(28.dp).clip(CircleShape).background(Amber).align(Alignment.BottomEnd)
-                    .clickable { photoLauncher.launch("image/*") },
+                    .clickable { haptics.tick(); photoLauncher.launch("image/*") },
                 contentAlignment = Alignment.Center
             ) { Icon(Icons.Default.CameraAlt, null, tint = NavyDeep, modifier = Modifier.size(14.dp)) }
         }
@@ -138,10 +145,8 @@ fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
         Text(profile?.mobile ?: "", color = TextSub, fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
         error?.let {
             Spacer(Modifier.height(8.dp))
-            Card(colors = CardDefaults.cardColors(containerColor = RedFaint), modifier = Modifier.fillMaxWidth()) {
-                Text(it, color = RedAlert, modifier = Modifier.padding(12.dp), fontSize = 13.sp)
-            }
-            vm.clearError()
+            MessageBanner(it, BannerTone.Error)
+            LaunchedEffect(it) { kotlinx.coroutines.delay(4000); vm.clearError() }
         }
         Spacer(Modifier.height(24.dp))
 
@@ -183,6 +188,7 @@ fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("✓ Uploaded", color = Emerald, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     TextButton(onClick = {
+                        haptics.tick()
                         val url = profile!!.aadhaarUrl!!
                         val fullUrl = if (url.startsWith("http")) url else "https://targetzone.co.in$url"
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(fullUrl)))
@@ -193,15 +199,12 @@ fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
                 Text("Not uploaded", color = TextMuted, fontSize = 13.sp)
                 Spacer(Modifier.height(8.dp))
             }
-            OutlinedButton(
+            OutlineButton(
+                text = if (profile?.aadhaarUrl.isNullOrBlank()) "Upload Aadhaar" else "Replace Aadhaar",
                 onClick = { aadhaarLauncher.launch("*/*") },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
-                border = BorderStroke(1.dp, Amber.copy(alpha = 0.5f)),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth().height(40.dp)
-            ) {
-                Text(if (profile?.aadhaarUrl.isNullOrBlank()) "Upload Aadhaar" else "Replace Aadhaar", fontSize = 13.sp)
-            }
+                height = 40.dp,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         if (isLoading) {
@@ -210,17 +213,13 @@ fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
         }
 
         Spacer(Modifier.height(24.dp))
-        OutlinedButton(
+        OutlineButton(
+            text = "Logout",
             onClick = onLogout,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = RedAlert),
-            border = BorderStroke(1.dp, RedAlert.copy(alpha = 0.4f)),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth().height(50.dp)
-        ) {
-            Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Logout", fontWeight = FontWeight.SemiBold)
-        }
+            tone = ButtonTone.Danger,
+            icon = Icons.Default.Logout,
+            modifier = Modifier.fillMaxWidth()
+        )
         Spacer(Modifier.height(32.dp))
     }
 }

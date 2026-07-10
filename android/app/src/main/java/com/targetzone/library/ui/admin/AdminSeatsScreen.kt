@@ -1,6 +1,7 @@
 package com.targetzone.library.ui.admin
 
 import android.app.DatePickerDialog
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,23 +14,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.targetzone.library.data.model.Seat
 import com.targetzone.library.ui.components.AppCard
+import com.targetzone.library.ui.components.FormDialog
+import com.targetzone.library.ui.components.OutlineButton
 import com.targetzone.library.ui.components.SeatGrid
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
-fun AdminSeatsScreen(vm: AdminViewModel) {
+fun AdminSeatsScreen(vm: AdminViewModel, onViewStudent: (String) -> Unit = {}) {
     val seats     by vm.adminSeats.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
     var shift     by remember { mutableStateOf("MORNING") }
     var date      by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())) }
     var detailSeat by remember { mutableStateOf<Seat?>(null) }
+    var expiryView by remember { mutableStateOf(false) }
+    val haptics = rememberLibraryHaptics()
 
     val context = LocalContext.current
     val cal = Calendar.getInstance()
@@ -58,7 +64,7 @@ fun AdminSeatsScreen(vm: AdminViewModel) {
             listOf("MORNING", "EVENING", "FULL_DAY").forEach { s ->
                 FilterChip(
                     selected = shift == s,
-                    onClick = { shift = s },
+                    onClick = { haptics.tick(); shift = s },
                     label = { Text(when(s) { "MORNING" -> "Morning"; "EVENING" -> "Evening"; else -> "Full Day" }, fontSize = 12.sp) },
                     colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AmberFaint, selectedLabelColor = Amber)
                 )
@@ -66,16 +72,15 @@ fun AdminSeatsScreen(vm: AdminViewModel) {
         }
         Spacer(Modifier.height(8.dp))
 
-        // Date picker
-        OutlinedButton(
-            onClick = { datePicker.show() },
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
-            border = androidx.compose.foundation.BorderStroke(1.dp, DividerColor),
-            shape = RoundedCornerShape(10.dp)
-        ) {
-            Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(date, fontSize = 13.sp)
+        // Date picker + expiry view toggle
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlineButton(text = date, onClick = { datePicker.show() }, icon = Icons.Default.CalendarToday, height = 40.dp)
+            FilterChip(
+                selected = expiryView,
+                onClick = { haptics.tick(); expiryView = !expiryView },
+                label = { Text("📅 Expiry View", fontSize = 12.sp) },
+                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AmberFaint, selectedLabelColor = Amber)
+            )
         }
         Spacer(Modifier.height(12.dp))
 
@@ -108,7 +113,9 @@ fun AdminSeatsScreen(vm: AdminViewModel) {
                     seats = seats,
                     selectedSeatNumber = null,
                     onSeatClick = {},
-                    onBookedSeatClick = { seat -> detailSeat = seat }
+                    onBookedSeatClick = { seat -> detailSeat = seat },
+                    expiryView = expiryView,
+                    viewDate = date
                 )
             }
         }
@@ -120,30 +127,43 @@ fun AdminSeatsScreen(vm: AdminViewModel) {
 
     // Seat detail dialog
     detailSeat?.let { seat ->
-        Dialog(onDismissRequest = { detailSeat = null }) {
-            Surface(shape = RoundedCornerShape(16.dp), color = NavyMid) {
-                Column(Modifier.padding(20.dp)) {
-                    Text("Seat ${seat.seatNumber}", style = MaterialTheme.typography.titleMedium, color = Amber)
-                    Spacer(Modifier.height(12.dp))
-                    DetailRow("Student", seat.studentName ?: "—")
-                    DetailRow("Mobile", seat.studentMobile ?: "—")
-                    DetailRow("Shift", shift)
-                    DetailRow("Expires", seat.membershipEnd ?: "—")
-                    Spacer(Modifier.height(12.dp))
-                    TextButton(onClick = { detailSeat = null }, modifier = Modifier.align(Alignment.End)) {
-                        Text("Close", color = Amber)
-                    }
-                }
+        FormDialog(title = "Seat ${seat.seatNumber}", onDismiss = { detailSeat = null }) {
+            if (seat.studentId != null) {
+                DetailRow("Student", seat.studentName ?: "—", onClick = {
+                    haptics.tick()
+                    detailSeat = null
+                    onViewStudent(seat.studentId)
+                })
+            } else {
+                DetailRow("Student", seat.studentName ?: "—")
             }
+            DetailRow("Mobile", seat.studentMobile ?: "—")
+            DetailRow("Shift", shift)
+            DetailRow("Expires", seat.membershipEnd ?: "—")
+            Spacer(Modifier.height(12.dp))
+            OutlineButton(text = "Close", onClick = { detailSeat = null }, modifier = Modifier.align(Alignment.End), height = 40.dp)
         }
     }
 }
 
 @Composable
-private fun DetailRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+private fun DetailRow(label: String, value: String, onClick: (() -> Unit)? = null) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Text(label, color = TextSub, fontSize = 13.sp)
-        Text(value, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Text(
+            value,
+            color = if (onClick != null) Amber else TextPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            textDecoration = if (onClick != null) TextDecoration.Underline else null
+        )
     }
     HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
 }

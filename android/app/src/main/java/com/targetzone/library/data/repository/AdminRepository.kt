@@ -2,6 +2,9 @@ package com.targetzone.library.data.repository
 
 import com.targetzone.library.data.api.ApiClient
 import com.targetzone.library.data.model.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 
 class AdminRepository {
     private val api = ApiClient.service
@@ -11,8 +14,8 @@ class AdminRepository {
         res.body()?.data ?: throw Exception("Failed to load stats")
     }
 
-    suspend fun getStudents(page: Int = 0, status: String? = null, membershipStatus: String? = null, search: String? = null): Result<Pair<List<StudentSummary>, Int>> = runCatching {
-        val res = api.getStudents(page = page, status = status?.takeIf { it.isNotBlank() }, membershipStatus = membershipStatus?.takeIf { it.isNotBlank() }, search = search?.takeIf { it.isNotBlank() })
+    suspend fun getStudents(page: Int = 0, status: String? = null, membershipStatus: String? = null, search: String? = null, size: Int = 20): Result<Pair<List<StudentSummary>, Int>> = runCatching {
+        val res = api.getStudents(page = page, size = size, status = status?.takeIf { it.isNotBlank() }, membershipStatus = membershipStatus?.takeIf { it.isNotBlank() }, search = search?.takeIf { it.isNotBlank() })
         val data = res.body()?.data ?: StudentListResponse()
         Pair(data.students, data.total)
     }
@@ -25,8 +28,61 @@ class AdminRepository {
         api.changeSeat(membershipId, ChangeSeatRequest(seatNumber = seatNumber))
     }
 
+    suspend fun swapSeat(membershipId: String, otherUserId: String): Result<Unit> = runCatching {
+        val res = api.swapSeat(membershipId, SwapSeatRequest(otherUserId = otherUserId))
+        // Business-logic failures (e.g. "other student doesn't have a seat") come back
+        // as a real 4xx with an { success:false, message } body — Retrofit/Gson only
+        // auto-parses res.body() for 2xx, so a non-2xx has to be read from errorBody().
+        if (!res.isSuccessful) {
+            val message = res.errorBody()?.string()?.let {
+                runCatching { com.google.gson.JsonParser.parseString(it).asJsonObject.get("message")?.asString }.getOrNull()
+            } ?: "Seat exchange failed"
+            throw Exception(message)
+        }
+        if (res.body()?.success == false) throw Exception(res.body()?.message ?: "Seat exchange failed")
+    }
+
     suspend fun updateMembershipPlan(membershipId: String, planId: String): Result<Unit> = runCatching {
         api.updateMembershipPlan(membershipId, UpdateMembershipPlanRequest(planId = planId))
+    }
+
+    suspend fun renewSeat(membershipId: String): Result<Unit> = runCatching {
+        api.renewSeat(membershipId)
+    }
+
+    suspend fun releaseSeat(membershipId: String, notifyStudent: Boolean): Result<Unit> = runCatching {
+        api.releaseSeat(membershipId, ReleaseSeatRequest(notifyStudent))
+    }
+
+    suspend fun clearDues(membershipId: String, amountCleared: Double): Result<Unit> = runCatching {
+        api.clearDues(membershipId, ClearAmountRequest(amountCleared))
+    }
+
+    suspend fun markPending(membershipId: String, pendingAmount: Double): Result<Unit> = runCatching {
+        api.markPending(membershipId, MarkPendingRequest(pendingAmount))
+    }
+
+    suspend fun markGrace(membershipId: String): Result<Unit> = runCatching {
+        api.markGrace(membershipId)
+    }
+
+    suspend fun deleteStudent(id: String): Result<Unit> = runCatching {
+        api.deleteStudent(id)
+    }
+
+    suspend fun getStudentsInGraceWithDues(): Result<List<StudentDetail>> = runCatching {
+        val res = api.getStudentsInGraceWithDues()
+        res.body()?.data ?: emptyList()
+    }
+
+    suspend fun getStudentsWithOrphanedSeats(): Result<List<StudentDetail>> = runCatching {
+        val res = api.getStudentsWithOrphanedSeats()
+        res.body()?.data ?: emptyList()
+    }
+
+    suspend fun sendGraceDuesReminders(userIds: List<String>): Result<String> = runCatching {
+        val res = api.sendGraceDuesReminders(SendReminderRequest(userIds = userIds))
+        res.body()?.data ?: res.body()?.message ?: "Reminders sent"
     }
 
     suspend fun getExpiringMemberships(withinDays: Int): Result<List<ReminderStudent>> = runCatching {
@@ -48,6 +104,7 @@ class AdminRepository {
                     seatNumber = s.seatNumber,
                     row = row,
                     isBooked = s.isOccupied,
+                    studentId = s.studentId,
                     studentName = s.studentName,
                     studentMobile = s.studentMobile,
                     studentGender = s.studentGender,
@@ -91,13 +148,12 @@ class AdminRepository {
         res.body()?.data ?: emptyList()
     }
 
-    suspend fun clearPendingFees(id: String): Result<StudentDetail> = runCatching {
-        val res = api.clearPendingFees(id)
-        res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to clear fees")
+    suspend fun clearPendingFees(id: String, amountCleared: Double): Result<Unit> = runCatching {
+        api.clearPendingFees(id, ClearAmountRequest(amountCleared))
     }
 
-    suspend fun sendPendingFeeReminders(): Result<String> = runCatching {
-        val res = api.sendPendingFeeReminders()
+    suspend fun sendPendingFeeReminders(userIds: List<String>): Result<String> = runCatching {
+        val res = api.sendPendingFeeReminders(SendReminderRequest(userIds = userIds))
         res.body()?.data ?: res.body()?.message ?: "Reminders sent"
     }
 
@@ -134,8 +190,14 @@ class AdminRepository {
         api.deleteInboxMessage(messageNumber)
     }
 
-    suspend fun importSingleStudent(req: ManualImportRequest): Result<Unit> = runCatching {
-        val res = api.importSingleStudent(req)
+    suspend fun importSingleStudent(name: String, phone: String, photo: java.io.File?): Result<Unit> = runCatching {
+        val nameBody = name.toRequestBody("text/plain".toMediaTypeOrNull())
+        val phoneBody = phone.toRequestBody("text/plain".toMediaTypeOrNull())
+        val photoPart = photo?.let {
+            val body = it.asRequestBody("image/jpeg".toMediaTypeOrNull())
+            okhttp3.MultipartBody.Part.createFormData("photo", it.name, body)
+        }
+        val res = api.importSingleStudentWithPhoto(nameBody, phoneBody, photoPart)
         if (res.body()?.success == false) throw Exception(res.body()?.message ?: "Import failed")
     }
 

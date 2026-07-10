@@ -11,7 +11,6 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
-// ← Change this to your production API URL before deploying
 const val BASE_URL = "https://targetzone.co.in/api/"
 
 object ApiClient {

@@ -18,8 +18,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.targetzone.library.R
 import com.targetzone.library.ui.components.AppTextField
+import com.targetzone.library.ui.components.BannerTone
 import com.targetzone.library.ui.components.LibraryPhotoSlideshow
+import com.targetzone.library.ui.components.MessageBanner
 import com.targetzone.library.ui.components.PrimaryButton
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 
 // Drop library photos into res/drawable/ then list them here, e.g.:
@@ -36,6 +39,7 @@ fun LoginScreen(
     val state by vm.state.collectAsState()
     var mobile by remember { mutableStateOf("") }
     var otp    by remember { mutableStateOf("") }
+    val haptics = rememberLibraryHaptics()
 
     LaunchedEffect(state.isLoggedIn) { if (state.isLoggedIn) onLoginSuccess() }
     LaunchedEffect(state.otpVerified, state.isNewUser) {
@@ -71,9 +75,7 @@ fun LoginScreen(
         Spacer(Modifier.height(24.dp))
 
         state.error?.let {
-            Card(colors = CardDefaults.cardColors(containerColor = RedFaint), modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-                Text(it, color = RedAlert, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
-            }
+            MessageBanner(it, BannerTone.Error, modifier = Modifier.padding(bottom = 16.dp))
         }
 
         if (!state.otpSent) {
@@ -99,7 +101,7 @@ fun LoginScreen(
             AppTextField(
                 value = otp, onValueChange = { otp = it.filter(Char::isDigit).take(6) },
                 label = "Enter 6-digit OTP",
-                trailingIcon = if (otp.isNotEmpty()) {{ TextButton(onClick = { otp = "" }) { Text("Clear", color = Amber, fontSize = 12.sp) } }} else null
+                trailingIcon = if (otp.isNotEmpty()) {{ TextButton(onClick = { haptics.tick(); otp = "" }) { Text("Clear", color = Amber, fontSize = 12.sp) } }} else null
             )
             Spacer(Modifier.height(20.dp))
             PrimaryButton(
@@ -110,11 +112,11 @@ fun LoginScreen(
             )
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { vm.resetOtpState(); otp = "" }) {
+                TextButton(onClick = { haptics.tick(); vm.resetOtpState(); otp = "" }) {
                     Text("← Change Number", color = TextSub, fontSize = 13.sp)
                 }
                 val canResend = state.secondsSinceSend >= 10
-                TextButton(onClick = { vm.resendOtp(mobile) }, enabled = canResend && !state.isLoading) {
+                TextButton(onClick = { haptics.tick(); vm.resendOtp(mobile) }, enabled = canResend && !state.isLoading) {
                     Text(
                         if (canResend) "Resend OTP" else "Resend in ${10 - state.secondsSinceSend}s",
                         color = if (canResend) Amber else TextMuted, fontSize = 13.sp
@@ -124,7 +126,7 @@ fun LoginScreen(
             val showSmsOption = state.secondsSinceSend >= 10 && state.otpSendCount >= 2 && !state.smsOptionUsed
             if (showSmsOption) {
                 Spacer(Modifier.height(4.dp))
-                TextButton(onClick = { vm.sendOtpViaSms(mobile) }, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth()) {
+                TextButton(onClick = { haptics.tick(); vm.sendOtpViaSms(mobile) }, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth()) {
                     Text("Still no OTP? Send via SMS instead", color = BlueSoft, fontSize = 13.sp)
                 }
             }
@@ -133,7 +135,7 @@ fun LoginScreen(
         Spacer(Modifier.height(32.dp))
         HorizontalDivider(color = DividerColor)
         Spacer(Modifier.height(16.dp))
-        TextButton(onClick = onAdminLogin) {
+        TextButton(onClick = { haptics.tick(); onAdminLogin() }) {
             Text("Admin Login →", color = TextMuted, fontSize = 13.sp)
         }
     }

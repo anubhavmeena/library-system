@@ -20,6 +20,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.targetzone.library.data.model.GalleryPhoto
+import com.targetzone.library.ui.components.BannerTone
+import com.targetzone.library.ui.components.LoadingScreen
+import com.targetzone.library.ui.components.MessageBanner
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 
 @Composable
@@ -29,6 +33,7 @@ fun StudentGalleryScreen(vm: StudentViewModel) {
     val error     by vm.error.collectAsState()
 
     var preview by remember { mutableStateOf<GalleryPhoto?>(null) }
+    val haptics = rememberLibraryHaptics()
 
     LaunchedEffect(Unit) { vm.loadGallery() }
 
@@ -39,17 +44,12 @@ fun StudentGalleryScreen(vm: StudentViewModel) {
         }
 
         error?.let {
-            Card(colors = CardDefaults.cardColors(containerColor = RedFaint),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                Text("⚠️  $it", color = RedAlert, modifier = Modifier.padding(12.dp))
-            }
+            MessageBanner("⚠️  $it", BannerTone.Error, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
             Spacer(Modifier.height(8.dp))
         }
 
         if (isLoading && photos.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Amber)
-            }
+            LoadingScreen()
         } else if (photos.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -72,7 +72,7 @@ fun StudentGalleryScreen(vm: StudentViewModel) {
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(12.dp))
                             .background(NavyMid)
-                            .clickable { preview = photo }
+                            .clickable { haptics.tick(); preview = photo }
                     ) {
                         val imgUrl = if (photo.url.startsWith("http")) photo.url
                                      else "https://targetzone.co.in${photo.url}"
@@ -106,7 +106,7 @@ fun StudentGalleryScreen(vm: StudentViewModel) {
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             Box(
-                Modifier.fillMaxSize().background(Color.Black.copy(0.92f)).clickable { preview = null },
+                Modifier.fillMaxSize().background(Color.Black.copy(0.92f)).clickable { haptics.tick(); preview = null },
                 contentAlignment = Alignment.Center
             ) {
                 Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -124,7 +124,7 @@ fun StudentGalleryScreen(vm: StudentViewModel) {
                     }
                     Spacer(Modifier.height(16.dp))
                     Button(
-                        onClick = { preview = null },
+                        onClick = { haptics.tick(); preview = null },
                         colors = ButtonDefaults.buttonColors(containerColor = NavyMid, contentColor = TextPrimary)
                     ) { Text("Close") }
                 }

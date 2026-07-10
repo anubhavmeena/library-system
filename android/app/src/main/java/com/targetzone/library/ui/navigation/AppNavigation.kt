@@ -1,5 +1,8 @@
 package com.targetzone.library.ui.navigation
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -18,6 +21,7 @@ import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -28,6 +32,7 @@ import com.targetzone.library.data.TokenManager
 import com.targetzone.library.data.api.ApiClient
 import com.targetzone.library.data.model.User
 import com.targetzone.library.data.repository.AuthRepository
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.SplashScreen
 import com.targetzone.library.ui.admin.*
 import com.targetzone.library.ui.auth.*
@@ -145,7 +150,13 @@ fun AppNavigation(tokenManager: TokenManager) {
 
             // Student routes
             composable("dashboard")       { DashboardScreen(studentVm, currentUser) { route -> navController.navigate(route) } }
-            composable("booking")         { BookingScreen(studentVm) { navController.navigate("payment-success") { popUpTo("booking") { inclusive = true } } } }
+            composable("booking")         {
+                BookingScreen(
+                    studentVm,
+                    onSuccess = { navController.navigate("payment-success") { popUpTo("booking") { inclusive = true } } },
+                    onNavigate = { route -> navController.navigate(route) }
+                )
+            }
             composable("membership")      { MembershipScreen(studentVm) { navController.navigate("booking") } }
             composable("profile")         { ProfileScreen(studentVm, onLogout = logout) }
             composable("facilities")      { FacilitiesScreen() }
@@ -175,7 +186,9 @@ fun AppNavigation(tokenManager: TokenManager) {
                 }
             }
             composable("admin/seats")     {
-                AdminScaffold("Seat Map", onLogout = logout) { AdminSeatsScreen(adminVm) }
+                AdminScaffold("Seat Map", onLogout = logout) {
+                    AdminSeatsScreen(adminVm) { studentId -> navController.navigate("admin/students/$studentId") }
+                }
             }
             composable("admin/reminders") {
                 AdminScaffold("Reminders", onLogout = logout) { AdminRemindersScreen(adminVm) }
@@ -239,22 +252,27 @@ private fun AdminScaffold(title: String, onLogout: (() -> Unit)? = null, onBack:
 
 @Composable
 private fun StudentBottomBar(currentRoute: String, navController: androidx.navigation.NavHostController) {
+    val haptics = rememberLibraryHaptics()
     NavigationBar(containerColor = NavyMid) {
         studentNavItems.forEach { item ->
             val selected = currentRoute.startsWith(item.route)
             NavigationBarItem(
                 selected = selected,
-                onClick = { navController.navigate(item.route) { popUpTo(navController.graph.findStartDestination().id); launchSingleTop = true } },
-                icon = { Icon(item.icon, item.label, modifier = Modifier.size(22.dp)) },
-                label = { Text(item.label, fontSize = 11.sp) },
+                onClick = {
+                    haptics.tick()
+                    navController.navigate(item.route) { popUpTo(navController.graph.findStartDestination().id); launchSingleTop = true }
+                },
+                icon = { NavIcon(item.icon, item.label, selected) },
+                label = null,
                 colors = NavigationBarItemDefaults.colors(selectedIconColor = Amber, selectedTextColor = Amber, indicatorColor = AmberFaint, unselectedIconColor = TextMuted, unselectedTextColor = TextMuted)
             )
         }
+        val gallerySelected = currentRoute == "gallery"
         NavigationBarItem(
-            selected = currentRoute == "gallery",
-            onClick = { navController.navigate("gallery") },
-            icon = { Icon(Icons.Default.Photo, "Gallery", modifier = Modifier.size(22.dp)) },
-            label = { Text("Gallery", fontSize = 11.sp) },
+            selected = gallerySelected,
+            onClick = { haptics.tick(); navController.navigate("gallery") },
+            icon = { NavIcon(Icons.Default.Photo, "Gallery", gallerySelected) },
+            label = null,
             colors = NavigationBarItemDefaults.colors(selectedIconColor = Amber, selectedTextColor = Amber, indicatorColor = AmberFaint, unselectedIconColor = TextMuted, unselectedTextColor = TextMuted)
         )
     }
@@ -262,16 +280,30 @@ private fun StudentBottomBar(currentRoute: String, navController: androidx.navig
 
 @Composable
 private fun AdminBottomBar(currentRoute: String, navController: androidx.navigation.NavHostController) {
+    val haptics = rememberLibraryHaptics()
     NavigationBar(containerColor = NavyMid) {
         adminNavItems.forEach { item ->
             val selected = currentRoute.startsWith(item.route)
             NavigationBarItem(
                 selected = selected,
-                onClick = { navController.navigate(item.route) { launchSingleTop = true } },
-                icon = { Icon(item.icon, item.label, modifier = Modifier.size(22.dp)) },
-                label = { Text(item.label, fontSize = 10.sp) },
+                onClick = { haptics.tick(); navController.navigate(item.route) { launchSingleTop = true } },
+                icon = { NavIcon(item.icon, item.label, selected) },
+                label = null,
                 colors = NavigationBarItemDefaults.colors(selectedIconColor = Amber, selectedTextColor = Amber, indicatorColor = AmberFaint, unselectedIconColor = TextMuted, unselectedTextColor = TextMuted)
             )
         }
     }
+}
+
+// M3's NavigationBarItem already animates the pill indicator's fade/scale by
+// default; the icon itself doesn't move on its own, so this adds a small
+// spring bounce on selection for extra tactile feedback.
+@Composable
+private fun NavIcon(icon: ImageVector, label: String, selected: Boolean) {
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.12f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "navIconScale"
+    )
+    Icon(icon, label, modifier = Modifier.size(28.dp).graphicsLayer { scaleX = scale; scaleY = scale })
 }

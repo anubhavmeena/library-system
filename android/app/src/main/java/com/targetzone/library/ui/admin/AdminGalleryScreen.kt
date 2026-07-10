@@ -28,7 +28,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.targetzone.library.data.model.GalleryPhoto
+import com.targetzone.library.ui.components.ButtonTone
+import com.targetzone.library.ui.components.ConfirmDialog
+import com.targetzone.library.ui.components.LoadingScreen
+import com.targetzone.library.ui.components.MessageBanner
+import com.targetzone.library.ui.components.BannerTone
 import com.targetzone.library.ui.components.PrimaryButton
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -48,6 +54,7 @@ fun AdminGalleryScreen(vm: AdminViewModel) {
     var previewPhoto  by remember { mutableStateOf<GalleryPhoto?>(null) }
     var deleteTarget  by remember { mutableStateOf<GalleryPhoto?>(null) }
     var uploadDialog  by remember { mutableStateOf(false) }
+    val haptics = rememberLibraryHaptics()
 
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -75,24 +82,16 @@ fun AdminGalleryScreen(vm: AdminViewModel) {
         }
 
         successMsg?.let {
-            Card(colors = CardDefaults.cardColors(containerColor = EmeraldFaint),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                Text("✅  $it", color = Emerald, modifier = Modifier.padding(12.dp))
-            }
+            MessageBanner("✅  $it", BannerTone.Success, modifier = Modifier.padding(horizontal = 16.dp))
             Spacer(Modifier.height(8.dp))
         }
         error?.let {
-            Card(colors = CardDefaults.cardColors(containerColor = RedFaint),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                Text("⚠️  $it", color = RedAlert, modifier = Modifier.padding(12.dp))
-            }
+            MessageBanner("⚠️  $it", BannerTone.Error, modifier = Modifier.padding(horizontal = 16.dp))
             Spacer(Modifier.height(8.dp))
         }
 
         if (isLoading && photos.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Amber)
-            }
+            LoadingScreen()
         } else if (photos.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -117,7 +116,7 @@ fun AdminGalleryScreen(vm: AdminViewModel) {
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(12.dp))
                             .background(NavyMid)
-                            .clickable { previewPhoto = photo }
+                            .clickable { haptics.tick(); previewPhoto = photo }
                     ) {
                         val imgUrl = if (photo.url.startsWith("http")) photo.url
                                      else "https://targetzone.co.in${photo.url}"
@@ -141,7 +140,7 @@ fun AdminGalleryScreen(vm: AdminViewModel) {
                         }
                         // Delete button
                         IconButton(
-                            onClick = { deleteTarget = photo },
+                            onClick = { haptics.tick(); deleteTarget = photo },
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(4.dp)
@@ -168,59 +167,40 @@ fun AdminGalleryScreen(vm: AdminViewModel) {
 
     // Upload dialog
     if (uploadDialog) {
-        Dialog(onDismissRequest = { if (!isLoading) uploadDialog = false }) {
-            Surface(shape = RoundedCornerShape(16.dp), color = NavyMid) {
-                Column(Modifier.padding(20.dp)) {
-                    Text("Upload Photo", fontWeight = FontWeight.SemiBold, color = TextPrimary, fontSize = 16.sp)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = caption,
-                        onValueChange = { caption = it },
-                        placeholder = { Text("Caption (optional)", color = TextMuted, fontSize = 13.sp) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Amber, unfocusedBorderColor = DividerColor,
-                            focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary, cursorColor = Amber
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = { uploadDialog = false },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSub),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, DividerColor)
-                        ) { Text("Cancel") }
-                        Button(
-                            onClick = { pickImage.launch("image/*") },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = NavyDeep)
-                        ) { Text("Pick Image") }
-                    }
-                }
-            }
+        ConfirmDialog(
+            title = "Upload Photo",
+            onDismiss = { if (!isLoading) uploadDialog = false },
+            onConfirm = { pickImage.launch("image/*") },
+            confirmLabel = "Pick Image"
+        ) {
+            OutlinedTextField(
+                value = caption,
+                onValueChange = { caption = it },
+                placeholder = { Text("Caption (optional)", color = TextMuted, fontSize = 13.sp) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Amber, unfocusedBorderColor = DividerColor,
+                    focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary, cursorColor = Amber
+                ),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
         }
     }
 
     // Delete confirm dialog
     deleteTarget?.let { photo ->
-        AlertDialog(
-            onDismissRequest = { deleteTarget = null },
-            title = { Text("Delete Photo?", color = TextPrimary) },
-            text = { Text(if (!photo.caption.isNullOrBlank()) "\"${photo.caption}\"" else "This photo will be permanently deleted.", color = TextSub) },
-            confirmButton = {
-                TextButton(onClick = {
-                    vm.deleteGalleryPhoto(photo.id) {}
-                    deleteTarget = null
-                    if (previewPhoto?.id == photo.id) previewPhoto = null
-                }) { Text("Delete", color = RedAlert) }
+        ConfirmDialog(
+            title = "Delete Photo?",
+            subtitle = if (!photo.caption.isNullOrBlank()) "\"${photo.caption}\"" else "This photo will be permanently deleted.",
+            onDismiss = { deleteTarget = null },
+            onConfirm = {
+                vm.deleteGalleryPhoto(photo.id) {}
+                deleteTarget = null
+                if (previewPhoto?.id == photo.id) previewPhoto = null
             },
-            dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) { Text("Cancel", color = Amber) }
-            },
-            containerColor = NavyMid
+            confirmLabel = "Delete",
+            confirmTone = ButtonTone.Danger
         )
     }
 
@@ -231,7 +211,7 @@ fun AdminGalleryScreen(vm: AdminViewModel) {
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(0.92f))
-                .clickable { previewPhoto = null }, contentAlignment = Alignment.Center) {
+                .clickable { haptics.tick(); previewPhoto = null }, contentAlignment = Alignment.Center) {
                 Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     val imgUrl = if (photo.url.startsWith("http")) photo.url
                                  else "https://targetzone.co.in${photo.url}"
@@ -248,12 +228,12 @@ fun AdminGalleryScreen(vm: AdminViewModel) {
                     Spacer(Modifier.height(16.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(
-                            onClick = { deleteTarget = photo },
+                            onClick = { haptics.tick(); deleteTarget = photo },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = RedAlert),
                             border = androidx.compose.foundation.BorderStroke(1.dp, RedAlert.copy(0.5f))
                         ) { Text("Delete") }
                         Button(
-                            onClick = { previewPhoto = null },
+                            onClick = { haptics.tick(); previewPhoto = null },
                             colors = ButtonDefaults.buttonColors(containerColor = NavyMid, contentColor = TextPrimary)
                         ) { Text("Close") }
                     }

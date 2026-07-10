@@ -14,12 +14,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.targetzone.library.ui.components.*
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 
 @Composable
 fun AdminDashboardScreen(vm: AdminViewModel, onNavigate: (String) -> Unit) {
     val stats     by vm.stats.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
+    val haptics = rememberLibraryHaptics()
 
     LaunchedEffect(Unit) { vm.loadStats() }
 
@@ -34,7 +36,7 @@ fun AdminDashboardScreen(vm: AdminViewModel, onNavigate: (String) -> Unit) {
                 Text("Admin Dashboard", style = MaterialTheme.typography.headlineMedium)
                 Text("Library overview", color = TextSub, fontSize = 13.sp)
             }
-            IconButton(onClick = { vm.loadStats() }) {
+            IconButton(onClick = { haptics.tick(); vm.loadStats() }) {
                 Icon(Icons.Default.Refresh, "Refresh", tint = Amber)
             }
         }
@@ -113,13 +115,14 @@ fun AdminDashboardScreen(vm: AdminViewModel, onNavigate: (String) -> Unit) {
             "feedback"       to "💬  View Feedback",
             "revenue"        to "📊  Revenue & Reports",
             "inbox"          to "📬  Inbox",
-            "memberships/new" to "➕  Create Membership"
+            "memberships/new" to "➕  Create Membership",
+            "import"         to "🧑‍🎓  Import Student"
         )
         links.forEach { (route, label) ->
-            AppCard(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+            AppCard(Modifier.fillMaxWidth().padding(bottom = 8.dp), onClick = { onNavigate(route) }) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text(label, color = TextPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { onNavigate(route) }) { Text("Go →", color = Amber, fontSize = 13.sp) }
+                    Text("Go →", color = Amber, fontSize = 13.sp)
                 }
             }
         }

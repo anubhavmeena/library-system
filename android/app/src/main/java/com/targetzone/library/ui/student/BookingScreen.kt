@@ -16,21 +16,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.cashfree.pg.api.CFPaymentGatewayService
-import com.cashfree.pg.core.api.CFSession
-import com.cashfree.pg.core.api.CFTheme
-import com.cashfree.pg.ui.api.CFDropCheckoutPayment
-import com.razorpay.Checkout
-import com.targetzone.library.BuildConfig
 import com.targetzone.library.MainActivity
 import com.targetzone.library.data.model.Plan
-import com.targetzone.library.data.model.PaymentOrder
 import com.targetzone.library.ui.components.*
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
-import org.json.JSONObject
 
 @Composable
-fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit) {
+fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit, onNavigate: (String) -> Unit = {}) {
     val membership   by vm.membership.collectAsState()
     val plans        by vm.plans.collectAsState()
     val seats        by vm.seats.collectAsState()
@@ -45,6 +38,7 @@ fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit) {
 
     val context = LocalContext.current
     val activity = context as? MainActivity
+    val haptics = rememberLibraryHaptics()
 
     // Route to the correct payment gateway based on backend response
     LaunchedEffect(Unit) {
@@ -92,6 +86,24 @@ fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit) {
         return
     }
 
+    // GRACE gate — the backend rejects create-order while dues are outstanding
+    // (PaymentService), so block here too rather than letting the student pick
+    // a plan/seat only to hit an error at the payment step.
+    if (membership?.status == "GRACE") {
+        Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("⚠️", fontSize = 48.sp)
+            Spacer(Modifier.height(12.dp))
+            Text("Dues Pending", style = MaterialTheme.typography.headlineSmall, color = RedAlert)
+            Text("Clear your outstanding dues before booking a new seat.", color = TextSub, fontSize = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Spacer(Modifier.height(8.dp))
+            InfoRow("Seat", membership?.seatNumber ?: "—")
+            InfoRow("Dues", "₹${(membership?.duesAmount ?: 0.0).toInt()}", highlight = true)
+            Spacer(Modifier.height(16.dp))
+            PrimaryButton(text = "Clear Dues", onClick = { onNavigate("membership") })
+        }
+        return
+    }
+
     Column(
         Modifier
             .fillMaxSize()
@@ -107,10 +119,8 @@ fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit) {
 
         error?.let {
             Spacer(Modifier.height(8.dp))
-            Card(colors = CardDefaults.cardColors(containerColor = RedFaint)) {
-                Text(it, color = RedAlert, modifier = Modifier.padding(12.dp), fontSize = 13.sp)
-            }
-            vm.clearError()
+            MessageBanner(it, BannerTone.Error)
+            LaunchedEffect(it) { kotlinx.coroutines.delay(4000); vm.clearError() }
         }
 
         // Step 1 — choose plan
@@ -138,7 +148,7 @@ fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit) {
                     listOf("MORNING", "EVENING").forEach { s ->
                         FilterChip(
                             selected = shift == s,
-                            onClick = { shift = s },
+                            onClick = { haptics.tick(); shift = s },
                             label = { Text(if (s == "MORNING") "Morning" else "Evening") },
                             colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AmberFaint, selectedLabelColor = Amber)
                         )
@@ -161,14 +171,12 @@ fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit) {
                             Text("Seat ${selectedSeat?.seatNumber}", color = Amber, fontWeight = FontWeight.SemiBold)
                             Text("Row ${selectedSeat?.row} · ${if (selectedPlan?.planType == "FULL_DAY") "Full Day" else shift}", color = TextSub, fontSize = 12.sp)
                         }
-                        Button(onClick = { step = 3 }, colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = NavyDeep)) {
-                            Text("Continue", fontWeight = FontWeight.SemiBold)
-                        }
+                        PrimaryButton(text = "Continue", onClick = { step = 3 }, modifier = Modifier.height(42.dp))
                     }
                 }
             }
             Spacer(Modifier.height(8.dp))
-            TextButton(onClick = { step = 1 }) { Text("← Back to Plans", color = TextSub) }
+            TextButton(onClick = { haptics.tick(); step = 1 }) { Text("← Back to Plans", color = TextSub) }
         }
 
         // Step 3 — summary & pay
@@ -204,7 +212,7 @@ fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
-            TextButton(onClick = { step = 2 }, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = { haptics.tick(); step = 2 }, modifier = Modifier.fillMaxWidth()) {
                 Text("← Change Seat", color = TextSub)
             }
         }
@@ -212,93 +220,8 @@ fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit) {
 }
 
 @Composable
-private fun PlanCard(plan: Plan, selected: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (selected) AmberFaint else CardBg)
-            .border(1.dp, if (selected) Amber else DividerColor, RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(16.dp)
-    ) {
-        Column {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-                Column(Modifier.weight(1f)) {
-                    Text(plan.name, style = MaterialTheme.typography.titleMedium)
-                    Text(plan.description, color = TextSub, fontSize = 13.sp)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("₹${plan.price.toInt()}", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Amber)
-                    Text("/month", color = TextMuted, fontSize = 11.sp)
-                }
-            }
-            if (plan.planType == "FULL_DAY") {
-                Spacer(Modifier.height(8.dp))
-                Box(Modifier.clip(RoundedCornerShape(50)).background(AmberFaint).padding(horizontal = 10.dp, vertical = 3.dp)) {
-                    Text("Most Popular", color = Amber, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-    }
-}
-
-private fun openRazorpay(
-    activity: MainActivity?,
-    order: PaymentOrder,
-    callback: (success: Boolean, paymentId: String?, orderId: String?, signature: String?, error: String?) -> Unit
-) {
-    activity ?: return
-    activity.onPaymentResult = callback
-    val checkout = Checkout()
-    checkout.setKeyID(order.razorpayKeyId)
-    val options = JSONObject().apply {
-        put("name", "Target Zone Library")
-        put("description", "Library Membership")
-        put("order_id", order.orderId)
-        put("amount", (order.amount * 100).toLong())
-        put("currency", "INR")
-        put("theme", JSONObject().put("color", "#F59E0B"))
-    }
-    checkout.open(activity, options)
-}
-
-private fun openCashfree(
-    activity: MainActivity?,
-    order: PaymentOrder,
-    callback: (success: Boolean, orderId: String?, error: String?) -> Unit
-) {
-    activity ?: return
-    activity.onCashfreeResult = callback
-    try {
-        val env = if (BuildConfig.CASHFREE_ENV == "production")
-            CFSession.Environment.PRODUCTION else CFSession.Environment.SANDBOX
-        val cfSession = CFSession.CFSessionBuilder()
-            .setEnvironment(env)
-            .setPaymentSessionID(order.paymentSessionId!!)
-            .setOrderId(order.orderId)
-            .build()
-        val cfTheme = CFTheme.CFThemeBuilder()
-            .setPrimaryTextColor("#FFFFFF")
-            .setSecondaryTextColor("#AAAAAA")
-            .setBackgroundColor("#0D1B4B")
-            .setNavigationBarBackgroundColor("#0D1B4B")
-            .setNavigationBarTextColor("#FFFFFF")
-            .setButtonBackgroundColor("#F59E0B")
-            .setButtonTextColor("#000000")
-            .build()
-        val cfPayment = CFDropCheckoutPayment.CFDropCheckoutPaymentBuilder()
-            .setSession(cfSession)
-            .setCFNativeCheckoutUITheme(cfTheme)
-            .build()
-        CFPaymentGatewayService.getInstance().doPayment(activity, cfPayment)
-    } catch (e: Exception) {
-        callback(false, null, e.message ?: "Failed to open payment")
-    }
-}
-
-@Composable
 private fun StepBar(current: Int, steps: List<String>, onStepClick: (Int) -> Unit) {
+    val haptics = rememberLibraryHaptics()
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         steps.forEachIndexed { idx, label ->
             val num = idx + 1
@@ -309,7 +232,7 @@ private fun StepBar(current: Int, steps: List<String>, onStepClick: (Int) -> Uni
                     .clip(RoundedCornerShape(50))
                     .background(if (active) Amber else CardBg)
                     .border(1.dp, if (active) Amber else DividerColor, RoundedCornerShape(50))
-                    .clickable(enabled = num < current) { onStepClick(num) },
+                    .clickable(enabled = num < current) { haptics.tick(); onStepClick(num) },
                 contentAlignment = Alignment.Center
             ) { Text("$num", color = if (active) NavyDeep else TextSub, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
             Spacer(Modifier.width(4.dp))

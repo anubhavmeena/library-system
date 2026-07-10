@@ -11,8 +11,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.targetzone.library.ui.components.AppCard
+import com.targetzone.library.ui.components.BannerTone
+import com.targetzone.library.ui.components.MessageBanner
 import com.targetzone.library.ui.components.PrimaryButton
 import com.targetzone.library.ui.components.SectionHeader
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 
 @Composable
@@ -23,6 +26,7 @@ fun AdminBroadcastScreen(vm: AdminViewModel) {
     val broadcastHistory by vm.broadcastHistory.collectAsState()
     var message         by remember { mutableStateOf("") }
     var target          by remember { mutableStateOf("ALL") }
+    val haptics = rememberLibraryHaptics()
 
     LaunchedEffect(Unit) { vm.loadBroadcastHistory() }
     LaunchedEffect(success) {
@@ -40,15 +44,11 @@ fun AdminBroadcastScreen(vm: AdminViewModel) {
         Spacer(Modifier.height(16.dp))
 
         success?.let {
-            Card(colors = CardDefaults.cardColors(containerColor = EmeraldFaint), modifier = Modifier.fillMaxWidth()) {
-                Text("✅  $it", color = Emerald, modifier = Modifier.padding(12.dp))
-            }
+            MessageBanner("✅  $it", BannerTone.Success)
             Spacer(Modifier.height(12.dp))
         }
         error?.let {
-            Card(colors = CardDefaults.cardColors(containerColor = RedFaint), modifier = Modifier.fillMaxWidth()) {
-                Text("⚠️  $it", color = RedAlert, modifier = Modifier.padding(12.dp))
-            }
+            MessageBanner("⚠️  $it", BannerTone.Error)
             Spacer(Modifier.height(12.dp))
         }
 
@@ -58,7 +58,7 @@ fun AdminBroadcastScreen(vm: AdminViewModel) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("ALL" to "All Students", "ACTIVE" to "Active Only", "EXPIRING" to "Expiring Soon").forEach { (v, l) ->
                     FilterChip(
-                        selected = target == v, onClick = { target = v },
+                        selected = target == v, onClick = { haptics.tick(); target = v },
                         label = { Text(l, fontSize = 12.sp) },
                         colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AmberFaint, selectedLabelColor = Amber)
                     )
@@ -83,13 +83,7 @@ fun AdminBroadcastScreen(vm: AdminViewModel) {
         }
 
         Spacer(Modifier.height(16.dp))
-        Card(colors = CardDefaults.cardColors(containerColor = AmberFaint), modifier = Modifier.fillMaxWidth()) {
-            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("⚠️", fontSize = 18.sp)
-                Spacer(Modifier.width(8.dp))
-                Text("This will send messages via WhatsApp & SMS to the selected group.", color = Amber, fontSize = 12.sp)
-            }
-        }
+        MessageBanner("⚠️ This will send messages via WhatsApp & SMS to the selected group.", BannerTone.Warning)
         Spacer(Modifier.height(16.dp))
         PrimaryButton(
             text = if (isLoading) "Sending…" else "Send Broadcast",

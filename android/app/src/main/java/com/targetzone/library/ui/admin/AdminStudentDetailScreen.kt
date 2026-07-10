@@ -1,18 +1,25 @@
 package com.targetzone.library.ui.admin
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material3.*
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -21,6 +28,7 @@ import coil.compose.AsyncImage
 import com.targetzone.library.data.model.StudentDetail
 import com.targetzone.library.data.model.UpdateStudentRequest
 import com.targetzone.library.ui.components.*
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -34,18 +42,15 @@ fun AdminStudentDetailScreen(
     val isLoading by vm.isLoading.collectAsState()
     val error     by vm.error.collectAsState()
 
-    val seats by vm.seats.collectAsState()
-    var changeSeatOpen by remember { mutableStateOf(false) }
-    var newSeat        by remember { mutableStateOf("") }
     var editOpen       by remember { mutableStateOf(false) }
-    var messageOpen    by remember { mutableStateOf(false) }
+    var photoPreviewOpen by remember { mutableStateOf(false) }
+    val haptics = rememberLibraryHaptics()
+    val context = LocalContext.current
 
     LaunchedEffect(studentId) { vm.loadStudentDetail(studentId) }
 
     if (isLoading && student == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = Amber)
-        }
+        LoadingScreen()
         return
     }
 
@@ -57,6 +62,9 @@ fun AdminStudentDetailScreen(
     }
 
     val s = student ?: return
+    // Backend returns a bare "/uploads/..." path, not an absolute URL — Coil
+    // can't resolve that without a host prefix.
+    val fullPhotoUrl = s.photoUrl?.let { if (it.startsWith("http")) it else "https://targetzone.co.in$it" }
 
     Column(
         Modifier
@@ -66,19 +74,21 @@ fun AdminStudentDetailScreen(
     ) {
         // ── Header ────────────────────────────────────────────────────────────
         AppCard(Modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                // Avatar
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Avatar — tapping a real photo opens a full-size lightbox, matching
+                // the web admin detail page; the placeholder initial isn't clickable.
                 Box(
                     Modifier
                         .size(64.dp)
                         .clip(CircleShape)
                         .background(AmberFaint)
-                        .border(2.dp, Amber, CircleShape),
+                        .border(2.dp, Amber, CircleShape)
+                        .let { if (!s.photoUrl.isNullOrBlank()) it.clickable { haptics.tick(); photoPreviewOpen = true } else it },
                     contentAlignment = Alignment.Center
                 ) {
                     if (!s.photoUrl.isNullOrBlank()) {
                         AsyncImage(
-                            model = s.photoUrl,
+                            model = fullPhotoUrl,
                             contentDescription = "Photo",
                             modifier = Modifier.fillMaxSize().clip(CircleShape)
                         )
@@ -92,14 +102,50 @@ fun AdminStudentDetailScreen(
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(s.name, fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 17.sp)
-                        Box(
-                            Modifier
-                                .size(8.dp)
-                                .background(if (s.isActive) Emerald else RedAlert, CircleShape)
-                        )
                     }
                     Text(s.mobile, color = TextSub, fontSize = 13.sp)
                     if (!s.email.isNullOrBlank()) Text(s.email, color = TextMuted, fontSize = 12.sp)
+                    s.displayStatus?.let { status ->
+                        Spacer(Modifier.height(4.dp))
+                        StatusChip(status)
+                    }
+                }
+                Column(Modifier.width(IntrinsicSize.Max), horizontalAlignment = Alignment.CenterHorizontally) {
+                    StudentActionsMenu(
+                        vm = vm,
+                        studentId = s.id,
+                        name = s.name,
+                        mobile = s.mobile,
+                        membershipId = s.membershipId,
+                        membershipStatus = s.membershipStatus,
+                        displayStatus = s.displayStatus,
+                        shift = s.shift,
+                        pendingAmount = s.pendingAmount,
+                        duesAmount = s.duesAmount,
+                        onMutated = { vm.loadStudentDetail(studentId) },
+                        onDeleted = onBack,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (s.mobile.isNotBlank()) {
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Amber)
+                                .clickable {
+                                    haptics.tick()
+                                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${s.mobile}")))
+                                },
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Call, contentDescription = "Call ${s.name}", tint = NavyDeep, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Call", color = NavyDeep, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        }
+                    }
                 }
             }
         }
@@ -155,10 +201,12 @@ fun AdminStudentDetailScreen(
                             Text("Outstanding Amount", color = RedAlert, fontSize = 12.sp)
                             Text("₹${s.pendingAmount!!.toInt()}", color = RedAlert, fontWeight = FontWeight.Bold, fontSize = 22.sp)
                         }
-                        Button(
-                            onClick = { vm.clearPendingFees(s.id) { vm.loadStudentDetail(studentId) } },
-                            colors = ButtonDefaults.buttonColors(containerColor = RedAlert, contentColor = androidx.compose.ui.graphics.Color.White)
-                        ) { Text("Mark Cleared", fontSize = 13.sp) }
+                        PrimaryButton(
+                            text = "Mark Cleared",
+                            onClick = { vm.clearPendingFees(s.id, s.pendingAmount ?: 0.0) { vm.loadStudentDetail(studentId) } },
+                            tone = ButtonTone.Danger,
+                            modifier = Modifier.height(40.dp)
+                        )
                     }
                 }
             }
@@ -188,44 +236,34 @@ fun AdminStudentDetailScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Actions ───────────────────────────────────────────────────────────
-        SectionHeader("Actions")
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            OutlinedButton(
-                onClick = { vm.toggleStudentStatus(s.id, s.isActive) { vm.loadStudentDetail(studentId) } },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = if (s.isActive) RedAlert else Emerald),
-                modifier = Modifier.height(40.dp)
-            ) { Text(if (s.isActive) "Deactivate" else "Activate", fontSize = 13.sp) }
-
-            OutlinedButton(
-                onClick = { editOpen = true },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
-                modifier = Modifier.height(40.dp)
-            ) { Text("Edit Profile", fontSize = 13.sp) }
-
-            if (!s.membershipId.isNullOrBlank()) {
-                OutlinedButton(
-                    onClick = {
-                        vm.loadSeats(s.shift ?: "MORNING")
-                        changeSeatOpen = true
-                    },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
-                    modifier = Modifier.height(40.dp)
-                ) { Text("Change Seat", fontSize = 13.sp) }
-            }
-
-            OutlinedButton(
-                onClick = { messageOpen = true },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Emerald),
-                modifier = Modifier.height(40.dp)
-            ) { Text("Message", fontSize = 13.sp) }
-        }
+        OutlineButton(text = "Edit Profile", onClick = { editOpen = true }, height = 40.dp)
 
         Spacer(Modifier.height(8.dp))
+    }
+
+    // Full-size photo lightbox
+    if (photoPreviewOpen && !s.photoUrl.isNullOrBlank()) {
+        Dialog(onDismissRequest = { photoPreviewOpen = false }) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { haptics.tick(); photoPreviewOpen = false },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    AsyncImage(
+                        model = fullPhotoUrl,
+                        contentDescription = s.name,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlineButton(text = "✕ Close", onClick = { photoPreviewOpen = false })
+                }
+            }
+        }
     }
 
     // Edit profile dialog
@@ -253,13 +291,34 @@ fun AdminStudentDetailScreen(
             focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
         )
 
-        Dialog(onDismissRequest = { editOpen = false }) {
-            Surface(shape = RoundedCornerShape(16.dp), color = NavyMid) {
-                Column(Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
-                    Text("Edit Profile", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                    Text(s.name, color = TextSub, fontSize = 12.sp)
-                    Spacer(Modifier.height(16.dp))
-
+        ConfirmDialog(
+            title = "Edit Profile",
+            subtitle = s.name,
+            onDismiss = { editOpen = false },
+            onConfirm = {
+                val req = UpdateStudentRequest(
+                    name        = eName.trim(),
+                    mobile      = eMobile.trim().ifBlank { null },
+                    email       = eEmail.trim().ifBlank { null },
+                    address     = eAddress.trim().ifBlank { null },
+                    gender      = eGender.trim().ifBlank { null },
+                    dateOfBirth = eDob.trim().ifBlank { null },
+                    joinedAt    = eJoinedAt.trim().ifBlank { null }
+                )
+                vm.updateStudentProfile(s.id, req) {
+                    val mid = s.membershipId
+                    if (mid != null) {
+                        if (eSeatNumber.isNotBlank() && eSeatNumber != s.seatNumber)
+                            vm.changeSeat(mid, eSeatNumber) {}
+                        if (ePlanId.isNotBlank() && ePlanId != s.membershipPlanId)
+                            vm.updateMembershipPlan(mid, ePlanId) {}
+                    }
+                    editOpen = false
+                }
+            },
+            confirmLabel = "Save",
+            confirmEnabled = eName.isNotBlank()
+        ) {
                     OutlinedTextField(eName, { eName = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth(), singleLine = true, colors = tfColors)
                     Spacer(Modifier.height(10.dp))
                     OutlinedTextField(eMobile, { eMobile = it }, label = { Text("Mobile") }, modifier = Modifier.fillMaxWidth(), singleLine = true, colors = tfColors)
@@ -313,104 +372,7 @@ fun AdminStudentDetailScreen(
                             }
                         }
                     }
-
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { editOpen = false }) { Text("Cancel", color = TextSub) }
-                        Spacer(Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                val req = UpdateStudentRequest(
-                                    name        = eName.trim(),
-                                    mobile      = eMobile.trim().ifBlank { null },
-                                    email       = eEmail.trim().ifBlank { null },
-                                    address     = eAddress.trim().ifBlank { null },
-                                    gender      = eGender.trim().ifBlank { null },
-                                    dateOfBirth = eDob.trim().ifBlank { null },
-                                    joinedAt    = eJoinedAt.trim().ifBlank { null }
-                                )
-                                vm.updateStudentProfile(s.id, req) {
-                                    val mid = s.membershipId
-                                    if (mid != null) {
-                                        if (eSeatNumber.isNotBlank() && eSeatNumber != s.seatNumber)
-                                            vm.changeSeat(mid, eSeatNumber) {}
-                                        if (ePlanId.isNotBlank() && ePlanId != s.membershipPlanId)
-                                            vm.updateMembershipPlan(mid, ePlanId) {}
-                                    }
-                                    editOpen = false
-                                }
-                            },
-                            enabled = eName.isNotBlank(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = NavyDeep)
-                        ) { Text("Save") }
-                    }
-                }
-            }
         }
     }
 
-    // Send message dialog
-    if (messageOpen) {
-        var msgBody by remember { mutableStateOf("") }
-        Dialog(onDismissRequest = { messageOpen = false; msgBody = "" }) {
-            Surface(shape = RoundedCornerShape(16.dp), color = NavyMid) {
-                Column(Modifier.padding(20.dp)) {
-                    Text("Message ${s.name}", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                    Text("Sends via WhatsApp to ${s.mobile}", color = TextSub, fontSize = 12.sp)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = msgBody,
-                        onValueChange = { msgBody = it },
-                        label = { Text("Message") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 3,
-                        maxLines = 6,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Emerald, focusedLabelColor = Emerald, cursorColor = Emerald,
-                            unfocusedBorderColor = DividerColor, unfocusedLabelColor = TextMuted,
-                            focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
-                        )
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { messageOpen = false; msgBody = "" }) { Text("Cancel", color = TextSub) }
-                        Spacer(Modifier.width(8.dp))
-                        Button(
-                            onClick = { vm.sendMessageToStudent(s.id, msgBody.trim()) { messageOpen = false; msgBody = "" } },
-                            enabled = msgBody.trim().length >= 5,
-                            colors = ButtonDefaults.buttonColors(containerColor = Emerald, contentColor = NavyDeep)
-                        ) { Text("Send") }
-                    }
-                }
-            }
-        }
-    }
-
-    // Change seat dialog
-    if (changeSeatOpen) {
-        Dialog(onDismissRequest = { changeSeatOpen = false; newSeat = "" }) {
-            Surface(shape = RoundedCornerShape(16.dp), color = NavyMid) {
-                Column(Modifier.padding(20.dp)) {
-                    Text("Change Seat – ${s.name}", style = MaterialTheme.typography.titleMedium)
-                    Text("Current: ${s.seatNumber ?: "—"} · ${s.shift ?: "—"}", color = TextSub, fontSize = 12.sp)
-                    Spacer(Modifier.height(12.dp))
-                    SeatGrid(seats = seats, selectedSeatNumber = newSeat.takeIf { it.isNotBlank() }, onSeatClick = { newSeat = it.seatNumber })
-                    Spacer(Modifier.height(12.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { changeSeatOpen = false; newSeat = "" }) { Text("Cancel", color = TextSub) }
-                        Spacer(Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                s.membershipId?.let { mid ->
-                                    vm.changeSeat(mid, newSeat) { changeSeatOpen = false; newSeat = "" }
-                                }
-                            },
-                            enabled = newSeat.isNotBlank(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = NavyDeep)
-                        ) { Text("Apply") }
-                    }
-                }
-            }
-        }
-    }
 }

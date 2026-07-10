@@ -12,7 +12,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.targetzone.library.ui.components.AppTextField
+import com.targetzone.library.ui.components.BannerTone
+import com.targetzone.library.ui.components.MessageBanner
 import com.targetzone.library.ui.components.PrimaryButton
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,6 +35,7 @@ fun RegisterScreen(
     var gender         by remember { mutableStateOf("") }
     var genderExpanded by remember { mutableStateOf(false) }
     val genderOptions = listOf("Male", "Female", "Other")
+    val haptics = rememberLibraryHaptics()
 
     LaunchedEffect(state.isLoggedIn) { if (state.isLoggedIn) onSuccess() }
 
@@ -49,9 +53,7 @@ fun RegisterScreen(
         Spacer(Modifier.height(32.dp))
 
         state.error?.let {
-            Card(colors = CardDefaults.cardColors(containerColor = RedFaint), modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-                Text(it, color = RedAlert, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
-            }
+            MessageBanner(it, BannerTone.Error, modifier = Modifier.padding(bottom = 16.dp))
         }
 
         AppTextField(value = name, onValueChange = { name = it }, label = "Full Name *")
@@ -90,12 +92,12 @@ fun RegisterScreen(
                 genderOptions.forEach { option ->
                     DropdownMenuItem(
                         text = { Text(option, color = TextPrimary) },
-                        onClick = { gender = option; genderExpanded = false }
+                        onClick = { haptics.tick(); gender = option; genderExpanded = false }
                     )
                 }
                 DropdownMenuItem(
                     text = { Text("Prefer not to say", color = TextMuted) },
-                    onClick = { gender = ""; genderExpanded = false }
+                    onClick = { haptics.tick(); gender = ""; genderExpanded = false }
                 )
             }
         }

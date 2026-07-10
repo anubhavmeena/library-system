@@ -22,7 +22,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.targetzone.library.data.model.InboxSummary
 import com.targetzone.library.ui.components.AppCard
+import com.targetzone.library.ui.components.BannerTone
+import com.targetzone.library.ui.components.ButtonTone
+import com.targetzone.library.ui.components.ConfirmDialog
+import com.targetzone.library.ui.components.LoadingScreen
+import com.targetzone.library.ui.components.MessageBanner
+import com.targetzone.library.ui.components.OutlineButton
 import com.targetzone.library.ui.components.PrimaryButton
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 
 @Composable
@@ -54,7 +61,7 @@ fun AdminInboxScreen(vm: AdminViewModel) {
         }
 
         if (isLoading && messages.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Amber) }
+            LoadingScreen()
         } else if (messages.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -78,9 +85,7 @@ fun AdminInboxScreen(vm: AdminViewModel) {
 
 @Composable
 private fun InboxRow(msg: InboxSummary, onClick: () -> Unit) {
-    AppCard(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
-    ) {
+    AppCard(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
                 Modifier.size(10.dp).clip(CircleShape)
@@ -104,22 +109,18 @@ private fun MessageDetailView(vm: AdminViewModel, onBack: () -> Unit) {
     var replyText by remember { mutableStateOf("") }
     var showReply by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    val haptics = rememberLibraryHaptics()
 
     val m = msg ?: return
 
     if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            containerColor = NavyMid,
-            title = { Text("Delete Message?", color = TextPrimary) },
-            text = { Text("This message will be permanently removed.", color = TextSub) },
-            confirmButton = {
-                Button(
-                    onClick = { vm.deleteInboxMessage(m.messageNumber) { onBack() } },
-                    colors = ButtonDefaults.buttonColors(containerColor = RedAlert)
-                ) { Text("Delete") }
-            },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = TextSub) } }
+        ConfirmDialog(
+            title = "Delete Message?",
+            subtitle = "This message will be permanently removed.",
+            onDismiss = { showDeleteConfirm = false },
+            onConfirm = { vm.deleteInboxMessage(m.messageNumber) { onBack() } },
+            confirmLabel = "Delete",
+            confirmTone = ButtonTone.Danger
         )
     }
 
@@ -130,13 +131,13 @@ private fun MessageDetailView(vm: AdminViewModel, onBack: () -> Unit) {
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
+            IconButton(onClick = { haptics.tick(); onBack() }) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Amber)
             }
             Spacer(Modifier.width(4.dp))
             Text("Message", style = MaterialTheme.typography.headlineSmall, color = TextPrimary)
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = { showDeleteConfirm = true }) {
+            IconButton(onClick = { haptics.tick(); showDeleteConfirm = true }) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete", tint = RedAlert)
             }
         }
@@ -156,24 +157,15 @@ private fun MessageDetailView(vm: AdminViewModel, onBack: () -> Unit) {
         Spacer(Modifier.height(16.dp))
 
         success?.let {
-            Card(colors = CardDefaults.cardColors(containerColor = EmeraldFaint), modifier = Modifier.fillMaxWidth()) {
-                Text("✅  $it", color = Emerald, modifier = Modifier.padding(12.dp), fontSize = 13.sp)
-            }
+            MessageBanner("✅  $it", BannerTone.Success)
             Spacer(Modifier.height(8.dp))
         }
         error?.let {
-            Card(colors = CardDefaults.cardColors(containerColor = RedFaint), modifier = Modifier.fillMaxWidth()) {
-                Text("⚠️  $it", color = RedAlert, modifier = Modifier.padding(12.dp), fontSize = 13.sp)
-            }
+            MessageBanner("⚠️  $it", BannerTone.Error)
             Spacer(Modifier.height(8.dp))
         }
 
-        OutlinedButton(
-            onClick = { showReply = !showReply },
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
-            border = ButtonDefaults.outlinedButtonBorder,
-            modifier = Modifier.fillMaxWidth()
-        ) { Text(if (showReply) "Cancel Reply" else "Reply") }
+        OutlineButton(text = if (showReply) "Cancel Reply" else "Reply", onClick = { showReply = !showReply }, modifier = Modifier.fillMaxWidth())
 
         if (showReply) {
             Spacer(Modifier.height(12.dp))

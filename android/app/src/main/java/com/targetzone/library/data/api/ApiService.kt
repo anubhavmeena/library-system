@@ -30,7 +30,9 @@ interface ApiService {
     @GET("users/admin-contact")
     suspend fun getAdminContact(): Response<ApiResponse<AdminContact>>
 
-    @HTTP(method = "POST", path = "memberships/my/call-admin", hasBody = false)
+    // Same fix as createDuesOrder below: hasBody=false left this POST with a
+    // null body, which OkHttp rejects outright.
+    @POST("memberships/my/call-admin")
     suspend fun callAdmin(): Response<ApiResponse<Any?>>
 
     @PATCH("users/me")
@@ -67,6 +69,17 @@ interface ApiService {
 
     @GET("payments/my")
     suspend fun getPaymentHistory(): Response<ApiResponse<List<StudentPayment>>>
+
+    // Pay dues on a GRACE membership — plain @POST (not @HTTP hasBody=false):
+    // Retrofit only auto-synthesizes an empty body for POST/PATCH when hasBody
+    // is true (the implicit default for @POST), so hasBody=false here left the
+    // request body null and OkHttp rejected it ("method POST must have a
+    // request body") before the call ever reached the server.
+    @POST("payments/dues/create-order")
+    suspend fun createDuesOrder(): Response<ApiResponse<PaymentOrder>>
+
+    @POST("payments/dues/verify")
+    suspend fun verifyDuesPayment(@Body req: VerifyPaymentRequest): Response<ApiResponse<Membership>>
 
     // Seats
     @GET("seats/availability")
@@ -122,11 +135,53 @@ interface ApiService {
         @Body req: ChangeSeatRequest
     ): Response<ApiResponse<Any?>>
 
+    @POST("admin/memberships/{id}/swap-seat")
+    suspend fun swapSeat(
+        @Path("id") membershipId: String,
+        @Body req: SwapSeatRequest
+    ): Response<ApiResponse<Any?>>
+
     @PATCH("admin/memberships/{id}/plan")
     suspend fun updateMembershipPlan(
         @Path("id") membershipId: String,
         @Body req: UpdateMembershipPlanRequest
     ): Response<ApiResponse<String?>>
+
+    @PATCH("admin/memberships/{id}/renew")
+    suspend fun renewSeat(@Path("id") membershipId: String): Response<ApiResponse<String?>>
+
+    @PATCH("admin/memberships/{id}/release")
+    suspend fun releaseSeat(
+        @Path("id") membershipId: String,
+        @Body req: ReleaseSeatRequest
+    ): Response<ApiResponse<String?>>
+
+    @PATCH("admin/memberships/{id}/clear-dues")
+    suspend fun clearDues(
+        @Path("id") membershipId: String,
+        @Body req: ClearAmountRequest
+    ): Response<ApiResponse<String?>>
+
+    @PATCH("admin/memberships/{id}/mark-pending")
+    suspend fun markPending(
+        @Path("id") membershipId: String,
+        @Body req: MarkPendingRequest
+    ): Response<ApiResponse<String?>>
+
+    @PATCH("admin/memberships/{id}/mark-grace")
+    suspend fun markGrace(@Path("id") membershipId: String): Response<ApiResponse<String?>>
+
+    @DELETE("admin/students/{id}")
+    suspend fun deleteStudent(@Path("id") id: String): Response<ApiResponse<String?>>
+
+    @GET("admin/students/grace-dues")
+    suspend fun getStudentsInGraceWithDues(): Response<ApiResponse<List<StudentDetail>>>
+
+    @GET("admin/students/orphaned-seats")
+    suspend fun getStudentsWithOrphanedSeats(): Response<ApiResponse<List<StudentDetail>>>
+
+    @POST("admin/reminders/grace-dues")
+    suspend fun sendGraceDuesReminders(@Body req: SendReminderRequest): Response<ApiResponse<String?>>
 
     @GET("admin/memberships/expiring")
     suspend fun getExpiringMemberships(
@@ -167,17 +222,25 @@ interface ApiService {
     @POST("admin/students/import")
     suspend fun importStudents(@Part file: MultipartBody.Part): Response<ApiResponse<ImportResult>>
 
-    @POST("admin/students/import/single")
-    suspend fun importSingleStudent(@Body req: ManualImportRequest): Response<ApiResponse<Any?>>
+    @Multipart
+    @POST("admin/students/import/single-with-photo")
+    suspend fun importSingleStudentWithPhoto(
+        @Part("name") name: okhttp3.RequestBody,
+        @Part("phone") phone: okhttp3.RequestBody,
+        @Part photo: MultipartBody.Part?
+    ): Response<ApiResponse<Any?>>
 
     @GET("admin/students/pending-fees")
     suspend fun getStudentsWithPendingFees(): Response<ApiResponse<List<StudentDetail>>>
 
-    @POST("admin/students/{id}/clear-fees")
-    suspend fun clearPendingFees(@Path("id") id: String): Response<ApiResponse<StudentDetail>>
+    @PATCH("admin/students/{id}/clear-pending-fees")
+    suspend fun clearPendingFees(
+        @Path("id") id: String,
+        @Body req: ClearAmountRequest
+    ): Response<ApiResponse<String?>>
 
     @POST("admin/reminders/pending-fees")
-    suspend fun sendPendingFeeReminders(): Response<ApiResponse<String?>>
+    suspend fun sendPendingFeeReminders(@Body req: SendReminderRequest): Response<ApiResponse<String?>>
 
     @GET("admin/broadcast/history")
     suspend fun getBroadcastHistory(): Response<ApiResponse<List<BroadcastHistory>>>

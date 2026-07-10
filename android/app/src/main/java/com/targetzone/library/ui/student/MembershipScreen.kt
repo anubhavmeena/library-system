@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.targetzone.library.MainActivity
 import com.targetzone.library.data.model.Membership
 import com.targetzone.library.ui.components.*
 import com.targetzone.library.ui.theme.*
@@ -24,13 +25,42 @@ fun MembershipScreen(vm: StudentViewModel, onBookNow: () -> Unit) {
     val queuedMembership  by vm.queuedMembership.collectAsState()
     val myPayments        by vm.myPayments.collectAsState()
     val history           by vm.membershipHistory.collectAsState()
+    val isLoading         by vm.isLoading.collectAsState()
+    val error             by vm.error.collectAsState()
+    val downloadStatus    by vm.downloadStatus.collectAsState()
     val context           = LocalContext.current
+    val activity          = context as? MainActivity
 
     LaunchedEffect(Unit) { vm.loadDashboard(); vm.loadMembershipHistory(); vm.loadMyPayments() }
 
-    val daysLeft = membership?.let {
-        max(0L, ((java.text.SimpleDateFormat("yyyy-MM-dd").parse(it.endDate)?.time ?: 0L) - System.currentTimeMillis()) / 86400000L).toInt()
+    // Route dues payment to the correct gateway, mirroring BookingScreen's flow —
+    // Cashfree verifies server-side (gatewayPaymentId = orderId, no signature).
+    LaunchedEffect(Unit) {
+        vm.duesPaymentOrder.collect { order ->
+            if (order.gateway == "CASHFREE" && order.paymentSessionId != null) {
+                openCashfree(activity, order) { success, orderId, err ->
+                    if (success && orderId != null) {
+                        vm.verifyDuesPayment(orderId, orderId, "", order.membershipId)
+                    } else {
+                        vm.setError(err ?: "Payment failed")
+                    }
+                }
+            } else {
+                openRazorpay(activity, order) { success, paymentId, orderId, signature, _ ->
+                    if (success && paymentId != null && orderId != null && signature != null) {
+                        vm.verifyDuesPayment(orderId, paymentId, signature, order.membershipId)
+                    } else {
+                        vm.clearError()
+                    }
+                }
+            }
+        }
     }
+
+    val rawDaysLeft = membership?.let {
+        ((java.text.SimpleDateFormat("yyyy-MM-dd").parse(it.endDate)?.time ?: 0L) - System.currentTimeMillis()) / 86400000L
+    }
+    val daysLeft = rawDaysLeft?.let { max(0L, it).toInt() }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -42,12 +72,13 @@ fun MembershipScreen(vm: StudentViewModel, onBookNow: () -> Unit) {
             Spacer(Modifier.height(16.dp))
         }
 
-        if (membership != null && membership!!.status == "ACTIVE") {
+        if (membership != null && (membership!!.status == "ACTIVE" || membership!!.status == "GRACE")) {
             item {
+                val isGrace = membership!!.status == "GRACE"
                 AppCard(Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                         Column {
-                            Text("Active Membership", style = MaterialTheme.typography.titleMedium)
+                            Text(if (isGrace) "Grace Period" else "Active Membership", style = MaterialTheme.typography.titleMedium)
                             Text(membership!!.planName, color = TextSub, fontSize = 13.sp)
                         }
                         StatusChip(membership!!.status)
@@ -61,7 +92,32 @@ fun MembershipScreen(vm: StudentViewModel, onBookNow: () -> Unit) {
                     InfoRow("Expires", membership!!.endDate)
                     InfoRow("Amount Paid", "₹${membership!!.amountPaid.toInt()}")
 
-                    if (daysLeft != null) {
+                    if (isGrace) {
+                        Spacer(Modifier.height(12.dp))
+                        error?.let {
+                            MessageBanner(it, BannerTone.Error)
+                            Spacer(Modifier.height(8.dp))
+                            // Auto-dismiss after a beat instead of clearing inline during
+                            // composition — clearing synchronously here raced the Card's
+                            // own render, so a real error could disappear before it painted.
+                            LaunchedEffect(it) { kotlinx.coroutines.delay(4000); vm.clearError() }
+                        }
+                        Card(colors = CardDefaults.cardColors(containerColor = RedFaint), modifier = Modifier.fillMaxWidth()) {
+                            Row(Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Column {
+                                    Text("Dues Pending", color = RedAlert, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                    Text("₹${(membership!!.duesAmount ?: 0.0).toInt()} to keep this seat", color = RedAlert, fontSize = 11.sp)
+                                }
+                                PrimaryButton(
+                                    text = if (isLoading) "Processing…" else "Pay Now",
+                                    onClick = { vm.startDuesPayment() },
+                                    enabled = !isLoading,
+                                    tone = ButtonTone.Danger,
+                                    modifier = Modifier.height(40.dp)
+                                )
+                            }
+                        }
+                    } else if (daysLeft != null) {
                         Spacer(Modifier.height(12.dp))
                         Column {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -78,16 +134,18 @@ fun MembershipScreen(vm: StudentViewModel, onBookNow: () -> Unit) {
                         }
                     }
                     Spacer(Modifier.height(12.dp))
-                    OutlinedButton(
+                    OutlineButton(
+                        text = "Download ID Card",
                         onClick = { vm.downloadIdCard(context) },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Amber.copy(alpha = 0.5f)),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth().height(40.dp)
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Download ID Card", fontSize = 13.sp)
+                        icon = Icons.Default.Download,
+                        height = 40.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    downloadStatus?.let { status ->
+                        val failed = status.startsWith("Download failed") || status.startsWith("Couldn't") || status.startsWith("Not signed in")
+                        Spacer(Modifier.height(8.dp))
+                        Text(status, color = if (failed) RedAlert else Emerald, fontSize = 12.sp)
+                        LaunchedEffect(status) { kotlinx.coroutines.delay(4000); vm.clearDownloadStatus() }
                     }
                 }
                 Spacer(Modifier.height(16.dp))
@@ -101,9 +159,7 @@ fun MembershipScreen(vm: StudentViewModel, onBookNow: () -> Unit) {
                         Text("No Active Membership", style = MaterialTheme.typography.titleMedium)
                         Text("Purchase a plan to access the library", color = TextSub, fontSize = 13.sp)
                         Spacer(Modifier.height(12.dp))
-                        Button(onClick = onBookNow, colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = NavyDeep)) {
-                            Text("Book Now", fontWeight = FontWeight.SemiBold)
-                        }
+                        PrimaryButton(text = "Book Now", onClick = onBookNow, modifier = Modifier.height(42.dp))
                     }
                 }
                 Spacer(Modifier.height(16.dp))

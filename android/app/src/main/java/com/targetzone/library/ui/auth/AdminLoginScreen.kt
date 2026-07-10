@@ -14,7 +14,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.targetzone.library.ui.components.AppTextField
+import com.targetzone.library.ui.components.BannerTone
+import com.targetzone.library.ui.components.MessageBanner
 import com.targetzone.library.ui.components.PrimaryButton
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 
 @Composable
@@ -23,6 +26,7 @@ fun AdminLoginScreen(vm: AuthViewModel, onSuccess: () -> Unit, onBack: () -> Uni
     var contact     by remember { mutableStateOf("") }
     var otp         by remember { mutableStateOf("") }
     var contactType by remember { mutableStateOf("MOBILE") }
+    val haptics = rememberLibraryHaptics()
 
     LaunchedEffect(state.isLoggedIn) { if (state.isLoggedIn) onSuccess() }
 
@@ -45,12 +49,7 @@ fun AdminLoginScreen(vm: AuthViewModel, onSuccess: () -> Unit, onBack: () -> Uni
         Spacer(Modifier.height(32.dp))
 
         state.error?.let {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = RedFaint),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-            ) {
-                Text(it, color = RedAlert, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
-            }
+            MessageBanner(it, BannerTone.Error, modifier = Modifier.padding(bottom = 16.dp))
         }
 
         if (!state.otpSent) {
@@ -77,7 +76,7 @@ fun AdminLoginScreen(vm: AuthViewModel, onSuccess: () -> Unit, onBack: () -> Uni
                 label = "6-digit OTP",
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                 trailingIcon = if (otp.isNotEmpty()) {
-                    { TextButton(onClick = { otp = "" }) { Text("Clear", color = Amber, fontSize = 12.sp) } }
+                    { TextButton(onClick = { haptics.tick(); otp = "" }) { Text("Clear", color = Amber, fontSize = 12.sp) } }
                 } else null
             )
             Spacer(Modifier.height(28.dp))
@@ -89,11 +88,11 @@ fun AdminLoginScreen(vm: AuthViewModel, onSuccess: () -> Unit, onBack: () -> Uni
             )
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { vm.resetOtpState(); otp = "" }) {
+                TextButton(onClick = { haptics.tick(); vm.resetOtpState(); otp = "" }) {
                     Text("← Change Contact", color = TextSub, fontSize = 13.sp)
                 }
                 val canResend = state.secondsSinceSend >= 10
-                TextButton(onClick = { vm.resendOtp(contact, contactType) }, enabled = canResend && !state.isLoading) {
+                TextButton(onClick = { haptics.tick(); vm.resendOtp(contact, contactType) }, enabled = canResend && !state.isLoading) {
                     Text(
                         if (canResend) "Resend OTP" else "Resend in ${10 - state.secondsSinceSend}s",
                         color = if (canResend) Amber else TextMuted, fontSize = 13.sp
@@ -103,14 +102,14 @@ fun AdminLoginScreen(vm: AuthViewModel, onSuccess: () -> Unit, onBack: () -> Uni
             val showSmsOption = contactType == "MOBILE" && state.secondsSinceSend >= 10 && state.otpSendCount >= 2 && !state.smsOptionUsed
             if (showSmsOption) {
                 Spacer(Modifier.height(4.dp))
-                TextButton(onClick = { vm.sendOtpViaSms(contact, contactType) }, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth()) {
+                TextButton(onClick = { haptics.tick(); vm.sendOtpViaSms(contact, contactType) }, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth()) {
                     Text("Still no OTP? Send via SMS instead", color = BlueSoft, fontSize = 13.sp)
                 }
             }
         }
 
         Spacer(Modifier.height(16.dp))
-        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = { haptics.tick(); onBack() }, modifier = Modifier.fillMaxWidth()) {
             Text("← Student Login", color = TextMuted)
         }
     }

@@ -36,6 +36,19 @@ class AdminViewModel(
     // Pending fees
     val pendingFeeStudents = MutableStateFlow<List<StudentDetail>>(emptyList())
 
+    // Grace-period dues & orphaned seats (Reminders screen extra tabs)
+    val graceDuesStudents    = MutableStateFlow<List<StudentDetail>>(emptyList())
+    val orphanedSeatStudents = MutableStateFlow<List<StudentDetail>>(emptyList())
+
+    // Student search for New Membership flow — kept separate from `students`/`totalStudents`
+    // (used by the Students list screen) so the two screens never clobber each other's state.
+    val eligibleStudents = MutableStateFlow<List<StudentSummary>>(emptyList())
+
+    // Exchange Seat picker — active, currently-seated students to swap with
+    // (deliberately separate from eligibleStudents, which is the opposite
+    // pool: NEW/RELEASED students with no seat, used by Create Membership).
+    val swapCandidates = MutableStateFlow<List<StudentSummary>>(emptyList())
+
     // Broadcast history
     val broadcastHistory = MutableStateFlow<List<BroadcastHistory>>(emptyList())
 
@@ -98,10 +111,94 @@ class AdminViewModel(
             .onFailure { error.value = it.message }
     }
 
+    fun searchSwapCandidates(query: String, excludeStudentId: String) = viewModelScope.launch {
+        adminRepo.getStudents(page = 0, size = 200, search = query.takeIf { it.isNotBlank() }, membershipStatus = "ACTIVE")
+            .onSuccess { (list, _) ->
+                swapCandidates.value = list.filter { it.id != excludeStudentId && !it.seatNumber.isNullOrBlank() }
+            }
+            .onFailure { error.value = it.message }
+    }
+
+    fun swapSeat(membershipId: String, otherUserId: String, otherSeatNumber: String, onDone: () -> Unit) = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.swapSeat(membershipId, otherUserId)
+            .onSuccess { successMsg.value = "Seat exchanged with seat $otherSeatNumber"; onDone() }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
     fun updateMembershipPlan(membershipId: String, planId: String, onDone: () -> Unit) = viewModelScope.launch {
         adminRepo.updateMembershipPlan(membershipId, planId)
             .onSuccess { successMsg.value = "Plan updated"; onDone() }
             .onFailure { error.value = it.message }
+    }
+
+    fun renewSeat(membershipId: String, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.renewSeat(membershipId)
+            .onSuccess { successMsg.value = "Seat renewed"; onDone() }
+            .onFailure { error.value = it.message }
+    }
+
+    fun releaseSeat(membershipId: String, notifyStudent: Boolean, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.releaseSeat(membershipId, notifyStudent)
+            .onSuccess { successMsg.value = "Seat released"; onDone() }
+            .onFailure { error.value = it.message }
+    }
+
+    fun clearDues(membershipId: String, amountCleared: Double, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.clearDues(membershipId, amountCleared)
+            .onSuccess { successMsg.value = "Dues cleared"; onDone() }
+            .onFailure { error.value = it.message }
+    }
+
+    fun markPending(membershipId: String, pendingAmount: Double, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.markPending(membershipId, pendingAmount)
+            .onSuccess { successMsg.value = "Marked as Pending"; onDone() }
+            .onFailure { error.value = it.message }
+    }
+
+    fun markGrace(membershipId: String, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.markGrace(membershipId)
+            .onSuccess { successMsg.value = "Marked as Grace"; onDone() }
+            .onFailure { error.value = it.message }
+    }
+
+    fun deleteStudent(id: String, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.deleteStudent(id)
+            .onSuccess { successMsg.value = "Student deleted"; onDone() }
+            .onFailure { error.value = it.message }
+    }
+
+    fun loadGraceDuesStudents() = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.getStudentsInGraceWithDues()
+            .onSuccess { graceDuesStudents.value = it }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
+    fun loadOrphanedSeatStudents() = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.getStudentsWithOrphanedSeats()
+            .onSuccess { orphanedSeatStudents.value = it }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
+    fun sendGraceDuesReminders(userIds: List<String>) = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.sendGraceDuesReminders(userIds)
+            .onSuccess { successMsg.value = it }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
+    fun searchEligibleStudents(query: String) = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.getStudents(page = 0, size = 200, search = query.takeIf { it.isNotBlank() })
+            .onSuccess { (list, _) -> eligibleStudents.value = list.filter { it.displayStatus == "NEW" || it.displayStatus == "RELEASED" } }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
     }
 
     fun loadExpiring(withinDays: Int = 7) = viewModelScope.launch {
@@ -175,8 +272,8 @@ class AdminViewModel(
         isLoading.value = false
     }
 
-    fun clearPendingFees(id: String, onDone: () -> Unit) = viewModelScope.launch {
-        adminRepo.clearPendingFees(id)
+    fun clearPendingFees(id: String, amountCleared: Double, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.clearPendingFees(id, amountCleared)
             .onSuccess {
                 pendingFeeStudents.value = pendingFeeStudents.value.filter { s -> s.id != id }
                 successMsg.value = "Fees cleared"
@@ -185,9 +282,9 @@ class AdminViewModel(
             .onFailure { error.value = it.message }
     }
 
-    fun sendPendingFeeReminders() = viewModelScope.launch {
+    fun sendPendingFeeReminders(userIds: List<String>) = viewModelScope.launch {
         isLoading.value = true
-        adminRepo.sendPendingFeeReminders()
+        adminRepo.sendPendingFeeReminders(userIds)
             .onSuccess { successMsg.value = it }
             .onFailure { error.value = it.message }
         isLoading.value = false
@@ -247,10 +344,10 @@ class AdminViewModel(
             .onFailure { error.value = it.message }
     }
 
-    fun importSingleStudent(req: ManualImportRequest, onDone: () -> Unit) = viewModelScope.launch {
+    fun importSingleStudent(name: String, phone: String, photo: java.io.File?, onDone: () -> Unit) = viewModelScope.launch {
         isLoading.value = true
-        adminRepo.importSingleStudent(req)
-            .onSuccess { successMsg.value = "${req.name} registered successfully"; onDone() }
+        adminRepo.importSingleStudent(name, phone, photo)
+            .onSuccess { successMsg.value = "$name registered successfully"; onDone() }
             .onFailure { error.value = it.message }
         isLoading.value = false
     }

@@ -14,6 +14,7 @@ import com.targetzone.library.data.model.FeedbackItem
 import com.targetzone.library.ui.components.AppCard
 import com.targetzone.library.ui.components.AppTextField
 import com.targetzone.library.ui.components.PrimaryButton
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 
 @Composable
@@ -24,6 +25,7 @@ fun FeedbackScreen(vm: StudentViewModel) {
     var subject   by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var submitted by remember { mutableStateOf(false) }
+    val haptics = rememberLibraryHaptics()
 
     LaunchedEffect(Unit) { vm.loadFeedback() }
 
@@ -42,7 +44,7 @@ fun FeedbackScreen(vm: StudentViewModel) {
                         Spacer(Modifier.height(8.dp))
                         Text("Thank you for your feedback!", style = MaterialTheme.typography.titleMedium, color = Emerald)
                         Spacer(Modifier.height(8.dp))
-                        TextButton(onClick = { submitted = false; subject = ""; description = ""; type = "FEEDBACK" }) {
+                        TextButton(onClick = { haptics.tick(); submitted = false; subject = ""; description = ""; type = "FEEDBACK" }) {
                             Text("Submit Another", color = Amber)
                         }
                     }
@@ -59,7 +61,7 @@ fun FeedbackScreen(vm: StudentViewModel) {
                         listOf("FEEDBACK" to "Feedback", "COMPLAINT" to "Complaint").forEach { (v, l) ->
                             FilterChip(
                                 selected = type == v,
-                                onClick = { type = v },
+                                onClick = { haptics.tick(); type = v },
                                 label = { Text(l, fontSize = 12.sp) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = AmberFaint,

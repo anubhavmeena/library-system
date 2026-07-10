@@ -55,4 +55,14 @@ class MembershipRepository {
         api.callAdmin()
         Unit
     }
+
+    suspend fun createDuesOrder(): Result<PaymentOrder> = runCatching {
+        val res = api.createDuesOrder()
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to create dues order")
+    }
+
+    suspend fun verifyDuesPayment(req: VerifyPaymentRequest): Result<Membership> = runCatching {
+        val res = api.verifyDuesPayment(req)
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Payment verification failed")
+    }
 }

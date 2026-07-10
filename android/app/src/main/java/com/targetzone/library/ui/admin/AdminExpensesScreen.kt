@@ -18,7 +18,10 @@ import androidx.compose.ui.unit.sp
 import com.targetzone.library.data.model.MiscItem
 import com.targetzone.library.data.model.SaveExpenseRequest
 import com.targetzone.library.ui.components.AppCard
+import com.targetzone.library.ui.components.BannerTone
+import com.targetzone.library.ui.components.MessageBanner
 import com.targetzone.library.ui.components.PrimaryButton
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 import java.time.LocalDate
 
@@ -39,6 +42,7 @@ fun AdminExpensesScreen(vm: AdminViewModel) {
     var electricity by remember { mutableStateOf("") }
     var internet    by remember { mutableStateOf("") }
     val miscItems   = remember { mutableStateListOf<MiscItem>() }
+    val haptics = rememberLibraryHaptics()
 
     val isLoading by vm.isLoading.collectAsState()
     val success   by vm.successMsg.collectAsState()
@@ -81,15 +85,11 @@ fun AdminExpensesScreen(vm: AdminViewModel) {
         Spacer(Modifier.height(16.dp))
 
         success?.let {
-            Card(colors = CardDefaults.cardColors(containerColor = EmeraldFaint), modifier = Modifier.fillMaxWidth()) {
-                Text("✅  $it", color = Emerald, modifier = Modifier.padding(12.dp))
-            }
+            MessageBanner("✅  $it", BannerTone.Success)
             Spacer(Modifier.height(8.dp))
         }
         error?.let {
-            Card(colors = CardDefaults.cardColors(containerColor = RedFaint), modifier = Modifier.fillMaxWidth()) {
-                Text("⚠️  $it", color = RedAlert, modifier = Modifier.padding(12.dp))
-            }
+            MessageBanner("⚠️  $it", BannerTone.Error)
             Spacer(Modifier.height(8.dp))
         }
 
@@ -106,7 +106,7 @@ fun AdminExpensesScreen(vm: AdminViewModel) {
                         visibleMonths.forEach { m ->
                             FilterChip(
                                 selected = month == m,
-                                onClick = { month = m },
+                                onClick = { haptics.tick(); month = m },
                                 label = { Text(MONTHS[m - 1].take(3), fontSize = 11.sp) },
                                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AmberFaint, selectedLabelColor = Amber)
                             )
@@ -121,7 +121,7 @@ fun AdminExpensesScreen(vm: AdminViewModel) {
                             modifier = Modifier.menuAnchor().fillMaxWidth().padding(top = 6.dp),
                             textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
                         )
-                        ExposedDropdownMenu(expanded = monthExpanded, onDismissRequest = { monthExpanded = false }) {
+                        ExposedDropdownMenu(expanded = monthExpanded, onDismissRequest = { monthExpanded = false }, containerColor = NavyMid) {
                             MONTHS.forEachIndexed { idx, name ->
                                 DropdownMenuItem(text = { Text(name) }, onClick = { month = idx + 1; monthExpanded = false })
                             }
@@ -140,7 +140,7 @@ fun AdminExpensesScreen(vm: AdminViewModel) {
                             modifier = Modifier.menuAnchor().fillMaxWidth(),
                             textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
                         )
-                        ExposedDropdownMenu(expanded = yearExpanded, onDismissRequest = { yearExpanded = false }) {
+                        ExposedDropdownMenu(expanded = yearExpanded, onDismissRequest = { yearExpanded = false }, containerColor = NavyMid) {
                             listOf(now.year - 1, now.year, now.year + 1).forEach { y ->
                                 DropdownMenuItem(text = { Text(y.toString()) }, onClick = { year = y; yearExpanded = false })
                             }
@@ -182,7 +182,7 @@ fun AdminExpensesScreen(vm: AdminViewModel) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("Miscellaneous", fontWeight = FontWeight.SemiBold, color = TextPrimary)
                 TextButton(
-                    onClick = { miscItems.add(MiscItem()) },
+                    onClick = { haptics.tick(); miscItems.add(MiscItem()) },
                     colors = ButtonDefaults.textButtonColors(contentColor = Amber)
                 ) {
                     Text("+ Add", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -228,7 +228,7 @@ fun AdminExpensesScreen(vm: AdminViewModel) {
                             modifier = Modifier.width(100.dp),
                             textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
                         )
-                        IconButton(onClick = { miscItems.removeAt(i) }, modifier = Modifier.size(36.dp)) {
+                        IconButton(onClick = { haptics.reject(); miscItems.removeAt(i) }, modifier = Modifier.size(36.dp)) {
                             Icon(Icons.Default.Close, contentDescription = "Remove", tint = RedAlert.copy(alpha = 0.7f))
                         }
                     }

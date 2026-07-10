@@ -14,7 +14,14 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-        buildConfigField("String", "CASHFREE_ENV", "\"${System.getenv("CASHFREE_ENV") ?: "sandbox"}\"")
+        // BASE_URL (ApiClient.kt) is hardcoded to the production API — this app
+        // has no sandbox backend to talk to, so the Cashfree SDK must always be
+        // in PRODUCTION mode to match. Previously defaulted to "sandbox" when
+        // CASHFREE_ENV wasn't set in the build shell (no CI script ever set it
+        // for Android, unlike the web frontend/other backends), which caused a
+        // sandbox-mode SDK session to reject a production-mode payment_session_id
+        // from the backend with "token is not present".
+        buildConfigField("String", "CASHFREE_ENV", "\"${System.getenv("CASHFREE_ENV") ?: "production"}\"")
     }
 
     buildTypes {

@@ -1,24 +1,34 @@
 package com.targetzone.library.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.targetzone.library.data.model.Seat
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.Locale
+import kotlin.math.ceil
 
 // Seat ordering matches the physical library layout (left section reads right→left, right reads left→right)
 private val L_TOP    = listOf(13, 11, 9, 7, 5, 3, 1)
@@ -41,7 +51,11 @@ fun SeatGrid(
     seats: List<Seat>,
     selectedSeatNumber: String?,
     onSeatClick: (Seat) -> Unit,
-    onBookedSeatClick: ((Seat) -> Unit)? = null
+    onBookedSeatClick: ((Seat) -> Unit)? = null,
+    // Mirrors the web admin seat map's "Expiry View" toggle (AdminSeatsPage.jsx)
+    // — occupied seats show a days-to-expiry badge instead of the seat number.
+    expiryView: Boolean = false,
+    viewDate: String? = null
 ) {
     val seatMap   = seats.associateBy { it.seatNumber }
     val adminView = onBookedSeatClick != null
@@ -70,13 +84,13 @@ fun SeatGrid(
                 // Left section: two sub-rows of 7 seats
                 Column {
                     Row(horizontalArrangement = Arrangement.spacedBy(SEAT_GAP)) {
-                        L_TOP.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick) }
+                        L_TOP.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick, expiryView, viewDate) }
                     }
                     Spacer(Modifier.height(2.dp))
                     HorizontalDivider(color = DividerColor.copy(alpha = 0.4f), thickness = 0.5.dp)
                     Spacer(Modifier.height(2.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(SEAT_GAP)) {
-                        L_BOTTOM.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick) }
+                        L_BOTTOM.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick, expiryView, viewDate) }
                     }
                 }
 
@@ -88,13 +102,13 @@ fun SeatGrid(
                 // Right section: two sub-rows of 7 seats
                 Column {
                     Row(horizontalArrangement = Arrangement.spacedBy(SEAT_GAP)) {
-                        R_TOP.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick) }
+                        R_TOP.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick, expiryView, viewDate) }
                     }
                     Spacer(Modifier.height(2.dp))
                     HorizontalDivider(color = DividerColor.copy(alpha = 0.4f), thickness = 0.5.dp)
                     Spacer(Modifier.height(2.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(SEAT_GAP)) {
-                        R_BOTTOM.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick) }
+                        R_BOTTOM.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick, expiryView, viewDate) }
                     }
                 }
             }
@@ -123,7 +137,14 @@ fun SeatGrid(
 
         // Legend
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (adminView) {
+            if (expiryView) {
+                LegendItem(RedDeep, RedAlert.copy(alpha = 0.5f), "Overdue")
+                LegendItem(RedFaint, RedAlert, "≤3d")
+                LegendItem(OrangeFaint, Orange, "≤7d")
+                LegendItem(YellowFaint, YellowWarn, "≤15d")
+                LegendItem(EmeraldFaint, Emerald, "Safe")
+                LegendItem(CardBg, DividerColor, "Available")
+            } else if (adminView) {
                 LegendItem(EmeraldFaint, Emerald.copy(alpha = 0.3f), "Available")
                 LegendItem(RedFaint, RedAlert, "Male")
                 LegendItem(MagentaFaint, Magenta, "Female")
@@ -143,7 +164,9 @@ private fun SeatCell(
     selectedSeatNumber: String?,
     adminView: Boolean,
     onSeatClick: (Seat) -> Unit,
-    onBookedSeatClick: ((Seat) -> Unit)?
+    onBookedSeatClick: ((Seat) -> Unit)?,
+    expiryView: Boolean = false,
+    viewDate: String? = null
 ) {
     if (seatNum in INACTIVE) {
         Box(
@@ -163,6 +186,8 @@ private fun SeatCell(
         gender          = seat.studentGender,
         adminView       = adminView,
         bookedClickable = onBookedSeatClick != null,
+        expiryView      = expiryView,
+        expiryDays      = if (expiryView && seat.isBooked) daysToExpiry(seat.membershipEnd, viewDate) else null,
         onClick         = { if (seat.isBooked) onBookedSeatClick?.invoke(seat) else onSeatClick(seat) }
     )
 }
@@ -175,26 +200,69 @@ private fun SeatButton(
     gender: String? = null,
     adminView: Boolean = false,
     bookedClickable: Boolean = false,
+    expiryView: Boolean = false,
+    expiryDays: Int? = null,
     onClick: () -> Unit
 ) {
     val isFemale = booked && gender == "Female"
     val (bg, border, textColor) = when {
+        expiryDays != null -> expiryColors(expiryDays)
         booked && isFemale -> Triple(MagentaFaint,                   Magenta.copy(alpha = 0.3f),  Magenta.copy(alpha = 0.7f))
         booked             -> Triple(RedFaint,                        RedAlert.copy(alpha = 0.3f), RedAlert.copy(alpha = 0.5f))
         selected           -> Triple(AmberFaint,                      Amber,                       Amber)
         adminView          -> Triple(EmeraldFaint,                    Emerald.copy(alpha = 0.3f),  Emerald.copy(alpha = 0.6f))
         else               -> Triple(CardBg,                          DividerColor,                TextSub)
     }
+    val haptics = rememberLibraryHaptics()
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.88f else 1f, label = "seatPressScale")
     Box(
         Modifier
             .size(SEAT_SIZE)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(6.dp))
             .background(bg)
             .border(1.dp, border, RoundedCornerShape(6.dp))
-            .clickable(enabled = !booked || bookedClickable, onClick = onClick),
+            .clickable(
+                enabled = !booked || bookedClickable,
+                interactionSource = interactionSource,
+                indication = null, // seat cells are tiny — a full ripple looks noisy at 28dp; scale+haptic carry the feedback
+                onClick = { haptics.tick(); onClick() } // enabled=false already blocks taps on a booked, non-admin seat — every onClick that actually fires here is a legitimate action (select, or admin viewing an occupant), not a rejection
+            ),
         contentAlignment = Alignment.Center
     ) {
-        Text(label.drop(1), fontSize = 9.sp, color = textColor, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+        Text(
+            text = when {
+                expiryDays != null -> "$expiryDays"
+                expiryView         -> ""
+                else                -> label.drop(1)
+            },
+            fontSize = 9.sp, color = textColor, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+        )
+    }
+}
+
+// Mirrors AdminSeatsPage.jsx's expiryClasses() thresholds exactly.
+private fun expiryColors(days: Int): Triple<Color, Color, Color> = when {
+    days < 0   -> Triple(RedDeep,      RedAlert.copy(alpha = 0.5f), RedAlert.copy(alpha = 0.8f))
+    days <= 3  -> Triple(RedFaint,     RedAlert.copy(alpha = 0.6f), RedAlert)
+    days <= 7  -> Triple(OrangeFaint,  Orange.copy(alpha = 0.6f),   Orange)
+    days <= 15 -> Triple(YellowFaint,  YellowWarn.copy(alpha = 0.6f), YellowWarn)
+    else       -> Triple(EmeraldFaint, Emerald.copy(alpha = 0.4f),  Emerald)
+}
+
+// Mirrors AdminSeatsPage.jsx's daysToExpiry(): ceil((end - viewDate) / 1 day).
+// Negative means overdue (membership in GRACE, seat held past its end date).
+private fun daysToExpiry(membershipEnd: String?, viewDate: String?): Int? {
+    if (membershipEnd.isNullOrBlank() || viewDate.isNullOrBlank()) return null
+    return try {
+        val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val end = fmt.parse(membershipEnd)?.time ?: return null
+        val today = fmt.parse(viewDate)?.time ?: return null
+        ceil((end - today) / 86400000.0).toInt()
+    } catch (e: Exception) {
+        null
     }
 }
 

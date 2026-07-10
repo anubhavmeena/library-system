@@ -12,9 +12,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.targetzone.library.data.model.DailyRevenue
 import com.targetzone.library.ui.components.AppCard
+import com.targetzone.library.ui.components.BannerTone
+import com.targetzone.library.ui.components.FormDialog
+import com.targetzone.library.ui.components.MessageBanner
+import com.targetzone.library.ui.components.OutlineButton
+import com.targetzone.library.ui.components.PrimaryButton
 import com.targetzone.library.ui.components.SectionHeader
 import com.targetzone.library.ui.components.StatCard
 import com.targetzone.library.ui.theme.*
@@ -82,21 +86,19 @@ fun AdminRevenueScreen(vm: AdminViewModel) {
                     )
                 }
                 Spacer(Modifier.height(10.dp))
-                Button(
-                    onClick = { vm.loadRevenueReport(fromDate, toDate) },
+                PrimaryButton(
+                    text = if (isLoading) "Loading…" else "Load Report",
                     enabled = !isLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = NavyDeep),
+                    onClick = { vm.loadRevenueReport(fromDate, toDate) },
                     modifier = Modifier.fillMaxWidth()
-                ) { Text(if (isLoading) "Loading…" else "Load Report") }
+                )
             }
             Spacer(Modifier.height(16.dp))
         }
 
         error?.let {
             item {
-                Card(colors = CardDefaults.cardColors(containerColor = RedFaint), modifier = Modifier.fillMaxWidth()) {
-                    Text("⚠️  $it", color = RedAlert, modifier = Modifier.padding(12.dp), fontSize = 13.sp)
-                }
+                MessageBanner("⚠️  $it", BannerTone.Error)
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -110,8 +112,8 @@ fun AdminRevenueScreen(vm: AdminViewModel) {
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatCard("Full Day", r.fullDayCount.toString(), accent = BlueSoft, modifier = Modifier.weight(1f))
-                    StatCard("Half Day", r.halfDayCount.toString(), accent = BlueSoft, modifier = Modifier.weight(1f))
+                    StatCard("Full Day", r.fullDayCount.toString(), sub = "₹${r.fullDayRevenue.toInt()}", accent = BlueSoft, modifier = Modifier.weight(1f))
+                    StatCard("Half Day", r.halfDayCount.toString(), sub = "₹${r.halfDayRevenue.toInt()}", accent = BlueSoft, modifier = Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(16.dp))
             }
@@ -134,7 +136,7 @@ fun AdminRevenueScreen(vm: AdminViewModel) {
 
 @Composable
 private fun DailyRevenueRow(day: DailyRevenue, onClick: () -> Unit) {
-    AppCard(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    AppCard(Modifier.fillMaxWidth(), onClick = onClick) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {
                 Text(day.date, fontWeight = FontWeight.Medium, color = TextPrimary, fontSize = 14.sp)
@@ -147,32 +149,26 @@ private fun DailyRevenueRow(day: DailyRevenue, onClick: () -> Unit) {
 
 @Composable
 private fun DrillDownDialog(date: String, payments: List<com.targetzone.library.data.model.DailyPayment>, isLoading: Boolean, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(16.dp), color = NavyMid) {
-            Column(Modifier.padding(20.dp).fillMaxWidth()) {
-                Text("Payments on $date", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(12.dp))
-                if (isLoading) {
-                    Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Amber, modifier = Modifier.size(32.dp))
+    FormDialog(title = "Payments on $date", onDismiss = onDismiss) {
+        if (isLoading) {
+            Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Amber, modifier = Modifier.size(32.dp))
+            }
+        } else if (payments.isEmpty()) {
+            Text("No payments found", color = TextMuted, fontSize = 13.sp)
+        } else {
+            payments.forEach { p ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(Modifier.weight(1f)) {
+                        Text(p.studentName ?: "—", color = TextPrimary, fontSize = 13.sp)
+                        Text(p.planName ?: "—", color = TextMuted, fontSize = 11.sp)
                     }
-                } else if (payments.isEmpty()) {
-                    Text("No payments found", color = TextMuted, fontSize = 13.sp)
-                } else {
-                    payments.forEach { p ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Column(Modifier.weight(1f)) {
-                                Text(p.studentName ?: "—", color = TextPrimary, fontSize = 13.sp)
-                                Text(p.planName ?: "—", color = TextMuted, fontSize = 11.sp)
-                            }
-                            Text("₹${p.amount.toInt()}", color = Emerald, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                        }
-                        HorizontalDivider(color = DividerColor)
-                    }
+                    Text("₹${p.amount.toInt()}", color = Emerald, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 }
-                Spacer(Modifier.height(12.dp))
-                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Close", color = Amber) }
+                HorizontalDivider(color = DividerColor)
             }
         }
+        Spacer(Modifier.height(12.dp))
+        OutlineButton(text = "Close", onClick = onDismiss, modifier = Modifier.align(Alignment.End), height = 40.dp)
     }
 }

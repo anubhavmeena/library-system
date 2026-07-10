@@ -49,7 +49,8 @@ data class Membership(
     val startDate: String = "",
     val endDate: String = "",
     val status: String = "",
-    val amountPaid: Double = 0.0
+    val amountPaid: Double = 0.0,
+    val duesAmount: Double? = null // non-null while status == GRACE
 )
 
 data class Plan(
@@ -68,6 +69,7 @@ data class Seat(
     val row: String = "",
     val isBooked: Boolean = false,
     // populated only from /admin/seats/map
+    val studentId: String? = null,
     val studentName: String? = null,
     val studentMobile: String? = null,
     val studentGender: String? = null,
@@ -101,6 +103,7 @@ data class SeatMapDto(
 data class SeatInfoItem(
     val seatNumber: String = "",
     val isOccupied: Boolean = false,
+    val studentId: String? = null,
     val studentName: String? = null,
     val studentMobile: String? = null,
     val studentGender: String? = null,
@@ -200,15 +203,20 @@ data class FeedbackItem(
     val studentMobile: String? = null
 )
 
+// Field names must match the deployed (rust-backend) ExpiringMembershipItem's
+// #[serde(rename_all = "camelCase")] JSON exactly — Gson does exact-name
+// matching with no naming policy configured. Previously used "endDate"/
+// "daysLeft"/"shift", none of which the API actually sends (it sends
+// "membershipEnd"/"daysRemaining", and no shift field at all), so those were
+// silently defaulting to ""/0/null on every student.
 data class ReminderStudent(
     val id: String = "",
     val name: String = "",
     val mobile: String = "",
     val email: String? = null,
-    val endDate: String = "",
-    val daysLeft: Int = 0,
-    val seatNumber: String? = null,
-    val shift: String? = null
+    val membershipEnd: String = "",
+    val daysRemaining: Int = 0,
+    val seatNumber: String? = null
 )
 
 // Request bodies
@@ -227,6 +235,10 @@ data class BookSeatRequest(val seatNumber: String, val membershipId: String, val
 data class UpdateProfileRequest(val name: String, val fatherName: String?, val address: String?, val gender: String?, val dateOfBirth: String?, val email: String?)
 data class ToggleStatusRequest(val active: Boolean)
 data class ChangeSeatRequest(val seatNumber: String)
+data class SwapSeatRequest(val otherUserId: String)
+data class ReleaseSeatRequest(val notifyStudent: Boolean = false)
+data class ClearAmountRequest(val amountCleared: Double)
+data class MarkPendingRequest(val pendingAmount: Double)
 data class SendReminderRequest(val userIds: List<String>)
 data class BroadcastRequest(val message: String, val targetGroup: String = "ALL")
 data class SubmitFeedbackRequest(val type: String, val subject: String, val description: String)
@@ -308,14 +320,6 @@ data class CreateCashMembershipRequest(
     val pendingAmount: Double? = null
 )
 
-data class ManualImportRequest(
-    val name: String,
-    val phone: String,
-    val fees: String? = null,
-    val date: String? = null,
-    val seatNumber: String
-)
-
 data class ReplyRequest(val body: String)
 
 data class StudentPayment(
@@ -362,6 +366,8 @@ data class RevenueReport(
     val totalTransactions: Int = 0,
     val fullDayCount: Int = 0,
     val halfDayCount: Int = 0,
+    val fullDayRevenue: Double = 0.0,
+    val halfDayRevenue: Double = 0.0,
     val dailyBreakdown: List<DailyRevenue> = emptyList()
 )
 

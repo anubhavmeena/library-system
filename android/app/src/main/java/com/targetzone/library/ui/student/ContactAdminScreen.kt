@@ -16,6 +16,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.targetzone.library.data.model.Membership
 import com.targetzone.library.ui.components.AppCard
+import com.targetzone.library.ui.components.PrimaryButton
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 
 @Composable
@@ -23,6 +25,7 @@ fun ContactAdminScreen(vm: StudentViewModel, membership: Membership?) {
     val adminContact  by vm.adminContact.collectAsState()
     val callAdminSent by vm.callAdminSent.collectAsState()
     val context = LocalContext.current
+    val haptics = rememberLibraryHaptics()
 
     LaunchedEffect(Unit) { vm.loadAdminContact() }
 
@@ -113,22 +116,12 @@ fun ContactAdminScreen(vm: StudentViewModel, membership: Membership?) {
                             lineHeight = 18.sp
                         )
                         Spacer(Modifier.height(12.dp))
-                        Button(
+                        PrimaryButton(
+                            text = if (callAdminSent) "✓ Admin Notified" else "Call Admin to My Seat",
                             onClick = { vm.callAdmin() },
                             enabled = !callAdminSent,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = BlueSoft,
-                                contentColor = NavyDeep,
-                                disabledContainerColor = BlueSoft.copy(alpha = 0.5f),
-                                disabledContentColor = NavyDeep
-                            )
-                        ) {
-                            Text(
-                                if (callAdminSent) "✓ Admin Notified" else "Call Admin to My Seat",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp
-                            )
-                        }
+                            modifier = Modifier.height(42.dp)
+                        )
                     }
                 }
             }
@@ -146,10 +139,11 @@ private fun ContactRow(label: String, value: String) {
 
 @Composable
 private fun ContactChip(label: String, onClick: () -> Unit) {
+    val haptics = rememberLibraryHaptics()
     Surface(
         shape = MaterialTheme.shapes.small,
         color = BlueSoft.copy(alpha = 0.15f),
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = Modifier.clickable { haptics.tick(); onClick() }
     ) {
         Text(
             label,

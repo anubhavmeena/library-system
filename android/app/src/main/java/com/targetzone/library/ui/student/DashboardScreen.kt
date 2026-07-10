@@ -15,19 +15,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.targetzone.library.data.model.User
 import com.targetzone.library.ui.components.AppCard
+import com.targetzone.library.ui.components.PrimaryButton
 import com.targetzone.library.ui.components.StatCard
+import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
 import kotlin.math.max
 
 @Composable
 fun DashboardScreen(vm: StudentViewModel, user: User?, onNavigate: (String) -> Unit) {
     val membership by vm.membership.collectAsState()
+    val haptics = rememberLibraryHaptics()
 
     LaunchedEffect(Unit) { vm.loadDashboard() }
 
-    val daysLeft = membership?.let {
-        max(0, ((java.text.SimpleDateFormat("yyyy-MM-dd").parse(it.endDate)?.time ?: 0L) - System.currentTimeMillis()) / 86400000L).toInt()
+    // Raw (possibly negative) days left drives color/urgency; the displayed
+    // number is floored at 0 so a GRACE student doesn't see a confusing "-3".
+    val rawDaysLeft = membership?.let {
+        ((java.text.SimpleDateFormat("yyyy-MM-dd").parse(it.endDate)?.time ?: 0L) - System.currentTimeMillis()) / 86400000L
     }
+    val daysLeft = rawDaysLeft?.let { max(0, it).toInt() }
 
     Column(
         Modifier
@@ -58,18 +64,47 @@ fun DashboardScreen(vm: StudentViewModel, user: User?, onNavigate: (String) -> U
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             StatCard(
                 label = "Days Left",
-                value = daysLeft?.toString() ?: "—",
+                value = if (rawDaysLeft != null && rawDaysLeft < 0) "Overdue" else daysLeft?.toString() ?: "—",
                 sub = membership?.let { "Expires ${it.endDate}" } ?: "No membership",
-                accent = if (daysLeft != null && daysLeft <= 5) Amber else Emerald,
+                accent = when {
+                    rawDaysLeft != null && rawDaysLeft < 0 -> RedAlert
+                    daysLeft != null && daysLeft <= 5 -> Amber
+                    else -> Emerald
+                },
                 modifier = Modifier.weight(1f)
             )
             StatCard(
                 label = "Status",
                 value = membership?.status ?: "Inactive",
                 sub = if (membership != null) "Active membership" else "Get a plan",
-                accent = if (membership?.status == "ACTIVE") Emerald else Amber,
+                accent = when (membership?.status) {
+                    "ACTIVE" -> Emerald
+                    "GRACE"  -> RedAlert
+                    else     -> Amber
+                },
                 modifier = Modifier.weight(1f)
             )
+        }
+
+        // Dues warning — GRACE means the student is holding the seat but owes
+        // money to keep it; shown ahead of the plain expiry-soon warning below.
+        if (membership?.status == "GRACE") {
+            Spacer(Modifier.height(16.dp))
+            AppCard(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("⚠️", fontSize = 20.sp)
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Dues Pending", color = RedAlert, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text(
+                            membership?.duesAmount?.let { "₹${it.toInt()} due to keep seat ${membership?.seatNumber}" }
+                                ?: "Clear your dues to keep seat ${membership?.seatNumber}",
+                            color = TextSub, fontSize = 12.sp
+                        )
+                    }
+                    TextButton(onClick = { haptics.tick(); onNavigate("membership") }) { Text("Clear Dues", color = RedAlert, fontSize = 12.sp) }
+                }
+            }
         }
 
         // Expiry warning
@@ -83,7 +118,7 @@ fun DashboardScreen(vm: StudentViewModel, user: User?, onNavigate: (String) -> U
                         Text("Expiring in $daysLeft day${if (daysLeft == 1) "" else "s"}!", color = Amber, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                         Text("Seat ${membership?.seatNumber} — renew soon", color = TextSub, fontSize = 12.sp)
                     }
-                    TextButton(onClick = { onNavigate("booking") }) { Text("Renew", color = Amber, fontSize = 12.sp) }
+                    TextButton(onClick = { haptics.tick(); onNavigate("booking") }) { Text("Renew", color = Amber, fontSize = 12.sp) }
                 }
             }
         }
@@ -98,9 +133,7 @@ fun DashboardScreen(vm: StudentViewModel, user: User?, onNavigate: (String) -> U
                     Text("No Active Membership", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
                     Text("Book a seat to get started", color = TextSub, fontSize = 13.sp)
                     Spacer(Modifier.height(12.dp))
-                    Button(onClick = { onNavigate("booking") }, colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = NavyDeep)) {
-                        Text("Book a Seat", fontWeight = FontWeight.SemiBold)
-                    }
+                    PrimaryButton(text = "Book a Seat", onClick = { onNavigate("booking") }, modifier = Modifier.height(42.dp))
                 }
             }
         }
@@ -136,12 +169,15 @@ fun DashboardScreen(vm: StudentViewModel, user: User?, onNavigate: (String) -> U
 
 @Composable
 private fun QuickActionRow(icon: ImageVector, label: String, onClick: () -> Unit) {
-    AppCard(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+    // Whole row is now tappable (was previously only the trailing chevron
+    // IconButton) — a bigger, more forgiving tap target is a straightforward
+    // modernization win here.
+    AppCard(Modifier.fillMaxWidth().padding(bottom = 8.dp), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Icon(icon, contentDescription = label, tint = Amber, modifier = Modifier.size(22.dp))
             Spacer(Modifier.width(12.dp))
             Text(label, color = TextPrimary, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            IconButton(onClick = onClick) { Icon(Icons.Default.ChevronRight, null, tint = TextSub) }
+            Icon(Icons.Default.ChevronRight, null, tint = TextSub)
         }
     }
 }
