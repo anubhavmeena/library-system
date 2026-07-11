@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
-import com.targetzone.library.data.api.BASE_URL
 import java.net.URLEncoder
 
 // Mirrors frontend/src/utils/upiPay.js — kept in sync manually, no shared
@@ -14,12 +13,6 @@ private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 fun buildUpiDeepLink(vpa: String, payeeName: String, amount: Double, note: String): String {
     val amountStr = "%.2f".format(amount)
     return "upi://pay?pa=${enc(vpa)}&pn=${enc(payeeName)}&am=${enc(amountStr)}&cu=INR&tn=${enc(note)}"
-}
-
-fun buildPayRedirectLink(vpa: String, payeeName: String, amount: Double, note: String): String {
-    val origin = BASE_URL.removeSuffix("api/").removeSuffix("/")
-    val amountStr = "%.2f".format(amount)
-    return "$origin/pay?pa=${enc(vpa)}&pn=${enc(payeeName)}&am=${enc(amountStr)}&cu=INR&tn=${enc(note)}"
 }
 
 // Encode-only — no scanning/camera dependency, just com.google.zxing:core.

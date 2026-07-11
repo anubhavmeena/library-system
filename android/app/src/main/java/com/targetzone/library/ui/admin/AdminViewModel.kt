@@ -27,6 +27,7 @@ class AdminViewModel(
     val adminSeats   = MutableStateFlow<List<Seat>>(emptyList())    // admin seat map with student details
     val expiring     = MutableStateFlow<List<ReminderStudent>>(emptyList())
     val feedback     = MutableStateFlow<List<FeedbackItem>>(emptyList())
+    val paymentClaims = MutableStateFlow<List<AdminPaymentClaimItem>>(emptyList())
     val plans        = MutableStateFlow<List<Plan>>(emptyList())
     val appSettings  = MutableStateFlow<AppSettings?>(null)
 
@@ -239,6 +240,18 @@ class AdminViewModel(
             .onFailure { error.value = it.message }
     }
 
+    fun loadPaymentClaims(status: String? = "PENDING") = viewModelScope.launch {
+        adminRepo.listPaymentClaims(status)
+            .onSuccess { paymentClaims.value = it }
+            .onFailure { error.value = it.message }
+    }
+
+    fun reviewPaymentClaim(id: String, status: String, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.reviewPaymentClaim(id, status)
+            .onSuccess { successMsg.value = if (status == "VERIFIED") "Payment verified and applied" else "Claim rejected"; loadPaymentClaims(); onDone() }
+            .onFailure { error.value = it.message }
+    }
+
     fun sendBroadcast(message: String, targetGroup: String, onDone: () -> Unit) = viewModelScope.launch {
         isLoading.value = true
         adminRepo.sendBroadcast(message, targetGroup)
@@ -251,6 +264,21 @@ class AdminViewModel(
         adminRepo.sendMessageToStudent(id, message)
             .onSuccess { successMsg.value = "Message sent"; onDone() }
             .onFailure { error.value = it.message }
+    }
+
+    // Mints a short pay link server-side, then sends it to the student as a
+    // WhatsApp message — two network calls chained so the caller (Create
+    // Membership's "Send Payment Request" button) only needs one function.
+    fun sendPaymentRequest(studentId: String, amount: Double, onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.createPayLink(studentId, amount)
+            .onSuccess { link ->
+                val message = "💰 Payment Request — Target Zone Library\n\n" +
+                    "Please pay ₹${"%.2f".format(amount)} using this link (opens your UPI app):\n$link\n\nThank you!"
+                adminRepo.sendMessageToStudent(studentId, message)
+                    .onSuccess { successMsg.value = "Payment request sent"; onDone() }
+                    .onFailure { error.value = it.message; onDone() }
+            }
+            .onFailure { error.value = it.message; onDone() }
     }
 
     fun loadPlans() = viewModelScope.launch {

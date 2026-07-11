@@ -113,6 +113,7 @@ fun AdminDashboardScreen(vm: AdminViewModel, onNavigate: (String) -> Unit) {
             "reminders"      to "🔔  Reminders",
             "broadcast"      to "📢  Broadcast",
             "feedback"       to "💬  View Feedback",
+            "payment-verifications" to "✅  Verify Payments",
             "revenue"        to "📊  Revenue & Reports",
             "inbox"          to "📬  Inbox",
             "memberships/new" to "➕  Create Membership",

@@ -212,6 +212,26 @@ data class FeedbackItem(
     val studentMobile: String? = null
 )
 
+data class AdminPaymentClaimItem(
+    val id: String = "",
+    val userId: String = "",
+    val studentName: String = "",
+    val studentMobile: String? = null,
+    val claimType: String = "",      // DUES or PENDING_FEE
+    val membershipId: String? = null,
+    val amountClaimed: Double = 0.0,
+    val screenshotUrl: String = "",
+    val status: String = "",         // PENDING, VERIFIED, REJECTED
+    val createdAt: String = "",
+    val reviewedAt: String? = null,
+    val reviewedBy: String? = null
+)
+
+data class ReviewPaymentClaimRequest(val status: String)
+
+data class CreatePayLinkRequest(val studentId: String, val amount: Double)
+data class PayLinkResponse(val link: String = "")
+
 // Field names must match the deployed (rust-backend) ExpiringMembershipItem's
 // #[serde(rename_all = "camelCase")] JSON exactly — Gson does exact-name
 // matching with no naming policy configured. Previously used "endDate"/

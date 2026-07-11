@@ -206,6 +206,18 @@ interface ApiService {
         @Body req: UpdateFeedbackRequest
     ): Response<ApiResponse<FeedbackItem>>
 
+    @GET("admin/payment-claims")
+    suspend fun listPaymentClaims(@Query("status") status: String? = null): Response<ApiResponse<List<AdminPaymentClaimItem>>>
+
+    @PATCH("admin/payment-claims/{id}")
+    suspend fun reviewPaymentClaim(
+        @Path("id") id: String,
+        @Body req: ReviewPaymentClaimRequest
+    ): Response<ApiResponse<AdminPaymentClaimItem>>
+
+    @POST("admin/pay-links")
+    suspend fun createPayLink(@Body req: CreatePayLinkRequest): Response<ApiResponse<PayLinkResponse>>
+
     @POST("admin/broadcast")
     suspend fun sendBroadcast(@Body req: BroadcastRequest): Response<ApiResponse<String?>>
 

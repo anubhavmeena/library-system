@@ -196,6 +196,9 @@ fun AppNavigation(tokenManager: TokenManager) {
             composable("admin/feedback")  {
                 AdminScaffold("Feedback", onLogout = logout) { AdminFeedbackScreen(adminVm) }
             }
+            composable("admin/payment-verifications") {
+                AdminScaffold("Verify Payments", onLogout = logout) { AdminPaymentVerificationsScreen(adminVm) }
+            }
             composable("admin/broadcast") {
                 AdminScaffold("Broadcast", onLogout = logout) { AdminBroadcastScreen(adminVm) }
             }

@@ -291,14 +291,8 @@ fun AdminCreateMembershipScreen(vm: AdminViewModel, onBack: () -> Unit) {
                                 haptics.tick()
                                 val student = selectedStudent ?: return@TextButton
                                 val paid = paidAmount.toDoubleOrNull() ?: 0.0
-                                val link = buildPayRedirectLink(
-                                    vpa = upiId, payeeName = "Target Zone Library",
-                                    amount = paid, note = "Library fee - ${student.name}"
-                                )
-                                val message = "💰 Payment Request — Target Zone Library\n\n" +
-                                    "Please pay ₹${"%.2f".format(paid)} using this link (opens your UPI app):\n$link\n\nThank you!"
                                 sendingRequest = true
-                                vm.sendMessageToStudent(student.id, message) { sendingRequest = false }
+                                vm.sendPaymentRequest(student.id, paid) { sendingRequest = false }
                             },
                             enabled = !sendingRequest
                         ) {

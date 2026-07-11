@@ -129,6 +129,21 @@ class AdminRepository {
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Update failed")
     }
 
+    suspend fun listPaymentClaims(status: String? = "PENDING"): Result<List<AdminPaymentClaimItem>> = runCatching {
+        val res = api.listPaymentClaims(status)
+        res.body()?.data ?: emptyList()
+    }
+
+    suspend fun reviewPaymentClaim(id: String, status: String): Result<AdminPaymentClaimItem> = runCatching {
+        val res = api.reviewPaymentClaim(id, ReviewPaymentClaimRequest(status = status))
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Review failed")
+    }
+
+    suspend fun createPayLink(studentId: String, amount: Double): Result<String> = runCatching {
+        val res = api.createPayLink(CreatePayLinkRequest(studentId = studentId, amount = amount))
+        res.body()?.data?.link ?: throw Exception(res.body()?.message ?: "Failed to create payment link")
+    }
+
     suspend fun sendBroadcast(message: String, targetGroup: String): Result<String> = runCatching {
         val res = api.sendBroadcast(BroadcastRequest(message = message, targetGroup = targetGroup))
         res.body()?.data ?: res.body()?.message ?: "Broadcast sent"
