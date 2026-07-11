@@ -839,6 +839,8 @@
     "step4": {
       "title": "Review & Confirm",
       "cashConfirmation": "I confirm that cash payment of ₹{{amount}} has been collected from {{name}}",
+      "cashConfirmationWithPending": "I confirm that cash payment of ₹{{amount}} has been collected from {{name}}, with ₹{{pending}} remaining as a pending balance",
+      "cashConfirmationNoPayment": "I confirm that {{name}} is being registered with no cash collected — the full ₹{{pending}} plan price remains as a pending balance",
       "create": "Create Membership",
       "creating": "Creating..."
     },

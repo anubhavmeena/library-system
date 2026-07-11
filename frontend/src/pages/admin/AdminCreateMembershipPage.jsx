@@ -596,10 +596,18 @@ export default function AdminCreateMembershipPage() {
                                 </div>
                             </div>
                             <p className="text-primary-200 text-sm leading-relaxed">
-                                {t('adminNewMembership.step4.cashConfirmation', {
-                                    amount: selectedPlan?.price,
-                                    name: selectedStudent?.name,
-                                })}
+                                {(() => {
+                                    const paid    = parseFloat(paidAmount)    || 0
+                                    const pending = parseFloat(pendingAmount) || 0
+                                    const name    = selectedStudent?.name
+                                    if (paid <= 0) {
+                                        return t('adminNewMembership.step4.cashConfirmationNoPayment', { pending, name })
+                                    }
+                                    if (pending > 0) {
+                                        return t('adminNewMembership.step4.cashConfirmationWithPending', { amount: paid, pending, name })
+                                    }
+                                    return t('adminNewMembership.step4.cashConfirmation', { amount: paid, name })
+                                })()}
                             </p>
                         </label>
                     </div>
