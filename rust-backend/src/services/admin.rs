@@ -476,7 +476,7 @@ pub async fn get_pending_fees(
            FROM users u
            JOIN payments p ON p.user_id = u.id
            LEFT JOIN LATERAL (
-               SELECT id AS membership_id, seat_number, end_date FROM memberships
+               SELECT id AS membership_id, seat_number, end_date, status FROM memberships
                WHERE user_id = u.id AND status != 'PENDING'
                ORDER BY
                    CASE WHEN status = 'GRACE' THEN 0 WHEN status = 'ACTIVE' THEN 1 ELSE 2 END,
@@ -485,6 +485,11 @@ pub async fn get_pending_fees(
                LIMIT 1
            ) m ON true
            WHERE p.pending_amount > 0 AND p.status = 'SUCCESS'
+             -- Excludes released students: when a student has no ACTIVE/GRACE
+             -- membership, the lateral join above falls back to their most
+             -- recent row regardless of status, which is 'EXPIRED' exactly
+             -- when resolve_display_status would compute them as RELEASED.
+             AND (m.status IS NULL OR m.status != 'EXPIRED')
            GROUP BY u.id, u.name, u.mobile, u.email, m.seat_number, m.membership_id, m.end_date
            ORDER BY SUM(p.pending_amount) DESC"#,
     )
@@ -1358,10 +1363,24 @@ pub async fn send_pending_fee_reminders(
         .fetch_all(&state.db)
         .await?
     } else {
+        // "Send to All" — must mirror get_pending_fees' released-student
+        // exclusion, since this branch re-queries independently rather than
+        // trusting an admin-picked id list (see comment there).
         sqlx::query_as(
             "SELECT u.name, u.mobile, u.email, SUM(p.pending_amount)
-             FROM users u JOIN payments p ON p.user_id = u.id
+             FROM users u
+             JOIN payments p ON p.user_id = u.id
+             LEFT JOIN LATERAL (
+                 SELECT status FROM memberships
+                 WHERE user_id = u.id AND status != 'PENDING'
+                 ORDER BY
+                     CASE WHEN status = 'GRACE' THEN 0 WHEN status = 'ACTIVE' THEN 1 ELSE 2 END,
+                     CASE WHEN status IN ('ACTIVE', 'GRACE') THEN end_date END DESC,
+                     created_at DESC
+                 LIMIT 1
+             ) m ON true
              WHERE p.pending_amount > 0 AND p.status = 'SUCCESS'
+               AND (m.status IS NULL OR m.status != 'EXPIRED')
              GROUP BY u.name, u.mobile, u.email",
         )
         .fetch_all(&state.db)
