@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../services/api'
-import { buildUpiDeepLink, UPI_APPS } from '../utils/upiPay'
+import { buildUpiIntentLink, UPI_APPS } from '../utils/upiPay'
 
 // Public, unauthenticated — reached via a tap-to-pay link shared over
 // WhatsApp (see AdminCreateMembershipPage's "Send Payment Request", and the
@@ -84,9 +84,9 @@ export default function PayRedirectPage() {
                         {UPI_APPS.map(app => (
                             <a
                                 key={app.key}
-                                href={buildUpiDeepLink({
+                                href={buildUpiIntentLink({
                                     vpa: info.vpa, payeeName: info.payeeName, amount: info.amount, note: info.note,
-                                    scheme: app.scheme,
+                                    androidPackage: app.androidPackage,
                                 })}
                                 className="btn-primary w-full py-2.5 text-sm text-center"
                             >
