@@ -8,6 +8,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3'
 import { parseISO, format, addDays } from 'date-fns'
 import { formatCurrency } from '../../utils/currency'
+import { paymentModeInfo } from '../../utils/paymentMode'
 
 const DATE_PICKER_SX = {
     '& .MuiOutlinedInput-root': {
@@ -70,6 +71,7 @@ export default function AdminCreateMembershipPage() {
     // step 4
     const [paidAmount,    setPaidAmount]    = useState('')
     const [pendingAmount, setPendingAmount] = useState('0')
+    const [paymentMode,   setPaymentMode]   = useState('CASH') // 'CASH' | 'UPI-QR'
     const [cashConfirmed, setCashConfirmed] = useState(false)
     const [submitting, setSubmitting]       = useState(false)
 
@@ -157,6 +159,7 @@ export default function AdminCreateMembershipPage() {
                 // the onChange handlers above, so it never needs a non-zero fallback here.
                 paidAmount:    parseFloat(paidAmount)    || 0,
                 pendingAmount: parseFloat(pendingAmount) || 0,
+                paymentMode,
             })
             toast.success(t('adminNewMembership.toasts.created'))
             navigate('/admin/students')
@@ -570,11 +573,14 @@ export default function AdminCreateMembershipPage() {
                                 </div>
                             </div>
 
-                            <div className="flex justify-between py-2 text-sm">
+                            <div className="flex justify-between items-center py-2 text-sm">
                                 <span className="text-primary-400">{t('adminNewMembership.summary.payment')}</span>
-                                <span className="px-3 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-medium">
-                                    💵 {t('adminNewMembership.summary.cash')}
-                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setPaymentMode(m => m === 'CASH' ? 'UPI-QR' : 'CASH')}
+                                    className={`px-3 py-0.5 rounded-full border text-xs font-medium transition-colors ${paymentModeInfo(paymentMode, t).className}`}>
+                                    {paymentModeInfo(paymentMode, t).emoji} {paymentModeInfo(paymentMode, t).label}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -600,13 +606,14 @@ export default function AdminCreateMembershipPage() {
                                     const paid    = parseFloat(paidAmount)    || 0
                                     const pending = parseFloat(pendingAmount) || 0
                                     const name    = selectedStudent?.name
+                                    const prefix  = paymentMode === 'UPI-QR' ? 'upi' : 'cash'
                                     if (paid <= 0) {
-                                        return t('adminNewMembership.step4.cashConfirmationNoPayment', { pending, name })
+                                        return t(`adminNewMembership.step4.${prefix}ConfirmationNoPayment`, { pending, name })
                                     }
                                     if (pending > 0) {
-                                        return t('adminNewMembership.step4.cashConfirmationWithPending', { amount: paid, pending, name })
+                                        return t(`adminNewMembership.step4.${prefix}ConfirmationWithPending`, { amount: paid, pending, name })
                                     }
-                                    return t('adminNewMembership.step4.cashConfirmation', { amount: paid, name })
+                                    return t(`adminNewMembership.step4.${prefix}Confirmation`, { amount: paid, name })
                                 })()}
                             </p>
                         </label>

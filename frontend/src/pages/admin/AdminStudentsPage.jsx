@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import { formatCurrency } from '../../utils/currency'
+import { paymentModeInfo } from '../../utils/paymentMode'
 import StudentActionsMenu from '../../components/admin/StudentActionsMenu'
 
 const STATUS_BADGE_CLASSES = {
@@ -213,13 +214,14 @@ export default function AdminStudentsPage() {
                                         )}
                                     </td>
                                     <td className="p-4">
-                                        {s.paymentMode === 'CASH' ? (
-                                            <span className="text-xs px-2 py-1 rounded-full border bg-indigo-500/20 text-indigo-400 border-indigo-500/30">💵 {t('adminStudents.cash')}</span>
-                                        ) : s.paymentMode === 'ONLINE' ? (
-                                            <span className="text-xs px-2 py-1 rounded-full border bg-indigo-500/20 text-indigo-400 border-indigo-500/30">💳 {t('adminStudents.online')}</span>
-                                        ) : (
-                                            <span className="text-primary-600 text-xs">—</span>
-                                        )}
+                                        {(() => {
+                                            const info = paymentModeInfo(s.paymentMode, t)
+                                            return info ? (
+                                                <span className={`text-xs px-2 py-1 rounded-full border ${info.className}`}>{info.emoji} {info.label}</span>
+                                            ) : (
+                                                <span className="text-primary-600 text-xs">—</span>
+                                            )
+                                        })()}
                                     </td>
                                     <td className="p-4">
                                         {s.pendingAmount > 0 ? (
@@ -340,7 +342,10 @@ export default function AdminStudentsPage() {
                             {/* Payment mode (always read-only) */}
                             <div className="flex justify-between py-1.5 border-b border-primary-700/20 text-sm">
                                 <span className="text-primary-400">{t('adminStudents.modal.payment')}</span>
-                                <span className="text-white">{detail.paymentMode === 'CASH' ? `💵 ${t('adminStudents.cash')}` : detail.paymentMode === 'ONLINE' ? `💳 ${t('adminStudents.online')}` : '—'}</span>
+                                <span className="text-white">{(() => {
+                                    const info = paymentModeInfo(detail.paymentMode, t)
+                                    return info ? `${info.emoji} ${info.label}` : '—'
+                                })()}</span>
                             </div>
 
                             <div className="flex justify-between items-center py-1.5 border-b border-primary-700/20 text-sm gap-4">
@@ -371,14 +376,14 @@ export default function AdminStudentsPage() {
                             ) : (
                                 <div className="space-y-2">
                                     {studentPayments.filter(p => p.status === 'SUCCESS').map(p => {
-                                        const isCash = p.paymentGateway === 'CASH'
+                                        const info = paymentModeInfo(p.paymentGateway, t)
                                         return (
                                             <div key={p.id} className="rounded-lg bg-primary-800/40 border border-primary-700/30 px-3 py-2.5 text-xs">
                                                 <div className="flex items-center justify-between mb-1.5">
                                                     <span className="text-white font-semibold">₹{Number(p.amount).toLocaleString('en-IN')}</span>
                                                     <div className="flex items-center gap-2">
-                                                        <span className={`px-2 py-0.5 rounded-full font-medium border ${isCash ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}>
-                                                            {isCash ? 'Cash' : 'Online'}
+                                                        <span className={`px-2 py-0.5 rounded-full font-medium border ${info?.className ?? 'bg-primary-700/40 text-primary-400 border-primary-600/30'}`}>
+                                                            {info ? `${info.emoji} ${info.label}` : '—'}
                                                         </span>
                                                         <span className={`px-2 py-0.5 rounded-full font-medium border ${
                                                             p.status === 'SUCCESS'  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :

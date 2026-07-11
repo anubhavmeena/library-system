@@ -561,6 +561,7 @@
     "expired": "Expired",
     "cash": "Cash",
     "online": "Online",
+    "upiQr": "UPI (QR)",
     "view": "View",
     "changeSeat": "Change Seat",
     "changeSeatModal": {
@@ -841,6 +842,9 @@
       "cashConfirmation": "I confirm that cash payment of ₹{{amount}} has been collected from {{name}}",
       "cashConfirmationWithPending": "I confirm that cash payment of ₹{{amount}} has been collected from {{name}}, with ₹{{pending}} remaining as a pending balance",
       "cashConfirmationNoPayment": "I confirm that {{name}} is being registered with no cash collected — the full ₹{{pending}} plan price remains as a pending balance",
+      "upiConfirmation": "I confirm that a UPI payment of ₹{{amount}} has been collected from {{name}}",
+      "upiConfirmationWithPending": "I confirm that a UPI payment of ₹{{amount}} has been collected from {{name}}, with ₹{{pending}} remaining as a pending balance",
+      "upiConfirmationNoPayment": "I confirm that {{name}} is being registered with no UPI payment collected — the full ₹{{pending}} plan price remains as a pending balance",
       "create": "Create Membership",
       "creating": "Creating..."
     },
@@ -854,7 +858,8 @@
       "dates": "Dates",
       "amount": "Amount",
       "payment": "Payment Mode",
-      "cash": "Cash"
+      "cash": "Cash",
+      "upiQr": "UPI (QR)"
     },
     "toasts": {
       "loadStudentsFailed": "Failed to load students",

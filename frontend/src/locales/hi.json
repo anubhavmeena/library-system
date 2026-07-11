@@ -557,6 +557,7 @@
     "expired": "समाप्त",
     "cash": "नकद",
     "online": "ऑनलाइन",
+    "upiQr": "यूपीआई (QR)",
     "view": "देखें",
     "changeSeat": "सीट बदलें",
     "changeSeatModal": {
@@ -820,6 +821,9 @@
       "cashConfirmation": "मैं पुष्टि करता/करती हूं कि {{name}} से ₹{{amount}} नकद प्राप्त हो चुका है",
       "cashConfirmationWithPending": "मैं पुष्टि करता/करती हूं कि {{name}} से ₹{{amount}} नकद प्राप्त हो चुका है, और ₹{{pending}} बकाया शेष है",
       "cashConfirmationNoPayment": "मैं पुष्टि करता/करती हूं कि {{name}} को बिना कोई नकद लिए पंजीकृत किया जा रहा है — पूरी ₹{{pending}} प्लान राशि बकाया रहेगी",
+      "upiConfirmation": "मैं पुष्टि करता/करती हूं कि {{name}} से ₹{{amount}} यूपीआई भुगतान प्राप्त हो चुका है",
+      "upiConfirmationWithPending": "मैं पुष्टि करता/करती हूं कि {{name}} से ₹{{amount}} यूपीआई भुगतान प्राप्त हो चुका है, और ₹{{pending}} बकाया शेष है",
+      "upiConfirmationNoPayment": "मैं पुष्टि करता/करती हूं कि {{name}} को बिना कोई यूपीआई भुगतान लिए पंजीकृत किया जा रहा है — पूरी ₹{{pending}} प्लान राशि बकाया रहेगी",
       "create": "सदस्यता बनाएं",
       "creating": "बन रहा है..."
     },
@@ -833,7 +837,8 @@
       "dates": "तिथियां",
       "amount": "राशि",
       "payment": "भुगतान मोड",
-      "cash": "नकद"
+      "cash": "नकद",
+      "upiQr": "यूपीआई (QR)"
     },
     "toasts": {
       "loadStudentsFailed": "छात्र लोड करने में विफल",

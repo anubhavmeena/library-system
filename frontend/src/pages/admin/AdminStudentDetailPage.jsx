@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+import { paymentModeInfo } from '../../utils/paymentMode'
 import StudentActionsMenu from '../../components/admin/StudentActionsMenu'
 
 const STATUS_BADGE_CLASSES = {
@@ -235,8 +236,10 @@ export default function AdminStudentDetailPage() {
                     <div>
                         <p className="text-primary-400 text-xs mb-1">{t('adminStudents.modal.payment')}</p>
                         <p className="text-white">
-                            {student.paymentMode === 'CASH' ? `💵 ${t('adminStudents.cash')}`
-                                : student.paymentMode === 'ONLINE' ? `💳 ${t('adminStudents.online')}` : '—'}
+                            {(() => {
+                                const info = paymentModeInfo(student.paymentMode, t)
+                                return info ? `${info.emoji} ${info.label}` : '—'
+                            })()}
                         </p>
                     </div>
                 </div>
@@ -252,13 +255,13 @@ export default function AdminStudentDetailPage() {
                 ) : (
                     <div className="space-y-2">
                         {payments.filter(p => p.status === 'SUCCESS').map(p => {
-                            const isCash = p.paymentGateway === 'CASH'
+                            const info = paymentModeInfo(p.paymentGateway, t)
                             return (
                                 <div key={p.id} className="rounded-lg bg-primary-800/40 border border-primary-700/30 px-3 py-2.5 text-xs">
                                     <div className="flex items-center justify-between mb-1.5">
                                         <span className="text-white font-semibold">₹{Number(p.amount).toLocaleString('en-IN')}</span>
-                                        <span className={`px-2 py-0.5 rounded-full font-medium border ${isCash ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}>
-                                            {isCash ? t('adminStudents.cash') : t('adminStudents.online')}
+                                        <span className={`px-2 py-0.5 rounded-full font-medium border ${info?.className ?? 'bg-primary-700/40 text-primary-400 border-primary-600/30'}`}>
+                                            {info ? `${info.emoji} ${info.label}` : '—'}
                                         </span>
                                     </div>
                                     <div className="text-primary-400 space-y-0.5">

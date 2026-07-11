@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatNumber } from '../../utils/currency'
+import { paymentModeInfo } from '../../utils/paymentMode'
 
 const ROWS = ['A', 'B', 'C', 'D']
 const INACTIVE_SEATS = new Set(['B8', 'B18'])
@@ -48,8 +49,10 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
 
     const [clearDuesOpen, setClearDuesOpen]             = useState(false)
     const [clearDuesAmountInput, setClearDuesAmountInput] = useState('')
+    const [clearDuesPaymentMode, setClearDuesPaymentMode] = useState('CASH')
     const [clearFeesOpen, setClearFeesOpen]             = useState(false)
     const [clearFeesAmountInput, setClearFeesAmountInput] = useState('')
+    const [clearFeesPaymentMode, setClearFeesPaymentMode] = useState('CASH')
 
     const [changeStatusOpen, setChangeStatusOpen]       = useState(false)
     const [changeStatusTarget, setChangeStatusTarget]   = useState('PENDING')
@@ -199,6 +202,7 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
     const closeClearDues = () => {
         setClearDuesOpen(false)
         setClearDuesAmountInput('')
+        setClearDuesPaymentMode('CASH')
     }
 
     const handleClearDues = async () => {
@@ -210,7 +214,7 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
         }
         setClearingDues(true)
         try {
-            await api.patch(`/admin/memberships/${student.membershipId}/clear-dues`, { amountCleared: amount })
+            await api.patch(`/admin/memberships/${student.membershipId}/clear-dues`, { amountCleared: amount, paymentMode: clearDuesPaymentMode })
             toast.success(`₹${amount} cleared for ${student.name}`)
             closeClearDues()
             onMutated()
@@ -224,6 +228,7 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
     const closeClearFees = () => {
         setClearFeesOpen(false)
         setClearFeesAmountInput('')
+        setClearFeesPaymentMode('CASH')
     }
 
     const handleClearPendingFees = async () => {
@@ -235,7 +240,7 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
         }
         setClearingFees(true)
         try {
-            await api.patch(`/admin/students/${student.id}/clear-pending-fees`, { amountCleared: amount })
+            await api.patch(`/admin/students/${student.id}/clear-pending-fees`, { amountCleared: amount, paymentMode: clearFeesPaymentMode })
             toast.success(`₹${amount} cleared for ${student.name}`)
             closeClearFees()
             onMutated()
@@ -757,6 +762,23 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
                             </p>
                         )}
 
+                        <label className="label">Payment Mode</label>
+                        <div className="flex gap-2 mb-3">
+                            {['CASH', 'UPI-QR'].map(mode => {
+                                const info = paymentModeInfo(mode, t)
+                                const active = clearDuesPaymentMode === mode
+                                return (
+                                    <button
+                                        key={mode}
+                                        type="button"
+                                        onClick={() => setClearDuesPaymentMode(mode)}
+                                        className={`px-3 py-1 rounded-full border text-xs font-medium transition-colors ${active ? info.className : 'bg-primary-800 border-primary-600 text-primary-400'}`}>
+                                        {info.emoji} {info.label}
+                                    </button>
+                                )
+                            })}
+                        </div>
+
                         <div className="flex gap-3 justify-end mt-3">
                             <button onClick={closeClearDues} className="btn-outline text-sm px-4 py-2">
                                 Cancel
@@ -796,6 +818,23 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
                                 ₹{formatNumber(Number(student.pendingAmount ?? 0) - Number(clearFeesAmountInput))} will remain as a pending amount.
                             </p>
                         )}
+
+                        <label className="label">Payment Mode</label>
+                        <div className="flex gap-2 mb-3">
+                            {['CASH', 'UPI-QR'].map(mode => {
+                                const info = paymentModeInfo(mode, t)
+                                const active = clearFeesPaymentMode === mode
+                                return (
+                                    <button
+                                        key={mode}
+                                        type="button"
+                                        onClick={() => setClearFeesPaymentMode(mode)}
+                                        className={`px-3 py-1 rounded-full border text-xs font-medium transition-colors ${active ? info.className : 'bg-primary-800 border-primary-600 text-primary-400'}`}>
+                                        {info.emoji} {info.label}
+                                    </button>
+                                )
+                            })}
+                        </div>
 
                         <div className="flex gap-3 justify-end mt-3">
                             <button onClick={closeClearFees} className="btn-outline text-sm px-4 py-2">
