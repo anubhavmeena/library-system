@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../services/api'
-import { buildUpiIntentLink, UPI_APPS } from '../utils/upiPay'
+import { buildUpiIntentLink, UPI_APPS, isIOS } from '../utils/upiPay'
 
 // Public, unauthenticated — reached via a tap-to-pay link shared over
 // WhatsApp (see AdminCreateMembershipPage's "Send Payment Request", and the
@@ -26,6 +26,14 @@ export default function PayRedirectPage() {
     const [submitting, setSubmitting] = useState(false)
     const [submitted, setSubmitted] = useState(false)
     const [error, setError] = useState('')
+    const [copied, setCopied] = useState(false)
+    const ios = isIOS()
+
+    const handleCopyVpa = () => {
+        navigator.clipboard?.writeText(info.vpa)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
 
     useEffect(() => {
         if (!id) { setLoadError(true); return }
@@ -79,7 +87,7 @@ export default function PayRedirectPage() {
                     </p>
                 )}
 
-                {info && (
+                {info && !ios && (
                     <div className="flex flex-col gap-2">
                         {UPI_APPS.map(app => (
                             <a
@@ -95,11 +103,28 @@ export default function PayRedirectPage() {
                         ))}
                     </div>
                 )}
+                {info && !ios && (
+                    <p className="text-primary-500 text-xs mt-4">
+                        Tap the app you use — if it doesn't open, that app may not be installed on this device.
+                        This won't work on a desktop browser.
+                    </p>
+                )}
 
-                <p className="text-primary-500 text-xs mt-4">
-                    Tap the app you use — if it doesn't open, that app may not be installed on this device.
-                    This won't work on a desktop browser.
-                </p>
+                {info && ios && (
+                    <div className="text-left">
+                        <p className="text-primary-400 text-xs mb-3">
+                            iPhones don't support opening a UPI app directly with the amount pre-filled — open your
+                            UPI app (PhonePe, Google Pay, Paytm, etc.) yourself and pay to this UPI ID:
+                        </p>
+                        <div className="flex items-center gap-2 bg-primary-900/50 border border-primary-700/40 rounded-xl px-3 py-2.5 mb-2">
+                            <span className="text-white font-mono text-sm flex-1 break-all">{info.vpa}</span>
+                            <button onClick={handleCopyVpa} className="btn-ghost border border-primary-700/40 px-3 py-1.5 text-xs rounded-lg flex-shrink-0">
+                                {copied ? '✓ Copied' : 'Copy'}
+                            </button>
+                        </div>
+                        <p className="text-primary-400 text-xs">Amount: <span className="text-white font-semibold">₹{info.amount}</span></p>
+                    </div>
+                )}
 
                 {info?.claimType && (
                     <div className="mt-6 pt-6 border-t border-primary-700/30 text-left">

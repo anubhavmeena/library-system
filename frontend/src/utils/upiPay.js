@@ -38,3 +38,20 @@ export const UPI_APPS = [
     { key: 'paytm',   label: 'Paytm',      androidPackage: 'net.one97.paytm' },
     { key: 'other',   label: 'Other UPI App', androidPackage: null },
 ]
+
+// The intent:// package-targeting trick is Android/Chrome-only syntax —
+// tested live on iOS Safari and it throws "address is invalid" (not just
+// silently no-ops). iOS also has no reliable app-specific or universal
+// upi:// scheme for launching a UPI app with pre-filled payment details
+// from a web page (confirmed: neither NPCI nor the major apps document a
+// working iOS URL scheme for this). So iOS gets a manual "copy the UPI ID
+// and pay yourself" fallback instead of guessing at yet another broken
+// deep-link trick.
+export function isIOS() {
+    if (typeof navigator === 'undefined') return false
+    const ua = navigator.userAgent || ''
+    // iPadOS 13+ reports as "MacIntel" in the UA string but is touch-capable,
+    // unlike a real Mac.
+    const isIpadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+    return /iPhone|iPad|iPod/.test(ua) || isIpadOS
+}
