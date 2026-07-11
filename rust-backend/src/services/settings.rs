@@ -47,15 +47,16 @@ pub async fn save_app_settings(
     req: &SaveAppSettingsRequest,
 ) -> crate::error::Result<AppSettings> {
     sqlx::query_as::<_, AppSettings>(
-        "INSERT INTO app_settings (id, wifi_name, wifi_password, grace_days, convenience_fee, water_tanker_rate, updated_at)
-         VALUES (1, $1, $2, $3, $4, $5, NOW())
+        "INSERT INTO app_settings (id, wifi_name, wifi_password, upi_id, grace_days, convenience_fee, water_tanker_rate, updated_at)
+         VALUES (1, $1, $2, $3, $4, $5, $6, NOW())
          ON CONFLICT (id) DO UPDATE SET
-             wifi_name = $1, wifi_password = $2, grace_days = $3,
-             convenience_fee = $4, water_tanker_rate = $5, updated_at = NOW()
+             wifi_name = $1, wifi_password = $2, upi_id = $3, grace_days = $4,
+             convenience_fee = $5, water_tanker_rate = $6, updated_at = NOW()
          RETURNING *",
     )
     .bind(&req.wifi_name)
     .bind(&req.wifi_password)
+    .bind(&req.upi_id)
     .bind(req.grace_days)
     .bind(req.convenience_fee)
     .bind(req.water_tanker_rate)

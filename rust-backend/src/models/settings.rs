@@ -9,6 +9,7 @@ pub struct AppSettings {
     pub id: i64,
     pub wifi_name: Option<String>,
     pub wifi_password: Option<String>,
+    pub upi_id: Option<String>,
     pub grace_days: i32,
     pub convenience_fee: Decimal,
     pub water_tanker_rate: Decimal,
@@ -20,6 +21,7 @@ pub struct AppSettings {
 pub struct SaveAppSettingsRequest {
     pub wifi_name: Option<String>,
     pub wifi_password: Option<String>,
+    pub upi_id: Option<String>,
     pub grace_days: i32,
     pub convenience_fee: Decimal,
     pub water_tanker_rate: Decimal,
