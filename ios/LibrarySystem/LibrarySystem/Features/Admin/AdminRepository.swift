@@ -65,8 +65,8 @@ struct AdminRepository {
             fileData: photoData, token: token)
     }
 
-    func clearPendingFees(userId: String, amountCleared: Double) async throws {
-        let req = ClearAmountRequest(amountCleared: amountCleared)
+    func clearPendingFees(userId: String, amountCleared: Double, paymentMode: String? = nil) async throws {
+        let req = ClearAmountRequest(amountCleared: amountCleared, paymentMode: paymentMode)
         try await api.requestVoid(.clearPendingFees(userId: userId, req: req), token: token)
     }
 
@@ -74,8 +74,8 @@ struct AdminRepository {
         try await api.request(.getStudentsInGraceWithDues, token: token)
     }
 
-    func clearDues(membershipId: String, amountCleared: Double) async throws {
-        let req = ClearAmountRequest(amountCleared: amountCleared)
+    func clearDues(membershipId: String, amountCleared: Double, paymentMode: String? = nil) async throws {
+        let req = ClearAmountRequest(amountCleared: amountCleared, paymentMode: paymentMode)
         try await api.requestVoid(.clearDues(membershipId: membershipId, req: req), token: token)
     }
 
@@ -131,11 +131,12 @@ struct AdminRepository {
     // caller that genuinely relies on it being present.
     func createCashMembership(studentId: String, planId: String, seatNumber: String,
                               shift: String, startDate: String,
-                              paidAmount: Double?, pendingAmount: Double?) async throws {
+                              paidAmount: Double?, pendingAmount: Double?,
+                              paymentMode: String? = nil) async throws {
         let req = CreateCashMembershipRequest(studentId: studentId, planId: planId,
                                               seatNumber: seatNumber, shift: shift,
                                               startDate: startDate, paidAmount: paidAmount,
-                                              pendingAmount: pendingAmount)
+                                              pendingAmount: pendingAmount, paymentMode: paymentMode)
         try await api.requestVoid(.createCashMembership(req), token: token)
     }
 
@@ -216,12 +217,28 @@ struct AdminRepository {
         try await api.request(.getAppSettings, token: token)
     }
 
-    func saveAppSettings(wifiName: String?, wifiPassword: String?, graceDays: Int,
+    func saveAppSettings(wifiName: String?, wifiPassword: String?, upiId: String?, graceDays: Int,
                         convenienceFee: Double, waterTankerRate: Double) async throws -> AppSettings {
-        let req = SaveAppSettingsRequest(wifiName: wifiName, wifiPassword: wifiPassword,
+        let req = SaveAppSettingsRequest(wifiName: wifiName, wifiPassword: wifiPassword, upiId: upiId,
                                          graceDays: graceDays, convenienceFee: convenienceFee,
                                          waterTankerRate: waterTankerRate)
         return try await api.request(.saveAppSettings(req), token: token)
+    }
+
+    // MARK: - UPI Pay Links & Payment Verification
+    func createPayLink(studentId: String, amount: Double) async throws -> String {
+        let req = PayLinkRequest(studentId: studentId, amount: amount)
+        let res: PayLinkResponse = try await api.request(.createPayLink(req), token: token)
+        return res.link
+    }
+
+    func getPaymentClaims(status: String? = nil) async throws -> [PaymentClaim] {
+        try await api.request(.getPaymentClaims(status: status), token: token)
+    }
+
+    func reviewPaymentClaim(id: String, status: String) async throws -> PaymentClaim {
+        let req = PaymentClaimReviewRequest(status: status)
+        return try await api.request(.reviewPaymentClaim(id: id, req: req), token: token)
     }
 
     // MARK: - Expenses

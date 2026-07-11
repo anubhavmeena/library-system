@@ -204,6 +204,19 @@ extension Endpoint {
         Endpoint(path: "admin/settings", method: .POST, body: encode(req))
     }
 
+    // MARK: - Admin: UPI Pay Links & Payment Verification
+    static func createPayLink(_ req: PayLinkRequest) -> Endpoint {
+        Endpoint(path: "admin/pay-links", method: .POST, body: encode(req))
+    }
+    static func getPaymentClaims(status: String? = nil) -> Endpoint {
+        var items: [URLQueryItem] = []
+        if let status { items.append(URLQueryItem(name: "status", value: status)) }
+        return Endpoint(path: "admin/payment-claims", queryItems: items)
+    }
+    static func reviewPaymentClaim(id: String, req: PaymentClaimReviewRequest) -> Endpoint {
+        Endpoint(path: "admin/payment-claims/\(id)", method: .PATCH, body: encode(req))
+    }
+
     // MARK: - Admin: Expenses
     static func getExpenses(year: Int? = nil, month: Int? = nil) -> Endpoint {
         var items: [URLQueryItem] = []

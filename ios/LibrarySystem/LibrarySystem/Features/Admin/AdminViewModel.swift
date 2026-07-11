@@ -28,6 +28,7 @@ final class AdminViewModel: ObservableObject {
     @Published var expense:           MonthlyExpense = MonthlyExpense()
     @Published var inboxMessages:     [InboxSummary] = []
     @Published var selectedMessage:   InboxMessage?
+    @Published var paymentClaims:     [PaymentClaim] = []
 
     @Published var isLoading  = false
     @Published var error:      String?
@@ -123,10 +124,10 @@ final class AdminViewModel: ObservableObject {
         }
     }
 
-    func clearPendingFees(userId: String, amountCleared: Double) {
+    func clearPendingFees(userId: String, amountCleared: Double, paymentMode: String? = nil) {
         Task {
             do {
-                try await repo.clearPendingFees(userId: userId, amountCleared: amountCleared)
+                try await repo.clearPendingFees(userId: userId, amountCleared: amountCleared, paymentMode: paymentMode)
                 successMsg = "₹\(Int(amountCleared)) cleared"
                 loadPendingFeeStudents()
                 if selectedStudent?.id == userId { loadStudentDetail(id: userId) }
@@ -143,10 +144,10 @@ final class AdminViewModel: ObservableObject {
         }
     }
 
-    func clearDues(membershipId: String, amountCleared: Double, userId: String) {
+    func clearDues(membershipId: String, amountCleared: Double, userId: String, paymentMode: String? = nil) {
         Task {
             do {
-                try await repo.clearDues(membershipId: membershipId, amountCleared: amountCleared)
+                try await repo.clearDues(membershipId: membershipId, amountCleared: amountCleared, paymentMode: paymentMode)
                 successMsg = "₹\(Int(amountCleared)) cleared"
                 loadGraceDuesStudents()
                 if selectedStudent?.id == userId { loadStudentDetail(id: userId) }
@@ -253,13 +254,13 @@ final class AdminViewModel: ObservableObject {
         }
     }
 
-    func saveAppSettings(wifiName: String?, wifiPassword: String?, graceDays: Int,
+    func saveAppSettings(wifiName: String?, wifiPassword: String?, upiId: String?, graceDays: Int,
                         convenienceFee: Double, waterTankerRate: Double) {
         isLoading = true
         Task {
             do {
                 appSettings = try await repo.saveAppSettings(
-                    wifiName: wifiName, wifiPassword: wifiPassword, graceDays: graceDays,
+                    wifiName: wifiName, wifiPassword: wifiPassword, upiId: upiId, graceDays: graceDays,
                     convenienceFee: convenienceFee, waterTankerRate: waterTankerRate)
                 successMsg = "Settings saved"
             } catch { self.error = error.localizedDescription }
@@ -404,17 +405,67 @@ final class AdminViewModel: ObservableObject {
 
     func createCashMembership(studentId: String, planId: String, seatNumber: String,
                               shift: String, startDate: String,
-                              paidAmount: Double?, pendingAmount: Double?) {
+                              paidAmount: Double?, pendingAmount: Double?,
+                              paymentMode: String? = nil) {
         isLoading = true
         Task {
             do {
                 try await repo.createCashMembership(
                     studentId: studentId, planId: planId, seatNumber: seatNumber,
                     shift: shift, startDate: startDate,
-                    paidAmount: paidAmount, pendingAmount: pendingAmount)
+                    paidAmount: paidAmount, pendingAmount: pendingAmount,
+                    paymentMode: paymentMode)
                 successMsg = "Membership created"
             } catch { self.error = error.localizedDescription }
             isLoading = false
+        }
+    }
+
+    // MARK: - UPI Pay Links & Payment Verification
+    //
+    // Deliberately takes a completion closure instead of setting the shared
+    // successMsg/error like every other action here: AdminCreateMembershipView
+    // (the only caller) has a global `.onChange(of: vm.successMsg)` that
+    // dismisses the whole wizard on ANY success message — using successMsg
+    // for this ad-hoc helper action would close the wizard the instant the
+    // admin sends a payment request, before they've actually created the
+    // membership.
+    func sendPaymentRequest(studentId: String, amount: Double, onDone: @escaping (Result<Void, Error>) -> Void) {
+        Task {
+            do {
+                let link = try await repo.createPayLink(studentId: studentId, amount: amount)
+                let message = "💰 Payment Request — Target Zone Library\n\n" +
+                    "Please pay ₹\(String(format: "%.2f", amount)) using this link (opens your UPI app):\n\(link)\n\nThank you!"
+                try await repo.sendMessageToStudent(id: studentId, message: message)
+                onDone(.success(()))
+            } catch {
+                onDone(.failure(error))
+            }
+        }
+    }
+
+    func loadPaymentClaims(status: String? = "PENDING") {
+        isLoading = true
+        Task {
+            do { paymentClaims = try await repo.getPaymentClaims(status: status) }
+            catch { self.error = error.localizedDescription }
+            isLoading = false
+        }
+    }
+
+    func reviewPaymentClaim(id: String, status: String) {
+        Task {
+            do {
+                let updated = try await repo.reviewPaymentClaim(id: id, status: status)
+                if let idx = paymentClaims.firstIndex(where: { $0.id == id }) {
+                    if status == "PENDING" {
+                        paymentClaims[idx] = updated
+                    } else {
+                        paymentClaims.remove(at: idx)
+                    }
+                }
+                successMsg = status == "VERIFIED" ? "Payment verified and applied" : "Claim rejected"
+            } catch { self.error = error.localizedDescription }
         }
     }
 

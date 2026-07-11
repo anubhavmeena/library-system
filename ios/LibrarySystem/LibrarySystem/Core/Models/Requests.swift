@@ -119,6 +119,7 @@ struct CreateCashMembershipRequest: Codable {
     let startDate: String
     let paidAmount: Double?
     let pendingAmount: Double?
+    let paymentMode: String?   // "CASH" | "UPI-QR" — nil defaults to CASH server-side
 }
 
 struct SaveExpenseRequest: Codable {
@@ -150,6 +151,7 @@ struct ManualImportRequest: Codable {
 // pending balance rather than being wiped out.
 struct ClearAmountRequest: Codable {
     let amountCleared: Double
+    let paymentMode: String?   // "CASH" | "UPI-QR" — nil defaults to CASH server-side
 }
 
 struct ReleaseSeatRequest: Codable {
@@ -163,9 +165,26 @@ struct MarkPendingRequest: Codable {
 struct SaveAppSettingsRequest: Codable {
     let wifiName: String?
     let wifiPassword: String?
+    let upiId: String?
     let graceDays: Int
     let convenienceFee: Double
     let waterTankerRate: Double
+}
+
+// Backs the admin's ad-hoc "Send Payment Request" on Create Membership —
+// mints a short https://.../pay?id=... link server-side rather than
+// building a long query-string link on-device.
+struct PayLinkRequest: Codable {
+    let studentId: String
+    let amount: Double
+}
+
+struct PayLinkResponse: Codable {
+    let link: String
+}
+
+struct PaymentClaimReviewRequest: Codable {
+    let status: String   // "VERIFIED" | "REJECTED"
 }
 
 struct UpdateNotificationSettingRequest: Codable {

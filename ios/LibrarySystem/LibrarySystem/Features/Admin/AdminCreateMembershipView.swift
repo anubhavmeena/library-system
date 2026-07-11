@@ -34,6 +34,11 @@ struct AdminCreateMembershipView: View {
     @State private var paidAmountStr       = ""
     @State private var pendingAmountStr    = "0"
     @State private var cashConfirmed       = false
+    @State private var paymentMode         = "CASH"   // "CASH" | "UPI-QR"
+    @State private var showQrSheet         = false
+    @State private var sendingRequest      = false
+    @State private var paymentRequestMsg   = ""
+    @State private var paymentRequestError = ""
 
     private static let today: String = {
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current
@@ -79,6 +84,7 @@ struct AdminCreateMembershipView: View {
             vm.clearError()
             loadPlans()
             loadStudents()
+            vm.loadAppSettings()
         }
         .onChange(of: vm.successMsg) { msg in
             if msg != nil { vm.clearSuccess(); dismiss() }
@@ -548,9 +554,54 @@ struct AdminCreateMembershipView: View {
                     HStack {
                         Text("Payment").font(.bodyMedium).foregroundColor(.textSub)
                         Spacer()
-                        Text("💵 Cash").font(.labelSmall).foregroundColor(.amber)
-                            .padding(.horizontal, 10).padding(.vertical, 4)
-                            .background(Color.amberFaint).clipShape(Capsule())
+                        Button {
+                            paymentMode = paymentMode == "CASH" ? "UPI-QR" : "CASH"
+                        } label: {
+                            Text(paymentMode == "CASH" ? "💵 Cash" : "📱 UPI (QR)")
+                                .font(.labelSmall).foregroundColor(paymentMode == "CASH" ? .amber : .blueSoft)
+                                .padding(.horizontal, 10).padding(.vertical, 4)
+                                .background(paymentMode == "CASH" ? Color.amberFaint : Color.blueFaint)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if paymentMode == "UPI-QR" {
+                        if let upiId = vm.appSettings.upiId, !upiId.isEmpty {
+                            HStack(spacing: 10) {
+                                Button { showQrSheet = true } label: {
+                                    Text("📱 Show QR Code")
+                                        .font(.labelSmall).foregroundColor(.blueSoft)
+                                        .frame(maxWidth: .infinity).padding(.vertical, 8)
+                                        .background(Color.blueFaint)
+                                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.blueSoft.opacity(0.4)))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    sendPaymentRequest()
+                                } label: {
+                                    Text(sendingRequest ? "Sending…" : "💬 Send Request")
+                                        .font(.labelSmall).foregroundColor(.emerald)
+                                        .frame(maxWidth: .infinity).padding(.vertical, 8)
+                                        .background(Color.emeraldFaint)
+                                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.emerald.opacity(0.4)))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(sendingRequest)
+                            }
+                            if !paymentRequestMsg.isEmpty {
+                                Text(paymentRequestMsg).font(.caption).foregroundColor(.emerald)
+                            }
+                            if !paymentRequestError.isEmpty {
+                                Text(paymentRequestError).font(.caption).foregroundColor(.redAlert)
+                            }
+                        } else {
+                            Text("Set a UPI ID in App Settings first to enable QR/payment request.")
+                                .font(.caption).foregroundColor(.yellowWarn)
+                        }
                     }
                 }
             }
@@ -561,7 +612,7 @@ struct AdminCreateMembershipView: View {
                         Image(systemName: cashConfirmed ? "checkmark.square.fill" : "square")
                             .foregroundColor(cashConfirmed ? .amber : .textMuted)
                             .font(.system(size: 20))
-                        Text("I confirm ₹\(String(format: "%.0f", selectedPlan?.price ?? 0)) has been collected in cash from \(selectedStudent?.name ?? "the student").")
+                        Text(confirmationText)
                             .font(.bodySmall).foregroundColor(.textSub)
                     }
                 }
@@ -575,6 +626,71 @@ struct AdminCreateMembershipView: View {
                 PrimaryButton(vm.isLoading ? "Creating…" : "Create Membership", isLoading: vm.isLoading) { submit() }
                     .disabled(!cashConfirmed || vm.isLoading)
                     .opacity(cashConfirmed ? 1 : 0.4)
+            }
+        }
+        .sheet(isPresented: $showQrSheet) { qrSheet }
+    }
+
+    private var confirmationText: String {
+        let paid = Double(paidAmountStr) ?? 0
+        let pending = Double(pendingAmountStr) ?? 0
+        let name = selectedStudent?.name ?? "the student"
+        let method = paymentMode == "UPI-QR" ? "UPI" : "cash"
+        if paid <= 0 {
+            return "I confirm \(name) is being registered with no \(method) collected — the full ₹\(String(format: "%.0f", pending)) plan price remains as a pending balance."
+        }
+        if pending > 0 {
+            return "I confirm ₹\(String(format: "%.0f", paid)) \(method) payment has been collected from \(name), with ₹\(String(format: "%.0f", pending)) remaining as a pending balance."
+        }
+        return "I confirm ₹\(String(format: "%.0f", paid)) \(method) payment has been collected from \(name)."
+    }
+
+    private func sendPaymentRequest() {
+        guard let student = selectedStudent else { return }
+        let paid = Double(paidAmountStr) ?? 0
+        sendingRequest = true
+        paymentRequestMsg = ""
+        paymentRequestError = ""
+        vm.sendPaymentRequest(studentId: student.id, amount: paid) { result in
+            sendingRequest = false
+            switch result {
+            case .success:
+                paymentRequestMsg = "Payment request sent"
+            case .failure(let err):
+                paymentRequestError = err.localizedDescription
+            }
+        }
+    }
+
+    private var qrSheet: some View {
+        NavigationStack {
+            ZStack {
+                Color.navyDeep.ignoresSafeArea()
+                VStack(spacing: 16) {
+                    Text("Scan to Pay").font(.headlineSmall).foregroundColor(.textPrimary)
+                    if let upiId = vm.appSettings.upiId {
+                        let paid = Double(paidAmountStr) ?? 0
+                        let link = buildUpiDeepLink(vpa: upiId, payeeName: "Target Zone Library",
+                                                    amount: paid, note: "Library fee - \(selectedStudent?.name ?? "")")
+                        Image(uiImage: generateQrImage(from: link))
+                            .interpolation(.none)
+                            .resizable()
+                            .frame(width: 240, height: 240)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        Text("₹\(String(format: "%.2f", paid)) — scan with any UPI app")
+                            .font(.bodySmall).foregroundColor(.textSub)
+                    }
+                    Spacer()
+                }
+                .padding(16)
+            }
+            .navigationTitle("UPI QR")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") { showQrSheet = false }.foregroundColor(.amber)
+                }
             }
         }
     }
@@ -606,7 +722,8 @@ struct AdminCreateMembershipView: View {
         vm.createCashMembership(
             studentId: student.id, planId: plan.id, seatNumber: seat.seatNumber,
             shift: resolvedShift, startDate: startDate,
-            paidAmount: Double(paidAmountStr), pendingAmount: Double(pendingAmountStr))
+            paidAmount: Double(paidAmountStr), pendingAmount: Double(pendingAmountStr),
+            paymentMode: paymentMode)
     }
 
     // MARK: - Date helpers

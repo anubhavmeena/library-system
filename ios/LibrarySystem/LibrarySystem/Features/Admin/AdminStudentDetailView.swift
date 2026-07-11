@@ -17,6 +17,7 @@ struct AdminStudentDetailView: View {
     private enum ClearKind { case fees, dues }
     @State private var clearKind:       ClearKind?
     @State private var clearAmountText = ""
+    @State private var clearPaymentMode = "CASH"   // "CASH" | "UPI-QR"
     @State private var showReleaseConfirm = false
     @State private var showReleaseNotifyPrompt = false
     @State private var showRenewConfirm = false
@@ -71,6 +72,9 @@ struct AdminStudentDetailView: View {
             .sheet(isPresented: $showChangeStatus) {
                 if let s = vm.selectedStudent { changeStatusSheet(s) }
             }
+            .sheet(isPresented: Binding(get: { clearKind != nil }, set: { if !$0 { clearKind = nil } })) {
+                if let s = vm.selectedStudent { clearAmountSheet(s) }
+            }
         }
         .dismissKeyboardOnTap()
         .navigationTitle("Student Details")
@@ -81,27 +85,6 @@ struct AdminStudentDetailView: View {
         .onAppear { vm.loadStudentDetail(id: studentId) }
         .onChange(of: vm.studentDeleted) { deleted in
             if deleted { vm.studentDeleted = false; dismiss() }
-        }
-        .alert(clearKind == .dues ? "Clear Dues" : "Clear Pending Fees",
-               isPresented: Binding(get: { clearKind != nil }, set: { if !$0 { clearKind = nil } })) {
-            TextField("Amount", text: $clearAmountText).keyboardType(.decimalPad)
-            Button("Cancel", role: .cancel) { clearKind = nil }
-            Button("Clear") {
-                guard let s = vm.selectedStudent, let amount = Double(clearAmountText), amount > 0 else { return }
-                if clearKind == .dues {
-                    if let membershipId = s.membershipId {
-                        vm.clearDues(membershipId: membershipId, amountCleared: amount, userId: s.id)
-                    }
-                } else {
-                    vm.clearPendingFees(userId: s.id, amountCleared: amount)
-                }
-                clearKind = nil
-            }
-        } message: {
-            if let s = vm.selectedStudent {
-                let outstanding = clearKind == .dues ? (s.duesAmount ?? 0) : (s.pendingAmount ?? 0)
-                Text("Outstanding: ₹\(String(format: "%.0f", outstanding)). Any amount not cleared stays on record as a pending balance.")
-            }
         }
         .alert("Release Seat", isPresented: $showReleaseConfirm) {
             Button("Cancel", role: .cancel) {}
@@ -213,6 +196,7 @@ struct AdminStudentDetailView: View {
                 Button {
                     clearKind = .fees
                     clearAmountText = String(format: "%.0f", s.pendingAmount ?? 0)
+                    clearPaymentMode = "CASH"
                 } label: {
                     HStack {
                         Image(systemName: "checkmark.circle")
@@ -244,6 +228,7 @@ struct AdminStudentDetailView: View {
                 Button {
                     clearKind = .dues
                     clearAmountText = String(format: "%.0f", s.duesAmount ?? 0)
+                    clearPaymentMode = "CASH"
                 } label: {
                     HStack {
                         Image(systemName: "checkmark.circle")
@@ -438,6 +423,69 @@ struct AdminStudentDetailView: View {
                 }
             }
         }
+    }
+
+    private func clearAmountSheet(_ s: StudentDetail) -> some View {
+        let outstanding = clearKind == .dues ? (s.duesAmount ?? 0) : (s.pendingAmount ?? 0)
+        return NavigationStack {
+            ZStack {
+                Color.navyDeep.ignoresSafeArea()
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Outstanding: ₹\(String(format: "%.0f", outstanding)). Any amount not cleared stays on record as a pending balance.")
+                        .font(.bodySmall).foregroundColor(.textSub)
+
+                    AppTextField(label: "Amount to Clear (₹)", text: $clearAmountText,
+                                placeholder: "0", keyboardType: .decimalPad,
+                                leadingIcon: "indianrupeesign")
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Payment Mode").font(.labelMedium).foregroundColor(.textSub)
+                        HStack(spacing: 10) {
+                            clearModeButton("💵 Cash", value: "CASH", color: .amber)
+                            clearModeButton("📱 UPI (QR)", value: "UPI-QR", color: .blueSoft)
+                        }
+                    }
+
+                    Spacer()
+
+                    PrimaryButton("Clear") {
+                        guard let amount = Double(clearAmountText), amount > 0 else { return }
+                        if clearKind == .dues {
+                            if let membershipId = s.membershipId {
+                                vm.clearDues(membershipId: membershipId, amountCleared: amount, userId: s.id, paymentMode: clearPaymentMode)
+                            }
+                        } else {
+                            vm.clearPendingFees(userId: s.id, amountCleared: amount, paymentMode: clearPaymentMode)
+                        }
+                        clearKind = nil
+                    }
+                    .disabled((Double(clearAmountText) ?? 0) <= 0)
+                }
+                .padding(16)
+            }
+            .dismissKeyboardOnTap()
+            .navigationTitle(clearKind == .dues ? "Clear Dues" : "Clear Pending Fees")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { clearKind = nil }.foregroundColor(.amber)
+                }
+            }
+        }
+    }
+
+    private func clearModeButton(_ title: String, value: String, color: Color) -> some View {
+        let selected = clearPaymentMode == value
+        return Button { clearPaymentMode = value } label: {
+            Text(title)
+                .font(.labelSmall)
+                .foregroundColor(selected ? color : .textSub)
+                .frame(maxWidth: .infinity).padding(.vertical, 8)
+                .background(selected ? color.opacity(0.15) : Color.cardBg)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? color.opacity(0.4) : Color.cardBorder))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
     }
 
     private func changeStatusSheet(_ s: StudentDetail) -> some View {

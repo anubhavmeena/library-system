@@ -5,6 +5,7 @@ struct AdminAppSettingsView: View {
 
     @State private var wifiName        = ""
     @State private var wifiPassword    = ""
+    @State private var upiId           = ""
     @State private var graceDays       = ""
     @State private var convenienceFee  = ""
     @State private var waterTankerRate = ""
@@ -23,6 +24,16 @@ struct AdminAppSettingsView: View {
                                             placeholder: "Network name", leadingIcon: "wifi")
                                 AppTextField(label: "WiFi Password", text: $wifiPassword,
                                             placeholder: "Password", isSecure: true, leadingIcon: "lock")
+                            }
+                        }
+
+                        AppCard {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Payments").font(.labelMedium).foregroundColor(.textSub)
+                                AppTextField(label: "UPI ID (VPA)", text: $upiId,
+                                            placeholder: "yourname@upi", leadingIcon: "indianrupeesign.circle")
+                                Text("Used to generate UPI QR codes and payment-request links on the Create Membership screen.")
+                                    .font(.caption).foregroundColor(.textMuted)
                             }
                         }
 
@@ -59,6 +70,7 @@ struct AdminAppSettingsView: View {
                             vm.saveAppSettings(
                                 wifiName: wifiName.isEmpty ? nil : wifiName,
                                 wifiPassword: wifiPassword.isEmpty ? nil : wifiPassword,
+                                upiId: upiId.isEmpty ? nil : upiId,
                                 graceDays: Int(graceDays) ?? 0,
                                 convenienceFee: Double(convenienceFee) ?? 0,
                                 waterTankerRate: Double(waterTankerRate) ?? 0)
@@ -81,6 +93,7 @@ struct AdminAppSettingsView: View {
             loaded = true
             wifiName = vm.appSettings.wifiName ?? ""
             wifiPassword = vm.appSettings.wifiPassword ?? ""
+            upiId = vm.appSettings.upiId ?? ""
             graceDays = vm.appSettings.graceDays.map { "\($0)" } ?? "10"
             convenienceFee = vm.appSettings.convenienceFee.map { String(format: "%.0f", $0) } ?? "0"
             waterTankerRate = vm.appSettings.waterTankerRate.map { String(format: "%.0f", $0) } ?? "0"

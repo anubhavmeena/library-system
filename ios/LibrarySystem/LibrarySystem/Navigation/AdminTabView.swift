@@ -53,6 +53,11 @@ struct AdminTabView: View {
                         }
                         .buttonStyle(.plain)
 
+                        NavigationLink { AdminPaymentVerificationsView(vm: vm) } label: {
+                            moreActionRow(icon: "checkmark.seal.fill", label: "Verify Payments")
+                        }
+                        .buttonStyle(.plain)
+
                         NavigationLink { AdminRevenueView(vm: vm) } label: {
                             moreActionRow(icon: "chart.line.uptrend.xyaxis", label: "Revenue & Reports")
                         }

@@ -589,17 +589,37 @@ struct PaymentBreakdownItem: Codable {
 struct AppSettings: Codable {
     var wifiName: String?
     var wifiPassword: String?
+    var upiId: String?
     var graceDays: Int?
     var convenienceFee: Double?
     var waterTankerRate: Double?
     let updatedAt: String?
 
-    init(wifiName: String? = nil, wifiPassword: String? = nil, graceDays: Int? = nil,
+    init(wifiName: String? = nil, wifiPassword: String? = nil, upiId: String? = nil, graceDays: Int? = nil,
          convenienceFee: Double? = nil, waterTankerRate: Double? = nil, updatedAt: String? = nil) {
-        self.wifiName = wifiName; self.wifiPassword = wifiPassword; self.graceDays = graceDays
+        self.wifiName = wifiName; self.wifiPassword = wifiPassword; self.upiId = upiId; self.graceDays = graceDays
         self.convenienceFee = convenienceFee; self.waterTankerRate = waterTankerRate
         self.updatedAt = updatedAt
     }
+}
+
+// Student-submitted UPI payment claim (screenshot + self-reported amount),
+// reviewed by an admin on the "Verify Payments" screen. Verifying auto-clears
+// the student's dues/pending fee server-side; the screenshot itself is
+// uploaded by the student via the web /pay page, never by this app.
+struct PaymentClaim: Codable, Identifiable {
+    let id: String
+    let userId: String
+    let studentName: String
+    let studentMobile: String?
+    let claimType: String        // "DUES" | "PENDING_FEE"
+    let membershipId: String?
+    let amountClaimed: Double
+    let screenshotUrl: String
+    let status: String           // "PENDING" | "VERIFIED" | "REJECTED"
+    let createdAt: String
+    let reviewedAt: String?
+    let reviewedBy: String?
 }
 
 // MARK: - Bulk Import Result
