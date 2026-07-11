@@ -825,7 +825,16 @@
       "upiConfirmationWithPending": "मैं पुष्टि करता/करती हूं कि {{name}} से ₹{{amount}} यूपीआई भुगतान प्राप्त हो चुका है, और ₹{{pending}} बकाया शेष है",
       "upiConfirmationNoPayment": "मैं पुष्टि करता/करती हूं कि {{name}} को बिना कोई यूपीआई भुगतान लिए पंजीकृत किया जा रहा है — पूरी ₹{{pending}} प्लान राशि बकाया रहेगी",
       "create": "सदस्यता बनाएं",
-      "creating": "बन रहा है..."
+      "creating": "बन रहा है...",
+      "showQrCode": "क्यूआर कोड दिखाएं",
+      "sendPaymentRequest": "भुगतान अनुरोध भेजें",
+      "sending": "भेजा जा रहा है…",
+      "qrModalTitle": "भुगतान के लिए स्कैन करें",
+      "qrModalSubtitle": "₹{{amount}} — किसी भी यूपीआई ऐप से स्कैन करें",
+      "close": "बंद करें",
+      "noUpiIdConfigured": "क्यूआर/भुगतान अनुरोध सक्षम करने के लिए पहले सेटिंग्स में यूपीआई आईडी सेट करें।",
+      "goToSettings": "सेटिंग्स पर जाएं",
+      "paymentRequestMessage": "💰 भुगतान अनुरोध — Target Zone Library\n\nकृपया इस लिंक (यूपीआई ऐप खुलेगा) का उपयोग करके ₹{{amount}} का भुगतान करें:\n{{link}}\n\nधन्यवाद!"
     },
     "summary": {
       "student": "छात्र",
@@ -845,7 +854,9 @@
       "loadPlansFailed": "प्लान लोड करने में विफल",
       "loadSeatsFailed": "सीट उपलब्धता लोड करने में विफल",
       "created": "सदस्यता सफलतापूर्वक बनाई गई",
-      "createFailed": "सदस्यता बनाने में विफल"
+      "createFailed": "सदस्यता बनाने में विफल",
+      "paymentRequestSent": "भुगतान अनुरोध भेजा गया",
+      "paymentRequestFailed": "भुगतान अनुरोध भेजने में विफल"
     }
   },
   "adminImport": {
@@ -909,6 +920,9 @@
     "wifiSection": "वाईफ़ाई",
     "wifiName": "वाईफ़ाई नाम",
     "wifiPassword": "वाईफ़ाई पासवर्ड",
+    "paymentsSection": "भुगतान",
+    "upiId": "यूपीआई आईडी (VPA)",
+    "upiIdHint": "Create Membership स्क्रीन पर यूपीआई क्यूआर कोड और भुगतान-अनुरोध लिंक बनाने के लिए उपयोग किया जाता है।",
     "gracePeriodSection": "छूट अवधि",
     "graceDays": "छूट अवधि (दिन)",
     "convenienceFeeSection": "सुविधा शुल्क",

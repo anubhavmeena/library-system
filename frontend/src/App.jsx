@@ -10,6 +10,7 @@ import PrivacyPolicyPage        from './pages/PrivacyPolicyPage'
 import RefundPolicyPage         from './pages/RefundPolicyPage'
 import CancellationPolicyPage   from './pages/CancellationPolicyPage'
 import AboutUsPage              from './pages/AboutUsPage'
+import PayRedirectPage          from './pages/PayRedirectPage'
 import LoginPage          from './pages/auth/LoginPage'
 import RegisterPage       from './pages/auth/RegisterPage'
 import AdminLoginPage     from './pages/admin/AdminLoginPage'
@@ -74,6 +75,7 @@ export default function App() {
             <Route path="/privacy-policy"      element={<PrivacyPolicyPage />} />
             <Route path="/refund-policy"       element={<RefundPolicyPage />} />
             <Route path="/cancellation-policy" element={<CancellationPolicyPage />} />
+            <Route path="/pay"                 element={<PayRedirectPage />} />
             <Route path="/login"       element={<LoginPage />} />
             <Route path="/register"    element={<RegisterPage />} />
             <Route path="/admin/login" element={<AdminLoginPage />} />

@@ -9,6 +9,8 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3'
 import { parseISO, format, addDays } from 'date-fns'
 import { formatCurrency } from '../../utils/currency'
 import { paymentModeInfo } from '../../utils/paymentMode'
+import { buildPayRedirectLink } from '../../utils/upiPay'
+import UpiQrModal from '../../components/admin/UpiQrModal'
 
 const DATE_PICKER_SX = {
     '& .MuiOutlinedInput-root': {
@@ -74,6 +76,9 @@ export default function AdminCreateMembershipPage() {
     const [paymentMode,   setPaymentMode]   = useState('CASH') // 'CASH' | 'UPI-QR'
     const [cashConfirmed, setCashConfirmed] = useState(false)
     const [submitting, setSubmitting]       = useState(false)
+    const [showQrModal, setShowQrModal]     = useState(false)
+    const [sendingRequest, setSendingRequest] = useState(false)
+    const [upiId, setUpiId]                 = useState(null)
 
     useEffect(() => {
         api.get('/admin/students?page=0&size=200')
@@ -92,6 +97,12 @@ export default function AdminCreateMembershipPage() {
     useEffect(() => {
         if (selectedPlan) { setPaidAmount(String(selectedPlan.price)); setPendingAmount('0') }
     }, [selectedPlan])
+
+    useEffect(() => {
+        api.get('/admin/settings')
+            .then(r => setUpiId(r.data.data?.upiId || null))
+            .catch(() => {})
+    }, [])
 
     useEffect(() => {
         if (step !== 3 || !selectedPlan) return
@@ -167,6 +178,24 @@ export default function AdminCreateMembershipPage() {
             toast.error(e.response?.data?.message || t('adminNewMembership.toasts.createFailed'))
         } finally {
             setSubmitting(false)
+        }
+    }
+
+    const handleSendPaymentRequest = async () => {
+        setSendingRequest(true)
+        try {
+            const paid = parseFloat(paidAmount) || 0
+            const link = buildPayRedirectLink({
+                vpa: upiId, payeeName: 'Target Zone Library', amount: paid,
+                note: `Library fee - ${selectedStudent.name}`,
+            })
+            const message = t('adminNewMembership.step4.paymentRequestMessage', { amount: paid, link })
+            await api.post(`/admin/students/${selectedStudent.id}/message`, { message })
+            toast.success(t('adminNewMembership.toasts.paymentRequestSent'))
+        } catch (e) {
+            toast.error(e.response?.data?.message || t('adminNewMembership.toasts.paymentRequestFailed'))
+        } finally {
+            setSendingRequest(false)
         }
     }
 
@@ -582,6 +611,28 @@ export default function AdminCreateMembershipPage() {
                                     {paymentModeInfo(paymentMode, t).emoji} {paymentModeInfo(paymentMode, t).label}
                                 </button>
                             </div>
+
+                            {paymentMode === 'UPI-QR' && (
+                                <div className="pt-3 mt-1 border-t border-primary-700/20">
+                                    {!upiId ? (
+                                        <p className="text-xs text-amber-400">
+                                            {t('adminNewMembership.step4.noUpiIdConfigured')}{' '}
+                                            <a href="/admin/settings" className="underline">{t('adminNewMembership.step4.goToSettings')}</a>
+                                        </p>
+                                    ) : (
+                                        <div className="flex gap-3 flex-wrap">
+                                            <button type="button" onClick={() => setShowQrModal(true)}
+                                                    className="btn-ghost border border-sky-500/30 text-sky-300 px-4 py-2 rounded-xl text-xs font-medium">
+                                                📱 {t('adminNewMembership.step4.showQrCode')}
+                                            </button>
+                                            <button type="button" onClick={handleSendPaymentRequest} disabled={sendingRequest}
+                                                    className="btn-ghost border border-emerald-500/30 text-emerald-300 px-4 py-2 rounded-xl text-xs font-medium disabled:opacity-50">
+                                                {sendingRequest ? t('adminNewMembership.step4.sending') : `💬 ${t('adminNewMembership.step4.sendPaymentRequest')}`}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -631,6 +682,15 @@ export default function AdminCreateMembershipPage() {
                         </button>
                     </div>
                 </div>
+            )}
+
+            {showQrModal && (
+                <UpiQrModal
+                    vpa={upiId}
+                    amount={parseFloat(paidAmount) || 0}
+                    studentName={selectedStudent?.name}
+                    onClose={() => setShowQrModal(false)}
+                />
             )}
         </div>
     )

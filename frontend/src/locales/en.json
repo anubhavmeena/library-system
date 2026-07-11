@@ -846,7 +846,16 @@
       "upiConfirmationWithPending": "I confirm that a UPI payment of ₹{{amount}} has been collected from {{name}}, with ₹{{pending}} remaining as a pending balance",
       "upiConfirmationNoPayment": "I confirm that {{name}} is being registered with no UPI payment collected — the full ₹{{pending}} plan price remains as a pending balance",
       "create": "Create Membership",
-      "creating": "Creating..."
+      "creating": "Creating...",
+      "showQrCode": "Show QR Code",
+      "sendPaymentRequest": "Send Payment Request",
+      "sending": "Sending…",
+      "qrModalTitle": "Scan to Pay",
+      "qrModalSubtitle": "₹{{amount}} — scan with any UPI app",
+      "close": "Close",
+      "noUpiIdConfigured": "Set a UPI ID in Settings first to enable QR/payment request.",
+      "goToSettings": "Go to Settings",
+      "paymentRequestMessage": "💰 Payment Request — Target Zone Library\n\nPlease pay ₹{{amount}} using this link (opens your UPI app):\n{{link}}\n\nThank you!"
     },
     "summary": {
       "student": "Student",
@@ -866,7 +875,9 @@
       "loadPlansFailed": "Failed to load plans",
       "loadSeatsFailed": "Failed to load seat availability",
       "created": "Membership created successfully",
-      "createFailed": "Failed to create membership"
+      "createFailed": "Failed to create membership",
+      "paymentRequestSent": "Payment request sent",
+      "paymentRequestFailed": "Failed to send payment request"
     }
   },
   "adminImport": {
@@ -930,6 +941,9 @@
     "wifiSection": "WiFi",
     "wifiName": "WiFi Name",
     "wifiPassword": "WiFi Password",
+    "paymentsSection": "Payments",
+    "upiId": "UPI ID (VPA)",
+    "upiIdHint": "Used to generate UPI QR codes and payment-request links on the Create Membership screen.",
     "gracePeriodSection": "Grace Period",
     "graceDays": "Grace Period (days)",
     "convenienceFeeSection": "Convenience Fee",

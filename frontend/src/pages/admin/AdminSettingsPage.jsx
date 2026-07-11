@@ -407,6 +407,7 @@ export default function AdminSettingsPage() {
     const [wifiName,        setWifiName]        = useState('')
     const [wifiPassword,    setWifiPassword]    = useState('')
     const [showPassword,    setShowPassword]    = useState(false)
+    const [upiId,           setUpiId]           = useState('')
     const [graceDays,       setGraceDays]       = useState('')
     const [convenienceFee,  setConvenienceFee]  = useState('')
     const [waterTankerRate, setWaterTankerRate] = useState('')
@@ -420,6 +421,7 @@ export default function AdminSettingsPage() {
             const d = res.data.data ?? {}
             setWifiName(d.wifiName ?? '')
             setWifiPassword(d.wifiPassword ?? '')
+            setUpiId(d.upiId ?? '')
             setGraceDays(d.graceDays ?? 10)
             setConvenienceFee(d.convenienceFee ?? 0)
             setWaterTankerRate(d.waterTankerRate ?? 0)
@@ -438,6 +440,7 @@ export default function AdminSettingsPage() {
             await api.post('/admin/settings', {
                 wifiName,
                 wifiPassword,
+                upiId,
                 graceDays: parseInt(graceDays || '0', 10),
                 convenienceFee: num(convenienceFee),
                 waterTankerRate: num(waterTankerRate),
@@ -494,6 +497,22 @@ export default function AdminSettingsPage() {
                                     </button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* UPI Payments */}
+                    <div className="card p-5 mb-4">
+                        <p className="text-primary-400 text-xs uppercase tracking-widest mb-3">{t('adminSettings.paymentsSection')}</p>
+                        <div>
+                            <label className="label">{t('adminSettings.upiId')}</label>
+                            <input
+                                type="text"
+                                placeholder="yourname@upi"
+                                className="input w-full"
+                                value={upiId}
+                                onChange={e => setUpiId(e.target.value)}
+                            />
+                            <p className="text-primary-500 text-xs mt-1">{t('adminSettings.upiIdHint')}</p>
                         </div>
                     </div>
 
