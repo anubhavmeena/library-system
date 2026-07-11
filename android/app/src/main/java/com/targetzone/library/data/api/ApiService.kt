@@ -218,6 +218,9 @@ interface ApiService {
     @POST("admin/memberships/cash")
     suspend fun createCashMembership(@Body req: CreateCashMembershipRequest): Response<ApiResponse<Membership>>
 
+    @GET("admin/settings")
+    suspend fun getAppSettings(): Response<ApiResponse<AppSettings>>
+
     @Multipart
     @POST("admin/students/import")
     suspend fun importStudents(@Part file: MultipartBody.Part): Response<ApiResponse<ImportResult>>

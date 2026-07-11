@@ -143,6 +143,11 @@ class AdminRepository {
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to create membership")
     }
 
+    suspend fun getAppSettings(): Result<AppSettings> = runCatching {
+        val res = api.getAppSettings()
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to load settings")
+    }
+
     suspend fun getStudentsWithPendingFees(): Result<List<StudentDetail>> = runCatching {
         val res = api.getStudentsWithPendingFees()
         res.body()?.data ?: emptyList()

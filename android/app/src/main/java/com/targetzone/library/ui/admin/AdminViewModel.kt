@@ -28,6 +28,7 @@ class AdminViewModel(
     val expiring     = MutableStateFlow<List<ReminderStudent>>(emptyList())
     val feedback     = MutableStateFlow<List<FeedbackItem>>(emptyList())
     val plans        = MutableStateFlow<List<Plan>>(emptyList())
+    val appSettings  = MutableStateFlow<AppSettings?>(null)
 
     val expense      = MutableStateFlow<MonthlyExpense?>(null)
     val importResult = MutableStateFlow<ImportResult?>(null)
@@ -254,6 +255,10 @@ class AdminViewModel(
 
     fun loadPlans() = viewModelScope.launch {
         membershipRepo.getPlans().onSuccess { plans.value = it }
+    }
+
+    fun loadAppSettings() = viewModelScope.launch {
+        adminRepo.getAppSettings().onSuccess { appSettings.value = it }
     }
 
     fun createCashMembership(req: CreateCashMembershipRequest, onDone: () -> Unit) = viewModelScope.launch {

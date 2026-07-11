@@ -63,6 +63,15 @@ data class Plan(
     val isActive: Boolean = true
 )
 
+data class AppSettings(
+    val wifiName: String? = null,
+    val wifiPassword: String? = null,
+    val upiId: String? = null,
+    val graceDays: Int = 10,
+    val convenienceFee: Double = 0.0,
+    val waterTankerRate: Double = 0.0
+)
+
 data class Seat(
     val id: String? = null,
     val seatNumber: String = "",

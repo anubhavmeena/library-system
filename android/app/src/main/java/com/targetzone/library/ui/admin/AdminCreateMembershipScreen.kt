@@ -1,5 +1,7 @@
 package com.targetzone.library.ui.admin
 
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -40,6 +43,7 @@ fun AdminCreateMembershipScreen(vm: AdminViewModel, onBack: () -> Unit) {
     val isLoading by vm.isLoading.collectAsState()
     val success   by vm.successMsg.collectAsState()
     val error     by vm.error.collectAsState()
+    val appSettings by vm.appSettings.collectAsState()
 
     var search        by remember { mutableStateOf("") }
     var selectedStudent by remember { mutableStateOf<StudentSummary?>(null) }
@@ -50,6 +54,8 @@ fun AdminCreateMembershipScreen(vm: AdminViewModel, onBack: () -> Unit) {
     var showDatePicker by remember { mutableStateOf(false) }
     var paidAmount    by remember { mutableStateOf("") }
     var paymentMode   by remember { mutableStateOf("CASH") }
+    var showQrDialog  by remember { mutableStateOf(false) }
+    var sendingRequest by remember { mutableStateOf(false) }
     val haptics = rememberLibraryHaptics()
 
     val selectedPlan = plans.find { it.id == selectedPlanId }
@@ -64,7 +70,7 @@ fun AdminCreateMembershipScreen(vm: AdminViewModel, onBack: () -> Unit) {
         formatAmount((plan.price - paid).coerceAtLeast(0.0))
     } ?: ""
 
-    LaunchedEffect(Unit) { vm.loadPlans(); vm.searchEligibleStudents("") }
+    LaunchedEffect(Unit) { vm.loadPlans(); vm.searchEligibleStudents(""); vm.loadAppSettings() }
     LaunchedEffect(search) { delay(300); vm.searchEligibleStudents(search) }
     LaunchedEffect(shift, selectedPlanId) {
         if (selectedPlanId.isNotBlank()) vm.loadSeats(if (selectedPlan?.planType == "FULL_DAY") "FULL_DAY" else shift)
@@ -269,6 +275,38 @@ fun AdminCreateMembershipScreen(vm: AdminViewModel, onBack: () -> Unit) {
                     }
                 }
             }
+
+            if (paymentMode == "UPI-QR") {
+                Spacer(Modifier.height(10.dp))
+                val upiId = appSettings?.upiId
+                if (upiId.isNullOrBlank()) {
+                    Text("Set a UPI ID in Settings first to enable QR/payment request.", color = YellowWarn, fontSize = 11.sp)
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { haptics.tick(); showQrDialog = true }) {
+                            Text("📱 Show QR Code", color = BlueSoft, fontSize = 12.sp)
+                        }
+                        TextButton(
+                            onClick = {
+                                haptics.tick()
+                                val student = selectedStudent ?: return@TextButton
+                                val paid = paidAmount.toDoubleOrNull() ?: 0.0
+                                val link = buildPayRedirectLink(
+                                    vpa = upiId, payeeName = "Target Zone Library",
+                                    amount = paid, note = "Library fee - ${student.name}"
+                                )
+                                val message = "💰 Payment Request — Target Zone Library\n\n" +
+                                    "Please pay ₹${"%.2f".format(paid)} using this link (opens your UPI app):\n$link\n\nThank you!"
+                                sendingRequest = true
+                                vm.sendMessageToStudent(student.id, message) { sendingRequest = false }
+                            },
+                            enabled = !sendingRequest
+                        ) {
+                            Text(if (sendingRequest) "Sending…" else "💬 Send Payment Request", color = Emerald, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
         }
         Spacer(Modifier.height(20.dp))
 
@@ -320,6 +358,31 @@ fun AdminCreateMembershipScreen(vm: AdminViewModel, onBack: () -> Unit) {
             }
         ) {
             DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showQrDialog) {
+        val student = selectedStudent
+        val upiId = appSettings?.upiId
+        if (student != null && !upiId.isNullOrBlank()) {
+            val paid = paidAmount.toDoubleOrNull() ?: 0.0
+            val link = buildUpiDeepLink(upiId, "Target Zone Library", paid, "Library fee - ${student.name}")
+            val bitmap: Bitmap = remember(link) { generateQrBitmap(link) }
+            FormDialog(
+                title = "Scan to Pay",
+                onDismiss = { showQrDialog = false },
+                subtitle = "₹${"%.2f".format(paid)} — scan with any UPI app"
+            ) {
+                Image(
+                    bitmap.asImageBitmap(),
+                    contentDescription = "UPI QR code",
+                    modifier = Modifier.size(240.dp).align(Alignment.CenterHorizontally)
+                )
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = { showQrDialog = false }, modifier = Modifier.align(Alignment.End)) {
+                    Text("Close", color = Amber)
+                }
+            }
         }
     }
 }

@@ -63,5 +63,6 @@ dependencies {
     implementation(libs.androidx.splashscreen)
     implementation(libs.androidx.appcompat)
     implementation(libs.ucrop)
+    implementation(libs.zxing.core)
     debugImplementation(libs.androidx.ui.tooling)
 }
