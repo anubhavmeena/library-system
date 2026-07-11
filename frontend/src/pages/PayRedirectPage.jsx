@@ -2,16 +2,20 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../services/api'
-import { buildUpiDeepLink } from '../utils/upiPay'
+import { buildUpiDeepLink, UPI_APPS } from '../utils/upiPay'
 
 // Public, unauthenticated — reached via a tap-to-pay link shared over
 // WhatsApp (see AdminCreateMembershipPage's "Send Payment Request", and the
 // Pending Fee / Grace Dues reminders). The link only carries a short opaque
 // `id` (not the UPI params directly — those are resolved server-side via
-// GET /api/pay/:id, keeping the shared WhatsApp link short). Once resolved,
-// immediately redirects to a upi://pay deep link, handing off to whatever
-// UPI app is installed. Stays visible (as a fallback) if nothing claims the
-// upi:// intent — e.g. opened on a desktop browser or no UPI app installed.
+// GET /api/pay/:id, keeping the shared WhatsApp link short).
+//
+// Deliberately does NOT auto-redirect via `window.location.href` on load —
+// tested live and found that a script-triggered upi://pay redirect fired
+// inside WhatsApp's in-app browser gets silently absorbed by WhatsApp's own
+// UPI payments feature instead of handing off to the tapped app (PhonePe,
+// GPay, etc). Real per-app links the student taps themselves (a genuine
+// user-gesture navigation, not a JS redirect) route correctly instead.
 export default function PayRedirectPage() {
     const [params] = useSearchParams()
     const id = params.get('id')
@@ -26,14 +30,7 @@ export default function PayRedirectPage() {
     useEffect(() => {
         if (!id) { setLoadError(true); return }
         api.get(`/pay/${id}`)
-            .then(r => {
-                const data = r.data.data
-                setInfo(data)
-                const link = buildUpiDeepLink({
-                    vpa: data.vpa, payeeName: data.payeeName, amount: data.amount, note: data.note,
-                })
-                window.location.href = link
-            })
+            .then(r => setInfo(r.data.data))
             .catch(() => setLoadError(true))
     }, [id])
 
@@ -75,15 +72,33 @@ export default function PayRedirectPage() {
         <div className="min-h-screen flex items-center justify-center bg-primary-950 p-6 text-center">
             <div className="card p-8 max-w-sm w-full">
                 <p className="text-4xl mb-3">📱</p>
-                <h1 className="text-white text-lg font-semibold mb-2">Opening your UPI app…</h1>
+                <h1 className="text-white text-lg font-semibold mb-2">Pay via UPI</h1>
                 {info && (
-                    <p className="text-primary-400 text-sm mb-1">
+                    <p className="text-primary-400 text-sm mb-4">
                         Pay ₹{info.amount} to {info.payeeName}
                     </p>
                 )}
+
+                {info && (
+                    <div className="flex flex-col gap-2">
+                        {UPI_APPS.map(app => (
+                            <a
+                                key={app.key}
+                                href={buildUpiDeepLink({
+                                    vpa: info.vpa, payeeName: info.payeeName, amount: info.amount, note: info.note,
+                                    scheme: app.scheme,
+                                })}
+                                className="btn-primary w-full py-2.5 text-sm text-center"
+                            >
+                                Pay with {app.label}
+                            </a>
+                        ))}
+                    </div>
+                )}
+
                 <p className="text-primary-500 text-xs mt-4">
-                    Nothing happened? You need a UPI app (Google Pay, PhonePe, Paytm, etc.)
-                    installed on this device — this link won't work on a desktop browser.
+                    Tap the app you use — if it doesn't open, that app may not be installed on this device.
+                    This won't work on a desktop browser.
                 </p>
 
                 {info?.claimType && (
