@@ -330,6 +330,7 @@ pub struct CashMembershipRequest {
     #[serde(rename = "paidAmount")]
     pub amount: Decimal,
     pub pending_amount: Option<Decimal>,
+    pub payment_mode: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -384,6 +385,7 @@ pub struct RevenueQuery {
 pub struct ClearPendingFeesRequest {
     pub amount_cleared: Decimal,
     pub note: Option<String>,
+    pub payment_mode: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -442,6 +444,7 @@ pub struct MarkPendingRequest {
 #[serde(rename_all = "camelCase")]
 pub struct ClearAmountRequest {
     pub amount_cleared: Decimal,
+    pub payment_mode: Option<String>,
 }
 
 #[derive(Debug, Serialize, FromRow)]

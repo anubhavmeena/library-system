@@ -107,7 +107,7 @@ pub async fn clear_pending_fees(
     Path(user_id): Path<Uuid>,
     Json(req): Json<ClearPendingFeesRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    svc::clear_pending_fees(&state, user_id, req.amount_cleared).await?;
+    svc::clear_pending_fees(&state, user_id, req.amount_cleared, req.payment_mode.as_deref()).await?;
     Ok(ApiResponse::ok("Pending fees cleared"))
 }
 
@@ -473,7 +473,7 @@ pub async fn clear_dues(
     Path(membership_id): Path<Uuid>,
     Json(req): Json<ClearAmountRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    svc::clear_dues(&state, membership_id, req.amount_cleared).await?;
+    svc::clear_dues(&state, membership_id, req.amount_cleared, req.payment_mode.as_deref()).await?;
     Ok(ApiResponse::ok("Dues cleared"))
 }
 

@@ -132,7 +132,8 @@ const STUDENT_SELECT: &str = "
         m.status AS membership_status,
         (m.end_date - CURRENT_DATE)::int AS days_remaining,
         CASE WHEN p.payment_gateway = 'CASH' THEN 'CASH'
-             WHEN p.payment_gateway IS NOT NULL THEN 'ONLINE'
+             WHEN p.payment_gateway = 'UPI-QR' THEN 'UPI-QR'
+             WHEN p.payment_gateway IS NOT NULL THEN 'ONLINE-PG'
              ELSE NULL END AS payment_mode,
         ps.pending_amount,
         m.dues_amount,
@@ -496,10 +497,13 @@ pub async fn clear_pending_fees(
     state: &Arc<AppState>,
     user_id: Uuid,
     amount_cleared: Decimal,
+    payment_mode: Option<&str>,
 ) -> crate::error::Result<()> {
     if amount_cleared <= Decimal::ZERO {
         return Err(AppError::BadRequest("Amount to clear must be positive".into()));
     }
+
+    let (mode_db, mode_label) = resolve_admin_payment_mode(payment_mode)?;
 
     let rows = sqlx::query_as::<_, (Uuid, Uuid, Decimal)>(
         "SELECT id, membership_id, pending_amount FROM payments
@@ -534,12 +538,13 @@ pub async fn clear_pending_fees(
     let invoice_id = ids::generate_invoice_id();
     sqlx::query(
         "INSERT INTO payments (membership_id, user_id, amount, pending_amount, payment_gateway, invoice_id, status)
-         VALUES ($1, $2, $3, $4, 'CASH', $5, 'SUCCESS')",
+         VALUES ($1, $2, $3, $4, $5, $6, 'SUCCESS')",
     )
     .bind(membership_id)
     .bind(user_id)
     .bind(amount_cleared)
     .bind(remainder)
+    .bind(mode_db)
     .bind(&invoice_id)
     .execute(&state.db)
     .await?;
@@ -581,7 +586,7 @@ pub async fn clear_pending_fees(
         plan_name: membership.as_ref().map(|m| m.plan_name.clone()).unwrap_or_default(),
         seat_number: membership.as_ref().and_then(|m| m.seat_number.clone()),
         valid_upto: membership.as_ref().map(|m| m.end_date),
-        payment_method: "CASH".into(),
+        payment_method: mode_label.into(),
     };
     tokio::spawn(async move {
         notification::send_payment_receipt_typed(&s, &receipt_event, "DUES_CLEARED").await
@@ -824,6 +829,7 @@ async fn process_import_row(
         start_date,
         amount: plan.price,
         pending_amount: Some(Decimal::ZERO),
+        payment_mode: None, // bulk sheet imports are always treated as cash
     };
     create_cash_membership(state, &req).await?;
     Ok(())
@@ -1461,6 +1467,25 @@ pub async fn get_broadcast_history(
 
 // ── Cash membership ───────────────────────────────────────────────────────────
 
+/// Admin-selectable payment mode for the three cash-desk write paths
+/// (create_cash_membership, clear_dues, clear_pending_fees). Deliberately does
+/// NOT accept "ONLINE-PG" — that value is only ever written by the real
+/// gateway-verification code in services/membership.rs (verify_payment /
+/// verify_and_pay_dues / verify_and_pay_pending), never by an admin action.
+/// Missing/None defaults to CASH so older (not-yet-upgraded) clients that
+/// don't send this field keep working unchanged. Centralized so the DB value
+/// and the receipt label can't drift apart the way the old hardcoded 'CASH'
+/// literal + hardcoded "CASH" receipt string did across all three call sites.
+fn resolve_admin_payment_mode(raw: Option<&str>) -> crate::error::Result<(&'static str, &'static str)> {
+    match raw.unwrap_or("CASH") {
+        "CASH" => Ok(("CASH", "Cash")),
+        "UPI-QR" => Ok(("UPI-QR", "UPI (QR)")),
+        other => Err(AppError::BadRequest(format!(
+            "Invalid payment mode '{other}' — must be CASH or UPI-QR"
+        ))),
+    }
+}
+
 pub async fn create_cash_membership(
     state: &Arc<AppState>,
     req: &CashMembershipRequest,
@@ -1481,6 +1506,8 @@ pub async fn create_cash_membership(
             "Paid amount + pending amount must equal the plan price".into(),
         ));
     }
+
+    let (mode_db, mode_label) = resolve_admin_payment_mode(req.payment_mode.as_deref())?;
 
     let blocked: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM memberships
@@ -1552,12 +1579,13 @@ pub async fn create_cash_membership(
     let invoice_id = crate::services::ids::generate_invoice_id();
     sqlx::query(
         "INSERT INTO payments (membership_id, user_id, amount, pending_amount, payment_gateway, invoice_id, status)
-         VALUES ($1, $2, $3, $4, 'CASH', $5, 'SUCCESS')",
+         VALUES ($1, $2, $3, $4, $5, $6, 'SUCCESS')",
     )
     .bind(membership.id)
     .bind(req.user_id)
     .bind(req.amount)
     .bind(req.pending_amount)
+    .bind(mode_db)
     .bind(&invoice_id)
     .execute(&state.db)
     .await?;
@@ -1634,7 +1662,7 @@ pub async fn create_cash_membership(
             plan_name: plan.name.clone(),
             seat_number: req.seat_number.clone(),
             valid_upto: Some(end_date),
-            payment_method: "CASH".into(),
+            payment_method: mode_label.into(),
         };
         tokio::spawn(async move { notification::send_payment_receipt(&s2, &receipt_event).await });
     }
@@ -2194,6 +2222,7 @@ pub async fn clear_dues(
     state: &Arc<AppState>,
     membership_id: Uuid,
     amount_cleared: Decimal,
+    payment_mode: Option<&str>,
 ) -> crate::error::Result<()> {
     let membership = sqlx::query_as::<_, Membership>(
         "SELECT * FROM memberships WHERE id = $1 AND status = 'GRACE'",
@@ -2208,6 +2237,8 @@ pub async fn clear_dues(
         return Err(AppError::BadRequest("Amount cleared must be between 0 and the outstanding dues".into()));
     }
 
+    let (mode_db, mode_label) = resolve_admin_payment_mode(payment_mode)?;
+
     let remainder = dues - amount_cleared;
     let new_end = membership.end_date.checked_add_months(chrono::Months::new(1))
         .ok_or_else(|| AppError::Internal("Date overflow computing dues clearance".into()))?;
@@ -2215,12 +2246,13 @@ pub async fn clear_dues(
     let invoice_id = ids::generate_invoice_id();
     sqlx::query(
         "INSERT INTO payments (membership_id, user_id, amount, pending_amount, payment_gateway, invoice_id, status)
-         VALUES ($1, $2, $3, $4, 'CASH', $5, 'SUCCESS')",
+         VALUES ($1, $2, $3, $4, $5, $6, 'SUCCESS')",
     )
     .bind(membership_id)
     .bind(membership.user_id)
     .bind(amount_cleared)
     .bind(remainder)
+    .bind(mode_db)
     .bind(&invoice_id)
     .execute(&state.db)
     .await?;
@@ -2273,7 +2305,7 @@ pub async fn clear_dues(
         plan_name: plan.name,
         seat_number: updated.seat_number.clone(),
         valid_upto: Some(new_end),
-        payment_method: "CASH".into(),
+        payment_method: mode_label.into(),
     };
     tokio::spawn(async move {
         notification::send_payment_receipt_typed(&s, &receipt_event, "GRACE_DUES_CLEARED").await
