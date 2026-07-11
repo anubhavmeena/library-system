@@ -15,6 +15,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.targetzone.library.data.model.StudentSummary
@@ -64,8 +66,10 @@ fun StudentActionsMenu(
     var deleteOpen by remember { mutableStateOf(false) }
     var clearDuesOpen by remember { mutableStateOf(false) }
     var clearDuesInput by remember { mutableStateOf("") }
+    var clearDuesPaymentMode by remember { mutableStateOf("CASH") }
     var clearFeesOpen by remember { mutableStateOf(false) }
     var clearFeesInput by remember { mutableStateOf("") }
+    var clearFeesPaymentMode by remember { mutableStateOf("CASH") }
     var changeStatusOpen by remember { mutableStateOf(false) }
     var changeStatusTarget by remember { mutableStateOf("PENDING") }
     var pendingInput by remember { mutableStateOf("") }
@@ -319,11 +323,13 @@ fun StudentActionsMenu(
             outstanding = duesAmount ?: 0.0,
             amountInput = clearDuesInput,
             onAmountChange = { clearDuesInput = it },
-            onDismiss = { clearDuesOpen = false; clearDuesInput = "" },
+            paymentMode = clearDuesPaymentMode,
+            onPaymentModeChange = { clearDuesPaymentMode = it },
+            onDismiss = { clearDuesOpen = false; clearDuesInput = ""; clearDuesPaymentMode = "CASH" },
             onConfirm = {
                 val amt = clearDuesInput.toDoubleOrNull()
                 if (amt != null && amt > 0 && amt <= (duesAmount ?: 0.0)) {
-                    membershipId?.let { vm.clearDues(it, amt) { clearDuesOpen = false; clearDuesInput = ""; onMutated() } }
+                    membershipId?.let { vm.clearDues(it, amt, clearDuesPaymentMode) { clearDuesOpen = false; clearDuesInput = ""; clearDuesPaymentMode = "CASH"; onMutated() } }
                 }
             }
         )
@@ -336,11 +342,13 @@ fun StudentActionsMenu(
             outstanding = pendingAmount ?: 0.0,
             amountInput = clearFeesInput,
             onAmountChange = { clearFeesInput = it },
-            onDismiss = { clearFeesOpen = false; clearFeesInput = "" },
+            paymentMode = clearFeesPaymentMode,
+            onPaymentModeChange = { clearFeesPaymentMode = it },
+            onDismiss = { clearFeesOpen = false; clearFeesInput = ""; clearFeesPaymentMode = "CASH" },
             onConfirm = {
                 val amt = clearFeesInput.toDoubleOrNull()
                 if (amt != null && amt > 0 && amt <= (pendingAmount ?: 0.0)) {
-                    vm.clearPendingFees(studentId, amt) { clearFeesOpen = false; clearFeesInput = ""; onMutated() }
+                    vm.clearPendingFees(studentId, amt, clearFeesPaymentMode) { clearFeesOpen = false; clearFeesInput = ""; clearFeesPaymentMode = "CASH"; onMutated() }
                 }
             }
         )
@@ -424,6 +432,8 @@ private fun AmountClearDialog(
     outstanding: Double,
     amountInput: String,
     onAmountChange: (String) -> Unit,
+    paymentMode: String,
+    onPaymentModeChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -448,6 +458,25 @@ private fun AmountClearDialog(
             if (amt != null && amt > 0 && amt < outstanding) {
                 Spacer(Modifier.height(4.dp))
                 Text("₹${(outstanding - amt).let { if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString() }} will remain as a pending amount.", color = Amber, fontSize = 11.sp)
+            }
+            Spacer(Modifier.height(10.dp))
+            Text("Payment Mode", color = TextSub, fontSize = 12.sp)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("CASH", "UPI-QR").forEach { mode ->
+                    val info = paymentModeInfo(mode)
+                    val active = paymentMode == mode
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (active) info.faintColor else Color.Transparent)
+                            .border(1.dp, if (active) info.color else DividerColor, RoundedCornerShape(50))
+                            .clickable { onPaymentModeChange(mode) }
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(info.label, color = if (active) info.color else TextSub, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
             }
         }
     )

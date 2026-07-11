@@ -145,8 +145,8 @@ class AdminViewModel(
             .onFailure { error.value = it.message }
     }
 
-    fun clearDues(membershipId: String, amountCleared: Double, onDone: () -> Unit) = viewModelScope.launch {
-        adminRepo.clearDues(membershipId, amountCleared)
+    fun clearDues(membershipId: String, amountCleared: Double, paymentMode: String = "CASH", onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.clearDues(membershipId, amountCleared, paymentMode)
             .onSuccess { successMsg.value = "Dues cleared"; onDone() }
             .onFailure { error.value = it.message }
     }
@@ -272,8 +272,8 @@ class AdminViewModel(
         isLoading.value = false
     }
 
-    fun clearPendingFees(id: String, amountCleared: Double, onDone: () -> Unit) = viewModelScope.launch {
-        adminRepo.clearPendingFees(id, amountCleared)
+    fun clearPendingFees(id: String, amountCleared: Double, paymentMode: String = "CASH", onDone: () -> Unit) = viewModelScope.launch {
+        adminRepo.clearPendingFees(id, amountCleared, paymentMode)
             .onSuccess {
                 pendingFeeStudents.value = pendingFeeStudents.value.filter { s -> s.id != id }
                 successMsg.value = "Fees cleared"

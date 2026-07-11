@@ -178,7 +178,7 @@ fun AdminStudentDetailScreen(
                 InfoRow("Start",     s.membershipStart ?: "—")
                 InfoRow("Expires",   s.membershipEnd ?: "—")
                 InfoRow("Days Left", "${s.daysRemaining} days", highlight = s.daysRemaining <= 7)
-                InfoRow("Payment",   s.paymentMode ?: "—")
+                InfoRow("Payment",   paymentModeLabel(s.paymentMode))
             }
         } else {
             AppCard(Modifier.fillMaxWidth()) {
@@ -224,8 +224,8 @@ fun AdminStudentDetailScreen(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("₹${p.amount.toInt()}", fontWeight = FontWeight.SemiBold, color = TextPrimary)
-                            val isCash = p.paymentGateway == "CASH"
-                            Text(if (isCash) "Cash" else "Online", color = if (isCash) Amber else Emerald, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            val info = paymentModeInfo(p.paymentGateway)
+                            Text(info.label, color = info.color, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                             if (p.createdAt != null) Text(p.createdAt.take(10), color = TextMuted, fontSize = 11.sp)
                         }
                         StatusChip(p.status)

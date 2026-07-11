@@ -237,7 +237,7 @@ data class ToggleStatusRequest(val active: Boolean)
 data class ChangeSeatRequest(val seatNumber: String)
 data class SwapSeatRequest(val otherUserId: String)
 data class ReleaseSeatRequest(val notifyStudent: Boolean = false)
-data class ClearAmountRequest(val amountCleared: Double)
+data class ClearAmountRequest(val amountCleared: Double, val paymentMode: String? = null)
 data class MarkPendingRequest(val pendingAmount: Double)
 data class SendReminderRequest(val userIds: List<String>)
 data class BroadcastRequest(val message: String, val targetGroup: String = "ALL")
@@ -317,7 +317,8 @@ data class CreateCashMembershipRequest(
     val shift: String,
     val startDate: String,
     val paidAmount: Double? = null,
-    val pendingAmount: Double? = null
+    val pendingAmount: Double? = null,
+    val paymentMode: String? = null
 )
 
 data class ReplyRequest(val body: String)

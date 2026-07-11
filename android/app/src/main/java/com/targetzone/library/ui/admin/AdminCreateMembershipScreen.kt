@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -48,6 +49,7 @@ fun AdminCreateMembershipScreen(vm: AdminViewModel, onBack: () -> Unit) {
     var startDate     by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())) }
     var showDatePicker by remember { mutableStateOf(false) }
     var paidAmount    by remember { mutableStateOf("") }
+    var paymentMode   by remember { mutableStateOf("CASH") }
     val haptics = rememberLibraryHaptics()
 
     val selectedPlan = plans.find { it.id == selectedPlanId }
@@ -248,6 +250,25 @@ fun AdminCreateMembershipScreen(vm: AdminViewModel, onBack: () -> Unit) {
                 label = "Pending Amount (₹) — auto-calculated",
                 enabled = false
             )
+            Spacer(Modifier.height(10.dp))
+            Text("Payment Mode", color = TextMuted, fontSize = 11.sp)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("CASH", "UPI-QR").forEach { mode ->
+                    val info = paymentModeInfo(mode)
+                    val active = paymentMode == mode
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (active) info.faintColor else Color.Transparent)
+                            .border(1.dp, if (active) info.color else DividerColor, RoundedCornerShape(50))
+                            .clickable { haptics.tick(); paymentMode = mode }
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(info.label, color = if (active) info.color else TextSub, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
         }
         Spacer(Modifier.height(20.dp))
 
@@ -265,7 +286,8 @@ fun AdminCreateMembershipScreen(vm: AdminViewModel, onBack: () -> Unit) {
                         shift        = if (selectedPlan?.planType == "FULL_DAY") "FULL_DAY" else shift,
                         startDate    = startDate,
                         paidAmount   = paidAmount.toDoubleOrNull(),
-                        pendingAmount = pendingAmount.toDoubleOrNull()
+                        pendingAmount = pendingAmount.toDoubleOrNull(),
+                        paymentMode  = paymentMode
                     )
                 ) {}
             },

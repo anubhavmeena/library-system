@@ -194,10 +194,11 @@ private fun StudentCard(student: StudentSummary, onClick: () -> Unit) {
                 MembershipLine(student)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     student.paymentMode?.let { mode ->
+                        val info = paymentModeInfo(mode)
                         Box(
-                            Modifier.clip(RoundedCornerShape(50)).background(IndigoFaint)
+                            Modifier.clip(RoundedCornerShape(50)).background(info.faintColor)
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
-                        ) { Text(if (mode == "CASH") "💵 Cash" else "💳 Online", color = Indigo, fontSize = 10.sp) }
+                        ) { Text(info.label, color = info.color, fontSize = 10.sp) }
                     }
                     if ((student.pendingAmount ?: 0.0) > 0.0) {
                         Text("Pending ₹${student.pendingAmount!!.toInt()}", color = RedAlert, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)

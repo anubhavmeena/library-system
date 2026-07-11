@@ -54,8 +54,8 @@ class AdminRepository {
         api.releaseSeat(membershipId, ReleaseSeatRequest(notifyStudent))
     }
 
-    suspend fun clearDues(membershipId: String, amountCleared: Double): Result<Unit> = runCatching {
-        api.clearDues(membershipId, ClearAmountRequest(amountCleared))
+    suspend fun clearDues(membershipId: String, amountCleared: Double, paymentMode: String = "CASH"): Result<Unit> = runCatching {
+        api.clearDues(membershipId, ClearAmountRequest(amountCleared, paymentMode))
     }
 
     suspend fun markPending(membershipId: String, pendingAmount: Double): Result<Unit> = runCatching {
@@ -148,8 +148,8 @@ class AdminRepository {
         res.body()?.data ?: emptyList()
     }
 
-    suspend fun clearPendingFees(id: String, amountCleared: Double): Result<Unit> = runCatching {
-        api.clearPendingFees(id, ClearAmountRequest(amountCleared))
+    suspend fun clearPendingFees(id: String, amountCleared: Double, paymentMode: String = "CASH"): Result<Unit> = runCatching {
+        api.clearPendingFees(id, ClearAmountRequest(amountCleared, paymentMode))
     }
 
     suspend fun sendPendingFeeReminders(userIds: List<String>): Result<String> = runCatching {
