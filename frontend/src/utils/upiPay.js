@@ -12,17 +12,3 @@ export function buildUpiDeepLink({ vpa, payeeName, amount, note }) {
     return `upi://pay?${params.toString()}`
 }
 
-// The https:// redirect link shared over WhatsApp — same params, decoded by
-// PayRedirectPage back into the upi:// deep link above. A plain upi:// link
-// pasted into a WhatsApp message isn't reliably tappable (WhatsApp only
-// auto-linkifies http(s) URLs), so this wraps it in a real https link.
-export function buildPayRedirectLink({ vpa, payeeName, amount, note }) {
-    const params = new URLSearchParams({
-        pa: vpa,
-        pn: payeeName,
-        am: Number(amount).toFixed(2),
-        cu: 'INR',
-        tn: note,
-    })
-    return `${window.location.origin}/pay?${params.toString()}`
-}

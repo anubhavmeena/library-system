@@ -30,6 +30,7 @@ import AdminStudentDetailPage from './pages/admin/AdminStudentDetailPage'
 import AdminSeatsPage     from './pages/admin/AdminSeatsPage'
 import AdminRemindersPage from './pages/admin/AdminRemindersPage'
 import AdminFeedbackPage  from './pages/admin/AdminFeedbackPage'
+import AdminPaymentVerificationsPage from './pages/admin/AdminPaymentVerificationsPage'
 import AdminCreateMembershipPage from './pages/admin/AdminCreateMembershipPage'
 import AdminBroadcastPage from './pages/admin/AdminBroadcastPage'
 import AdminExpensesPage  from './pages/admin/AdminExpensesPage'
@@ -105,6 +106,7 @@ export default function App() {
                 <Route path="seats"      element={<AdminSeatsPage />} />
                 <Route path="reminders"  element={<AdminRemindersPage />} />
                 <Route path="feedback"         element={<AdminFeedbackPage />} />
+                <Route path="payment-verifications" element={<AdminPaymentVerificationsPage />} />
                 <Route path="memberships/new" element={<AdminCreateMembershipPage />} />
                 <Route path="broadcast"       element={<AdminBroadcastPage />} />
                 <Route path="expenses"        element={<AdminExpensesPage />} />

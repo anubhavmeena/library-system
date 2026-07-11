@@ -9,7 +9,6 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3'
 import { parseISO, format, addDays } from 'date-fns'
 import { formatCurrency } from '../../utils/currency'
 import { paymentModeInfo } from '../../utils/paymentMode'
-import { buildPayRedirectLink } from '../../utils/upiPay'
 import UpiQrModal from '../../components/admin/UpiQrModal'
 
 const DATE_PICKER_SX = {
@@ -185,10 +184,11 @@ export default function AdminCreateMembershipPage() {
         setSendingRequest(true)
         try {
             const paid = parseFloat(paidAmount) || 0
-            const link = buildPayRedirectLink({
-                vpa: upiId, payeeName: 'Target Zone Library', amount: paid,
-                note: `Library fee - ${selectedStudent.name}`,
+            const linkRes = await api.post('/admin/pay-links', {
+                studentId: selectedStudent.id,
+                amount: paid,
             })
+            const link = linkRes.data.data.link
             const message = t('adminNewMembership.step4.paymentRequestMessage', { amount: paid, link })
             await api.post(`/admin/students/${selectedStudent.id}/message`, { message })
             toast.success(t('adminNewMembership.toasts.paymentRequestSent'))
