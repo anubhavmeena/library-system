@@ -4,6 +4,7 @@ pub mod gallery;
 pub mod mailbox;
 pub mod membership;
 pub mod payment;
+pub mod payment_claim;
 pub mod seat;
 pub mod user;
 pub mod visitor;

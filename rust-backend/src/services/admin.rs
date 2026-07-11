@@ -6,7 +6,7 @@ use crate::{
         membership::{Membership, MembershipPlan},
         user::User,
     },
-    services::{ids, notification, settings},
+    services::{ids, notification, settings, upi_pay},
 };
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
@@ -1294,9 +1294,9 @@ pub async fn send_grace_dues_reminders(
 ) -> crate::error::Result<i64> {
     let ids_filter = user_ids.filter(|v| !v.is_empty());
 
-    let rows: Vec<(String, Option<String>, Option<String>, Decimal)> = if let Some(ref ids) = ids_filter {
+    let rows: Vec<(Uuid, Uuid, String, Option<String>, Option<String>, Decimal)> = if let Some(ref ids) = ids_filter {
         sqlx::query_as(
-            "SELECT u.name, u.mobile, u.email, COALESCE(m.dues_amount, 0)
+            "SELECT u.id, m.id, u.name, u.mobile, u.email, COALESCE(m.dues_amount, 0)
              FROM memberships m JOIN users u ON u.id = m.user_id
              WHERE m.status = 'GRACE' AND u.id = ANY($1)",
         )
@@ -1305,7 +1305,7 @@ pub async fn send_grace_dues_reminders(
         .await?
     } else {
         sqlx::query_as(
-            "SELECT u.name, u.mobile, u.email, COALESCE(m.dues_amount, 0)
+            "SELECT u.id, m.id, u.name, u.mobile, u.email, COALESCE(m.dues_amount, 0)
              FROM memberships m JOIN users u ON u.id = m.user_id
              WHERE m.status = 'GRACE'",
         )
@@ -1315,14 +1315,28 @@ pub async fn send_grace_dues_reminders(
 
     let count = rows.len() as i64;
     let setting = settings::setting_for(state, "GRACE_DUES_REMINDER").await;
-    for (name, mobile, email, dues) in &rows {
-        let msg = settings::apply_hindi(
-            &format!(
-                "Grace Period Reminder - Hi {name}, your library membership is in its grace period with Rs.{dues:.0} \
+    let app_settings = settings::get_app_settings(state).await.ok();
+    let upi_id = app_settings.as_ref().and_then(|s| s.upi_id.clone()).filter(|v| !v.is_empty());
+    for (user_id, membership_id, name, mobile, email, dues) in &rows {
+        let mut text = format!(
+            "Grace Period Reminder - Hi {name}, your library membership is in its grace period with Rs.{dues:.0} \
 in outstanding dues. Please clear your dues soon to avoid losing your seat. - Target Zone Library Team"
-            ),
-            &setting, true,
         );
+        if let Some(vpa) = &upi_id {
+            let payload = upi_pay::PayLinkPayload {
+                user_id: *user_id,
+                claim_type: Some("DUES".to_string()),
+                membership_id: Some(*membership_id),
+                amount: *dues,
+                vpa: vpa.clone(),
+                payee_name: "Target Zone Library".to_string(),
+                note: format!("Grace dues - {name}"),
+            };
+            if let Ok(link) = upi_pay::create_pay_link(state, &payload).await {
+                text.push_str(&format!("\n\nPay via UPI: {link}"));
+            }
+        }
+        let msg = settings::apply_hindi(&text, &setting, true);
         if setting.send_to_student {
             notification::send_direct_message(state, mobile.as_deref(), email.as_deref(), &msg).await;
         }
@@ -1351,13 +1365,13 @@ pub async fn send_pending_fee_reminders(
     // Treat empty vec the same as None (send to all) — matches frontend behaviour
     let ids = user_ids.filter(|v| !v.is_empty());
 
-    let rows: Vec<(String, Option<String>, Option<String>, Option<Decimal>)> = if let Some(ref ids) = ids {
+    let rows: Vec<(Uuid, String, Option<String>, Option<String>, Option<Decimal>)> = if let Some(ref ids) = ids {
         sqlx::query_as(
-            "SELECT u.name, u.mobile, u.email, SUM(p.pending_amount)
+            "SELECT u.id, u.name, u.mobile, u.email, SUM(p.pending_amount)
              FROM users u JOIN payments p ON p.user_id = u.id
              WHERE p.pending_amount > 0 AND p.status = 'SUCCESS'
                AND u.id = ANY($1)
-             GROUP BY u.name, u.mobile, u.email",
+             GROUP BY u.id, u.name, u.mobile, u.email",
         )
         .bind(ids)
         .fetch_all(&state.db)
@@ -1367,7 +1381,7 @@ pub async fn send_pending_fee_reminders(
         // exclusion, since this branch re-queries independently rather than
         // trusting an admin-picked id list (see comment there).
         sqlx::query_as(
-            "SELECT u.name, u.mobile, u.email, SUM(p.pending_amount)
+            "SELECT u.id, u.name, u.mobile, u.email, SUM(p.pending_amount)
              FROM users u
              JOIN payments p ON p.user_id = u.id
              LEFT JOIN LATERAL (
@@ -1381,19 +1395,35 @@ pub async fn send_pending_fee_reminders(
              ) m ON true
              WHERE p.pending_amount > 0 AND p.status = 'SUCCESS'
                AND (m.status IS NULL OR m.status != 'EXPIRED')
-             GROUP BY u.name, u.mobile, u.email",
+             GROUP BY u.id, u.name, u.mobile, u.email",
         )
         .fetch_all(&state.db)
         .await?
     };
 
     let count = rows.len() as i64;
-    for (name, mobile, email, pending) in &rows {
+    let app_settings = settings::get_app_settings(state).await.ok();
+    let upi_id = app_settings.as_ref().and_then(|s| s.upi_id.clone()).filter(|v| !v.is_empty());
+    for (user_id, name, mobile, email, pending) in &rows {
         let amount = pending.unwrap_or_default();
-        let msg = format!(
+        let mut msg = format!(
             "Pending Fee Reminder - Hi {name}, you have a pending library fee of Rs.{amount:.0}. \
 Please visit the library or contact us to clear your dues. - Target Zone Library Team"
         );
+        if let Some(vpa) = &upi_id {
+            let payload = upi_pay::PayLinkPayload {
+                user_id: *user_id,
+                claim_type: Some("PENDING_FEE".to_string()),
+                membership_id: None,
+                amount,
+                vpa: vpa.clone(),
+                payee_name: "Target Zone Library".to_string(),
+                note: format!("Pending fee - {name}"),
+            };
+            if let Ok(link) = upi_pay::create_pay_link(state, &payload).await {
+                msg.push_str(&format!("\n\nPay via UPI: {link}"));
+            }
+        }
         notification::send_direct_message(state, mobile.as_deref(), email.as_deref(), &msg).await;
     }
 

@@ -1,6 +1,6 @@
 use crate::{
     app_state::AppState,
-    handlers::{admin, auth, gallery, mailbox, membership, payment, seat, user, visitor},
+    handlers::{admin, auth, gallery, mailbox, membership, payment, payment_claim, seat, user, visitor},
 };
 use axum::{
     extract::DefaultBodyLimit,
@@ -57,6 +57,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/payments/dues/verify",        post(payment::verify_dues_payment))
         .route("/api/payments/pending/create-order", post(payment::create_pending_order))
         .route("/api/payments/pending/verify",       post(payment::verify_pending_payment))
+        .route("/api/payments/claims",               post(payment_claim::submit_claim)
+            .layer(DefaultBodyLimit::max(10 * 1024 * 1024)))
+        .route("/api/pay/:id",                        get(payment_claim::get_pay_link))
 
         // ── Seats ─────────────────────────────────────────────────────────────
         .route("/api/seats/availability",       get(seat::get_availability))
@@ -108,6 +111,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/admin/settings",                        get(admin::get_app_settings).post(admin::save_app_settings))
         .route("/api/admin/notification-settings",           get(admin::get_notification_settings))
         .route("/api/admin/notification-settings/:key",      patch(admin::update_notification_setting))
+        .route("/api/admin/payment-claims",                  get(payment_claim::list_claims))
+        .route("/api/admin/payment-claims/:id",               patch(payment_claim::review_claim))
+        .route("/api/admin/pay-links",                       post(payment_claim::create_pay_link))
 
         // ── Admin mailbox (IMAP) ──────────────────────────────────────────────
         .route("/api/admin/inbox",                           get(mailbox::list_messages))
