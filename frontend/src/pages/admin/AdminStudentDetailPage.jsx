@@ -74,7 +74,17 @@ export default function AdminStudentDetailPage() {
     const handleSave = async () => {
         setSaving(true)
         try {
-            const res = await api.patch(`/admin/students/${userId}`, editForm)
+            // dateOfBirth/joinedAt are Option<NaiveDate> on the backend — an empty
+            // string fails to parse as a date (unlike Option<String> fields, where
+            // "" is a valid value), so a blank date input must be sent as null,
+            // not "", or the whole request is rejected before it reaches the
+            // update logic.
+            const payload = {
+                ...editForm,
+                dateOfBirth: editForm.dateOfBirth || null,
+                joinedAt: editForm.joinedAt || null,
+            }
+            const res = await api.patch(`/admin/students/${userId}`, payload)
             setStudent(res.data.data)
             toast.success(t('adminStudentDetail.toasts.saved'))
         } catch (e) {
