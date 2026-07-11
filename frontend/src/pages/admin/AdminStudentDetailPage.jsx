@@ -79,8 +79,16 @@ export default function AdminStudentDetailPage() {
             // "" is a valid value), so a blank date input must be sent as null,
             // not "", or the whole request is rejected before it reaches the
             // update logic.
+            //
+            // email is Option<String> and does deserialize "" fine, but the column
+            // itself is UNIQUE — "" is a real, distinct value there (unlike NULL,
+            // which Postgres never considers a duplicate of another NULL), so the
+            // moment two students both have a blank email saved as "", the second
+            // save hits "duplicate key value violates unique constraint
+            // users_email_key". Sending null instead avoids ever writing "" at all.
             const payload = {
                 ...editForm,
+                email: editForm.email || null,
                 dateOfBirth: editForm.dateOfBirth || null,
                 joinedAt: editForm.joinedAt || null,
             }
