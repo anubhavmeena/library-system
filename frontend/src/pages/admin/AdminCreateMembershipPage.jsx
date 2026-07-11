@@ -149,7 +149,13 @@ export default function AdminCreateMembershipPage() {
                 shift:         resolvedShift,
                 seatNumber:    selectedSeat.seatNumber,
                 startDate,
-                paidAmount:    parseFloat(paidAmount)    || selectedPlan.price,
+                // parseFloat(...) || 0 for both — not `|| selectedPlan.price` for paid:
+                // a legitimate ₹0 paid amount is falsy in JS, so that fallback silently
+                // overrode it with the full plan price while pendingAmount stayed as
+                // typed, breaking the paid+pending===price invariant the backend
+                // enforces. paidAmount is already kept correctly initialized/derived by
+                // the onChange handlers above, so it never needs a non-zero fallback here.
+                paidAmount:    parseFloat(paidAmount)    || 0,
                 pendingAmount: parseFloat(pendingAmount) || 0,
             })
             toast.success(t('adminNewMembership.toasts.created'))
