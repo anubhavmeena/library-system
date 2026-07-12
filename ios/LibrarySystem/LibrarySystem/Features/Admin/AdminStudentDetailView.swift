@@ -24,6 +24,7 @@ struct AdminStudentDetailView: View {
     private enum ProfileField { case name, mobile, email, gender, dateOfBirth, address, joinedAt }
     @State private var editingField: ProfileField?
     @State private var editBuffer = ""
+    @FocusState private var focusedField: ProfileField?
 
     private enum ClearKind { case fees, dues }
     @State private var clearKind:       ClearKind?
@@ -214,23 +215,35 @@ struct AdminStudentDetailView: View {
         }
     }
 
+    // Switching directly from one field's long-press to another's (without ever
+    // tapping away to drop focus first) would otherwise discard whatever was
+    // typed into the field being left, since editBuffer/editingField are shared
+    // single-field state — commit it before moving on.
+    private func beginEditing(_ s: StudentDetail, field: ProfileField, value: String) {
+        if editingField != nil, editingField != field { saveEditingField(s) }
+        editBuffer = value
+        editingField = field
+        focusedField = field
+    }
+
     private func editableNameHeader(_ s: StudentDetail) -> some View {
         Group {
             if editingField == .name {
-                HStack(spacing: 8) {
-                    TextField("Name", text: $editBuffer)
-                        .font(.headlineMedium)
-                        .padding(8)
-                        .background(Color.navyMid)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .foregroundColor(.textPrimary)
-                    fieldEditControls(s)
-                }
+                TextField("Name", text: $editBuffer)
+                    .font(.headlineMedium)
+                    .padding(8)
+                    .background(Color.navyMid)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .foregroundColor(.textPrimary)
+                    .focused($focusedField, equals: .name)
+                    .onSubmit { saveEditingField(s) }
+                    .onChange(of: focusedField) { newValue in
+                        if newValue != .name && editingField == .name { saveEditingField(s) }
+                    }
             } else {
                 Text(s.name).font(.headlineMedium).foregroundColor(.textPrimary)
                     .onLongPressGesture(minimumDuration: 0.5) {
-                        editBuffer = s.name
-                        editingField = .name
+                        beginEditing(s, field: .name, value: s.name)
                     }
             }
         }
@@ -240,22 +253,26 @@ struct AdminStudentDetailView: View {
     // email, DOB, address, joined date) — replaces the old modal "Edit Profile"
     // sheet with inline editing directly on this page. Rows always render (with
     // an em-dash placeholder when empty) so a blank field can still be long-pressed
-    // to fill in, not just an already-populated one.
+    // to fill in, not just an already-populated one. No explicit save/cancel
+    // buttons: submitting the keyboard (Return) or tapping away (which resigns
+    // focus via the screen's existing dismissKeyboardOnTap()) both commit it.
     private func editableInfoRow(_ s: StudentDetail, label: String, value: String, field: ProfileField,
                                   keyboard: UIKeyboardType = .default, placeholder: String = "") -> some View {
         Group {
             if editingField == field {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(label).font(.bodySmall).foregroundColor(.textMuted)
-                    HStack(spacing: 8) {
-                        TextField(placeholder.isEmpty ? label : placeholder, text: $editBuffer)
-                            .keyboardType(keyboard)
-                            .padding(8)
-                            .background(Color.navyMid)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .foregroundColor(.textPrimary)
-                        fieldEditControls(s)
-                    }
+                    TextField(placeholder.isEmpty ? label : placeholder, text: $editBuffer)
+                        .keyboardType(keyboard)
+                        .padding(8)
+                        .background(Color.navyMid)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .foregroundColor(.textPrimary)
+                        .focused($focusedField, equals: field)
+                        .onSubmit { saveEditingField(s) }
+                        .onChange(of: focusedField) { newValue in
+                            if newValue != field && editingField == field { saveEditingField(s) }
+                        }
                 }
                 .padding(.vertical, 8)
                 Divider().background(Color.dividerColor)
@@ -263,28 +280,27 @@ struct AdminStudentDetailView: View {
                 InfoRow(label: label, value: value.isEmpty ? "—" : value)
                     .contentShape(Rectangle())
                     .onLongPressGesture(minimumDuration: 0.5) {
-                        editBuffer = value
-                        editingField = field
+                        beginEditing(s, field: field, value: value)
                     }
             }
         }
     }
 
+    // Gender has no keyboard to submit or dismiss, so selecting a segment commits
+    // immediately rather than waiting for a separate save action.
     private func editableGenderRow(_ s: StudentDetail, value: String) -> some View {
         Group {
             if editingField == .gender {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Gender").font(.bodySmall).foregroundColor(.textMuted)
-                    HStack(spacing: 8) {
-                        Picker("", selection: $editBuffer) {
-                            Text("—").tag("")
-                            Text("Male").tag("Male")
-                            Text("Female").tag("Female")
-                            Text("Other").tag("Other")
-                        }
-                        .pickerStyle(.segmented)
-                        fieldEditControls(s)
+                    Picker("", selection: $editBuffer) {
+                        Text("—").tag("")
+                        Text("Male").tag("Male")
+                        Text("Female").tag("Female")
+                        Text("Other").tag("Other")
                     }
+                    .pickerStyle(.segmented)
+                    .onChange(of: editBuffer) { _ in saveEditingField(s) }
                 }
                 .padding(.vertical, 8)
                 Divider().background(Color.dividerColor)
@@ -292,20 +308,8 @@ struct AdminStudentDetailView: View {
                 InfoRow(label: "Gender", value: value.isEmpty ? "—" : value.capitalized)
                     .contentShape(Rectangle())
                     .onLongPressGesture(minimumDuration: 0.5) {
-                        editBuffer = value
-                        editingField = .gender
+                        beginEditing(s, field: .gender, value: value)
                     }
-            }
-        }
-    }
-
-    private func fieldEditControls(_ s: StudentDetail) -> some View {
-        HStack(spacing: 8) {
-            Button { saveEditingField(s) } label: {
-                Image(systemName: "checkmark.circle.fill").foregroundColor(.emerald)
-            }
-            Button { editingField = nil } label: {
-                Image(systemName: "xmark.circle.fill").foregroundColor(.redAlert)
             }
         }
     }
@@ -332,7 +336,11 @@ struct AdminStudentDetailView: View {
         case .joinedAt:    joinedAt = trimmed
         }
 
-        guard !name.isEmpty else { editingField = nil; return }
+        guard !name.isEmpty else {
+            editingField = nil
+            focusedField = nil
+            return
+        }
 
         let req = UpdateStudentRequest(
             name: name,
@@ -345,6 +353,7 @@ struct AdminStudentDetailView: View {
         )
         vm.updateStudent(id: s.id, req: req)
         editingField = nil
+        focusedField = nil
     }
 
     private func membershipSection(_ s: StudentDetail) -> some View {
