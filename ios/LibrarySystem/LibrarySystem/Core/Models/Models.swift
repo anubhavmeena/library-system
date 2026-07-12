@@ -360,6 +360,11 @@ struct StudentSummary: Codable, Identifiable {
     // concept (see backend/admin-service/CLAUDE.md). Decoding every student in
     // the list against a non-optional isActive with no fallback failed the
     // WHOLE array, so the students screen always showed "No students found."
+    // mobile is also decoded defensively: this same StudentSummary/StudentDetail
+    // shape backs three of the Reminders tabs (pending fees, grace dues, orphaned
+    // seats), whose underlying rust-backend rows (PendingFeeItem/GraceDuesStudentItem/
+    // OrphanedSeatItem) all declare mobile as nullable — one null mobile would
+    // otherwise fail that entire tab's list, not just the one row.
     enum CodingKeys: String, CodingKey {
         case id, name, mobile, email, isActive, photoUrl, joinedAt, membershipId, membershipStatus
         case seatNumber, shift, membershipStart, membershipEnd, planName, daysRemaining
@@ -370,7 +375,7 @@ struct StudentSummary: Codable, Identifiable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id               = try c.decode(String.self, forKey: .id)
         name             = try c.decode(String.self, forKey: .name)
-        mobile           = try c.decode(String.self, forKey: .mobile)
+        mobile           = try c.decodeIfPresent(String.self, forKey: .mobile) ?? ""
         email            = try c.decodeIfPresent(String.self, forKey: .email)
         isActive         = try c.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
         photoUrl         = try c.decodeIfPresent(String.self, forKey: .photoUrl)
@@ -437,7 +442,7 @@ struct StudentDetail: Codable, Identifiable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id               = try c.decode(String.self, forKey: .id)
         name             = try c.decode(String.self, forKey: .name)
-        mobile           = try c.decode(String.self, forKey: .mobile)
+        mobile           = try c.decodeIfPresent(String.self, forKey: .mobile) ?? ""
         email            = try c.decodeIfPresent(String.self, forKey: .email)
         address          = try c.decodeIfPresent(String.self, forKey: .address)
         gender           = try c.decodeIfPresent(String.self, forKey: .gender)
@@ -486,6 +491,31 @@ struct ReminderStudent: Codable, Identifiable {
     let daysLeft: Int
     let seatNumber: String?
     let shift: String?
+
+    // The backend's ExpiringMembershipItem names these "membershipEnd" and
+    // "daysRemaining" (not "endDate"/"daysLeft"), and has no "shift" field at
+    // all — both of the former were non-optional with no fallback, so every
+    // single expiring membership failed to decode and the "Expiring" tab
+    // always rendered empty regardless of actual data. mobile is also
+    // Option<String> on the backend, defaulted here rather than failing the
+    // whole list over one null mobile.
+    private enum CodingKeys: String, CodingKey {
+        case id, name, mobile, email, seatNumber, shift
+        case endDate = "membershipEnd"
+        case daysLeft = "daysRemaining"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id         = try c.decode(String.self, forKey: .id)
+        name       = try c.decode(String.self, forKey: .name)
+        mobile     = try c.decodeIfPresent(String.self, forKey: .mobile) ?? ""
+        email      = try c.decodeIfPresent(String.self, forKey: .email)
+        endDate    = try c.decode(String.self, forKey: .endDate)
+        daysLeft   = try c.decode(Int.self, forKey: .daysLeft)
+        seatNumber = try c.decodeIfPresent(String.self, forKey: .seatNumber)
+        shift      = try c.decodeIfPresent(String.self, forKey: .shift)
+    }
 }
 
 // MARK: - Broadcast History
