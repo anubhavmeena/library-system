@@ -83,7 +83,18 @@ struct AdminSeatsView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .sheet(isPresented: $showDatePicker) { datePickerSheet }
-            .sheet(item: $tappedSeat, onDismiss: { showSeatHistory = false; vm.seatHistory = [] }) { seat in seatDetailSheet(seat) }
+            .sheet(item: $tappedSeat, onDismiss: {
+                showSeatHistory = false
+                vm.seatHistory = []
+                // showStudentDetail/tappedStudentId live on this outer view, but the
+                // navigationDestination that reads them is inside the sheet's own
+                // NavigationStack, torn down and recreated fresh each time the sheet
+                // opens. Without resetting here, a still-true showStudentDetail from
+                // a previous seat leaks into the next sheet and immediately
+                // auto-navigates into that stale student before anything is tapped.
+                showStudentDetail = false
+                tappedStudentId = ""
+            }) { seat in seatDetailSheet(seat) }
         }
         .onAppear { vm.loadSeatMap(shift: selectedShift, date: dateString) }
     }
