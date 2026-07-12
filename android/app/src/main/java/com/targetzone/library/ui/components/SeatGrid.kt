@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -267,9 +266,9 @@ private fun SeatButton(
         )
         if (isFullDayOccupant) {
             Canvas(modifier = Modifier.matchParentSize()) {
-                val strokeWidthPx = 1.5.dp.toPx()
-                drawLine(color = textColor, start = Offset(0f, 0f), end = Offset(size.width, size.height), strokeWidth = strokeWidthPx, cap = StrokeCap.Round)
-                drawLine(color = textColor, start = Offset(size.width, 0f), end = Offset(0f, size.height), strokeWidth = strokeWidthPx, cap = StrokeCap.Round)
+                val strokeWidthPx = 1.dp.toPx()
+                drawLine(color = border, start = Offset(0f, 0f), end = Offset(size.width, size.height), strokeWidth = strokeWidthPx)
+                drawLine(color = border, start = Offset(size.width, 0f), end = Offset(0f, size.height), strokeWidth = strokeWidthPx)
             }
         }
         if (isOtherShiftBooked) {

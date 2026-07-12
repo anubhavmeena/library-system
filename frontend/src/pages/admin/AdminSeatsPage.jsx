@@ -221,9 +221,9 @@ export default function AdminSeatsPage() {
                                             {viewMode === 'expiry' ? '' : isFullDayOccupant ? '' : sn.substring(1)}
                                         </button>
                                         {isFullDayOccupant && (
-                                            <svg className={`absolute inset-0 w-8 h-8 pointer-events-none ${seat.studentGender === 'Female' ? 'text-fuchsia-300' : 'text-red-300'}`} viewBox="0 0 32 32">
-                                                <line x1="3" y1="3" x2="29" y2="29" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                                <line x1="29" y1="3" x2="3" y2="29" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                            <svg className={`absolute inset-0 w-8 h-8 pointer-events-none ${seat.studentGender === 'Female' ? 'text-fuchsia-500/50' : 'text-red-500/50'}`} viewBox="0 0 32 32">
+                                                <line x1="3" y1="3" x2="29" y2="29" stroke="currentColor" strokeWidth="1" />
+                                                <line x1="29" y1="3" x2="3" y2="29" stroke="currentColor" strokeWidth="1" />
                                             </svg>
                                         )}
                                         {isOtherShiftOccupied && (

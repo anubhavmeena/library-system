@@ -384,7 +384,7 @@ struct AdminSeatsView: View {
                         path.move(to: CGPoint(x: seatSize, y: 0))
                         path.addLine(to: CGPoint(x: 0, y: seatSize))
                     }
-                    .stroke(fg, lineWidth: 1.5)
+                    .stroke(fg, lineWidth: 1)
                     .frame(width: seatSize, height: seatSize)
                     .allowsHitTesting(false)
                 }
