@@ -42,6 +42,7 @@ struct AdminStudentDetailView: View {
     @State private var showPhotoCapture     = false
     @State private var photoCaptureStage: StudentPhotoCaptureStage = .camera
     @State private var photoCaptureError:   String?
+    @State private var showPhotoPreview     = false
 
     private let baseURL = "https://targetzone.co.in"
 
@@ -87,6 +88,9 @@ struct AdminStudentDetailView: View {
             }
             .sheet(isPresented: Binding(get: { clearKind != nil }, set: { if !$0 { clearKind = nil } })) {
                 if let s = vm.selectedStudent { clearAmountSheet(s) }
+            }
+            .sheet(isPresented: $showPhotoPreview) {
+                if let s = vm.selectedStudent { photoPreviewSheet(s) }
             }
             .fullScreenCover(isPresented: $showPhotoCapture) {
                 switch photoCaptureStage {
@@ -171,6 +175,30 @@ struct AdminStudentDetailView: View {
         showPhotoCapture = true
     }
 
+    // Mirrors AdminPaymentVerificationsView's screenshot preview sheet.
+    private func photoPreviewSheet(_ s: StudentDetail) -> some View {
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                if let urlStr = s.photoUrl, let url = URL(string: baseURL + urlStr) {
+                    AsyncImage(url: url) { phase in
+                        if case .success(let img) = phase {
+                            img.resizable().scaledToFit()
+                        } else {
+                            Color.navyMid
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") { showPhotoPreview = false }.foregroundColor(.white)
+                }
+            }
+        }
+    }
+
     private func profileHeader(_ s: StudentDetail) -> some View {
         AppCard(accentColor: .amber) {
             VStack(spacing: 12) {
@@ -180,6 +208,7 @@ struct AdminStudentDetailView: View {
                         placeholder: { Color.navyLight }
                             .frame(width: 72, height: 72).clipShape(Circle())
                             .overlay(Circle().stroke(Color.amber, lineWidth: 2))
+                            .onTapGesture { showPhotoPreview = true }
                     } else {
                         Circle().fill(Color.navyLight).frame(width: 72, height: 72)
                             .overlay(Text(String(s.name.prefix(1))).font(.headlineLarge).foregroundColor(.amber))
