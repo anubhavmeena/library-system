@@ -271,11 +271,13 @@ struct AdminStudentDetailView: View {
                     }
             } else {
                 Text(s.name).font(.headlineMedium).foregroundColor(.textPrimary)
-                    .simultaneousGesture(
-                        LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                    .contextMenu {
+                        Button {
                             beginEditing(s, field: .name, value: s.name)
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
                         }
-                    )
+                    }
             }
         }
     }
@@ -287,10 +289,14 @@ struct AdminStudentDetailView: View {
     // to fill in, not just an already-populated one. No explicit save/cancel
     // buttons: submitting the keyboard (Return) or tapping away (which resigns
     // focus via the screen's existing dismissKeyboardOnTap()) both commit it.
-    // Uses simultaneousGesture (not onLongPressGesture, which is exclusive) so
-    // this doesn't compete with — and block — the page's ScrollView drag
-    // gesture; these rows span most of the visible screen at the top of the
-    // page, so onLongPressGesture there made the whole page feel unscrollable.
+    // Uses .contextMenu (not onLongPressGesture/LongPressGesture, both of which
+    // — even as a .simultaneousGesture — compete with the page's ScrollView
+    // drag gesture for the same touch and can still block or stutter scrolling)
+    // since these rows span most of the visible screen at the top of the page.
+    // .contextMenu's long press is implemented via UIContextMenuInteraction,
+    // the same system-level mechanism Mail/Photos/Files use for exactly this
+    // "long-press for an action inside scrollable content" pattern, which is
+    // built to coexist with scrolling rather than race it for the touch.
     private func editableInfoRow(_ s: StudentDetail, label: String, value: String, field: ProfileField,
                                   keyboard: UIKeyboardType = .default, placeholder: String = "") -> some View {
         Group {
@@ -314,11 +320,13 @@ struct AdminStudentDetailView: View {
             } else {
                 InfoRow(label: label, value: value.isEmpty ? "—" : value)
                     .contentShape(Rectangle())
-                    .simultaneousGesture(
-                        LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                    .contextMenu {
+                        Button {
                             beginEditing(s, field: field, value: value)
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
                         }
-                    )
+                    }
             }
         }
     }
@@ -344,11 +352,13 @@ struct AdminStudentDetailView: View {
             } else {
                 InfoRow(label: "Gender", value: value.isEmpty ? "—" : value.capitalized)
                     .contentShape(Rectangle())
-                    .simultaneousGesture(
-                        LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                    .contextMenu {
+                        Button {
                             beginEditing(s, field: .gender, value: value)
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
                         }
-                    )
+                    }
             }
         }
     }
