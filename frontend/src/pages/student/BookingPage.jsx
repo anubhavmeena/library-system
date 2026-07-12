@@ -140,13 +140,25 @@ export default function BookingPage() {
         return shift === 'MORNING' ? t('booking.summary.shiftMorning') : t('booking.summary.shiftEvening')
     }
 
-    // Attempts to reserve the seat for an already-activated (paid) membership.
-    // Only navigates to the success page once the seat is actually reserved —
-    // on failure, surfaces a real error and keeps `activated` around so the
-    // "Retry" banner can call this again without re-running payment.
+    // verify_payment (rust-backend services::membership::verify_payment) already
+    // reserves the seat server-side as part of activating the membership, and
+    // returns the updated seatNumber if that succeeded — so the common case is
+    // just confirming, not booking again. A second unconditional call to
+    // /api/seats/book here would always collide with the ACTIVE seat_bookings
+    // row verify_payment just inserted for the same seat/shift/date range and
+    // 409, which is why the success toast never fired. Only fall back to the
+    // explicit book call when verify_payment actually declined the seat
+    // (returns no seatNumber — a genuine conflict), so "Retry" can still try
+    // to claim it in case it's freed up.
     const attemptSeatBooking = async (activated) => {
+        if (activated.seatNumber) {
+            setBookingFailed(null)
+            toast.success(t('booking.toasts.confirmed'))
+            navigate('/student/payment-success')
+            return true
+        }
         const res = await dispatch(bookSeat({
-            seatNumber: activated.seatNumber,
+            seatNumber: selectedSeat?.seatNumber,
             membershipId: activated.id,
             shift: activated.shift,
             startDate: activated.startDate,

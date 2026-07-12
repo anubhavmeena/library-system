@@ -82,15 +82,21 @@ export default function MembershipPage() {
         }
     }
 
-    // Payment activates/queues the membership before the seat is actually
-    // reserved (a separate call to seat-service) — if that second call fails,
-    // onSuccess() must not fire, or the student is told their plan is queued
-    // with a seat that was never actually reserved.
+    // verify_payment already reserves the (inherited) seat server-side as part
+    // of activating/queueing the membership, and returns it via m.seatNumber
+    // once that succeeds — so the common case is just confirming, not booking
+    // again. A second unconditional call to /api/seats/book here would always
+    // collide with the ACTIVE seat_bookings row verify_payment just inserted
+    // and fail, which is why a successful queue payment used to surface as a
+    // false "seat reservation failed" error instead of onSuccess(). Only fall
+    // back to the explicit book call when verify_payment actually declined
+    // the seat (a genuine conflict), retrying with the seat the student's
+    // current membership actually holds.
     const bookQueuedSeat = async (m) => {
-        if (!m.seatNumber) return true
+        if (m.seatNumber) return true
         try {
             await api.post('/seats/book', {
-                seatNumber: m.seatNumber, membershipId: m.id,
+                seatNumber: membership?.seatNumber, membershipId: m.id,
                 shift: m.shift, startDate: m.startDate, endDate: m.endDate,
             })
             return true

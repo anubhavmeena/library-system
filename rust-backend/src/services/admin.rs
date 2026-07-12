@@ -626,13 +626,24 @@ pub async fn import_student(
         return Ok(existing);
     }
 
+    // A blank email cell from a CSV import (or a blank admin form field)
+    // arrives as Some("") — normalize to None the same way auth::register
+    // does, or a second blank-email import collides on users.email's UNIQUE
+    // constraint against the first one.
+    let email = req
+        .email
+        .as_deref()
+        .map(str::trim)
+        .filter(|e| !e.is_empty())
+        .map(|e| e.to_lowercase());
+
     sqlx::query_as::<_, User>(
         "INSERT INTO users (name, mobile, email, address, gender, date_of_birth, role, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, 'STUDENT', NOW()) RETURNING *",
     )
     .bind(req.name.trim())
     .bind(&phone)
-    .bind(&req.email)
+    .bind(&email)
     .bind(&req.address)
     .bind(&req.gender)
     .bind(req.date_of_birth)

@@ -113,6 +113,7 @@ export default function LoginPage() {
         if (!form.name.trim()) return toast.error(t('auth.register.toasts.nameRequired'))
         const payload = { ...form, sessionToken, [contactType === 'MOBILE' ? 'mobile' : 'email']: contact }
         if (!payload.dateOfBirth) delete payload.dateOfBirth
+        if (!payload.email?.trim()) delete payload.email
         const res = await dispatch(registerUser(payload))
         if (registerUser.fulfilled.match(res)) { toast.success(t('auth.register.toasts.registered')); navigate('/student/dashboard') }
         else toast.error(res.payload || 'Registration failed')

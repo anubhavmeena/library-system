@@ -77,10 +77,18 @@ pub async fn register(
 ) -> crate::error::Result<(String, User)> {
     let contact = otp::consume_session(state, session_token).await?;
 
+    // The frontend sends the optional email field as Some("") rather than
+    // omitting it, and users.email's UNIQUE constraint treats repeated ""
+    // as colliding values (unlike NULL, which is never equal to itself) —
+    // mirrors user::update_profile's normalization so a second blank-email
+    // registration doesn't 409 as "already exists" against the first one.
     let (mobile, reg_email) = if contact.contains('@') {
-        (None, Some(contact.as_str()))
+        (None, Some(contact.clone()))
     } else {
-        (Some(contact.as_str()), email)
+        (
+            Some(contact.as_str()),
+            email.map(str::trim).filter(|e| !e.is_empty()).map(|e| e.to_lowercase()),
+        )
     };
 
     let user = sqlx::query_as::<_, User>(
