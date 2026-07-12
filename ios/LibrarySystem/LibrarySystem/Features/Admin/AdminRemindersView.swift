@@ -8,11 +8,6 @@ struct AdminRemindersView: View {
     @State private var selectedIds  = Set<String>()
     @State private var selectAll    = false
 
-    // Shared "clear amount" prompt — used by both Pending Fees and Grace Dues rows.
-    @State private var clearTarget:      StudentDetail?
-    @State private var clearAmountText   = ""
-    @State private var clearIsGraceDues  = false
-
     private let dayOptions = [3, 5, 7]
 
     var body: some View {
@@ -43,27 +38,6 @@ struct AdminRemindersView: View {
             vm.loadPendingFeeStudents()
             vm.loadGraceDuesStudents()
             vm.loadOrphanedSeatStudents()
-        }
-        .alert(clearIsGraceDues ? "Clear Dues" : "Clear Pending Fees",
-               isPresented: Binding(get: { clearTarget != nil }, set: { if !$0 { clearTarget = nil } })) {
-            TextField("Amount", text: $clearAmountText).keyboardType(.decimalPad)
-            Button("Cancel", role: .cancel) { clearTarget = nil }
-            Button("Clear") {
-                guard let target = clearTarget, let amount = Double(clearAmountText), amount > 0 else { return }
-                if clearIsGraceDues {
-                    if let membershipId = target.membershipId {
-                        vm.clearDues(membershipId: membershipId, amountCleared: amount, userId: target.id)
-                    }
-                } else {
-                    vm.clearPendingFees(userId: target.id, amountCleared: amount)
-                }
-                clearTarget = nil
-            }
-        } message: {
-            if let target = clearTarget {
-                let outstanding = clearIsGraceDues ? (target.duesAmount ?? 0) : (target.pendingAmount ?? 0)
-                Text("Record a payment for \(target.name). Outstanding: ₹\(String(format: "%.0f", outstanding)). Any amount not cleared stays on record as a pending balance.")
-            }
         }
     }
 
@@ -264,19 +238,6 @@ struct AdminRemindersView: View {
                                 }
 
                                 Spacer()
-
-                                Button {
-                                    clearIsGraceDues = false
-                                    clearAmountText = String(format: "%.0f", student.pendingAmount ?? 0)
-                                    clearTarget = student
-                                } label: {
-                                    Text("Clear")
-                                        .font(.labelSmall).foregroundColor(.emerald)
-                                        .padding(.horizontal, 10).padding(.vertical, 5)
-                                        .background(Color.emeraldFaint)
-                                        .clipShape(Capsule())
-                                }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -360,19 +321,6 @@ struct AdminRemindersView: View {
                                 }
 
                                 Spacer()
-
-                                Button {
-                                    clearIsGraceDues = true
-                                    clearAmountText = String(format: "%.0f", student.duesAmount ?? 0)
-                                    clearTarget = student
-                                } label: {
-                                    Text("Clear")
-                                        .font(.labelSmall).foregroundColor(.emerald)
-                                        .padding(.horizontal, 10).padding(.vertical, 5)
-                                        .background(Color.emeraldFaint)
-                                        .clipShape(Capsule())
-                                }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
