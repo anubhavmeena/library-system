@@ -109,6 +109,14 @@ struct AuthResponse: Codable {
 struct OtpVerifyResponse: Codable {
     let sessionToken: String
     let newUser: Bool
+
+    // Backend key is "isNewUser", not "newUser" — non-optional with no
+    // fallback, so every single OTP verification (student or admin login)
+    // failed to decode right after a correct OTP was entered.
+    private enum CodingKeys: String, CodingKey {
+        case sessionToken
+        case newUser = "isNewUser"
+    }
 }
 
 struct Membership: Codable, Identifiable, Equatable {
@@ -155,8 +163,12 @@ struct Membership: Codable, Identifiable, Equatable {
         planId     = try c.decode(String.self, forKey: .planId)
         planName   = try c.decode(String.self, forKey: .planName)
         planType   = try c.decode(String.self, forKey: .planType)
-        seatNumber = try c.decode(String.self, forKey: .seatNumber)
-        shift      = try c.decode(String.self, forKey: .shift)
+        // Both nullable on the backend (MembershipWithPlan.seat_number/shift:
+        // Option<String>) — a PENDING/QUEUED membership with no seat assigned
+        // yet would otherwise fail this decode entirely, breaking the
+        // student's own membership view (GET /memberships/my and friends).
+        seatNumber = try c.decodeIfPresent(String.self, forKey: .seatNumber) ?? ""
+        shift      = try c.decodeIfPresent(String.self, forKey: .shift) ?? ""
         startDate  = try c.decode(String.self, forKey: .startDate)
         endDate    = try c.decode(String.self, forKey: .endDate)
         status     = try c.decode(String.self, forKey: .status)
@@ -206,14 +218,17 @@ struct Seat: Codable, Identifiable {
     let studentMobile: String?
     let membershipEnd: String?
 
-    // seat-service's SeatDto sends this field as "rowLabel", not "row" — the
-    // required, non-optional `row` key was never actually present in the
-    // response, so every seat in the array failed to decode (on top of the
-    // separate SeatAvailability wrapper-object mismatch fixed in
-    // SeatRepository.getAvailability).
+    // The backend's per-seat SeatAvailability row sends "rowLabel" (not "row")
+    // and "seatId" (not "id") — studentName/studentMobile/membershipEnd have no
+    // equivalent at all in this endpoint's shape (only bookedByName is close,
+    // which this maps in), so they always decode to nil here. None of that
+    // breaks the decode since all four are optional; row/seatNumber/isBooked
+    // are the only non-optional fields and all three now line up correctly.
     enum CodingKeys: String, CodingKey {
-        case id, seatNumber, isBooked, studentName, studentMobile, membershipEnd
+        case seatNumber, isBooked, studentMobile, membershipEnd
+        case id = "seatId"
         case row = "rowLabel"
+        case studentName = "bookedByName"
     }
 
     var rowLabel: String { row }
@@ -226,6 +241,30 @@ struct SeatAvailability: Codable {
     let bookedSeats: Int
     let availableSeats: Int
     let seats: [Seat]
+
+    // The backend's actual SeatAvailabilityResponse has no "totalSeats" key at
+    // all — only "availableCount"/"bookedCount" — so decoding this wrapper's
+    // required, non-optional totalSeats/bookedSeats/availableSeats against
+    // those mismatched names threw immediately, before ever reading `seats`.
+    // That made GET /seats/availability fail on every single call: students
+    // could never see seat availability or book a seat, and the admin Change
+    // Seat sheet's grid never populated (silently, since that call site
+    // swallows the error via try?).
+    private enum CodingKeys: String, CodingKey {
+        case shift, date, seats
+        case bookedSeats = "bookedCount"
+        case availableSeats = "availableCount"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        shift          = try c.decode(String.self, forKey: .shift)
+        date           = try c.decode(String.self, forKey: .date)
+        seats          = try c.decode([Seat].self, forKey: .seats)
+        bookedSeats    = try c.decodeIfPresent(Int.self, forKey: .bookedSeats) ?? 0
+        availableSeats = try c.decodeIfPresent(Int.self, forKey: .availableSeats) ?? (seats.count - bookedSeats)
+        totalSeats     = seats.count
+    }
 }
 
 struct SeatMapDto: Codable {
@@ -480,6 +519,30 @@ struct FeedbackItem: Codable, Identifiable {
     let updatedAt: String?
     let studentName: String?
     let studentMobile: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, userId, type, subject, description, status, adminNotes
+        case createdAt, updatedAt, studentName, studentMobile
+    }
+
+    // createdAt is nullable on the backend (AdminFeedbackItem.created_at:
+    // Option<NaiveDateTime>) though this field's type stays non-optional —
+    // defaults to "" instead of failing the whole feedback list over one
+    // null timestamp.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id             = try c.decode(String.self, forKey: .id)
+        userId         = try c.decodeIfPresent(String.self, forKey: .userId)
+        type           = try c.decode(String.self, forKey: .type)
+        subject        = try c.decode(String.self, forKey: .subject)
+        description    = try c.decode(String.self, forKey: .description)
+        status         = try c.decode(String.self, forKey: .status)
+        adminNotes     = try c.decodeIfPresent(String.self, forKey: .adminNotes)
+        createdAt      = try c.decodeIfPresent(String.self, forKey: .createdAt) ?? ""
+        updatedAt      = try c.decodeIfPresent(String.self, forKey: .updatedAt)
+        studentName    = try c.decodeIfPresent(String.self, forKey: .studentName)
+        studentMobile  = try c.decodeIfPresent(String.self, forKey: .studentMobile)
+    }
 }
 
 struct ReminderStudent: Codable, Identifiable {
@@ -525,6 +588,19 @@ struct BroadcastHistory: Codable, Identifiable {
     let message: String
     let recipientCount: Int
     let sentAt: String
+
+    private enum CodingKeys: String, CodingKey { case id, message, recipientCount, sentAt }
+
+    // sentAt is nullable on the backend (BroadcastMessage.sent_at:
+    // Option<NaiveDateTime>) though this field's type stays non-optional —
+    // defaults to "" instead of failing the whole history list.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id             = try c.decode(String.self, forKey: .id)
+        message        = try c.decode(String.self, forKey: .message)
+        recipientCount = try c.decode(Int.self, forKey: .recipientCount)
+        sentAt         = try c.decodeIfPresent(String.self, forKey: .sentAt) ?? ""
+    }
 }
 
 // MARK: - Revenue Reports
@@ -699,11 +775,6 @@ struct MonthlyExpense: Codable, Equatable {
 
 // MARK: - Inbox / Email
 
-// InboxSummaryDto/InboxMessageDto's `isRead` is a primitive `boolean` with no
-// @JsonProperty override, so Lombok's plain `isRead()` getter serializes to the
-// JSON key "read", not "isRead" — same Jackson boolean-getter stripping that broke
-// Plan.isActive ("active") above. Mapped explicitly rather than hitting the same
-// non-optional decode crash on every inbox open.
 struct InboxSummary: Codable, Identifiable, Hashable {
     var id: Int { messageNumber }
     let messageNumber: Int
@@ -712,9 +783,13 @@ struct InboxSummary: Codable, Identifiable, Hashable {
     let date: String
     let isRead: Bool
 
+    // The Java backend's plain `boolean isRead` getter stripped down to JSON key
+    // "read" (Lombok/Jackson JavaBean convention) — but rust-backend's InboxSummary
+    // just derives #[serde(rename_all = "camelCase")] with no such override, so
+    // its actual key is "isRead". Non-optional with no fallback, so this failed
+    // to decode every single inbox list/message on the currently-deployed backend.
     enum CodingKeys: String, CodingKey {
-        case messageNumber, from, subject, date
-        case isRead = "read"
+        case messageNumber, from, subject, date, isRead
     }
 }
 
@@ -727,8 +802,7 @@ struct InboxMessage: Codable {
     let body: String
 
     enum CodingKeys: String, CodingKey {
-        case messageNumber, from, subject, date, body
-        case isRead = "read"
+        case messageNumber, from, subject, date, body, isRead
     }
 }
 
@@ -739,6 +813,16 @@ struct GalleryPhoto: Codable, Identifiable {
     let url: String
     let caption: String?
     let uploadedAt: String?
+
+    // Unlike most backend response structs, GalleryPhoto has no
+    // #[serde(rename_all = "camelCase")] — its JSON key is the raw snake_case
+    // "uploaded_at", not "uploadedAt". Harmless since this field is optional
+    // (silently decoded to nil instead of throwing), but the upload date never
+    // actually showed anywhere it's used.
+    private enum CodingKeys: String, CodingKey {
+        case id, url, caption
+        case uploadedAt = "uploaded_at"
+    }
 }
 
 // MARK: - Seat History
