@@ -189,6 +189,8 @@ struct AdminRemindersView: View {
                                         }
                                     }
                                 }
+
+                                Spacer()
                             }
                         }
                     }

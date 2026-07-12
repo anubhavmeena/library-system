@@ -20,7 +20,10 @@ struct AdminStudentDetailView: View {
     @State private var showSeatHistory  = false
     @State private var showMessage      = false
     @State private var messageText      = ""
-    @State private var showEdit         = false
+
+    private enum ProfileField { case name, mobile, email, gender, dateOfBirth, address, joinedAt }
+    @State private var editingField: ProfileField?
+    @State private var editBuffer = ""
 
     private enum ClearKind { case fees, dues }
     @State private var clearKind:       ClearKind?
@@ -77,9 +80,6 @@ struct AdminStudentDetailView: View {
             }
             .sheet(isPresented: $showMessage) {
                 messageSheet
-            }
-            .sheet(isPresented: $showEdit) {
-                if let s = vm.selectedStudent { editSheet(s) }
             }
             .sheet(isPresented: $showChangeStatus) {
                 if let s = vm.selectedStudent { changeStatusSheet(s) }
@@ -197,18 +197,154 @@ struct AdminStudentDetailView: View {
                     Text(err).font(.labelSmall).foregroundColor(.redAlert)
                 }
 
-                Text(s.name).font(.headlineMedium).foregroundColor(.textPrimary)
+                editableNameHeader(s)
                 StatusChip(status: s.isActive ? "ACTIVE" : "INACTIVE")
 
+                Text("Long-press a field below to edit it")
+                    .font(.labelSmall).foregroundColor(.textMuted)
+
                 Divider().background(Color.dividerColor)
-                InfoRow(label: "Mobile",   value: s.mobile)
-                if let em = s.email       { InfoRow(label: "Email",   value: em) }
-                if let g  = s.gender      { InfoRow(label: "Gender",  value: g.capitalized) }
-                if let dob = s.dateOfBirth { InfoRow(label: "DOB",    value: dob) }
-                if let addr = s.address   { InfoRow(label: "Address", value: addr) }
-                if let joined = s.joinedAt { InfoRow(label: "Joined", value: joined.prefix(10).description) }
+                editableInfoRow(s, label: "Mobile", value: s.mobile, field: .mobile, keyboard: .phonePad)
+                editableInfoRow(s, label: "Email", value: s.email ?? "", field: .email, keyboard: .emailAddress)
+                editableGenderRow(s, value: s.gender ?? "")
+                editableInfoRow(s, label: "DOB", value: s.dateOfBirth ?? "", field: .dateOfBirth, placeholder: "yyyy-MM-dd")
+                editableInfoRow(s, label: "Address", value: s.address ?? "", field: .address)
+                editableInfoRow(s, label: "Joined", value: String(s.joinedAt?.prefix(10) ?? ""), field: .joinedAt, placeholder: "yyyy-MM-dd")
             }
         }
+    }
+
+    private func editableNameHeader(_ s: StudentDetail) -> some View {
+        Group {
+            if editingField == .name {
+                HStack(spacing: 8) {
+                    TextField("Name", text: $editBuffer)
+                        .font(.headlineMedium)
+                        .padding(8)
+                        .background(Color.navyMid)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .foregroundColor(.textPrimary)
+                    fieldEditControls(s)
+                }
+            } else {
+                Text(s.name).font(.headlineMedium).foregroundColor(.textPrimary)
+                    .onLongPressGesture(minimumDuration: 0.5) {
+                        editBuffer = s.name
+                        editingField = .name
+                    }
+            }
+        }
+    }
+
+    // Generic long-press-to-edit row for the plain-text profile fields (mobile,
+    // email, DOB, address, joined date) — replaces the old modal "Edit Profile"
+    // sheet with inline editing directly on this page. Rows always render (with
+    // an em-dash placeholder when empty) so a blank field can still be long-pressed
+    // to fill in, not just an already-populated one.
+    private func editableInfoRow(_ s: StudentDetail, label: String, value: String, field: ProfileField,
+                                  keyboard: UIKeyboardType = .default, placeholder: String = "") -> some View {
+        Group {
+            if editingField == field {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(label).font(.bodySmall).foregroundColor(.textMuted)
+                    HStack(spacing: 8) {
+                        TextField(placeholder.isEmpty ? label : placeholder, text: $editBuffer)
+                            .keyboardType(keyboard)
+                            .padding(8)
+                            .background(Color.navyMid)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .foregroundColor(.textPrimary)
+                        fieldEditControls(s)
+                    }
+                }
+                .padding(.vertical, 8)
+                Divider().background(Color.dividerColor)
+            } else {
+                InfoRow(label: label, value: value.isEmpty ? "—" : value)
+                    .contentShape(Rectangle())
+                    .onLongPressGesture(minimumDuration: 0.5) {
+                        editBuffer = value
+                        editingField = field
+                    }
+            }
+        }
+    }
+
+    private func editableGenderRow(_ s: StudentDetail, value: String) -> some View {
+        Group {
+            if editingField == .gender {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Gender").font(.bodySmall).foregroundColor(.textMuted)
+                    HStack(spacing: 8) {
+                        Picker("", selection: $editBuffer) {
+                            Text("—").tag("")
+                            Text("Male").tag("Male")
+                            Text("Female").tag("Female")
+                            Text("Other").tag("Other")
+                        }
+                        .pickerStyle(.segmented)
+                        fieldEditControls(s)
+                    }
+                }
+                .padding(.vertical, 8)
+                Divider().background(Color.dividerColor)
+            } else {
+                InfoRow(label: "Gender", value: value.isEmpty ? "—" : value.capitalized)
+                    .contentShape(Rectangle())
+                    .onLongPressGesture(minimumDuration: 0.5) {
+                        editBuffer = value
+                        editingField = .gender
+                    }
+            }
+        }
+    }
+
+    private func fieldEditControls(_ s: StudentDetail) -> some View {
+        HStack(spacing: 8) {
+            Button { saveEditingField(s) } label: {
+                Image(systemName: "checkmark.circle.fill").foregroundColor(.emerald)
+            }
+            Button { editingField = nil } label: {
+                Image(systemName: "xmark.circle.fill").foregroundColor(.redAlert)
+            }
+        }
+    }
+
+    private func saveEditingField(_ s: StudentDetail) {
+        guard let field = editingField else { return }
+        let trimmed = editBuffer.trimmingCharacters(in: .whitespaces)
+
+        var name        = s.name
+        var mobile      = s.mobile
+        var email       = s.email ?? ""
+        var address     = s.address ?? ""
+        var gender      = s.gender ?? ""
+        var dateOfBirth = s.dateOfBirth ?? ""
+        var joinedAt    = String(s.joinedAt?.prefix(10) ?? "")
+
+        switch field {
+        case .name:        name = trimmed
+        case .mobile:      mobile = trimmed
+        case .email:       email = trimmed
+        case .address:     address = trimmed
+        case .gender:      gender = trimmed
+        case .dateOfBirth: dateOfBirth = trimmed
+        case .joinedAt:    joinedAt = trimmed
+        }
+
+        guard !name.isEmpty else { editingField = nil; return }
+
+        let req = UpdateStudentRequest(
+            name: name,
+            mobile: mobile.isEmpty ? nil : mobile,
+            email: email.isEmpty ? nil : email,
+            address: address.isEmpty ? nil : address,
+            gender: gender.isEmpty ? nil : gender,
+            dateOfBirth: dateOfBirth.isEmpty ? nil : dateOfBirth,
+            joinedAt: joinedAt.isEmpty ? nil : joinedAt
+        )
+        vm.updateStudent(id: s.id, req: req)
+        editingField = nil
     }
 
     private func membershipSection(_ s: StudentDetail) -> some View {
@@ -302,7 +438,9 @@ struct AdminStudentDetailView: View {
 
     private func actionsSection(_ s: StudentDetail) -> some View {
         VStack(spacing: 12) {
-            manageSection(s)
+            if s.membershipId != nil {
+                manageSection(s)
+            }
             historyAndCommunicationSection(s)
             dangerZoneSection(s)
 
@@ -322,8 +460,6 @@ struct AdminStudentDetailView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Manage").font(.headlineSmall).foregroundColor(.textPrimary)
                 Divider().background(Color.dividerColor)
-
-                OutlineButton("Edit Profile") { showEdit = true }
 
                 if s.membershipId != nil {
                     OutlineButton("Change Seat") { showChangeSeat = true }
@@ -621,11 +757,6 @@ struct AdminStudentDetailView: View {
         .buttonStyle(.plain)
     }
 
-    @ViewBuilder
-    private func editSheet(_ s: StudentDetail) -> some View {
-        EditStudentSheet(s: s, vm: vm, onDismiss: { showEdit = false })
-    }
-
     private var messageSheet: some View {
         NavigationStack {
             ZStack {
@@ -707,150 +838,6 @@ struct AdminStudentDetailView: View {
             let shift = vm.selectedStudent?.shift ?? "FULL_DAY"
             Task {
                 seatMapSeats = (try? await SeatRepository.shared.getAvailability(shift: shift)) ?? []
-            }
-        }
-    }
-}
-
-private struct EditStudentSheet: View {
-    let s: StudentDetail
-    @ObservedObject var vm: AdminViewModel
-    let onDismiss: () -> Void
-
-    @State private var name:         String
-    @State private var mobile:       String
-    @State private var email:        String
-    @State private var address:      String
-    @State private var gender:       String
-    @State private var dateOfBirth:  String
-    @State private var joinedAt:     String
-    @State private var seatNumber:   String
-    @State private var selectedPlanId: String
-
-    init(s: StudentDetail, vm: AdminViewModel, onDismiss: @escaping () -> Void) {
-        self.s = s
-        self.vm = vm
-        self.onDismiss = onDismiss
-        _name           = State(initialValue: s.name)
-        _mobile         = State(initialValue: s.mobile)
-        _email          = State(initialValue: s.email ?? "")
-        _address        = State(initialValue: s.address ?? "")
-        _gender         = State(initialValue: s.gender ?? "")
-        _dateOfBirth    = State(initialValue: s.dateOfBirth ?? "")
-        _joinedAt       = State(initialValue: String(s.joinedAt?.prefix(10) ?? ""))
-        _seatNumber     = State(initialValue: s.seatNumber ?? "")
-        _selectedPlanId = State(initialValue: s.membershipPlanId ?? "")
-    }
-
-    private let genderOptions = ["", "Male", "Female", "Other"]
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.navyDeep.ignoresSafeArea()
-                ScrollView {
-                    VStack(spacing: 12) {
-                        editField("Name",          text: $name)
-                        editField("Mobile",        text: $mobile,      keyboard: .phonePad)
-                        editField("Email",         text: $email,       keyboard: .emailAddress)
-                        editField("Address",       text: $address,     lines: 2)
-                        editField("Date of Birth", text: $dateOfBirth, placeholder: "yyyy-MM-dd")
-                        editField("Joined Date",   text: $joinedAt,    placeholder: "yyyy-MM-dd")
-
-                        // Gender picker
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Gender").font(.labelSmall).foregroundColor(.textMuted)
-                            Picker("", selection: $gender) {
-                                ForEach(genderOptions, id: \.self) { opt in
-                                    Text(opt.isEmpty ? "—" : opt).tag(opt)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                        }
-                        .padding(12)
-                        .background(Color.navyMid)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                        if s.membershipId != nil {
-                            editField("Seat Number", text: $seatNumber)
-
-                            // Plan picker
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Plan").font(.labelSmall).foregroundColor(.textMuted)
-                                Picker("", selection: $selectedPlanId) {
-                                    Text("— no change —").tag(s.membershipPlanId ?? "")
-                                    ForEach(vm.plans, id: \.id) { plan in
-                                        Text(plan.name).tag(plan.id)
-                                    }
-                                }
-                                .pickerStyle(.menu)
-                                .tint(.amber)
-                                .padding(8)
-                                .background(Color.navyMid)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                            }
-                        }
-
-                        PrimaryButton("Save Changes") {
-                            let req = UpdateStudentRequest(
-                                name:        name.trimmingCharacters(in: .whitespaces),
-                                mobile:      mobile.trimmingCharacters(in: .whitespaces).isEmpty ? nil : mobile.trimmingCharacters(in: .whitespaces),
-                                email:       email.trimmingCharacters(in: .whitespaces).isEmpty  ? nil : email.trimmingCharacters(in: .whitespaces),
-                                address:     address.trimmingCharacters(in: .whitespaces).isEmpty ? nil : address.trimmingCharacters(in: .whitespaces),
-                                gender:      gender.isEmpty ? nil : gender,
-                                dateOfBirth: dateOfBirth.trimmingCharacters(in: .whitespaces).isEmpty ? nil : dateOfBirth.trimmingCharacters(in: .whitespaces),
-                                joinedAt:    joinedAt.trimmingCharacters(in: .whitespaces).isEmpty ? nil : joinedAt.trimmingCharacters(in: .whitespaces)
-                            )
-                            vm.updateStudent(id: s.id, req: req)
-                            if let mid = s.membershipId {
-                                let trimSeat = seatNumber.trimmingCharacters(in: .whitespaces)
-                                if !trimSeat.isEmpty && trimSeat != s.seatNumber {
-                                    vm.changeSeat(membershipId: mid, seatNumber: trimSeat)
-                                }
-                                if !selectedPlanId.isEmpty && selectedPlanId != s.membershipPlanId {
-                                    vm.updateMembershipPlan(membershipId: mid, planId: selectedPlanId)
-                                }
-                            }
-                            onDismiss()
-                        }
-                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
-                    .padding(16)
-                }
-                .scrollDismissesKeyboard(.interactively)
-            }
-            .dismissKeyboardOnTap()
-            .navigationTitle("Edit Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .onAppear { vm.loadPlans() }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel", action: onDismiss).foregroundColor(.amber)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func editField(_ label: String, text: Binding<String>, placeholder: String = "", keyboard: UIKeyboardType = .default, lines: Int = 1) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label).font(.labelSmall).foregroundColor(.textMuted)
-            if lines > 1 {
-                TextEditor(text: text)
-                    .frame(minHeight: CGFloat(lines) * 44)
-                    .padding(8)
-                    .background(Color.navyMid)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .foregroundColor(.textPrimary)
-                    .font(.bodyMedium)
-            } else {
-                TextField(placeholder.isEmpty ? label : placeholder, text: text)
-                    .keyboardType(keyboard)
-                    .padding(12)
-                    .background(Color.navyMid)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .foregroundColor(.textPrimary)
-                    .font(.bodyMedium)
             }
         }
     }
