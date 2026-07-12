@@ -68,10 +68,6 @@ struct UpdateProfileRequest: Codable {
     let email: String?
 }
 
-struct ToggleStatusRequest: Codable {
-    let active: Bool
-}
-
 struct UpdateStudentRequest: Codable {
     let name: String
     let mobile: String?

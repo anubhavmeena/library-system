@@ -94,9 +94,6 @@ extension Endpoint {
     static func getStudentPayments(userId: String) -> Endpoint {
         Endpoint(path: "admin/students/\(userId)/payments")
     }
-    static func toggleStudentStatus(id: String, req: ToggleStatusRequest) -> Endpoint {
-        Endpoint(path: "admin/students/\(id)/status", method: .PATCH, body: encode(req))
-    }
     static func updateStudent(id: String, req: UpdateStudentRequest) -> Endpoint {
         Endpoint(path: "admin/students/\(id)", method: .PATCH, body: encode(req))
     }

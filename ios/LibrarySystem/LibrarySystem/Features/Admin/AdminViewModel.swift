@@ -87,16 +87,6 @@ final class AdminViewModel: ObservableObject {
         }
     }
 
-    func toggleStudentStatus(id: String, active: Bool) {
-        Task {
-            do {
-                try await repo.toggleStudentStatus(id: id, active: active)
-                successMsg = "Status updated"
-                loadStudentDetail(id: id)
-            } catch { self.error = error.localizedDescription }
-        }
-    }
-
     func updateStudent(id: String, req: UpdateStudentRequest) {
         Task {
             do {

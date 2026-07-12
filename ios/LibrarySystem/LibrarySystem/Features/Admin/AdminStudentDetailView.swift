@@ -301,106 +301,10 @@ struct AdminStudentDetailView: View {
     }
 
     private func actionsSection(_ s: StudentDetail) -> some View {
-        VStack(spacing: 10) {
-            Button {
-                vm.toggleStudentStatus(id: s.id, active: !s.isActive)
-            } label: {
-                HStack {
-                    Image(systemName: s.isActive ? "person.fill.xmark" : "person.fill.checkmark")
-                    Text(s.isActive ? "Deactivate Student" : "Activate Student")
-                }
-                .font(.labelLarge)
-                .foregroundColor(s.isActive ? .redAlert : .emerald)
-                .frame(maxWidth: .infinity).padding(14)
-                .background(s.isActive ? Color.redFaint : Color.emeraldFaint)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(s.isActive ? Color.redAlert.opacity(0.4) : Color.emerald.opacity(0.4)))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
-
-            OutlineButton("Edit Profile") { showEdit = true }
-
-            if s.membershipId != nil {
-                OutlineButton("Change Seat") { showChangeSeat = true }
-            }
-
-            if s.membershipId != nil && (s.membershipStatus == "ACTIVE" || s.membershipStatus == "GRACE") {
-                Button {
-                    showReleaseConfirm = true
-                } label: {
-                    HStack {
-                        Image(systemName: "chair.lounge")
-                        Text("Release Seat")
-                    }
-                    .font(.labelLarge).foregroundColor(.redAlert)
-                    .frame(maxWidth: .infinity).padding(14)
-                    .background(Color.redFaint)
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.redAlert.opacity(0.4)))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-            }
-
-            if s.membershipId != nil && s.displayStatus == "PAID" {
-                OutlineButton("Renew Seat") { showRenewConfirm = true }
-            }
-
-            if s.membershipId != nil && s.membershipStatus == "ACTIVE" {
-                OutlineButton("Change Status") {
-                    changeStatusTarget = "PENDING"
-                    pendingAmountInput = ""
-                    showChangeStatus = true
-                }
-            }
-
-            OutlineButton("Send Message") { showMessage = true }
-
-            Button {
-                showPayments.toggle()
-                if showPayments { vm.loadStudentPayments(userId: s.id) }
-            } label: {
-                HStack {
-                    Image(systemName: "creditcard")
-                    Text(showPayments ? "Hide Payments" : "View Payments")
-                }
-                .font(.labelLarge).foregroundColor(.blueSoft)
-                .frame(maxWidth: .infinity).padding(14)
-                .background(Color.blueFaint)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.blueSoft.opacity(0.4)))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                showSeatHistory.toggle()
-                if showSeatHistory { vm.loadStudentSeatHistory(userId: s.id) }
-            } label: {
-                HStack {
-                    Image(systemName: "clock.arrow.circlepath")
-                    Text(showSeatHistory ? "Hide Seat History" : "View Seat History")
-                }
-                .font(.labelLarge).foregroundColor(.blueSoft)
-                .frame(maxWidth: .infinity).padding(14)
-                .background(Color.blueFaint)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.blueSoft.opacity(0.4)))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                showDeleteConfirm = true
-            } label: {
-                HStack {
-                    Image(systemName: "trash")
-                    Text("Delete Student")
-                }
-                .font(.labelLarge).foregroundColor(.redAlert)
-                .frame(maxWidth: .infinity).padding(14)
-                .background(Color.redFaint)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.redAlert.opacity(0.4)))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
+        VStack(spacing: 12) {
+            manageSection(s)
+            historyAndCommunicationSection(s)
+            dangerZoneSection(s)
 
             if let err = vm.error { ErrorBanner(message: err) }
             if let msg = vm.successMsg {
@@ -409,6 +313,117 @@ struct AdminStudentDetailView: View {
                 }
                 .padding(12).background(Color.emeraldFaint)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+        }
+    }
+
+    private func manageSection(_ s: StudentDetail) -> some View {
+        AppCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Manage").font(.headlineSmall).foregroundColor(.textPrimary)
+                Divider().background(Color.dividerColor)
+
+                OutlineButton("Edit Profile") { showEdit = true }
+
+                if s.membershipId != nil {
+                    OutlineButton("Change Seat") { showChangeSeat = true }
+                }
+
+                if s.membershipId != nil && s.displayStatus == "PAID" {
+                    OutlineButton("Renew Seat") { showRenewConfirm = true }
+                }
+
+                if s.membershipId != nil && s.membershipStatus == "ACTIVE" {
+                    OutlineButton("Change Status") {
+                        changeStatusTarget = "PENDING"
+                        pendingAmountInput = ""
+                        showChangeStatus = true
+                    }
+                }
+            }
+        }
+    }
+
+    private func historyAndCommunicationSection(_ s: StudentDetail) -> some View {
+        AppCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("History & Communication").font(.headlineSmall).foregroundColor(.textPrimary)
+                Divider().background(Color.dividerColor)
+
+                OutlineButton("Send Message") { showMessage = true }
+
+                Button {
+                    showPayments.toggle()
+                    if showPayments { vm.loadStudentPayments(userId: s.id) }
+                } label: {
+                    HStack {
+                        Image(systemName: "creditcard")
+                        Text(showPayments ? "Hide Payments" : "View Payments")
+                    }
+                    .font(.labelLarge).foregroundColor(.blueSoft)
+                    .frame(maxWidth: .infinity).padding(14)
+                    .background(Color.blueFaint)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.blueSoft.opacity(0.4)))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    showSeatHistory.toggle()
+                    if showSeatHistory { vm.loadStudentSeatHistory(userId: s.id) }
+                } label: {
+                    HStack {
+                        Image(systemName: "clock.arrow.circlepath")
+                        Text(showSeatHistory ? "Hide Seat History" : "View Seat History")
+                    }
+                    .font(.labelLarge).foregroundColor(.blueSoft)
+                    .frame(maxWidth: .infinity).padding(14)
+                    .background(Color.blueFaint)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.blueSoft.opacity(0.4)))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func dangerZoneSection(_ s: StudentDetail) -> some View {
+        AppCard(accentColor: .redAlert) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Danger Zone").font(.headlineSmall).foregroundColor(.redAlert)
+                Divider().background(Color.dividerColor)
+
+                if s.membershipId != nil && (s.membershipStatus == "ACTIVE" || s.membershipStatus == "GRACE") {
+                    Button {
+                        showReleaseConfirm = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "chair.lounge")
+                            Text("Release Seat")
+                        }
+                        .font(.labelLarge).foregroundColor(.redAlert)
+                        .frame(maxWidth: .infinity).padding(14)
+                        .background(Color.redFaint)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.redAlert.opacity(0.4)))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Button {
+                    showDeleteConfirm = true
+                } label: {
+                    HStack {
+                        Image(systemName: "trash")
+                        Text("Delete Student")
+                    }
+                    .font(.labelLarge).foregroundColor(.redAlert)
+                    .frame(maxWidth: .infinity).padding(14)
+                    .background(Color.redFaint)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.redAlert.opacity(0.4)))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
             }
         }
     }

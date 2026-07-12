@@ -32,11 +32,6 @@ struct AdminRepository {
                                       data: photoData, token: token)
     }
 
-    func toggleStudentStatus(id: String, active: Bool) async throws {
-        let req = ToggleStatusRequest(active: active)
-        try await api.requestVoid(.toggleStudentStatus(id: id, req: req), token: token)
-    }
-
     func updateStudent(id: String, req: UpdateStudentRequest) async throws -> StudentDetail {
         try await api.request(.updateStudent(id: id, req: req), token: token)
     }
