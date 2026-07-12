@@ -172,14 +172,26 @@ public class ExpiryReminderScheduler {
             Optional<Membership> queuedOpt = membershipRepository.findQueuedByUserId(mem.getUserId());
 
             if (queuedOpt.isPresent()) {
-                // Happy path — student already renewed in advance. Unchanged from
-                // the pre-grace-period behaviour.
+                // Happy path — student already renewed in advance.
                 mem.setStatus(Membership.Status.EXPIRED);
                 membershipRepository.save(mem);
 
                 Membership queued = queuedOpt.get();
                 queued.setStatus(Membership.Status.ACTIVE);
                 membershipRepository.save(queued);
+
+                // The queued membership's own SeatBooking was created back when the
+                // renewal was paid for, before the exact activation date was known —
+                // resync it to the now-ACTIVE membership's real dates so it can't
+                // silently drift out of step with what the seat map actually shows
+                // (this activation path previously never touched SeatBooking at all).
+                seatBookingRepository.findFirstByMembershipIdAndStatus(queued.getId(), SeatBooking.Status.ACTIVE)
+                        .ifPresent(booking -> {
+                            booking.setBookingDate(queued.getStartDate());
+                            booking.setEndDate(queued.getEndDate());
+                            seatBookingRepository.save(booking);
+                        });
+
                 log.info("Activated queued plan for user {} — seat {} from {}",
                         mem.getUserId(), queued.getSeatNumber(), queued.getStartDate());
                 continue;

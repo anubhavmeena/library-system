@@ -363,17 +363,46 @@ public class PaymentService {
         return MembershipDto.fromEntity(membership);
     }
 
+    // Best-effort by necessity — the payment and membership reactivation have
+    // already committed by this point, so a seat-sync failure here must never
+    // make the student think their payment failed (or worse, invite a retry
+    // that double-charges them). A single attempt was too fragile though: any
+    // transient blip (seat-service mid-restart, a dropped connection) left the
+    // seat stuck at the far-future GRACE sentinel forever with only a WARN log
+    // to notice it by. Retries a few times with a short backoff to ride out
+    // exactly that kind of transient failure, and escalates to ERROR (not WARN)
+    // if every attempt fails, since that's the one signal ops has that this
+    // needs a manual reconciliation.
+    private static final int EXTEND_SEAT_BOOKING_MAX_ATTEMPTS = 3;
+    private static final long EXTEND_SEAT_BOOKING_RETRY_DELAY_MS = 500;
+
     private void extendSeatBooking(String membershipId, String newEndDate) {
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, String>> request = new HttpEntity<>(Map.of("newEndDate", newEndDate), headers);
-            restTemplate.exchange(
-                    seatServiceBaseUrl + "/api/seats/internal/bookings/" + membershipId + "/extend",
-                    HttpMethod.PATCH, request, Void.class);
-        } catch (Exception e) {
-            log.warn("Could not extend seat booking for membership {} after dues payment — " +
-                    "seat may still show the old GRACE hold: {}", membershipId, e.getMessage());
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, String>> request = new HttpEntity<>(Map.of("newEndDate", newEndDate), headers);
+
+        for (int attempt = 1; attempt <= EXTEND_SEAT_BOOKING_MAX_ATTEMPTS; attempt++) {
+            try {
+                restTemplate.exchange(
+                        seatServiceBaseUrl + "/api/seats/internal/bookings/" + membershipId + "/extend",
+                        HttpMethod.PATCH, request, Void.class);
+                return;
+            } catch (Exception e) {
+                if (attempt == EXTEND_SEAT_BOOKING_MAX_ATTEMPTS) {
+                    log.error("Could not extend seat booking for membership {} after dues payment " +
+                            "(gave up after {} attempts) — seat is stuck at the old GRACE hold and needs " +
+                            "manual reconciliation: {}", membershipId, attempt, e.getMessage());
+                } else {
+                    log.warn("Attempt {}/{} to extend seat booking for membership {} failed, retrying: {}",
+                            attempt, EXTEND_SEAT_BOOKING_MAX_ATTEMPTS, membershipId, e.getMessage());
+                    try {
+                        Thread.sleep(EXTEND_SEAT_BOOKING_RETRY_DELAY_MS);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
         }
     }
 
