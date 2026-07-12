@@ -39,16 +39,37 @@ struct CameraCaptureView: UIViewControllerRepresentable {
     }
 }
 
-private let passportAspect: CGFloat = 3.5 / 4.5   // ISO passport-photo width:height
+let passportAspect: CGFloat = 3.5 / 4.5   // ISO passport-photo width:height
 private let cropWindowWidth: CGFloat = 260
-private let cropWindowHeight: CGFloat = cropWindowWidth / passportAspect
 
-// A custom pinch-to-zoom / drag-to-pan cropper fixed to a passport-photo aspect ratio.
-// No crop library exists in this app, and Apple's built-in UIImagePickerController editor
-// only offers a square crop — this view fills that gap.
+// A custom pinch-to-zoom / drag-to-pan cropper fixed to a caller-chosen aspect ratio
+// (defaults to the ISO passport-photo ratio). No crop library exists in this app, and
+// Apple's built-in UIImagePickerController editor only offers a square crop — this
+// view fills that gap. Pass `aspect: 1` for a square crop (e.g. a circular avatar).
 struct PassportCropView: View {
+    let aspect: CGFloat
     let onDone: (UIImage) -> Void
     let onCancel: () -> Void
+    private var cropWindowHeight: CGFloat { cropWindowWidth / aspect }
+
+    init(image: UIImage, aspect: CGFloat = passportAspect,
+         onDone: @escaping (UIImage) -> Void, onCancel: @escaping () -> Void) {
+        self.aspect = aspect
+        self.onDone = onDone
+        self.onCancel = onCancel
+
+        let normalized = image.normalizedOrientation()
+        self.normalizedImage = normalized
+
+        let size: CGSize
+        if let cg = normalized.cgImage {
+            size = CGSize(width: CGFloat(cg.width), height: CGFloat(cg.height))
+        } else {
+            size = normalized.size
+        }
+        self.imageSize = size
+        self.baseScale = max(cropWindowWidth / size.width, cropWindowWidth / aspect / size.height)
+    }
 
     // Computed once in init rather than as computed properties re-deriving from `image`
     // on every access — normalizedOrientation() does a full UIGraphicsImageRenderer redraw,
@@ -64,26 +85,6 @@ struct PassportCropView: View {
     @State private var lastScale: CGFloat = 1
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
-
-    init(image: UIImage, onDone: @escaping (UIImage) -> Void, onCancel: @escaping () -> Void) {
-        self.onDone = onDone
-        self.onCancel = onCancel
-
-        let normalized = image.normalizedOrientation()
-        self.normalizedImage = normalized
-
-        // Natural pixel dimensions of the (now upright) image — deriving this from cgImage
-        // rather than UIImage.size keeps the math correct regardless of the image's `scale`
-        // factor (size is in points, cgImage width/height are in pixels).
-        let size: CGSize
-        if let cg = normalized.cgImage {
-            size = CGSize(width: CGFloat(cg.width), height: CGFloat(cg.height))
-        } else {
-            size = normalized.size
-        }
-        self.imageSize = size
-        self.baseScale = max(cropWindowWidth / size.width, cropWindowHeight / size.height)
-    }
 
     private var effectiveScale: CGFloat { baseScale * scale }
 

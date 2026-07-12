@@ -1,4 +1,12 @@
 import SwiftUI
+import UIKit
+
+// See AdminImportView's identical PhotoCaptureStage for why camera + crop share one
+// fullScreenCover instead of presenting two in sequence.
+private enum StudentPhotoCaptureStage {
+    case camera
+    case cropping(UIImage)
+}
 
 struct AdminStudentDetailView: View {
     @ObservedObject var vm: AdminViewModel
@@ -26,6 +34,10 @@ struct AdminStudentDetailView: View {
     @State private var showChangeStatus     = false
     @State private var changeStatusTarget   = "PENDING" // PENDING | GRACE
     @State private var pendingAmountInput   = ""
+
+    @State private var showPhotoCapture     = false
+    @State private var photoCaptureStage: StudentPhotoCaptureStage = .camera
+    @State private var photoCaptureError:   String?
 
     private let baseURL = "https://targetzone.co.in"
 
@@ -74,6 +86,25 @@ struct AdminStudentDetailView: View {
             }
             .sheet(isPresented: Binding(get: { clearKind != nil }, set: { if !$0 { clearKind = nil } })) {
                 if let s = vm.selectedStudent { clearAmountSheet(s) }
+            }
+            .fullScreenCover(isPresented: $showPhotoCapture) {
+                switch photoCaptureStage {
+                case .camera:
+                    CameraCaptureView { image in
+                        photoCaptureStage = .cropping(image)
+                    } onCancel: {
+                        showPhotoCapture = false
+                    }
+                case .cropping(let raw):
+                    PassportCropView(image: raw, aspect: 1) { cropped in
+                        showPhotoCapture = false
+                        if let jpeg = cropped.jpegData(compressionQuality: 0.85), let s = vm.selectedStudent {
+                            vm.uploadStudentPhoto(id: s.id, photoData: jpeg)
+                        }
+                    } onCancel: {
+                        showPhotoCapture = false
+                    }
+                }
             }
         }
         .dismissKeyboardOnTap()
@@ -129,17 +160,41 @@ struct AdminStudentDetailView: View {
         vm.releaseSeat(membershipId: membershipId, notifyStudent: notify, userId: s.id)
     }
 
+    private func openCamera() {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            photoCaptureError = "Camera not available on this device"
+            return
+        }
+        photoCaptureError = nil
+        photoCaptureStage = .camera
+        showPhotoCapture = true
+    }
+
     private func profileHeader(_ s: StudentDetail) -> some View {
         AppCard(accentColor: .amber) {
             VStack(spacing: 12) {
-                if let urlStr = s.photoUrl, let url = URL(string: baseURL + urlStr) {
-                    AsyncImage(url: url) { img in img.resizable().scaledToFill() }
-                    placeholder: { Color.navyLight }
-                        .frame(width: 72, height: 72).clipShape(Circle())
-                        .overlay(Circle().stroke(Color.amber, lineWidth: 2))
-                } else {
-                    Circle().fill(Color.navyLight).frame(width: 72, height: 72)
-                        .overlay(Text(String(s.name.prefix(1))).font(.headlineLarge).foregroundColor(.amber))
+                ZStack(alignment: .bottomTrailing) {
+                    if let urlStr = s.photoUrl, let url = URL(string: baseURL + urlStr) {
+                        AsyncImage(url: url) { img in img.resizable().scaledToFill() }
+                        placeholder: { Color.navyLight }
+                            .frame(width: 72, height: 72).clipShape(Circle())
+                            .overlay(Circle().stroke(Color.amber, lineWidth: 2))
+                    } else {
+                        Circle().fill(Color.navyLight).frame(width: 72, height: 72)
+                            .overlay(Text(String(s.name.prefix(1))).font(.headlineLarge).foregroundColor(.amber))
+                    }
+
+                    Button { openCamera() } label: {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.navyDeep)
+                            .padding(6)
+                            .background(Color.amber)
+                            .clipShape(Circle())
+                    }
+                }
+                if let err = photoCaptureError {
+                    Text(err).font(.labelSmall).foregroundColor(.redAlert)
                 }
 
                 Text(s.name).font(.headlineMedium).foregroundColor(.textPrimary)

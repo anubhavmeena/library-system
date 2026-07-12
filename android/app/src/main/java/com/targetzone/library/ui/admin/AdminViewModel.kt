@@ -85,6 +85,14 @@ class AdminViewModel(
         isLoading.value = false
     }
 
+    fun uploadStudentPhoto(studentId: String, file: java.io.File) = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.uploadStudentPhoto(studentId, file)
+            .onSuccess { url -> selectedStudent.value = selectedStudent.value?.copy(photoUrl = url) }
+            .onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
     fun loadStudents(page: Int = 0, status: String? = null, membershipStatus: String? = null, search: String? = null) = viewModelScope.launch {
         isLoading.value = true
         adminRepo.getStudents(page, status, membershipStatus, search)

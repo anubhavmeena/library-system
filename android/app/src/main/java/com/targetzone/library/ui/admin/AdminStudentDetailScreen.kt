@@ -1,7 +1,12 @@
 package com.targetzone.library.ui.admin
 
+import android.Manifest
+import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -24,12 +30,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.targetzone.library.data.model.StudentDetail
 import com.targetzone.library.data.model.UpdateStudentRequest
 import com.targetzone.library.ui.components.*
 import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
+import com.yalantis.ucrop.UCrop
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -46,6 +56,62 @@ fun AdminStudentDetailScreen(
     var photoPreviewOpen by remember { mutableStateOf(false) }
     val haptics = rememberLibraryHaptics()
     val context = LocalContext.current
+
+    // Admin can retake a student's profile photo in person: camera capture, then
+    // a square crop (matching the circular avatar), then upload — mirrors the
+    // self-service flow in ProfileScreen, but targets this specific student.
+    var cameraError       by remember { mutableStateOf<String?>(null) }
+    var pendingCaptureUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingCropFile   by remember { mutableStateOf<File?>(null) }
+
+    val cropLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        when (result.resultCode) {
+            Activity.RESULT_OK -> {
+                pendingCropFile?.takeIf { it.exists() && it.length() > 0 }?.let { vm.uploadStudentPhoto(studentId, it) }
+                pendingCropFile = null
+            }
+            UCrop.RESULT_ERROR -> {
+                cameraError = result.data?.let { UCrop.getError(it)?.message } ?: "Crop failed"
+                pendingCropFile = null
+            }
+        }
+    }
+
+    fun launchCrop(sourceUri: Uri) {
+        val destFile = File(context.cacheDir, "student_photo_${System.currentTimeMillis()}.jpg")
+        pendingCropFile = destFile
+        val uCropIntent = UCrop.of(sourceUri, Uri.fromFile(destFile))
+            .withAspectRatio(1f, 1f)
+            .withMaxResultSize(512, 512)
+            .getIntent(context)
+        cropLauncher.launch(uCropIntent)
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { captured ->
+        val uri = pendingCaptureUri
+        pendingCaptureUri = null
+        if (captured && uri != null) launchCrop(uri)
+    }
+
+    fun openCamera() {
+        val captureFile = File(context.cacheDir, "student_capture_${System.currentTimeMillis()}.jpg")
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", captureFile)
+        pendingCaptureUri = uri
+        cameraLauncher.launch(uri)
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) openCamera() else cameraError = "Camera permission is required to take a photo"
+    }
+
+    fun requestCameraAndCapture() {
+        cameraError = null
+        val hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        if (hasPermission) openCamera() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+    }
 
     LaunchedEffect(studentId) { vm.loadStudentDetail(studentId) }
 
@@ -77,27 +143,38 @@ fun AdminStudentDetailScreen(
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 // Avatar — tapping a real photo opens a full-size lightbox, matching
                 // the web admin detail page; the placeholder initial isn't clickable.
-                Box(
-                    Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(AmberFaint)
-                        .border(2.dp, Amber, CircleShape)
-                        .let { if (!s.photoUrl.isNullOrBlank()) it.clickable { haptics.tick(); photoPreviewOpen = true } else it },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (!s.photoUrl.isNullOrBlank()) {
-                        AsyncImage(
-                            model = fullPhotoUrl,
-                            contentDescription = "Photo",
-                            modifier = Modifier.fillMaxSize().clip(CircleShape)
-                        )
-                    } else {
-                        Text(
-                            s.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                            fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Amber
-                        )
+                Box {
+                    Box(
+                        Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(AmberFaint)
+                            .border(2.dp, Amber, CircleShape)
+                            .let { if (!s.photoUrl.isNullOrBlank()) it.clickable { haptics.tick(); photoPreviewOpen = true } else it },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!s.photoUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = fullPhotoUrl,
+                                contentDescription = "Photo",
+                                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                            )
+                        } else {
+                            Text(
+                                s.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Amber
+                            )
+                        }
                     }
+                    Box(
+                        Modifier
+                            .size(22.dp)
+                            .align(Alignment.BottomEnd)
+                            .clip(CircleShape)
+                            .background(Amber)
+                            .clickable { haptics.tick(); requestCameraAndCapture() },
+                        contentAlignment = Alignment.Center
+                    ) { Icon(Icons.Default.CameraAlt, contentDescription = "Take Photo", tint = NavyDeep, modifier = Modifier.size(12.dp)) }
                 }
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -148,6 +225,12 @@ fun AdminStudentDetailScreen(
                     }
                 }
             }
+        }
+
+        cameraError?.let {
+            Spacer(Modifier.height(8.dp))
+            MessageBanner(it, BannerTone.Error)
+            LaunchedEffect(it) { kotlinx.coroutines.delay(4000); cameraError = null }
         }
 
         Spacer(Modifier.height(12.dp))

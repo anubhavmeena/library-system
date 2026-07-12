@@ -4,7 +4,7 @@ use crate::{
     middleware::AdminUser,
     models::{admin::*, settings::{SaveAppSettingsRequest, UpdateNotificationSettingRequest}},
     response::ApiResponse,
-    services::{admin as svc, settings as settings_svc},
+    services::{admin as svc, settings as settings_svc, user as user_svc},
 };
 use axum::{
     extract::{Path, Query, State},
@@ -147,6 +147,36 @@ pub async fn import_student_with_photo(
 
     let result = svc::import_student_with_photo(&state, &name, &phone, photo).await?;
     Ok(ApiResponse::success("Student added successfully", result))
+}
+
+// Lets an admin replace an existing student's profile photo (e.g. a passport-style
+// photo taken in person) — distinct from import_student_with_photo, which only
+// attaches a photo at find-or-create time for a brand-new/matched student.
+pub async fn upload_student_photo(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(user_id): Path<Uuid>,
+    mut multipart: axum::extract::Multipart,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    svc::get_student(&state, user_id).await?; // 404s if the student doesn't exist
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| AppError::BadRequest(e.to_string()))? {
+        if field.name() == Some("file") {
+            let content_type = field.content_type().map(|s| s.to_string());
+            let filename = field.file_name().unwrap_or("photo.jpg").to_string();
+            let data = field.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
+            user_svc::validate_upload(
+                content_type.as_deref(),
+                &data,
+                user_svc::IMAGE_CONTENT_TYPES,
+                "Only JPEG, PNG, and WebP images are allowed.",
+            )?;
+            let url = user_svc::save_file(&state.config.upload_dir, user_id, "photo", &filename, &data).await?;
+            user_svc::update_photo_url(&state, user_id, &url).await?;
+            return Ok(ApiResponse::success("Photo uploaded", serde_json::json!({ "url": url })));
+        }
+    }
+    Err(AppError::BadRequest("No file provided".into()))
 }
 
 // ── Seat map ──────────────────────────────────────────────────────────────────

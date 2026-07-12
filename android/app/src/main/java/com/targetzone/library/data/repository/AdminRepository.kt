@@ -119,6 +119,18 @@ class AdminRepository {
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to load student details")
     }
 
+    suspend fun uploadStudentPhoto(studentId: String, file: java.io.File): Result<String> = runCatching {
+        val mimeType = when (file.extension.lowercase()) {
+            "png"  -> "image/png"
+            "webp" -> "image/webp"
+            else   -> "image/jpeg"
+        }
+        val requestFile = file.asRequestBody(mimeType.toMediaTypeOrNull())
+        val part = okhttp3.MultipartBody.Part.createFormData("file", file.name, requestFile)
+        val res = api.uploadStudentPhoto(studentId, part)
+        res.body()?.data?.get("url") ?: throw Exception(res.body()?.message ?: "Upload failed")
+    }
+
     suspend fun getAllFeedback(): Result<List<FeedbackItem>> = runCatching {
         val res = api.getAllFeedback()
         res.body()?.data ?: emptyList()

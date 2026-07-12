@@ -26,6 +26,12 @@ struct AdminRepository {
         try await api.request(.getStudentPayments(userId: userId), token: token)
     }
 
+    func updateStudentPhoto(id: String, photoData: Data) async throws -> String {
+        try await api.uploadMultipart(path: "admin/students/\(id)/photo", fieldName: "file",
+                                      fileName: "student_\(id).jpg", mimeType: "image/jpeg",
+                                      data: photoData, token: token)
+    }
+
     func toggleStudentStatus(id: String, active: Bool) async throws {
         let req = ToggleStatusRequest(active: active)
         try await api.requestVoid(.toggleStudentStatus(id: id, req: req), token: token)

@@ -115,7 +115,9 @@ actor APIClient {
 
         let (responseData, _) = try await URLSession.shared.data(for: request)
         let envelope = try decoder.decode(ApiResponse<[String: String]>.self, from: responseData)
-        return envelope.data?["photoUrl"] ?? envelope.data?["aadhaarUrl"] ?? ""
+        // Backend returns {"url": "..."} — photoUrl/aadhaarUrl kept only as a fallback
+        // in case an older server build is still returning those keys.
+        return envelope.data?["url"] ?? envelope.data?["photoUrl"] ?? envelope.data?["aadhaarUrl"] ?? ""
     }
 
     // Multipart upload that decodes the response payload into any Decodable type

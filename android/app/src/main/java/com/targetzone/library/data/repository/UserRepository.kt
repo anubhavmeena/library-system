@@ -35,7 +35,7 @@ class UserRepository {
         val requestFile = file.asRequestBody(mimeType.toMediaTypeOrNull())
         val part = MultipartBody.Part.createFormData("file", file.name, requestFile)
         val res = api.uploadPhoto(part)
-        res.body()?.data?.get("photoUrl") ?: throw Exception("Upload failed")
+        res.body()?.data?.get("url") ?: throw Exception("Upload failed")
     }
 
     suspend fun uploadAadhaar(file: File): Result<String> = runCatching {
@@ -48,6 +48,6 @@ class UserRepository {
         val requestFile = file.asRequestBody(mimeType.toMediaTypeOrNull())
         val part = MultipartBody.Part.createFormData("file", file.name, requestFile)
         val res = api.uploadAadhaar(part)
-        res.body()?.data?.get("photoUrl") ?: throw Exception("Upload failed")
+        res.body()?.data?.get("url") ?: throw Exception("Upload failed")
     }
 }

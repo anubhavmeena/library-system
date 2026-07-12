@@ -70,6 +70,16 @@ final class AdminViewModel: ObservableObject {
         }
     }
 
+    func uploadStudentPhoto(id: String, photoData: Data) {
+        Task {
+            do {
+                _ = try await repo.updateStudentPhoto(id: id, photoData: photoData)
+                successMsg = "Photo updated"
+                loadStudentDetail(id: id)
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
     func loadStudentPayments(userId: String) {
         Task {
             do { studentPayments = try await repo.getStudentPayments(userId: userId) }

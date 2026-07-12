@@ -117,6 +117,13 @@ interface ApiService {
     @GET("admin/students/{id}/payments")
     suspend fun getAdminStudentPayments(@Path("id") id: String): Response<ApiResponse<List<StudentPayment>>>
 
+    @Multipart
+    @POST("admin/students/{id}/photo")
+    suspend fun uploadStudentPhoto(
+        @Path("id") id: String,
+        @Part file: MultipartBody.Part
+    ): Response<ApiResponse<Map<String, String>>>
+
     @PATCH("admin/students/{id}")
     suspend fun updateStudent(
         @Path("id") id: String,

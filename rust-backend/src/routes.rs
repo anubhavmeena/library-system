@@ -79,6 +79,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/admin/students/import/single-with-photo", post(admin::import_student_with_photo)
             .layer(DefaultBodyLimit::max(10 * 1024 * 1024)))
         .route("/api/admin/students/:id",                    get(admin::get_student).patch(admin::update_student).delete(admin::delete_student))
+        .route("/api/admin/students/:id/photo",              post(admin::upload_student_photo)
+            .layer(DefaultBodyLimit::max(10 * 1024 * 1024)))
         .route("/api/admin/students/:id/status",             patch(admin::update_student_status))
         .route("/api/admin/students/:id/payments",           get(admin::get_student_payments))
         .route("/api/admin/students/:id/seat-history",       get(admin::student_seat_history))
