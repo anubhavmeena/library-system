@@ -596,7 +596,7 @@ mod tests {
         let seat = SeatMapSeat {
             seat_number: "A1".into(), is_occupied: true, student_id: Some(Uuid::new_v4()),
             student_name: Some("Alice".into()), student_mobile: None, student_gender: None,
-            shift: Some("MORNING".into()), membership_end: None,
+            shift: Some("MORNING".into()), membership_end: None, other_shift_occupied: false,
         };
         let json = serde_json::to_string(&seat).unwrap();
         assert!(json.contains("seatNumber"));
