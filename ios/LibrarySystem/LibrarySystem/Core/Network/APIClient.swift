@@ -32,7 +32,7 @@ actor APIClient {
 
     private init() {}
 
-    func request<T: Decodable>(_ endpoint: Endpoint, token: String? = nil) async throws -> T {
+    private func performRequest(_ endpoint: Endpoint, token: String?) async throws -> Data {
         guard var components = URLComponents(url: baseURL.appendingPathComponent(endpoint.path), resolvingAgainstBaseURL: true) else {
             throw APIError.invalidURL
         }
@@ -58,7 +58,11 @@ actor APIClient {
         if http.statusCode == 401 {
             throw APIError.unauthorized
         }
+        return data
+    }
 
+    func request<T: Decodable>(_ endpoint: Endpoint, token: String? = nil) async throws -> T {
+        let data = try await performRequest(endpoint, token: token)
         do {
             let envelope = try decoder.decode(ApiResponse<T>.self, from: data)
             if let payload = envelope.data, envelope.success {
@@ -72,9 +76,25 @@ actor APIClient {
         }
     }
 
-    // For endpoints that return no data payload (just success/message)
+    // For endpoints that return no data payload (just success/message). Decoded
+    // separately from request<T> above: the backend's ApiResponse::ok(...) omits
+    // the "data" key entirely (skip_serializing_if = "Option::is_none") rather
+    // than sending null, so requiring `data` to be present — as request<T> does,
+    // correctly, for endpoints that DO promise a payload — would treat every
+    // successful void response as a failure and surface its own success message
+    // as a thrown error. Here, `envelope.success` alone is the source of truth.
     func requestVoid(_ endpoint: Endpoint, token: String? = nil) async throws {
-        let _: AnyCodable = try await request(endpoint, token: token)
+        let data = try await performRequest(endpoint, token: token)
+        do {
+            let envelope = try decoder.decode(ApiResponse<AnyCodable>.self, from: data)
+            guard envelope.success else {
+                throw APIError.serverError(envelope.message ?? "Request failed")
+            }
+        } catch let e as APIError {
+            throw e
+        } catch {
+            throw APIError.decodingError(error)
+        }
     }
 
     // Raw data download (ID card PDF)

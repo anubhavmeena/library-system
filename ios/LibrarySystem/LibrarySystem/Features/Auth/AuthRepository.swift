@@ -6,7 +6,7 @@ struct AuthRepository {
 
     func sendOtp(contact: String, channel: String? = nil) async throws {
         let req = SendOtpRequest(contact: contact, channel: channel)
-        let _: AnyCodable = try await api.request(.sendOtp(req))
+        try await api.requestVoid(.sendOtp(req))
     }
 
     func verifyOtp(contact: String, otp: String) async throws -> OtpVerifyResponse {
