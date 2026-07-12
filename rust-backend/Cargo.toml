@@ -39,7 +39,7 @@ async-trait = "0.1"
 bytes = "1"
 mime = "0.3"
 tokio-cron-scheduler = "0.10"
-tower = "0.4"
+tower = { version = "0.4", features = ["util"] }
 anyhow = "1"
 csv = "1"
 printpdf = { version = "0.7", features = ["embedded_images"] }

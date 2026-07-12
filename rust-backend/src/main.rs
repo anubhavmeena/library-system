@@ -7,6 +7,8 @@ mod models;
 mod response;
 mod routes;
 mod services;
+#[cfg(test)]
+mod test_support;
 
 use app_state::AppState;
 use config::Config;

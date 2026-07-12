@@ -825,3 +825,49 @@ pub async fn log_notification(
     .execute(db)
     .await;
 }
+
+#[cfg(test)]
+mod pure_fn_tests {
+    use super::*;
+
+    #[test]
+    fn format_shift_known_values() {
+        assert_eq!(format_shift("MORNING"), "Morning (6AM-2PM)");
+        assert_eq!(format_shift("EVENING"), "Evening (2PM-10PM)");
+        assert_eq!(format_shift("FULL_DAY"), "Full Day (6AM-10PM)");
+    }
+
+    #[test]
+    fn format_shift_is_case_insensitive() {
+        assert_eq!(format_shift("morning"), "Morning (6AM-2PM)");
+        assert_eq!(format_shift("Evening"), "Evening (2PM-10PM)");
+    }
+
+    #[test]
+    fn format_shift_unknown_value_falls_back_to_full_day() {
+        assert_eq!(format_shift("NOT_A_SHIFT"), "Full Day (6AM-10PM)");
+        assert_eq!(format_shift(""), "Full Day (6AM-10PM)");
+    }
+
+    #[test]
+    fn sanitize_param_collapses_newlines_and_tabs_to_single_spaces() {
+        assert_eq!(sanitize_param("Row A\nSeat 5\r\n"), "Row A Seat 5");
+        assert_eq!(sanitize_param("a\tb\tc"), "a b c");
+    }
+
+    #[test]
+    fn sanitize_param_collapses_repeated_whitespace() {
+        assert_eq!(sanitize_param("too    many     spaces"), "too many spaces");
+    }
+
+    #[test]
+    fn sanitize_param_trims_leading_and_trailing_whitespace() {
+        assert_eq!(sanitize_param("  padded  "), "padded");
+    }
+
+    #[test]
+    fn sanitize_param_empty_input_stays_empty() {
+        assert_eq!(sanitize_param(""), "");
+        assert_eq!(sanitize_param("   "), "");
+    }
+}

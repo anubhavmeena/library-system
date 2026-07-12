@@ -25,9 +25,36 @@ cargo test -- --nocapture
 
 # Check without building
 cargo check
+
+# Full HTTP-level integration suite (needs local Postgres/Redis; see below)
+cargo test -- --ignored --test-threads=1
 ```
 
 The release binary lands at `target/release/library-backend`.
+
+### Integration tests (`#[ignore]`d, DB/Redis-backed)
+
+Alongside the pure-logic unit tests above, `src/handlers/*.rs` each carry a
+`#[cfg(test)] mod integration_tests` that drives the *actual* axum `Router`
+in-process via `tower::ServiceExt::oneshot` (see `src/test_support.rs`) —
+real HTTP requests through real middleware/extractors/handlers/services
+against a real local Postgres + Redis, with every external credential
+(Twilio/Meta/SendGrid/Razorpay/Cashfree) forced blank regardless of `.env` so
+nothing ever hits a real payment gateway or sends a real notification.
+
+- Kept out of plain `cargo test` via `#[ignore]`, preserving the "no DB/Redis
+  required" default. Opt in with `cargo test -- --ignored --test-threads=1`.
+  `--test-threads=1` matters: these share one persistent dev DB, not an
+  isolated schema per test, so parallel runs can collide on seat bookings.
+- Every test-created user carries a `69xxxxxxxx` mobile (`test_support::unique_mobile`).
+  Nothing is cleaned up mid-run, so repeated invocations slowly consume the
+  112 real seats' availability; `test_support::reset_all_integration_test_data`
+  (itself an `#[ignore]`d test, and part of the suite so it runs every time)
+  purges every `69%`-mobile row and its dependents when that happens.
+- If a real `cargo run` instance is live against the same DB while these run,
+  its actual daily cron jobs (9:00 UTC reminders, 5:00 IST expiry sweep) can
+  mutate shared rows mid-suite and cause a one-off, unreproducible failure —
+  suspect that first if a test fails once and then passes clean on retry.
 
 ## Architecture
 

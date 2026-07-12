@@ -524,3 +524,82 @@ pub struct AttachmentInfo {
 pub struct ReplyRequest {
     pub body: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    #[test]
+    fn cash_membership_request_deserializes_camel_case_and_studentid_alias() {
+        let user_id = Uuid::new_v4();
+        let plan_id = Uuid::new_v4();
+        let json = format!(
+            r#"{{"studentId":"{user_id}","planId":"{plan_id}","shift":"MORNING","seatNumber":"A1","startDate":"2026-01-01","paidAmount":"400","pendingAmount":"0","paymentMode":"CASH"}}"#
+        );
+        let req: CashMembershipRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(req.user_id, user_id);
+        assert_eq!(req.plan_id, plan_id);
+        assert_eq!(req.shift, "MORNING");
+        assert_eq!(req.seat_number, Some("A1".to_string()));
+        assert_eq!(req.amount, rust_decimal::Decimal::from(400));
+        assert_eq!(req.pending_amount, Some(rust_decimal::Decimal::ZERO));
+    }
+
+    #[test]
+    fn cash_membership_request_seat_and_pending_are_optional() {
+        let json = format!(
+            r#"{{"studentId":"{}","planId":"{}","shift":"FULL_DAY","startDate":"2026-01-01","paidAmount":"600"}}"#,
+            Uuid::new_v4(), Uuid::new_v4()
+        );
+        let req: CashMembershipRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(req.seat_number, None);
+        assert_eq!(req.pending_amount, None);
+        assert_eq!(req.payment_mode, None);
+    }
+
+    #[test]
+    fn update_student_status_request_uses_active_field_name() {
+        let req: UpdateStudentStatusRequest = serde_json::from_str(r#"{"active":false}"#).unwrap();
+        assert!(!req.is_active);
+    }
+
+    #[test]
+    fn import_student_request_accepts_phone_alias_for_mobile() {
+        let req: ImportStudentRequest = serde_json::from_str(r#"{"name":"A","phone":"9876543210"}"#).unwrap();
+        assert_eq!(req.mobile, Some("9876543210".to_string()));
+    }
+
+    #[test]
+    fn student_list_item_display_status_is_not_serialized_from_internal_fields() {
+        // current_status/current_end_date/latest_ever_status are #[serde(skip)]
+        // (computed server-side into display_status before the row is ever
+        // serialized) -- confirm they don't leak into the JSON.
+        let item = StudentListItem {
+            id: Uuid::new_v4(), name: "A".into(), mobile: None, email: None, photo_url: None,
+            aadhaar_url: None, is_active: true, gender: None, address: None, date_of_birth: None,
+            joined_at: None, membership_id: None, membership_plan_id: None, plan_name: None,
+            seat_number: None, shift: None, membership_start: None, membership_end: None,
+            membership_status: None, days_remaining: None, payment_mode: None, pending_amount: None,
+            dues_amount: None, current_status: Some("ACTIVE".into()), current_end_date: None,
+            latest_ever_status: None, display_status: "PAID".to_string(),
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("displayStatus"));
+        assert!(!json.contains("currentStatus"));
+        assert!(!json.contains("current_status"));
+    }
+
+    #[test]
+    fn seat_map_seat_serializes_camel_case() {
+        let seat = SeatMapSeat {
+            seat_number: "A1".into(), is_occupied: true, student_id: Some(Uuid::new_v4()),
+            student_name: Some("Alice".into()), student_mobile: None, student_gender: None,
+            shift: Some("MORNING".into()), membership_end: None,
+        };
+        let json = serde_json::to_string(&seat).unwrap();
+        assert!(json.contains("seatNumber"));
+        assert!(json.contains("isOccupied"));
+        assert!(json.contains("studentId"));
+    }
+}

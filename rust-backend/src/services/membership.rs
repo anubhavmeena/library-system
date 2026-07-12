@@ -419,6 +419,19 @@ pub async fn verify_payment(
         return Err(AppError::BadRequest("Order does not match this membership".into()));
     }
 
+    // A QUEUED renewal must stay QUEUED even once paid — it only becomes ACTIVE
+    // when mark_expired_and_start_grace promotes it after the *current*
+    // membership's end_date actually passes (see that function's QUEUED-sibling
+    // lookup). Flipping it to ACTIVE here would leave two ACTIVE rows for the
+    // same user at once, and once the original later expires there is no more
+    // QUEUED sibling for that job to find — it would wrongly push the
+    // already-superseded original into GRACE with a fresh dues charge despite
+    // the student having already paid for their renewal. The frontend already
+    // expects this: membershipSlice's verifyPayment.fulfilled branches on
+    // `status === 'QUEUED'` to file the result under `state.queued` rather
+    // than `state.current`.
+    let target_status = if membership.status == "QUEUED" { "QUEUED" } else { "ACTIVE" };
+
     let paid = payment::verify_payment(state, order_id, payment_id, signature).await?;
     if !paid {
         return Err(AppError::BadRequest("Payment verification failed".into()));
@@ -440,11 +453,12 @@ pub async fn verify_payment(
     .fetch_one(&state.db)
     .await?;
 
-    let membership = sqlx::query_as::<_, Membership>(
-        "UPDATE memberships SET status = 'ACTIVE' WHERE id = $1 AND user_id = $2 RETURNING *",
+    let mut membership = sqlx::query_as::<_, Membership>(
+        "UPDATE memberships SET status = $3 WHERE id = $1 AND user_id = $2 RETURNING *",
     )
     .bind(membership_id)
     .bind(user_id)
+    .bind(target_status)
     .fetch_one(&state.db)
     .await?;
     invalidate_status_cache(state, user_id).await;
@@ -454,11 +468,16 @@ pub async fn verify_payment(
     // decline the phantom claim (clear seat_number back to NULL) rather than silently
     // marking the membership as holding a seat someone else actually has; the admin
     // "Students Needing a Seat" tool picks up memberships left in that state.
-    if let Some(ref seat_num) = membership.seat_number {
+    //
+    // `membership` is kept in sync with whichever branch below actually runs —
+    // it's what the response at the bottom of this function is built from, and
+    // previously stayed stale (still showing the originally-requested seat)
+    // even when the conflict branch had just nulled it out in the DB.
+    if let Some(seat_num) = membership.seat_number.clone() {
         if let Ok(Some(seat)) = sqlx::query_as::<_, crate::models::seat::Seat>(
             "SELECT * FROM seats WHERE seat_number = $1",
         )
-        .bind(seat_num)
+        .bind(&seat_num)
         .fetch_optional(&state.db)
         .await
         {
@@ -486,6 +505,8 @@ pub async fn verify_payment(
                     .bind(membership.id)
                     .execute(&state.db)
                     .await;
+                membership.seat_number = None;
+                membership.seat_id = None;
             } else {
                 let _ = sqlx::query(
                     "UPDATE memberships SET seat_id = $2 WHERE id = $1",
@@ -494,6 +515,7 @@ pub async fn verify_payment(
                 .bind(seat.id)
                 .execute(&state.db)
                 .await;
+                membership.seat_id = Some(seat.id);
 
                 let _ = sqlx::query(
                     "INSERT INTO seat_bookings (seat_id, user_id, membership_id, shift, booking_date, end_date)

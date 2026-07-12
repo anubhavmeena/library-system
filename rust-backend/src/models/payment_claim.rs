@@ -62,3 +62,61 @@ pub struct CreatePayLinkRequest {
     pub student_id: Uuid,
     pub amount: Decimal,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_pay_link_request_deserializes_camel_case() {
+        let id = Uuid::new_v4();
+        let json = format!(r#"{{"studentId":"{id}","amount":"500"}}"#);
+        let req: CreatePayLinkRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(req.student_id, id);
+        assert_eq!(req.amount, Decimal::from(500));
+    }
+
+    #[test]
+    fn review_payment_claim_request_deserializes_camel_case() {
+        let req: ReviewPaymentClaimRequest = serde_json::from_str(r#"{"status":"VERIFIED"}"#).unwrap();
+        assert_eq!(req.status, "VERIFIED");
+    }
+
+    #[test]
+    fn pay_link_info_serializes_camel_case_and_omits_user_membership_ids() {
+        let info = PayLinkInfo {
+            vpa: "a@b".into(),
+            payee_name: "Target Zone".into(),
+            amount: Decimal::from(300),
+            note: "n".into(),
+            claim_type: Some("DUES".into()),
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("payeeName"));
+        assert!(json.contains("claimType"));
+        assert!(!json.contains("userId"));
+        assert!(!json.contains("membershipId"));
+    }
+
+    #[test]
+    fn payment_claim_serializes_camel_case() {
+        let claim = PaymentClaim {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            claim_type: "PENDING_FEE".into(),
+            membership_id: None,
+            amount_claimed: Decimal::from(150),
+            screenshot_url: "/uploads/x.png".into(),
+            status: "PENDING".into(),
+            created_at: chrono::NaiveDateTime::parse_from_str("2026-01-01 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap(),
+            reviewed_at: None,
+            reviewed_by: None,
+        };
+        let json = serde_json::to_string(&claim).unwrap();
+        assert!(json.contains("claimType"));
+        assert!(json.contains("amountClaimed"));
+        assert!(json.contains("screenshotUrl"));
+        assert!(json.contains("reviewedAt"));
+        assert!(json.contains("reviewedBy"));
+    }
+}

@@ -85,3 +85,52 @@ pub async fn delete_gallery_photo(
 
     Ok(ApiResponse::ok("Photo deleted"))
 }
+
+#[cfg(test)]
+mod integration_tests {
+    use crate::test_support::*;
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    #[ignore]
+    async fn gallery_is_public_to_list_but_admin_only_to_mutate() {
+        let state = test_state().await;
+        let router = test_router(state.clone());
+
+        let resp = router.clone().oneshot(get_request("/api/gallery", None)).await.unwrap();
+        assert_eq!(resp.status(), 200);
+
+        let admin = admin_token(&state).await;
+        let resp = router.clone().oneshot(multipart_request(
+            "POST", "/api/gallery", Some(&admin),
+            vec![
+                text_field("caption", "Reading room"),
+                file_field("photo", "room.png", "image/png", tiny_png_bytes()),
+            ],
+        )).await.unwrap();
+        assert_eq!(resp.status(), 200);
+        let body = body_json(resp).await;
+        assert_eq!(body["data"]["caption"], "Reading room");
+        let photo_id = body["data"]["id"].as_str().unwrap().to_string();
+
+        let resp = router.clone().oneshot(get_request("/api/gallery", None)).await.unwrap();
+        let body = body_json(resp).await;
+        assert!(body["data"].as_array().unwrap().iter().any(|p| p["id"] == photo_id));
+
+        let (_id, token) = create_test_user(&state, "STUDENT", "Not Admin Gallery").await;
+        let resp = router.clone().oneshot(multipart_request(
+            "POST", "/api/gallery", Some(&token),
+            vec![file_field("photo", "room2.png", "image/png", tiny_png_bytes())],
+        )).await.unwrap();
+        assert_eq!(resp.status(), 403);
+
+        let resp = router.clone().oneshot(delete_request(&format!("/api/gallery/{photo_id}"), Some(&token))).await.unwrap();
+        assert_eq!(resp.status(), 403);
+
+        let resp = router.clone().oneshot(delete_request(&format!("/api/gallery/{photo_id}"), Some(&admin))).await.unwrap();
+        assert_eq!(resp.status(), 200);
+
+        let resp = router.clone().oneshot(delete_request(&format!("/api/gallery/{photo_id}"), Some(&admin))).await.unwrap();
+        assert_eq!(resp.status(), 404, "already-deleted photo");
+    }
+}

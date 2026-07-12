@@ -24,3 +24,32 @@ pub async fn track(State(state): State<Arc<AppState>>, body: Bytes) -> impl axum
 
     ApiResponse::ok("Tracked")
 }
+
+#[cfg(test)]
+mod integration_tests {
+    use crate::test_support::*;
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    #[ignore]
+    async fn track_records_page_and_defaults_when_body_absent() {
+        let state = test_state().await;
+        let router = test_router(state.clone());
+
+        let resp = router.clone().oneshot(json_request("POST", "/api/visitor/track", None, serde_json::json!({ "page": "/library" }))).await.unwrap();
+        assert_eq!(resp.status(), 200);
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM visitor_events WHERE page = '/library'")
+            .fetch_one(&state.db).await.unwrap();
+        assert!(count >= 1);
+
+        // no body at all (Java's @RequestBody(required=false) equivalent)
+        let req = axum::http::Request::builder()
+            .method("POST").uri("/api/visitor/track")
+            .body(axum::body::Body::empty()).unwrap();
+        let resp = router.clone().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), 200);
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM visitor_events WHERE page = '/'")
+            .fetch_one(&state.db).await.unwrap();
+        assert!(count >= 1);
+    }
+}

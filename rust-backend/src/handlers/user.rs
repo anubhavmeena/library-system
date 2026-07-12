@@ -133,3 +133,138 @@ pub async fn get_my_feedback(
     let feedbacks = svc::get_my_feedback(&state, user.user_id).await?;
     Ok(ApiResponse::success("Feedback retrieved", feedbacks))
 }
+
+#[cfg(test)]
+mod integration_tests {
+    use crate::test_support::*;
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    #[ignore]
+    async fn get_and_update_own_profile() {
+        let state = test_state().await;
+        let router = test_router(state.clone());
+        let (_id, token) = create_test_user(&state, "STUDENT", "Profile Owner").await;
+
+        let resp = router.clone().oneshot(get_request("/api/users/me", Some(&token))).await.unwrap();
+        assert_eq!(resp.status(), 200);
+        let body = body_json(resp).await;
+        assert_eq!(body["data"]["name"], "Profile Owner");
+        assert_eq!(body["data"]["isActive"], true);
+
+        let resp = router.clone().oneshot(json_request(
+            "PATCH", "/api/users/me", Some(&token),
+            serde_json::json!({ "name": "Updated Name", "address": "42 Test Ave", "gender": "Other", "fatherName": "Test Father" }),
+        )).await.unwrap();
+        assert_eq!(resp.status(), 200);
+        let body = body_json(resp).await;
+        assert_eq!(body["data"]["name"], "Updated Name");
+        assert_eq!(body["data"]["address"], "42 Test Ave");
+        assert_eq!(body["data"]["fatherName"], "Test Father");
+
+        // partial update: omitted fields must be preserved, not wiped
+        let resp = router.clone().oneshot(json_request(
+            "PATCH", "/api/users/me", Some(&token), serde_json::json!({ "gender": "Female" }),
+        )).await.unwrap();
+        let body = body_json(resp).await;
+        assert_eq!(body["data"]["gender"], "Female");
+        assert_eq!(body["data"]["name"], "Updated Name", "fields omitted from a PATCH must be left untouched");
+        assert_eq!(body["data"]["address"], "42 Test Ave");
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn get_me_requires_auth() {
+        let state = test_state().await;
+        let router = test_router(state.clone());
+        let resp = router.clone().oneshot(get_request("/api/users/me", None)).await.unwrap();
+        assert_eq!(resp.status(), 401);
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn any_authed_user_can_view_another_users_profile_by_id() {
+        let state = test_state().await;
+        let router = test_router(state.clone());
+        let (_id_a, token_a) = create_test_user(&state, "STUDENT", "Viewer").await;
+        let (id_b, _token_b) = create_test_user(&state, "STUDENT", "Viewed").await;
+
+        let resp = router.clone().oneshot(get_request(&format!("/api/users/{id_b}"), Some(&token_a))).await.unwrap();
+        assert_eq!(resp.status(), 200);
+        let body = body_json(resp).await;
+        assert_eq!(body["data"]["name"], "Viewed");
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn get_user_unknown_id_is_not_found() {
+        let state = test_state().await;
+        let router = test_router(state.clone());
+        let (_id, token) = create_test_user(&state, "STUDENT", "Someone").await;
+        let resp = router.clone().oneshot(get_request(&format!("/api/users/{}", uuid::Uuid::new_v4()), Some(&token))).await.unwrap();
+        assert_eq!(resp.status(), 404);
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn admin_contact_is_public() {
+        let state = test_state().await;
+        let router = test_router(state.clone());
+        let resp = router.clone().oneshot(get_request("/api/users/admin-contact", None)).await.unwrap();
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn feedback_submit_and_list_own() {
+        let state = test_state().await;
+        let router = test_router(state.clone());
+        let (_id, token) = create_test_user(&state, "STUDENT", "Feedback Author").await;
+
+        // `feedbacks.type` has a DB CHECK constraint allowing only
+        // FEEDBACK/COMPLAINT (see migrations) -- any other value 500s rather
+        // than 400ing cleanly, since submit_feedback maps every DB error the
+        // same way; use a valid value here and probe that rough edge separately.
+        let resp = router.clone().oneshot(json_request(
+            "POST", "/api/users/feedback", Some(&token),
+            serde_json::json!({ "type": "FEEDBACK", "subject": "More outlets", "description": "Row C needs more power outlets." }),
+        )).await.unwrap();
+        assert_eq!(resp.status(), 200);
+        let body = body_json(resp).await;
+        assert_eq!(body["data"]["status"], "OPEN");
+        assert_eq!(body["data"]["type"], "FEEDBACK");
+
+        let resp = router.clone().oneshot(get_request("/api/users/feedback/my", Some(&token))).await.unwrap();
+        let body = body_json(resp).await;
+        assert!(body["data"].as_array().unwrap().iter().any(|f| f["subject"] == "More outlets"));
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn feedback_with_invalid_type_500s_instead_of_400ing_cleanly() {
+        // Documents a known rough edge rather than desired behavior: an
+        // out-of-range `type` trips the DB CHECK constraint, and
+        // submit_feedback maps every DB error to a generic 500 instead of
+        // validating/translating it into a 400 first.
+        let state = test_state().await;
+        let router = test_router(state.clone());
+        let (_id, token) = create_test_user(&state, "STUDENT", "Bad Feedback Type").await;
+        let resp = router.clone().oneshot(json_request(
+            "POST", "/api/users/feedback", Some(&token),
+            serde_json::json!({ "type": "SUGGESTION", "subject": "x", "description": "y" }),
+        )).await.unwrap();
+        assert_eq!(resp.status(), 500);
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn feedback_submission_requires_auth() {
+        let state = test_state().await;
+        let router = test_router(state.clone());
+        let resp = router.clone().oneshot(json_request(
+            "POST", "/api/users/feedback", None,
+            serde_json::json!({ "type": "COMPLAINT", "subject": "x", "description": "y" }),
+        )).await.unwrap();
+        assert_eq!(resp.status(), 401);
+    }
+}

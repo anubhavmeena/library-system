@@ -1726,6 +1726,67 @@ pub async fn create_cash_membership(
 
 // ── Seat change ───────────────────────────────────────────────────────────────
 
+/// Reports whether extending `membership`'s own seat booking's `end_date` out
+/// to `new_end` (which may be the far-future GRACE sentinel — a plain date
+/// comparison in SQL, not the day-by-day cache-busting loop that sentinel is
+/// dangerous with elsewhere) would newly overlap a *different* membership
+/// already booked on the same physical seat. `membership_id != $2` excludes
+/// the row being extended itself, since its own (pre-extension) range would
+/// otherwise trivially "conflict" with the new one. Always `false` when the
+/// membership never held a seat.
+async fn seat_conflict_on_extension(
+    state: &Arc<AppState>,
+    membership: &Membership,
+    new_end: NaiveDate,
+) -> crate::error::Result<bool> {
+    let Some(seat_id) = membership.seat_id else { return Ok(false) };
+    let shift = membership.shift.as_deref().unwrap_or("FULL_DAY");
+
+    let conflict: i64 = sqlx::query_scalar(
+        r#"SELECT COUNT(*) FROM seat_bookings
+         WHERE seat_id = $1
+           AND status = 'ACTIVE'
+           AND membership_id != $2
+           AND booking_date <= $4
+           AND end_date >= $3
+           AND (shift = $5 OR shift = 'FULL_DAY' OR $5::text = 'FULL_DAY')"#,
+    )
+    .bind(seat_id)
+    .bind(membership.id)
+    .bind(membership.start_date)
+    .bind(new_end)
+    .bind(shift)
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(conflict > 0)
+}
+
+/// `renew_seat`, `clear_dues`, `update_membership_plan`'s additional-days/
+/// explicit-end-date branches, and `mark_membership_grace` all push a
+/// booking's end_date further out in place (unlike
+/// `change_membership_seat`/`book_seat`/`create_cash_membership`, which claim
+/// a seat fresh and already conflict-check it) — this rejects the whole
+/// action outright when that would double-book a seat a later tenant already
+/// holds. Only suitable for a single interactive admin action with a caller
+/// to report the error to; the batch job (`mark_expired_and_start_grace`)
+/// uses `seat_conflict_on_extension` directly instead, since aborting an
+/// entire nightly sweep over one problem membership isn't the right response
+/// there (see that function for what it does instead).
+async fn check_no_seat_conflict_on_extension(
+    state: &Arc<AppState>,
+    membership: &Membership,
+    new_end: NaiveDate,
+) -> crate::error::Result<()> {
+    if seat_conflict_on_extension(state, membership, new_end).await? {
+        return Err(AppError::Conflict(format!(
+            "Seat {} is already booked by another student during the extended period",
+            membership.seat_number.as_deref().unwrap_or("?")
+        )));
+    }
+    Ok(())
+}
+
 pub async fn change_membership_seat(
     state: &Arc<AppState>,
     membership_id: Uuid,
@@ -1969,6 +2030,9 @@ pub async fn update_membership_plan(
             .await?;
     }
     if let Some(extra_days) = req.additional_days {
+        let new_end = before.end_date + chrono::Duration::days(extra_days as i64);
+        check_no_seat_conflict_on_extension(state, &before, new_end).await?;
+
         sqlx::query(
             "UPDATE memberships SET end_date = end_date + ($2 || ' days')::INTERVAL WHERE id = $1",
         )
@@ -1986,6 +2050,8 @@ pub async fn update_membership_plan(
         .await?;
     }
     if let Some(end_date) = req.end_date {
+        check_no_seat_conflict_on_extension(state, &before, end_date).await?;
+
         sqlx::query("UPDATE memberships SET end_date = $2 WHERE id = $1")
             .bind(membership_id)
             .bind(end_date)
@@ -2110,6 +2176,8 @@ pub async fn renew_seat(state: &Arc<AppState>, membership_id: Uuid) -> crate::er
     let new_end = membership.end_date.checked_add_months(chrono::Months::new(1))
         .ok_or_else(|| AppError::Internal("Date overflow computing renewal".into()))?;
 
+    check_no_seat_conflict_on_extension(state, &membership, new_end).await?;
+
     let updated = sqlx::query_as::<_, Membership>(
         "UPDATE memberships SET end_date = $2 WHERE id = $1 RETURNING *",
     )
@@ -2206,6 +2274,15 @@ pub async fn mark_membership_grace(state: &Arc<AppState>, membership_id: Uuid) -
         ));
     }
 
+    // GRACE holds the seat indefinitely (the far-future sentinel below), so
+    // this must reject up front if a different membership already holds a
+    // legitimate future booking on the same seat — otherwise this would
+    // silently double-book it. A single interactive admin action, so
+    // rejecting outright (rather than the batch job's skip-and-continue) is
+    // the right response; see `check_no_seat_conflict_on_extension`.
+    let far_future = NaiveDate::from_ymd_opt(9999, 12, 31).expect("valid sentinel date");
+    check_no_seat_conflict_on_extension(state, &membership, far_future).await?;
+
     let plan = sqlx::query_as::<_, MembershipPlan>("SELECT * FROM membership_plans WHERE id = $1")
         .bind(membership.plan_id)
         .fetch_one(&state.db)
@@ -2234,7 +2311,6 @@ pub async fn mark_membership_grace(state: &Arc<AppState>, membership_id: Uuid) -
     .await?;
 
     let today = chrono::Local::now().date_naive();
-    let far_future = NaiveDate::from_ymd_opt(9999, 12, 31).expect("valid sentinel date");
 
     sqlx::query(
         "UPDATE memberships SET status = 'GRACE', end_date = $2, dues_amount = $3 WHERE id = $1",
@@ -2291,6 +2367,8 @@ pub async fn clear_dues(
     let remainder = dues - amount_cleared;
     let new_end = membership.end_date.checked_add_months(chrono::Months::new(1))
         .ok_or_else(|| AppError::Internal("Date overflow computing dues clearance".into()))?;
+
+    check_no_seat_conflict_on_extension(state, &membership, new_end).await?;
 
     let invoice_id = ids::generate_invoice_id();
     sqlx::query(
@@ -2734,11 +2812,34 @@ pub async fn mark_expired_and_start_grace(state: &Arc<AppState>) -> crate::error
             .execute(&state.db)
             .await?;
 
-        sqlx::query("UPDATE seat_bookings SET end_date = $2 WHERE membership_id = $1 AND status = 'ACTIVE'")
+        // Unlike mark_membership_grace (a single interactive admin action
+        // that can reject outright), this is an unattended nightly sweep —
+        // aborting the whole run over one problem membership isn't the right
+        // response. The membership above still correctly enters GRACE with
+        // dues owed either way; only the seat *hold* is skipped when holding
+        // it indefinitely would double-book a seat a later tenant already
+        // legitimately holds (e.g. an admin pre-booked the next student
+        // before this one defaulted). That later tenant's own booking is
+        // left completely untouched, and this membership's stale (already-
+        // past) seat_booking simply stops mattering to any future-dated
+        // availability query without needing further changes here.
+        let current = sqlx::query_as::<_, Membership>("SELECT * FROM memberships WHERE id = $1")
             .bind(mem_id)
-            .bind(far_future)
-            .execute(&state.db)
+            .fetch_one(&state.db)
             .await?;
+        if seat_conflict_on_extension(state, &current, far_future).await? {
+            tracing::warn!(
+                "grace_transition: membership {mem_id} entered GRACE with dues but its seat hold was \
+skipped — seat {:?} already has a later legitimate booking",
+                current.seat_number
+            );
+        } else {
+            sqlx::query("UPDATE seat_bookings SET end_date = $2 WHERE membership_id = $1 AND status = 'ACTIVE'")
+                .bind(mem_id)
+                .bind(far_future)
+                .execute(&state.db)
+                .await?;
+        }
 
         if let Some(shift) = shift {
             // Matches Java's ExpiryReminderScheduler.markExpiredAndStartGrace

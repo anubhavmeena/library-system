@@ -211,3 +211,60 @@ pub async fn setting_for(state: &Arc<AppState>, key: &str) -> NotificationSettin
     .flatten();
     to_dto(entry, row.as_ref())
 }
+
+#[cfg(test)]
+mod apply_hindi_tests {
+    use super::*;
+
+    fn dto(hindi_enabled: bool, student: Option<&str>, admin: Option<&str>) -> NotificationSettingDto {
+        NotificationSettingDto {
+            notification_key: "X".into(),
+            send_to_student: true,
+            send_to_admin: true,
+            hindi_enabled,
+            hindi_text_student: student.map(str::to_string),
+            hindi_text_admin: admin.map(str::to_string),
+            student_editable: true,
+            admin_editable: true,
+            hindi_editable: true,
+        }
+    }
+
+    #[test]
+    fn appends_hindi_when_enabled_and_present() {
+        let d = dto(true, Some("नमस्ते"), None);
+        assert_eq!(apply_hindi("Hello", &d, true), "Hello\n\nनमस्ते");
+    }
+
+    #[test]
+    fn omits_hindi_when_disabled_even_if_text_present() {
+        let d = dto(false, Some("नमस्ते"), None);
+        assert_eq!(apply_hindi("Hello", &d, true), "Hello");
+    }
+
+    #[test]
+    fn omits_hindi_when_text_is_blank_or_whitespace() {
+        let d = dto(true, Some("   "), None);
+        assert_eq!(apply_hindi("Hello", &d, true), "Hello");
+    }
+
+    #[test]
+    fn omits_hindi_when_text_is_none() {
+        let d = dto(true, None, None);
+        assert_eq!(apply_hindi("Hello", &d, true), "Hello");
+    }
+
+    #[test]
+    fn uses_admin_text_when_for_student_is_false() {
+        let d = dto(true, Some("student-hi"), Some("admin-hi"));
+        assert_eq!(apply_hindi("Hi", &d, false), "Hi\n\nadmin-hi");
+        assert_eq!(apply_hindi("Hi", &d, true), "Hi\n\nstudent-hi");
+    }
+
+    #[test]
+    fn never_replaces_english_copy() {
+        let d = dto(true, Some("hi"), None);
+        let result = apply_hindi("English text", &d, true);
+        assert!(result.starts_with("English text"));
+    }
+}

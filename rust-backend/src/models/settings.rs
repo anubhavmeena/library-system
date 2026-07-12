@@ -97,3 +97,92 @@ pub const NOTIFICATION_CATALOG: &[NotificationCatalogEntry] = &[
 pub fn catalog_entry(key: &str) -> Option<&'static NotificationCatalogEntry> {
     NOTIFICATION_CATALOG.iter().find(|e| e.key == key)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn catalog_entry_finds_known_key() {
+        let e = catalog_entry("BOOKING_CONFIRMED").unwrap();
+        assert!(e.default_send_to_student);
+        assert!(e.default_send_to_admin);
+    }
+
+    #[test]
+    fn catalog_entry_unknown_key_is_none() {
+        assert!(catalog_entry("NOT_A_REAL_KEY").is_none());
+    }
+
+    #[test]
+    fn admin_broadcast_has_no_hindi_concept() {
+        let e = catalog_entry("ADMIN_BROADCAST").unwrap();
+        assert!(!e.hindi_editable);
+        assert!(!e.student_editable);
+        assert!(!e.admin_editable);
+    }
+
+    #[test]
+    fn grace_dues_cleared_ships_default_hindi_text() {
+        let e = catalog_entry("GRACE_DUES_CLEARED").unwrap();
+        assert!(e.default_hindi_text_student.is_some());
+        assert!(e.default_hindi_text_admin.is_some());
+    }
+
+    #[test]
+    fn every_catalog_key_is_unique() {
+        let mut keys: Vec<&str> = NOTIFICATION_CATALOG.iter().map(|e| e.key).collect();
+        let len_before = keys.len();
+        keys.sort_unstable();
+        keys.dedup();
+        assert_eq!(keys.len(), len_before, "duplicate notification catalog key");
+    }
+
+    #[test]
+    fn app_settings_serializes_camel_case() {
+        let s = AppSettings {
+            id: 1,
+            wifi_name: Some("lib-wifi".into()),
+            wifi_password: None,
+            upi_id: Some("lib@ybl".into()),
+            grace_days: 10,
+            convenience_fee: Decimal::from(20),
+            water_tanker_rate: Decimal::from(150),
+            updated_at: None,
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        assert!(json.contains("wifiName"));
+        assert!(json.contains("graceDays"));
+        assert!(json.contains("convenienceFee"));
+        assert!(json.contains("waterTankerRate"));
+        assert!(!json.contains("wifi_name"));
+    }
+
+    #[test]
+    fn save_app_settings_request_deserializes_camel_case() {
+        let json = r#"{"wifiName":"x","wifiPassword":null,"upiId":"a@b","graceDays":7,"convenienceFee":"15","waterTankerRate":"100"}"#;
+        let req: SaveAppSettingsRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.wifi_name, Some("x".to_string()));
+        assert_eq!(req.grace_days, 7);
+        assert_eq!(req.convenience_fee, Decimal::from(15));
+    }
+
+    #[test]
+    fn notification_setting_dto_serializes_camel_case() {
+        let dto = NotificationSettingDto {
+            notification_key: "X".into(),
+            send_to_student: true,
+            send_to_admin: false,
+            hindi_enabled: true,
+            hindi_text_student: None,
+            hindi_text_admin: None,
+            student_editable: true,
+            admin_editable: false,
+            hindi_editable: true,
+        };
+        let json = serde_json::to_string(&dto).unwrap();
+        assert!(json.contains("notificationKey"));
+        assert!(json.contains("sendToStudent"));
+        assert!(json.contains("studentEditable"));
+    }
+}
