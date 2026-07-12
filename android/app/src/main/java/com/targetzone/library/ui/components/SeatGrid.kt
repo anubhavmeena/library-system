@@ -9,6 +9,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
@@ -55,7 +56,11 @@ fun SeatGrid(
     // Mirrors the web admin seat map's "Expiry View" toggle (AdminSeatsPage.jsx)
     // — occupied seats show a days-to-expiry badge instead of the seat number.
     expiryView: Boolean = false,
-    viewDate: String? = null
+    viewDate: String? = null,
+    // The page's own shift filter (MORNING/EVENING/FULL_DAY) — used to mark
+    // FULL_DAY occupants with 'X' and other-shift bookings with a green dot
+    // when viewing a single shift. Only meaningful in admin view.
+    viewingShift: String? = null
 ) {
     val seatMap   = seats.associateBy { it.seatNumber }
     val adminView = onBookedSeatClick != null
@@ -84,13 +89,13 @@ fun SeatGrid(
                 // Left section: two sub-rows of 7 seats
                 Column {
                     Row(horizontalArrangement = Arrangement.spacedBy(SEAT_GAP)) {
-                        L_TOP.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick, expiryView, viewDate) }
+                        L_TOP.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick, expiryView, viewDate, viewingShift) }
                     }
                     Spacer(Modifier.height(2.dp))
                     HorizontalDivider(color = DividerColor.copy(alpha = 0.4f), thickness = 0.5.dp)
                     Spacer(Modifier.height(2.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(SEAT_GAP)) {
-                        L_BOTTOM.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick, expiryView, viewDate) }
+                        L_BOTTOM.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick, expiryView, viewDate, viewingShift) }
                     }
                 }
 
@@ -102,13 +107,13 @@ fun SeatGrid(
                 // Right section: two sub-rows of 7 seats
                 Column {
                     Row(horizontalArrangement = Arrangement.spacedBy(SEAT_GAP)) {
-                        R_TOP.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick, expiryView, viewDate) }
+                        R_TOP.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick, expiryView, viewDate, viewingShift) }
                     }
                     Spacer(Modifier.height(2.dp))
                     HorizontalDivider(color = DividerColor.copy(alpha = 0.4f), thickness = 0.5.dp)
                     Spacer(Modifier.height(2.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(SEAT_GAP)) {
-                        R_BOTTOM.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick, expiryView, viewDate) }
+                        R_BOTTOM.forEach { i -> SeatCell("$row$i", seatMap, selectedSeatNumber, adminView, onSeatClick, onBookedSeatClick, expiryView, viewDate, viewingShift) }
                     }
                 }
             }
@@ -148,6 +153,13 @@ fun SeatGrid(
                 LegendItem(EmeraldFaint, Emerald.copy(alpha = 0.3f), "Available")
                 LegendItem(RedFaint, RedAlert, "Male")
                 LegendItem(MagentaFaint, Magenta, "Female")
+                if (viewingShift != null && viewingShift != "FULL_DAY") {
+                    LegendItem(CardBg, DividerColor, "✕ Full-Day")
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(Modifier.size(7.dp).clip(CircleShape).background(Emerald))
+                        Text("Other shift booked", fontSize = 10.sp, color = TextSub)
+                    }
+                }
             } else {
                 LegendItem(CardBg, DividerColor, "Available")
                 LegendItem(AmberFaint, Amber, "Selected")
@@ -166,7 +178,8 @@ private fun SeatCell(
     onSeatClick: (Seat) -> Unit,
     onBookedSeatClick: ((Seat) -> Unit)?,
     expiryView: Boolean = false,
-    viewDate: String? = null
+    viewDate: String? = null,
+    viewingShift: String? = null
 ) {
     if (seatNum in INACTIVE) {
         Box(
@@ -180,15 +193,18 @@ private fun SeatCell(
     }
     val seat = seatMap[seatNum] ?: Seat(seatNumber = seatNum, row = seatNum.first().toString())
     SeatButton(
-        label           = seatNum,
-        booked          = seat.isBooked,
-        selected        = selectedSeatNumber == seatNum,
-        gender          = seat.studentGender,
-        adminView       = adminView,
-        bookedClickable = onBookedSeatClick != null,
-        expiryView      = expiryView,
-        expiryDays      = if (expiryView && seat.isBooked) daysToExpiry(seat.membershipEnd, viewDate) else null,
-        onClick         = { if (seat.isBooked) onBookedSeatClick?.invoke(seat) else onSeatClick(seat) }
+        label              = seatNum,
+        booked             = seat.isBooked,
+        selected           = selectedSeatNumber == seatNum,
+        gender             = seat.studentGender,
+        adminView          = adminView,
+        bookedClickable    = onBookedSeatClick != null,
+        expiryView         = expiryView,
+        expiryDays         = if (expiryView && seat.isBooked) daysToExpiry(seat.membershipEnd, viewDate) else null,
+        seatShift          = seat.shift,
+        otherShiftOccupied = seat.otherShiftOccupied,
+        viewingShift       = viewingShift,
+        onClick            = { if (seat.isBooked) onBookedSeatClick?.invoke(seat) else onSeatClick(seat) }
     )
 }
 
@@ -202,6 +218,9 @@ private fun SeatButton(
     bookedClickable: Boolean = false,
     expiryView: Boolean = false,
     expiryDays: Int? = null,
+    seatShift: String? = null,
+    otherShiftOccupied: Boolean = false,
+    viewingShift: String? = null,
     onClick: () -> Unit
 ) {
     val isFemale = booked && gender == "Female"
@@ -213,6 +232,8 @@ private fun SeatButton(
         adminView          -> Triple(EmeraldFaint,                    Emerald.copy(alpha = 0.3f),  Emerald.copy(alpha = 0.6f))
         else               -> Triple(CardBg,                          DividerColor,                TextSub)
     }
+    val isFullDayOccupant = booked && viewingShift != null && viewingShift != "FULL_DAY" && seatShift == "FULL_DAY"
+    val isOtherShiftBooked = !booked && viewingShift != null && viewingShift != "FULL_DAY" && otherShiftOccupied
     val haptics = rememberLibraryHaptics()
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -236,10 +257,21 @@ private fun SeatButton(
             text = when {
                 expiryDays != null -> "$expiryDays"
                 expiryView         -> ""
+                isFullDayOccupant  -> "✕"
                 else                -> label.drop(1)
             },
             fontSize = 9.sp, color = textColor, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
         )
+        if (isOtherShiftBooked) {
+            Box(
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(2.dp)
+                    .size(4.dp)
+                    .clip(CircleShape)
+                    .background(Emerald)
+            )
+        }
     }
 }
 

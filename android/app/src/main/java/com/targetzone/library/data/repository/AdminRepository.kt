@@ -108,6 +108,8 @@ class AdminRepository {
                     studentName = s.studentName,
                     studentMobile = s.studentMobile,
                     studentGender = s.studentGender,
+                    shift = s.shift,
+                    otherShiftOccupied = s.otherShiftOccupied,
                     membershipEnd = s.membershipEnd
                 )
             }

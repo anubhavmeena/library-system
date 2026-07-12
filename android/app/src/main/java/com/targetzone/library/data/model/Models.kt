@@ -82,6 +82,8 @@ data class Seat(
     val studentName: String? = null,
     val studentMobile: String? = null,
     val studentGender: String? = null,
+    val shift: String? = null, // the occupying booking's shift (e.g. "FULL_DAY") — independent of the page's shift filter
+    val otherShiftOccupied: Boolean = false, // true if the *other* (non-viewed) shift is actively booked for this seat
     val membershipEnd: String? = null
 )
 
@@ -117,7 +119,8 @@ data class SeatInfoItem(
     val studentMobile: String? = null,
     val studentGender: String? = null,
     val shift: String? = null,
-    val membershipEnd: String? = null
+    val membershipEnd: String? = null,
+    val otherShiftOccupied: Boolean = false
 )
 
 data class PaymentOrder(

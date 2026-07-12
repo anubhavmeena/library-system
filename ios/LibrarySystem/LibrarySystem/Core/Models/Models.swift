@@ -285,6 +285,41 @@ struct SeatInfoItem: Codable {
     let studentGender: String?
     let shift: String?
     let membershipEnd: String?
+    let otherShiftOccupied: Bool // true if the *other* (non-viewed) shift is actively booked for this seat
+
+    private enum CodingKeys: String, CodingKey {
+        case seatNumber, isOccupied, studentId, studentName, studentMobile, studentGender, shift, membershipEnd, otherShiftOccupied
+    }
+
+    init(seatNumber: String, isOccupied: Bool, studentId: String?, studentName: String?,
+         studentMobile: String?, studentGender: String?, shift: String?, membershipEnd: String?,
+         otherShiftOccupied: Bool = false) {
+        self.seatNumber = seatNumber
+        self.isOccupied = isOccupied
+        self.studentId = studentId
+        self.studentName = studentName
+        self.studentMobile = studentMobile
+        self.studentGender = studentGender
+        self.shift = shift
+        self.membershipEnd = membershipEnd
+        self.otherShiftOccupied = otherShiftOccupied
+    }
+
+    // Custom decoder: `otherShiftOccupied` is decoded defensively so a
+    // response from a backend that doesn't send it yet (rollout skew)
+    // degrades to `false` instead of failing the entire seat map decode.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        seatNumber = try c.decode(String.self, forKey: .seatNumber)
+        isOccupied = try c.decode(Bool.self, forKey: .isOccupied)
+        studentId = try c.decodeIfPresent(String.self, forKey: .studentId)
+        studentName = try c.decodeIfPresent(String.self, forKey: .studentName)
+        studentMobile = try c.decodeIfPresent(String.self, forKey: .studentMobile)
+        studentGender = try c.decodeIfPresent(String.self, forKey: .studentGender)
+        shift = try c.decodeIfPresent(String.self, forKey: .shift)
+        membershipEnd = try c.decodeIfPresent(String.self, forKey: .membershipEnd)
+        otherShiftOccupied = try c.decodeIfPresent(Bool.self, forKey: .otherShiftOccupied) ?? false
+    }
 }
 
 struct PaymentOrder: Codable, Equatable {

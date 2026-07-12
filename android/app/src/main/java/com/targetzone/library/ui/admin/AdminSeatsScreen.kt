@@ -31,7 +31,7 @@ import java.util.*
 fun AdminSeatsScreen(vm: AdminViewModel, onViewStudent: (String) -> Unit = {}) {
     val seats     by vm.adminSeats.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
-    var shift     by remember { mutableStateOf("MORNING") }
+    var shift     by remember { mutableStateOf("FULL_DAY") }
     var date      by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())) }
     var detailSeat by remember { mutableStateOf<Seat?>(null) }
     var expiryView by remember { mutableStateOf(false) }
@@ -115,7 +115,8 @@ fun AdminSeatsScreen(vm: AdminViewModel, onViewStudent: (String) -> Unit = {}) {
                     onSeatClick = {},
                     onBookedSeatClick = { seat -> detailSeat = seat },
                     expiryView = expiryView,
-                    viewDate = date
+                    viewDate = date,
+                    viewingShift = shift
                 )
             }
         }

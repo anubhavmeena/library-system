@@ -184,6 +184,7 @@ pub struct SeatMapSeat {
     pub student_gender: Option<String>,
     pub shift: Option<String>,
     pub membership_end: Option<NaiveDate>,
+    pub other_shift_occupied: bool,
 }
 
 #[derive(Debug, Serialize)]

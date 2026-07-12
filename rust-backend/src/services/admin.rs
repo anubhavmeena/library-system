@@ -1078,6 +1078,38 @@ pub async fn get_seat_map(
         })
         .collect();
 
+    // The "other" (non-viewed) shift's occupied seats — only fetched when
+    // viewing a single shift, to power a UI hint ("this seat is booked for
+    // the other shift too") without disturbing the primary is_occupied/counts
+    // logic above, which must stay exactly as it was.
+    let other_shift: Option<&str> = match shift {
+        "MORNING" => Some("EVENING"),
+        "EVENING" => Some("MORNING"),
+        _ => None,
+    };
+
+    let other_shift_seat_ids: std::collections::HashSet<Uuid> = if let Some(other) = other_shift {
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT sb.seat_id FROM seat_bookings sb
+             JOIN memberships m ON m.id = sb.membership_id
+             WHERE sb.status = 'ACTIVE'
+               AND sb.booking_date <= $1
+               AND (
+                   sb.end_date >= $1
+                   OR (m.status IN ('ACTIVE', 'GRACE') AND $1 = CURRENT_DATE AND m.end_date < CURRENT_DATE)
+               )
+               AND sb.shift = $2",
+        )
+        .bind(date)
+        .bind(other)
+        .fetch_all(&state.db)
+        .await?
+        .into_iter()
+        .collect()
+    } else {
+        std::collections::HashSet::new()
+    };
+
     let mut seats_by_row: HashMap<String, Vec<SeatMapSeat>> = HashMap::new();
     let mut occupied_count = 0i64;
     let total = seats.len() as i64;
@@ -1097,6 +1129,7 @@ pub async fn get_seat_map(
             student_gender: occ.and_then(|(_, _, _, g, _, _)| g.clone()),
             shift: occ.map(|(_, _, _, _, s, _)| s.clone()),
             membership_end: occ.map(|(_, _, _, _, _, e)| *e),
+            other_shift_occupied: !is_occupied && other_shift_seat_ids.contains(&seat.id),
         };
         seats_by_row
             .entry(seat.row_label.clone())

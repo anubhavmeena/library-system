@@ -185,6 +185,9 @@ export default function AdminSeatsPage() {
                                     return <div key={sn} className="w-8 h-8 rounded-lg bg-primary-900/50 border border-primary-800/20" title="Blocked" />
                                 }
                                 const seat = find(sn) ?? { seatNumber: sn, isOccupied: false }
+                                const isFullDayOccupant = shift !== 'FULL_DAY' && seat.isOccupied && seat.shift === 'FULL_DAY'
+                                const isOtherShiftOccupied = shift !== 'FULL_DAY' && !seat.isOccupied && seat.otherShiftOccupied
+                                const otherShift = shift === 'MORNING' ? 'EVENING' : 'MORNING'
 
                                 if (viewMode === 'expiry' && seat.isOccupied) {
                                     const days = daysToExpiry(seat.membershipEnd, date)
@@ -202,17 +205,25 @@ export default function AdminSeatsPage() {
                                 }
 
                                 return (
-                                    <button key={sn}
-                                            onClick={() => setSelected(seat.isOccupied ? seat : null)}
-                                            title={seat.isOccupied ? `${seat.studentName} — ${shiftLabel(seat.shift)}` : `${sn} (${t('adminSeats.legend.available')})`}
-                                            className={`w-8 h-8 rounded-lg text-xs font-medium border transition-all
-                                                ${seat.isOccupied
-                                                    ? seat.studentGender === 'Female'
-                                                        ? 'bg-fuchsia-500/30 border-fuchsia-500/50 text-fuchsia-300 hover:bg-fuchsia-500/50 cursor-pointer'
-                                                        : 'bg-red-500/30 border-red-500/50 text-red-300 hover:bg-red-500/50 cursor-pointer'
-                                                    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 cursor-default'}`}>
-                                        {viewMode === 'expiry' ? '' : sn.substring(1)}
-                                    </button>
+                                    <div key={sn} className="relative">
+                                        <button onClick={() => setSelected(seat.isOccupied ? seat : null)}
+                                                title={seat.isOccupied
+                                                    ? `${seat.studentName} — ${shiftLabel(seat.shift)}`
+                                                    : isOtherShiftOccupied
+                                                        ? `${sn} (Available — booked for ${shiftLabel(otherShift)})`
+                                                        : `${sn} (${t('adminSeats.legend.available')})`}
+                                                className={`w-8 h-8 rounded-lg text-xs font-medium border transition-all
+                                                    ${seat.isOccupied
+                                                        ? seat.studentGender === 'Female'
+                                                            ? 'bg-fuchsia-500/30 border-fuchsia-500/50 text-fuchsia-300 hover:bg-fuchsia-500/50 cursor-pointer'
+                                                            : 'bg-red-500/30 border-red-500/50 text-red-300 hover:bg-red-500/50 cursor-pointer'
+                                                        : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 cursor-default'}`}>
+                                            {viewMode === 'expiry' ? '' : isFullDayOccupant ? '✕' : sn.substring(1)}
+                                        </button>
+                                        {isOtherShiftOccupied && (
+                                            <span className="absolute top-0.5 left-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                        )}
+                                    </div>
                                 )
                             }
                             return (
@@ -259,6 +270,12 @@ export default function AdminSeatsPage() {
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/10 border border-emerald-500/20" />{t('adminSeats.legend.available')}</div>
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-500/30 border border-red-500/50" />Male occupied</div>
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-fuchsia-500/30 border border-fuchsia-500/50" />Female occupied</div>
+                            {shift !== 'FULL_DAY' && (
+                                <>
+                                    <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-primary-900/40 border border-primary-700/40 flex items-center justify-center text-[10px] leading-none text-primary-300">✕</div>Full-day booking</div>
+                                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-400" />Other shift booked</div>
+                                </>
+                            )}
                         </div>
                     )}
                 </div>

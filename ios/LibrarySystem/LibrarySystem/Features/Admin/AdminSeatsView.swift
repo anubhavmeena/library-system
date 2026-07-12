@@ -251,6 +251,13 @@ struct AdminSeatsView: View {
                 legendItem(color: .emeraldFaint, border: .emerald, label: "Available")
                 legendItem(color: .redFaint, border: .redAlert, label: "Male")
                 legendItem(color: .fuchsiaFaint, border: .fuchsia, label: "Female")
+                if selectedShift != "FULL_DAY" {
+                    legendItem(color: .cardBg, border: .cardBorder, label: "✕ Full-Day")
+                    HStack(spacing: 6) {
+                        Circle().fill(Color.emerald).frame(width: 7, height: 7)
+                        Text("Other shift booked").font(.labelSmall).foregroundColor(.textSub)
+                    }
+                }
             }
         }
     }
@@ -358,15 +365,25 @@ struct AdminSeatsView: View {
             let isFemale = seat.isOccupied && seat.studentGender?.caseInsensitiveCompare("Female") == .orderedSame
             let fg: Color = seat.isOccupied ? (isFemale ? .fuchsia : .redAlert) : .emerald
             let bg: Color = seat.isOccupied ? (isFemale ? Color.fuchsiaFaint : Color.redFaint) : Color.emeraldFaint
-            Text(viewMode == .expiry ? "" : String(seat.seatNumber.dropFirst()))
-                .font(.system(size: 9, weight: .medium))
-                .foregroundColor(fg)
-                .frame(width: seatSize, height: seatSize)
-                .background(bg)
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(fg, lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .contentShape(Rectangle())
-                .onTapGesture { if seat.isOccupied { tappedSeat = seat } }
+            let isFullDayOccupant = selectedShift != "FULL_DAY" && seat.isOccupied && seat.shift == "FULL_DAY"
+            let isOtherShiftBooked = selectedShift != "FULL_DAY" && !seat.isOccupied && seat.otherShiftOccupied
+            ZStack(alignment: .topLeading) {
+                Text(viewMode == .expiry ? "" : (isFullDayOccupant ? "✕" : String(seat.seatNumber.dropFirst())))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(fg)
+                    .frame(width: seatSize, height: seatSize)
+                    .background(bg)
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(fg, lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .contentShape(Rectangle())
+                    .onTapGesture { if seat.isOccupied { tappedSeat = seat } }
+                if isOtherShiftBooked {
+                    Circle()
+                        .fill(Color.emerald)
+                        .frame(width: 5, height: 5)
+                        .padding(2)
+                }
+            }
         }
     }
 
