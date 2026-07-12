@@ -19,9 +19,16 @@ struct AdminStudentsView: View {
     // param the backend doesn't even accept and a `membershipStatus` of "ACTIVE"/
     // "NONE" that never matches a real displayStatus, so those filters were a
     // silent no-op.
+    //
+    // The "Expired" bucket's query VALUE is "GRACE_OVERDUE", not "EXPIRED" — that's
+    // a separate concept from the per-student `displayStatus` field (which genuinely
+    // does use "EXPIRED", see statusColor below). admin::list_students's
+    // membership_status match has no "EXPIRED" arm at all, so sending that value
+    // silently fell through to its `_ => {}` case and applied no filter whatsoever,
+    // making "Expired" show every student instead of just the overdue-grace ones.
     private let membershipFilters: [(String, String)] = [
         ("", "All"), ("NEW", "New"), ("PAID", "Paid"), ("PENDING", "Pending"),
-        ("GRACE", "Grace"), ("EXPIRED", "Expired"), ("RELEASED", "Released"),
+        ("GRACE", "Grace"), ("GRACE_OVERDUE", "Expired"), ("RELEASED", "Released"),
     ]
 
     var body: some View {
