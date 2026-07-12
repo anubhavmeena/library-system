@@ -10,6 +10,34 @@ struct ApiResponse<T: Decodable>: Decodable {
     let data: T?
 }
 
+// Rust's rust_decimal::Decimal (this backend builds with the "serde-with-str"
+// feature, for lossless precision) always serializes as a JSON string
+// ("1234.50"), never a bare number — but Foundation's JSONDecoder won't
+// auto-coerce a string into a Double. Every money field decoded from the
+// backend goes through these instead of a plain decode(Double.self, ...) /
+// decodeIfPresent(Double.self, ...), which previously threw a type-mismatch
+// DecodingError the moment they were reached, failing the ENTIRE containing
+// struct's decode (e.g. the admin dashboard falling back to all-zero stats).
+extension KeyedDecodingContainer {
+    func decodeMoney(forKey key: Key) throws -> Double {
+        if let d = try? decode(Double.self, forKey: key) { return d }
+        let s = try decode(String.self, forKey: key)
+        guard let d = Double(s) else {
+            throw DecodingError.dataCorruptedError(forKey: key, in: self, debugDescription: "Not a valid decimal string: \(s)")
+        }
+        return d
+    }
+
+    func decodeMoneyIfPresent(forKey key: Key) throws -> Double? {
+        if let d = try? decodeIfPresent(Double.self, forKey: key) { return d }
+        guard let s = try decodeIfPresent(String.self, forKey: key) else { return nil }
+        guard let d = Double(s) else {
+            throw DecodingError.dataCorruptedError(forKey: key, in: self, debugDescription: "Not a valid decimal string: \(s)")
+        }
+        return d
+    }
+}
+
 struct User: Codable, Identifiable, Equatable {
     let id: String
     let name: String
@@ -114,6 +142,28 @@ struct Membership: Codable, Identifiable, Equatable {
         self.status = status; self.amountPaid = amountPaid; self.planPrice = planPrice
         self.duesAmount = duesAmount
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, userId, planId, planName, planType, seatNumber, shift
+        case startDate, endDate, status, amountPaid, planPrice, duesAmount
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id         = try c.decode(String.self, forKey: .id)
+        userId     = try c.decode(String.self, forKey: .userId)
+        planId     = try c.decode(String.self, forKey: .planId)
+        planName   = try c.decode(String.self, forKey: .planName)
+        planType   = try c.decode(String.self, forKey: .planType)
+        seatNumber = try c.decode(String.self, forKey: .seatNumber)
+        shift      = try c.decode(String.self, forKey: .shift)
+        startDate  = try c.decode(String.self, forKey: .startDate)
+        endDate    = try c.decode(String.self, forKey: .endDate)
+        status     = try c.decode(String.self, forKey: .status)
+        amountPaid = try c.decodeMoneyIfPresent(forKey: .amountPaid)
+        planPrice  = try c.decodeMoneyIfPresent(forKey: .planPrice)
+        duesAmount = try c.decodeMoneyIfPresent(forKey: .duesAmount)
+    }
 }
 
 struct Plan: Codable, Identifiable {
@@ -125,13 +175,25 @@ struct Plan: Codable, Identifiable {
     let durationDays: Int
     let isActive: Bool
 
-    // PlanDto's `isActive` is a primitive `boolean`, so Lombok generates a plain
-    // `isActive()` getter (not `getIsActive()`) — Jackson strips the "is" prefix off
-    // boolean getters per JavaBean convention, so the JSON key is actually "active",
-    // not "isActive". Confirmed directly against the live GET /api/plans response.
+    // The Java backend's PlanDto used a bare `boolean isActive`, which Lombok/Jackson
+    // serialize under the JavaBean-stripped key "active" rather than "isActive" — but
+    // the currently-deployed rust-backend's PlanWithFee derives `#[serde(rename_all =
+    // "camelCase")]` with no such override, so its actual JSON key is "isActive".
+    // Decoded defensively (like every other isActive field in this file) so a future
+    // backend swap degrades to a default rather than failing every plan's decode.
     enum CodingKeys: String, CodingKey {
-        case id, name, description, price, planType, durationDays
-        case isActive = "active"
+        case id, name, description, price, planType, durationDays, isActive
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id           = try c.decode(String.self, forKey: .id)
+        name         = try c.decode(String.self, forKey: .name)
+        description  = try c.decodeIfPresent(String.self, forKey: .description)
+        price        = try c.decodeMoney(forKey: .price)
+        planType     = try c.decode(String.self, forKey: .planType)
+        durationDays = try c.decode(Int.self, forKey: .durationDays)
+        isActive     = try c.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
     }
 }
 
@@ -194,6 +256,21 @@ struct PaymentOrder: Codable, Equatable {
     let gateway: String?          // "CASHFREE" | "RAZORPAY"
     let paymentSessionId: String? // Cashfree only
     let razorpayKeyId: String?    // Razorpay only
+
+    private enum CodingKeys: String, CodingKey {
+        case orderId, membershipId, amount, currency, gateway, paymentSessionId, razorpayKeyId
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        orderId          = try c.decode(String.self, forKey: .orderId)
+        membershipId     = try c.decode(String.self, forKey: .membershipId)
+        amount           = try c.decodeMoney(forKey: .amount)
+        currency         = try c.decodeIfPresent(String.self, forKey: .currency)
+        gateway          = try c.decodeIfPresent(String.self, forKey: .gateway)
+        paymentSessionId = try c.decodeIfPresent(String.self, forKey: .paymentSessionId)
+        razorpayKeyId    = try c.decodeIfPresent(String.self, forKey: .razorpayKeyId)
+    }
 }
 
 struct AdminStats: Codable {
@@ -249,8 +326,8 @@ struct AdminStats: Codable {
         totalSeats              = try c.decodeIfPresent(Int.self, forKey: .totalSeats) ?? 0
         occupiedSeats           = try c.decodeIfPresent(Int.self, forKey: .occupiedSeats) ?? 0
         availableSeats          = try c.decodeIfPresent(Int.self, forKey: .availableSeats) ?? 0
-        revenueToday            = try c.decodeIfPresent(Double.self, forKey: .revenueToday) ?? 0
-        revenueThisMonth        = try c.decodeIfPresent(Double.self, forKey: .revenueThisMonth) ?? 0
+        revenueToday            = try c.decodeMoneyIfPresent(forKey: .revenueToday) ?? 0
+        revenueThisMonth        = try c.decodeMoneyIfPresent(forKey: .revenueThisMonth) ?? 0
         paymentsThisMonth       = try c.decodeIfPresent(Int.self, forKey: .paymentsThisMonth) ?? 0
         totalVisitors           = try c.decodeIfPresent(Int.self, forKey: .totalVisitors) ?? 0
         visitorsToday           = try c.decodeIfPresent(Int.self, forKey: .visitorsToday) ?? 0
@@ -307,8 +384,8 @@ struct StudentSummary: Codable, Identifiable {
         planName         = try c.decodeIfPresent(String.self, forKey: .planName)
         daysRemaining    = try c.decodeIfPresent(Int.self, forKey: .daysRemaining) ?? 0
         paymentMode      = try c.decodeIfPresent(String.self, forKey: .paymentMode)
-        pendingAmount    = try c.decodeIfPresent(Double.self, forKey: .pendingAmount)
-        duesAmount       = try c.decodeIfPresent(Double.self, forKey: .duesAmount)
+        pendingAmount    = try c.decodeMoneyIfPresent(forKey: .pendingAmount)
+        duesAmount       = try c.decodeMoneyIfPresent(forKey: .duesAmount)
         displayStatus    = try c.decodeIfPresent(String.self, forKey: .displayStatus)
     }
 }
@@ -380,8 +457,8 @@ struct StudentDetail: Codable, Identifiable {
         membershipStatus = try c.decodeIfPresent(String.self, forKey: .membershipStatus)
         daysRemaining    = try c.decodeIfPresent(Int.self, forKey: .daysRemaining) ?? 0
         paymentMode      = try c.decodeIfPresent(String.self, forKey: .paymentMode)
-        pendingAmount    = try c.decodeIfPresent(Double.self, forKey: .pendingAmount)
-        duesAmount       = try c.decodeIfPresent(Double.self, forKey: .duesAmount)
+        pendingAmount    = try c.decodeMoneyIfPresent(forKey: .pendingAmount)
+        duesAmount       = try c.decodeMoneyIfPresent(forKey: .duesAmount)
         displayStatus    = try c.decodeIfPresent(String.self, forKey: .displayStatus)
     }
 }
@@ -435,6 +512,15 @@ struct RevenueReport: Codable {
         let date: String
         let amount: Double
         let count: Int
+
+        private enum CodingKeys: String, CodingKey { case date, amount, count }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            date   = try c.decode(String.self, forKey: .date)
+            amount = try c.decodeMoney(forKey: .amount)
+            count  = try c.decode(Int.self, forKey: .count)
+        }
     }
 
     init() {
@@ -449,10 +535,10 @@ struct RevenueReport: Codable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         fromDate           = try c.decode(String.self, forKey: .fromDate)
         toDate             = try c.decode(String.self, forKey: .toDate)
-        totalRevenue       = try c.decode(Double.self, forKey: .totalRevenue)
+        totalRevenue       = try c.decodeMoney(forKey: .totalRevenue)
         totalTransactions  = try c.decode(Int.self, forKey: .totalTransactions)
-        halfDayRevenue     = try c.decodeIfPresent(Double.self, forKey: .halfDayRevenue) ?? 0
-        fullDayRevenue     = try c.decodeIfPresent(Double.self, forKey: .fullDayRevenue) ?? 0
+        halfDayRevenue     = try c.decodeMoneyIfPresent(forKey: .halfDayRevenue) ?? 0
+        fullDayRevenue     = try c.decodeMoneyIfPresent(forKey: .fullDayRevenue) ?? 0
         dailyBreakdown     = try c.decode([DailyRevenue].self, forKey: .dailyBreakdown)
     }
 
@@ -468,6 +554,24 @@ struct DailyPayment: Codable {
     let paymentGateway: String?
     let referenceId: String?
     let paidAt: String
+
+    private enum CodingKeys: String, CodingKey {
+        case studentName, studentMobile, amount, paymentGateway, referenceId, paidAt
+    }
+
+    // studentMobile and paidAt are both nullable on the backend
+    // (DailyPaymentItem.student_mobile/paid_at: Option<...>) though these fields'
+    // types stay non-optional — default rather than failing the whole day's
+    // payment list over one null value.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        studentName    = try c.decode(String.self, forKey: .studentName)
+        studentMobile  = try c.decodeIfPresent(String.self, forKey: .studentMobile) ?? ""
+        amount         = try c.decodeMoney(forKey: .amount)
+        paymentGateway = try c.decodeIfPresent(String.self, forKey: .paymentGateway)
+        referenceId    = try c.decodeIfPresent(String.self, forKey: .referenceId)
+        paidAt         = try c.decodeIfPresent(String.self, forKey: .paidAt) ?? ""
+    }
 }
 
 // MARK: - Payment History (for admin student detail)
@@ -481,6 +585,22 @@ struct PaymentHistoryItem: Codable, Identifiable {
     let gatewayPaymentId: String?
     let status: String
     let paidAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, membershipId, amount, paymentGateway, gatewayOrderId, gatewayPaymentId, status, paidAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id               = try c.decode(String.self, forKey: .id)
+        membershipId     = try c.decodeIfPresent(String.self, forKey: .membershipId)
+        amount           = try c.decodeMoney(forKey: .amount)
+        paymentGateway   = try c.decodeIfPresent(String.self, forKey: .paymentGateway)
+        gatewayOrderId   = try c.decodeIfPresent(String.self, forKey: .gatewayOrderId)
+        gatewayPaymentId = try c.decodeIfPresent(String.self, forKey: .gatewayPaymentId)
+        status           = try c.decode(String.self, forKey: .status)
+        paidAt           = try c.decodeIfPresent(String.self, forKey: .paidAt)
+    }
 }
 
 // MARK: - Expenses
@@ -499,6 +619,14 @@ struct MonthlyExpense: Codable, Equatable {
     struct MiscItem: Codable, Equatable {
         let description: String
         let amount: Double
+
+        private enum CodingKeys: String, CodingKey { case description, amount }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            description = try c.decode(String.self, forKey: .description)
+            amount      = try c.decodeMoney(forKey: .amount)
+        }
     }
 
     init(
@@ -514,6 +642,28 @@ struct MonthlyExpense: Codable, Equatable {
         self.electricityBill = electricityBill; self.internetBill = internetBill
         self.miscellaneous = miscellaneous; self.totalExpense = totalExpense
         self.miscItems = miscItems
+    }
+
+    // The backend's MonthlyExpenseWithItems names this field "total", not
+    // "totalExpense" — a non-optional-field key mismatch that failed the whole
+    // decode on its own, independent of the Decimal-as-string issue every
+    // amount field here also needs decodeMoney(...) for.
+    private enum CodingKeys: String, CodingKey {
+        case year, month, waterTankerQty, waterTankerPrice, electricityBill
+        case internetBill, miscellaneous, totalExpense = "total", miscItems
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        year             = try c.decode(Int.self, forKey: .year)
+        month            = try c.decode(Int.self, forKey: .month)
+        waterTankerQty   = try c.decode(Int.self, forKey: .waterTankerQty)
+        waterTankerPrice = try c.decodeMoney(forKey: .waterTankerPrice)
+        electricityBill  = try c.decodeMoney(forKey: .electricityBill)
+        internetBill     = try c.decodeMoney(forKey: .internetBill)
+        miscellaneous    = try c.decodeMoney(forKey: .miscellaneous)
+        totalExpense     = try c.decodeMoney(forKey: .totalExpense)
+        miscItems        = try c.decodeIfPresent([MiscItem].self, forKey: .miscItems)
     }
 }
 
@@ -582,6 +732,14 @@ struct SeatHistoryEntry: Codable, Identifiable {
 struct PaymentBreakdownItem: Codable {
     let amount: Double
     let count: Int
+
+    private enum CodingKeys: String, CodingKey { case amount, count }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        amount = try c.decodeMoney(forKey: .amount)
+        count  = try c.decode(Int.self, forKey: .count)
+    }
 }
 
 // MARK: - App Settings
@@ -600,6 +758,21 @@ struct AppSettings: Codable {
         self.wifiName = wifiName; self.wifiPassword = wifiPassword; self.upiId = upiId; self.graceDays = graceDays
         self.convenienceFee = convenienceFee; self.waterTankerRate = waterTankerRate
         self.updatedAt = updatedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case wifiName, wifiPassword, upiId, graceDays, convenienceFee, waterTankerRate, updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        wifiName        = try c.decodeIfPresent(String.self, forKey: .wifiName)
+        wifiPassword    = try c.decodeIfPresent(String.self, forKey: .wifiPassword)
+        upiId           = try c.decodeIfPresent(String.self, forKey: .upiId)
+        graceDays       = try c.decodeIfPresent(Int.self, forKey: .graceDays)
+        convenienceFee  = try c.decodeMoneyIfPresent(forKey: .convenienceFee)
+        waterTankerRate = try c.decodeMoneyIfPresent(forKey: .waterTankerRate)
+        updatedAt       = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 }
 
@@ -620,6 +793,27 @@ struct PaymentClaim: Codable, Identifiable {
     let createdAt: String
     let reviewedAt: String?
     let reviewedBy: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, userId, studentName, studentMobile, claimType, membershipId
+        case amountClaimed, screenshotUrl, status, createdAt, reviewedAt, reviewedBy
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id             = try c.decode(String.self, forKey: .id)
+        userId         = try c.decode(String.self, forKey: .userId)
+        studentName    = try c.decode(String.self, forKey: .studentName)
+        studentMobile  = try c.decodeIfPresent(String.self, forKey: .studentMobile)
+        claimType      = try c.decode(String.self, forKey: .claimType)
+        membershipId   = try c.decodeIfPresent(String.self, forKey: .membershipId)
+        amountClaimed  = try c.decodeMoney(forKey: .amountClaimed)
+        screenshotUrl  = try c.decode(String.self, forKey: .screenshotUrl)
+        status         = try c.decode(String.self, forKey: .status)
+        createdAt      = try c.decode(String.self, forKey: .createdAt)
+        reviewedAt     = try c.decodeIfPresent(String.self, forKey: .reviewedAt)
+        reviewedBy     = try c.decodeIfPresent(String.self, forKey: .reviewedBy)
+    }
 }
 
 // MARK: - Bulk Import Result
@@ -671,4 +865,20 @@ struct StudentPayment: Codable, Identifiable {
     let gatewayPaymentId: String?
     let status: String
     let createdAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, membershipId, amount, paymentGateway, gatewayOrderId, gatewayPaymentId, status, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id               = try c.decode(String.self, forKey: .id)
+        membershipId     = try c.decodeIfPresent(String.self, forKey: .membershipId)
+        amount           = try c.decodeMoney(forKey: .amount)
+        paymentGateway   = try c.decodeIfPresent(String.self, forKey: .paymentGateway)
+        gatewayOrderId   = try c.decodeIfPresent(String.self, forKey: .gatewayOrderId)
+        gatewayPaymentId = try c.decodeIfPresent(String.self, forKey: .gatewayPaymentId)
+        status           = try c.decode(String.self, forKey: .status)
+        createdAt        = try c.decodeIfPresent(String.self, forKey: .createdAt)
+    }
 }
