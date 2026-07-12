@@ -218,8 +218,14 @@ export default function AdminSeatsPage() {
                                                             ? 'bg-fuchsia-500/30 border-fuchsia-500/50 text-fuchsia-300 hover:bg-fuchsia-500/50 cursor-pointer'
                                                             : 'bg-red-500/30 border-red-500/50 text-red-300 hover:bg-red-500/50 cursor-pointer'
                                                         : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 cursor-default'}`}>
-                                            {viewMode === 'expiry' ? '' : isFullDayOccupant ? '✕' : sn.substring(1)}
+                                            {viewMode === 'expiry' ? '' : isFullDayOccupant ? '' : sn.substring(1)}
                                         </button>
+                                        {isFullDayOccupant && (
+                                            <svg className={`absolute inset-0 w-8 h-8 pointer-events-none ${seat.studentGender === 'Female' ? 'text-fuchsia-300' : 'text-red-300'}`} viewBox="0 0 32 32">
+                                                <line x1="3" y1="3" x2="29" y2="29" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                                <line x1="29" y1="3" x2="3" y2="29" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                            </svg>
+                                        )}
                                         {isOtherShiftOccupied && (
                                             <span className="absolute top-0.5 left-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400" />
                                         )}

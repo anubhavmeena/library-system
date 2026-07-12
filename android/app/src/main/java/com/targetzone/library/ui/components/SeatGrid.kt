@@ -1,6 +1,7 @@
 package com.targetzone.library.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,7 +20,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -257,11 +260,18 @@ private fun SeatButton(
             text = when {
                 expiryDays != null -> "$expiryDays"
                 expiryView         -> ""
-                isFullDayOccupant  -> "✕"
+                isFullDayOccupant  -> ""
                 else                -> label.drop(1)
             },
             fontSize = 9.sp, color = textColor, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
         )
+        if (isFullDayOccupant) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                val strokeWidthPx = 1.5.dp.toPx()
+                drawLine(color = textColor, start = Offset(0f, 0f), end = Offset(size.width, size.height), strokeWidth = strokeWidthPx, cap = StrokeCap.Round)
+                drawLine(color = textColor, start = Offset(size.width, 0f), end = Offset(0f, size.height), strokeWidth = strokeWidthPx, cap = StrokeCap.Round)
+            }
+        }
         if (isOtherShiftBooked) {
             Box(
                 Modifier

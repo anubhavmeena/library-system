@@ -368,7 +368,7 @@ struct AdminSeatsView: View {
             let isFullDayOccupant = selectedShift != "FULL_DAY" && seat.isOccupied && seat.shift == "FULL_DAY"
             let isOtherShiftBooked = selectedShift != "FULL_DAY" && !seat.isOccupied && seat.otherShiftOccupied
             ZStack(alignment: .topLeading) {
-                Text(viewMode == .expiry ? "" : (isFullDayOccupant ? "✕" : String(seat.seatNumber.dropFirst())))
+                Text(viewMode == .expiry ? "" : (isFullDayOccupant ? "" : String(seat.seatNumber.dropFirst())))
                     .font(.system(size: 9, weight: .medium))
                     .foregroundColor(fg)
                     .frame(width: seatSize, height: seatSize)
@@ -377,6 +377,17 @@ struct AdminSeatsView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .contentShape(Rectangle())
                     .onTapGesture { if seat.isOccupied { tappedSeat = seat } }
+                if isFullDayOccupant {
+                    Path { path in
+                        path.move(to: CGPoint(x: 0, y: 0))
+                        path.addLine(to: CGPoint(x: seatSize, y: seatSize))
+                        path.move(to: CGPoint(x: seatSize, y: 0))
+                        path.addLine(to: CGPoint(x: 0, y: seatSize))
+                    }
+                    .stroke(fg, lineWidth: 1.5)
+                    .frame(width: seatSize, height: seatSize)
+                    .allowsHitTesting(false)
+                }
                 if isOtherShiftBooked {
                     Circle()
                         .fill(Color.emerald)
