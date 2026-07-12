@@ -69,6 +69,8 @@
 		834C88D7DC5E42AB29EC5570 /* AdminRevenueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832F2F0687285A3D4A9EB87D /* AdminRevenueView.swift */; };
 		A5AD7FC0FBDA4744FC6776CA /* AdminSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 927F9E46108C1588B64A9B86 /* AdminSettingsView.swift */; };
 		AE9BAB912CC77B44A82830E6 /* AdminAppSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2621F3E59DAB15F30443A0 /* AdminAppSettingsView.swift */; };
+		2475FAC2E273A6EF080A9756 /* AdminPaymentVerificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72B925F575572D4EB003FEAA /* AdminPaymentVerificationsView.swift */; };
+		658707718E64E2B1F6222B35 /* UpiQrGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C5DCE9F8605EFBB34A1DF8 /* UpiQrGenerator.swift */; };
 		C0A0F6B298A6BD2D4E0F07B7 /* CashfreeWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF9BCF79E23535136844043 /* CashfreeWebView.swift */; };
 		CF01F3EBDA786E984EB1CF4B /* cashfree_checkout.html in Resources */ = {isa = PBXBuildFile; fileRef = C7013F53C0983DAE556D6072 /* cashfree_checkout.html */; };
 /* End PBXBuildFile section */
@@ -138,6 +140,8 @@
 		832F2F0687285A3D4A9EB87D /* AdminRevenueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminRevenueView.swift; sourceTree = "<group>"; };
 		927F9E46108C1588B64A9B86 /* AdminSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSettingsView.swift; sourceTree = "<group>"; };
 		AC2621F3E59DAB15F30443A0 /* AdminAppSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminAppSettingsView.swift; sourceTree = "<group>"; };
+		72B925F575572D4EB003FEAA /* AdminPaymentVerificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminPaymentVerificationsView.swift; sourceTree = "<group>"; };
+		E4C5DCE9F8605EFBB34A1DF8 /* UpiQrGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpiQrGenerator.swift; sourceTree = "<group>"; };
 		BEF9BCF79E23535136844043 /* CashfreeWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CashfreeWebView.swift; sourceTree = "<group>"; };
 		C7013F53C0983DAE556D6072 /* cashfree_checkout.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = cashfree_checkout.html; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -296,6 +300,8 @@
 				832F2F0687285A3D4A9EB87D /* AdminRevenueView.swift */,
 				927F9E46108C1588B64A9B86 /* AdminSettingsView.swift */,
 				AC2621F3E59DAB15F30443A0 /* AdminAppSettingsView.swift */,
+				72B925F575572D4EB003FEAA /* AdminPaymentVerificationsView.swift */,
+				E4C5DCE9F8605EFBB34A1DF8 /* UpiQrGenerator.swift */,
 			);
 			path = Admin;
 			sourceTree = "<group>";
@@ -484,6 +490,8 @@
 				834C88D7DC5E42AB29EC5570 /* AdminRevenueView.swift in Sources */,
 				A5AD7FC0FBDA4744FC6776CA /* AdminSettingsView.swift in Sources */,
 				AE9BAB912CC77B44A82830E6 /* AdminAppSettingsView.swift in Sources */,
+				2475FAC2E273A6EF080A9756 /* AdminPaymentVerificationsView.swift in Sources */,
+				658707718E64E2B1F6222B35 /* UpiQrGenerator.swift in Sources */,
 				C0A0F6B298A6BD2D4E0F07B7 /* CashfreeWebView.swift in Sources */,
 				5115F879ED5C41D0917F979F /* SplashView.swift in Sources */,
 			);
