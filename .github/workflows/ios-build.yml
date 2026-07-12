@@ -1,0 +1,33 @@
+name: iOS Build
+
+# Compiles the iOS app on a macOS runner to catch Swift errors before they
+# land — there's no shared Xcode scheme checked into the repo, so this builds
+# the app target directly against the simulator SDK (no code signing needed
+# just to confirm it compiles).
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build LibrarySystem (iOS Simulator, no signing)
+        run: |
+          xcodebuild build \
+            -project ios/LibrarySystem/LibrarySystem.xcodeproj \
+            -target LibrarySystem \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
