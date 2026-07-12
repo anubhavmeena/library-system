@@ -242,9 +242,11 @@ struct AdminStudentDetailView: View {
                     }
             } else {
                 Text(s.name).font(.headlineMedium).foregroundColor(.textPrimary)
-                    .onLongPressGesture(minimumDuration: 0.5) {
-                        beginEditing(s, field: .name, value: s.name)
-                    }
+                    .simultaneousGesture(
+                        LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                            beginEditing(s, field: .name, value: s.name)
+                        }
+                    )
             }
         }
     }
@@ -256,6 +258,10 @@ struct AdminStudentDetailView: View {
     // to fill in, not just an already-populated one. No explicit save/cancel
     // buttons: submitting the keyboard (Return) or tapping away (which resigns
     // focus via the screen's existing dismissKeyboardOnTap()) both commit it.
+    // Uses simultaneousGesture (not onLongPressGesture, which is exclusive) so
+    // this doesn't compete with — and block — the page's ScrollView drag
+    // gesture; these rows span most of the visible screen at the top of the
+    // page, so onLongPressGesture there made the whole page feel unscrollable.
     private func editableInfoRow(_ s: StudentDetail, label: String, value: String, field: ProfileField,
                                   keyboard: UIKeyboardType = .default, placeholder: String = "") -> some View {
         Group {
@@ -279,9 +285,11 @@ struct AdminStudentDetailView: View {
             } else {
                 InfoRow(label: label, value: value.isEmpty ? "—" : value)
                     .contentShape(Rectangle())
-                    .onLongPressGesture(minimumDuration: 0.5) {
-                        beginEditing(s, field: field, value: value)
-                    }
+                    .simultaneousGesture(
+                        LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                            beginEditing(s, field: field, value: value)
+                        }
+                    )
             }
         }
     }
@@ -307,9 +315,11 @@ struct AdminStudentDetailView: View {
             } else {
                 InfoRow(label: "Gender", value: value.isEmpty ? "—" : value.capitalized)
                     .contentShape(Rectangle())
-                    .onLongPressGesture(minimumDuration: 0.5) {
-                        beginEditing(s, field: .gender, value: value)
-                    }
+                    .simultaneousGesture(
+                        LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                            beginEditing(s, field: .gender, value: value)
+                        }
+                    )
             }
         }
     }
