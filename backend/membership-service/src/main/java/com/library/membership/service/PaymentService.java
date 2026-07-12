@@ -441,7 +441,7 @@ public class PaymentService {
                 Map<String, Object> customerDetails = new HashMap<>();
                 customerDetails.put("customer_id",    userId);
                 customerDetails.put("customer_name",  user.getName()   != null && !user.getName().isBlank()   ? user.getName()   : "Library Student");
-                customerDetails.put("customer_phone", user.getMobile() != null && !user.getMobile().isBlank() ? user.getMobile() : "9999999999");
+                customerDetails.put("customer_phone", sanitizePhone(user.getMobile()));
                 if (user.getEmail() != null && !user.getEmail().isBlank()) {
                     customerDetails.put("customer_email", user.getEmail());
                 }
@@ -514,6 +514,22 @@ public class PaymentService {
         return "production".equals(cashfreeEnv.trim())
                 ? "https://api.cashfree.com"
                 : "https://sandbox.cashfree.com";
+    }
+
+    // Defense-in-depth: Cashfree rejects customer_phone values containing
+    // anything but digits, and legacy/dirty data (e.g. a mobile stored with a
+    // "+91 xxx-xxxxxxx" format from before auth-service normalized on write)
+    // must not be forwarded as-is, or order creation fails with an opaque
+    // "Payment gateway error" that masks the real cause.
+    private String sanitizePhone(String mobile) {
+        if (mobile == null) return "9999999999";
+        String digits = mobile.replaceAll("[^0-9]", "");
+        if (digits.length() == 12 && digits.startsWith("91")) {
+            digits = digits.substring(2);
+        } else if (digits.length() == 11 && digits.startsWith("0")) {
+            digits = digits.substring(1);
+        }
+        return digits.length() == 10 ? digits : "9999999999";
     }
 
     private UserProfileDto fetchUserProfile(String userId) {

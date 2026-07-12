@@ -44,7 +44,7 @@ pub async fn create_order(
         "customer_details": {
             "customer_id": user_id.to_string(),
             "customer_name": user_name,
-            "customer_phone": user_mobile.unwrap_or("0000000000"),
+            "customer_phone": sanitize_phone(user_mobile),
             "customer_email": user_email.unwrap_or(""),
         }
     });
@@ -116,6 +116,22 @@ pub async fn verify_payment(
         .map_err(|e| AppError::Internal(format!("Cashfree verify parse error: {e}")))?;
 
     Ok(data["order_status"].as_str() == Some("PAID"))
+}
+
+// Defense-in-depth: Cashfree rejects customer_phone values containing
+// anything but digits, and legacy/dirty data (e.g. a mobile stored with a
+// "+91 xxx-xxxxxxx" format from before auth::normalize_contact normalized on
+// write) must not be forwarded as-is, or order creation fails with an opaque
+// 500 that masks the real cause.
+fn sanitize_phone(mobile: Option<&str>) -> String {
+    let Some(mobile) = mobile else { return "0000000000".to_string() };
+    let mut digits: String = mobile.chars().filter(|c| c.is_ascii_digit()).collect();
+    if digits.len() == 12 && digits.starts_with("91") {
+        digits = digits[2..].to_string();
+    } else if digits.len() == 11 && digits.starts_with('0') {
+        digits = digits[1..].to_string();
+    }
+    if digits.len() == 10 { digits } else { "0000000000".to_string() }
 }
 
 fn random_suffix() -> String {

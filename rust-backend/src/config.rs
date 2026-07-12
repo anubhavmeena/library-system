@@ -117,11 +117,22 @@ impl Config {
             admin_email: env::var("ADMIN_EMAIL")
                 .unwrap_or_else(|_| "admin@targetzone.co.in".to_string()),
             admin_whatsapp: env::var("ADMIN_WHATSAPP").unwrap_or_default(),
+            // Normalized the same way self-service login normalizes a typed
+            // contact (services::auth::normalize_contact) — otherwise an
+            // ADMIN_PHONES entry written as "+91 xxxxxxxxxx" would silently
+            // never match the bare-digits mobile stored on the user row.
             admin_phones: env::var("ADMIN_PHONES")
                 .unwrap_or_default()
                 .split(',')
-                .filter(|s| !s.trim().is_empty())
-                .map(|s| s.trim().to_string())
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .filter_map(|s| match crate::services::auth::normalize_contact(s) {
+                    Ok(normalized) => Some(normalized),
+                    Err(_) => {
+                        tracing::warn!("Ignoring malformed entry in ADMIN_PHONES: {s}");
+                        None
+                    }
+                })
                 .collect(),
             imap_host: env::var("IMAP_HOST").unwrap_or_else(|_| "localhost".to_string()),
             imap_port: env::var("IMAP_PORT")

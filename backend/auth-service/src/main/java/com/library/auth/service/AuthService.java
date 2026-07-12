@@ -45,12 +45,15 @@ public class AuthService {
         adminPhones = Arrays.stream(adminPhonesRaw.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
+                .map(this::safeNormalizeContact)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
     }
 
     // ── OTP Flow ──────────────────────────────────────────────────────────────
 
     public void sendOtp(String contact, String contactType) {
+        contact = normalizeContact(contact);
         String otp = checkCooldownAndGenerateOtp(contact);
         otpService.sendOtp(contact, contactType, otp);
         log.info("OTP sent to {} ({})", contact, contactType);
@@ -60,6 +63,7 @@ public class AuthService {
     // chain; channel = "SMS" forces apitxt/Twilio, skipping WhatsApp — used by
     // the client's "Send via SMS instead" fallback.
     public void sendOtp(String contact, String contactType, String channel) {
+        contact = normalizeContact(contact);
         if (channel == null) {
             sendOtp(contact, contactType);
             return;
@@ -85,6 +89,7 @@ public class AuthService {
     }
 
     public OtpVerifyResponse verifyOtp(String contact, String otp) {
+        contact = normalizeContact(contact);
         String redisKey = "otp:" + contact;
         String storedOtp = redisTemplate.opsForValue().get(redisKey);
 
@@ -163,11 +168,12 @@ public class AuthService {
     }
 
     public AuthResponse adminLogin(LoginRequest request) {
+        String contact = normalizeContact(request.getContact());
         User user = userRepository
-                .findByMobileOrEmail(request.getContact(), request.getContact())
+                .findByMobileOrEmail(contact, contact)
                 .orElseThrow(() -> new RuntimeException("Admin not found."));
 
-        boolean isAdminPhone = request.getContact() != null && adminPhones.contains(request.getContact());
+        boolean isAdminPhone = adminPhones.contains(contact);
         if (user.getRole() != User.Role.ADMIN && !isAdminPhone) {
             throw new RuntimeException("Access denied. Not an admin account.");
         }
@@ -179,6 +185,40 @@ public class AuthService {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    // Mirrors ImportService's admin-import normalization so a student who is
+    // both admin-added and self-registers via OTP resolves to the same row —
+    // strips formatting (dashes/spaces/+) and any leading "91"/"0" so mobiles
+    // are always stored/looked-up as bare 10-digit strings (see auth-service
+    // CLAUDE.md "Mobile Number Formatting"). Emails pass through unchanged.
+    private String normalizeContact(String contact) {
+        if (contact == null) {
+            throw new IllegalArgumentException("Contact is required.");
+        }
+        contact = contact.trim();
+        if (contact.contains("@")) {
+            return contact;
+        }
+        String digits = contact.replaceAll("[^0-9]", "");
+        if (digits.length() == 12 && digits.startsWith("91")) {
+            digits = digits.substring(2);
+        } else if (digits.length() == 11 && digits.startsWith("0")) {
+            digits = digits.substring(1);
+        }
+        if (digits.length() != 10) {
+            throw new IllegalArgumentException("Please enter a valid 10-digit mobile number.");
+        }
+        return digits;
+    }
+
+    private String safeNormalizeContact(String contact) {
+        try {
+            return normalizeContact(contact);
+        } catch (IllegalArgumentException e) {
+            log.warn("Ignoring malformed entry in app.admin-phones: {}", contact);
+            return null;
+        }
+    }
 
     private User.Role effectiveRole(User user) {
         return (user.getMobile() != null && adminPhones.contains(user.getMobile()))

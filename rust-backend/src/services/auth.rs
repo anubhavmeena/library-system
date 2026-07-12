@@ -8,8 +8,32 @@ use chrono::NaiveDate;
 use sqlx::PgPool;
 use std::sync::Arc;
 
+/// Mirrors Java's `AuthService.normalizeContact` and `admin::import_student`'s
+/// digit-stripping: without this, a self-registering/logging-in student whose
+/// typed number carries formatting (e.g. "+91 861-9679323") never matches the
+/// bare-digits row an admin import created for the same person, so they land
+/// on a second, empty account with no membership/booking history. Emails pass
+/// through unchanged.
+pub(crate) fn normalize_contact(contact: &str) -> crate::error::Result<String> {
+    let contact = contact.trim();
+    if contact.contains('@') {
+        return Ok(contact.to_string());
+    }
+    let mut digits: String = contact.chars().filter(|c| c.is_ascii_digit()).collect();
+    if digits.len() == 12 && digits.starts_with("91") {
+        digits = digits[2..].to_string();
+    } else if digits.len() == 11 && digits.starts_with('0') {
+        digits = digits[1..].to_string();
+    }
+    if digits.len() != 10 {
+        return Err(AppError::BadRequest("Please enter a valid 10-digit mobile number.".into()));
+    }
+    Ok(digits)
+}
+
 pub async fn send_otp(state: &Arc<AppState>, contact: &str, channel: Option<&str>) -> crate::error::Result<()> {
-    otp::send_otp_channel(state, contact, channel).await
+    let contact = normalize_contact(contact)?;
+    otp::send_otp_channel(state, &contact, channel).await
 }
 
 pub async fn verify_otp(
@@ -17,12 +41,13 @@ pub async fn verify_otp(
     contact: &str,
     code: &str,
 ) -> crate::error::Result<(String, bool)> {
-    let session_token = otp::verify_otp(state, contact, code).await?;
+    let contact = normalize_contact(contact)?;
+    let session_token = otp::verify_otp(state, &contact, code).await?;
 
     let is_new_user = if contact.contains('@') {
-        user_exists_by_email(&state.db, contact).await?
+        user_exists_by_email(&state.db, &contact).await?
     } else {
-        user_exists_by_mobile(&state.db, contact).await?
+        user_exists_by_mobile(&state.db, &contact).await?
     };
 
     Ok((session_token, !is_new_user))
@@ -134,16 +159,17 @@ pub async fn admin_login(
     contact: &str,
     otp_code: &str,
 ) -> crate::error::Result<(String, User)> {
-    otp::verify_otp_direct(state, contact, otp_code).await?;
+    let contact = normalize_contact(contact)?;
+    otp::verify_otp_direct(state, &contact, otp_code).await?;
 
     let user = if contact.contains('@') {
         sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
-            .bind(contact)
+            .bind(&contact)
             .fetch_optional(&state.db)
             .await?
     } else {
         sqlx::query_as::<_, User>("SELECT * FROM users WHERE mobile = $1")
-            .bind(contact)
+            .bind(&contact)
             .fetch_optional(&state.db)
             .await?
     }
@@ -229,6 +255,25 @@ mod tests {
             created_at: chrono::Local::now().naive_local(),
             updated_at: None,
         }
+    }
+
+    #[test]
+    fn normalize_contact_strips_dashes_spaces_and_country_code() {
+        assert_eq!(normalize_contact("+91 861-9679323").unwrap(), "8619679323");
+        assert_eq!(normalize_contact("918619679323").unwrap(), "8619679323");
+        assert_eq!(normalize_contact("+918619679323").unwrap(), "8619679323");
+        assert_eq!(normalize_contact("8619679323").unwrap(), "8619679323");
+    }
+
+    #[test]
+    fn normalize_contact_leaves_email_unchanged_but_trims() {
+        assert_eq!(normalize_contact("  roshan@example.com  ").unwrap(), "roshan@example.com");
+    }
+
+    #[test]
+    fn normalize_contact_rejects_wrong_digit_count() {
+        assert!(normalize_contact("12345").is_err());
+        assert!(normalize_contact("091-8619679323").is_err());
     }
 
     #[test]

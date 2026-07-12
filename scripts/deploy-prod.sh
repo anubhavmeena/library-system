@@ -38,7 +38,7 @@
 set -euo pipefail
 
 SSH_KEY="$HOME/.ssh/my-ec2-key.pem"
-SSH_HOST="ubuntu@13.50.206.73"
+SSH_HOST="ubuntu@targetzone.co.in"
 REMOTE_REPO="/home/ubuntu/library-system"
 REMOTE_WEBROOT="/var/www/library-frontend"
 SITE_HOST="targetzone.co.in"
