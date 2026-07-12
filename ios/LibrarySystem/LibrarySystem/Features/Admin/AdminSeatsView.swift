@@ -1,15 +1,5 @@
 import SwiftUI
 
-// Measures the seat grid's real, un-scaled content size so the fit-to-view
-// zoom scale can be computed from actual layout rather than guessed pixel
-// math (see zoomableSeatGrid below).
-private struct SeatGridSizeKey: PreferenceKey {
-    static var defaultValue: CGSize = .zero
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
-        value = nextValue()
-    }
-}
-
 struct AdminSeatsView: View {
     @ObservedObject var vm: AdminViewModel
 
@@ -22,37 +12,35 @@ struct AdminSeatsView: View {
     @State private var showStudentDetail = false
     @State private var tappedStudentId = ""
 
-    // Pinch-to-zoom / pan for the seat grid specifically (not the legend or
-    // the rest of the page). The grid starts at its natural 1.0 scale — bigger
-    // than the fixed-height container — so it's scrollable/pannable right from
-    // the start rather than needing a pinch first. seatMapFitScale is computed
-    // at runtime from the grid's real measured size vs. the available width
-    // (see zoomableSeatGrid) and only used as the pinch-out floor and the
-    // double-tap reset target, so you can always zoom back out to see every
-    // row at once, but that's no longer the load-time default.
-    @State private var seatMapScale: CGFloat = 1.0
-    @State private var seatMapLastScale: CGFloat = 1.0
-    @State private var seatMapOffset: CGSize = .zero
-    @State private var seatMapLastOffset: CGSize = .zero
-    @State private var seatMapFitScale: CGFloat = 1.0
-
     private enum SeatViewMode { case standard, expiry }
 
     private let shifts = ["MORNING", "EVENING", "FULL_DAY"]
 
-    // Mirrors the web admin seat map (frontend/src/pages/admin/AdminSeatsPage.jsx)
-    // exactly: a fixed A-D row layout, each row split into a left block (seats
-    // 1-14) and a right block (15-28) with an aisle between them, and each
-    // block arranged as two stacked sub-rows of 7 (back-to-back desk pairs) —
-    // not one long row of 14, which is what made the previous layout too wide
-    // to fit a phone screen. Two seats are physically blocked (pillars) on
-    // both clients regardless of what the backend returns for them.
+    // Mirrors the Android seat map (SeatGrid.kt) exactly: a fixed A-D row
+    // layout, each row split into a left block (seats 1-14) and a right block
+    // (15-28) with an aisle between them, each block arranged as two stacked
+    // sub-rows of 7 (back-to-back desk pairs). The grid has no vertical scroll
+    // of its own — all four rows just lay out top to bottom at a fixed,
+    // readable cell size — but the row content is wider than the screen, so
+    // the whole thing (entry label, rows, footer labels) sits inside one
+    // horizontally-scrolling container, exactly like Android's
+    // Column.horizontalScroll(). Two seats are physically blocked (pillars)
+    // on both clients regardless of what the backend returns for them.
     private let seatMapRowLabels = ["A", "B", "C", "D"]
     private let inactiveSeatNumbers: Set<String> = ["B8", "B18"]
     private let leftTopSeats     = [13, 11, 9, 7, 5, 3, 1]
     private let leftBottomSeats  = [14, 12, 10, 8, 6, 4, 2]
     private let rightTopSeats    = [15, 17, 19, 21, 23, 25, 27]
     private let rightBottomSeats = [16, 18, 20, 22, 24, 26, 28]
+
+    // Matches Android's SEAT_SIZE/SEAT_GAP/AISLE_W/LABEL_W (in dp, used here
+    // 1:1 as points).
+    private let seatSize: CGFloat = 28
+    private let seatGap: CGFloat = 4
+    private let aisleWidth: CGFloat = 28
+    private let rowLabelWidth: CGFloat = 18
+    private var sectionWidth: CGFloat { 7 * seatSize + 6 * seatGap }
+    private var sectionHeight: CGFloat { seatSize * 2 + 6 }
 
     private var dateString: String {
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: selectedDate)
@@ -207,25 +195,19 @@ struct AdminSeatsView: View {
                 }
                 .padding(.horizontal, 16)
 
-                // Seat grid (admin read-only version — tap to see occupant).
-                // The grid itself lives in a fixed-height, pinch-to-zoom/pan
-                // region (zoomableSeatGrid) separate from the legend, which
-                // stays fixed size — zooming the legend text wouldn't be
-                // useful. The grid loads pre-scaled to a computed fit-to-view
-                // level so all four rows are visible immediately; pinching in
-                // zooms further for a closer look, and out only as far back
-                // as that same fit level.
+                // Seat grid (admin read-only version — tap a booked seat to see
+                // its occupant). Fixed vertically — all four rows just lay out
+                // top to bottom, no vertical scroll or zoom of their own — but
+                // horizontally scrollable, since the row content (14 seats a
+                // side plus aisle) is wider than the screen. The entry label
+                // and footer labels scroll in sync with the rows since they're
+                // all inside the same ScrollView, so they stay lined up with
+                // the aisle/seats at any scroll position.
                 VStack(spacing: 10) {
                     seatMapLegend
-                    floorPlanLabel("ENTRY")
-                    zoomableSeatGrid(map)
-                    HStack(spacing: 8) {
-                        floorPlanLabel("EXIT")
-                        floorPlanLabel("RO / PANTRY")
-                        floorPlanLabel("WASHROOM")
-                    }
-                    Text("Pinch to zoom · drag to pan · double-tap to reset")
-                        .font(.system(size: 10))
+                    seatGridScrollView(map)
+                    Text("Tap a booked seat to view student details")
+                        .font(.system(size: 11))
                         .foregroundColor(.textMuted)
                 }
             }
@@ -262,108 +244,70 @@ struct AdminSeatsView: View {
         }
     }
 
-    // Pinch-to-zoom + drag-to-pan container for the seat grid. Fixed height
-    // via GeometryReader so the scaled/offset content has well-defined
-    // clipping bounds instead of blowing out the page layout. A hidden
-    // background GeometryReader measures the grid's real un-scaled size (via
-    // SeatGridSizeKey) so seatMapFitScale can be computed from actual layout —
-    // min(containerWidth/contentWidth, containerHeight/contentHeight, 1.0) —
-    // rather than assuming a fixed cell size happens to fit every screen.
-    // The grid loads at its natural (unscaled) size — bigger than the 340pt
-    // container, so it's scrollable/pannable immediately without needing to
-    // pinch first — and fit scale only serves as the pinch-out floor and the
-    // double-tap reset target (a way to zoom all the way out to see every row
-    // at once), not the starting state.
-    private func zoomableSeatGrid(_ map: SeatMapDto) -> some View {
-        GeometryReader { geo in
-            adminSeatGrid(map)
-                .padding(16)
-                .background(
-                    GeometryReader { contentGeo in
-                        Color.clear.preference(key: SeatGridSizeKey.self, value: contentGeo.size)
-                    }
-                )
-                .frame(width: geo.size.width, height: geo.size.height)
-                .scaleEffect(seatMapScale)
-                .offset(seatMapOffset)
-                .clipped()
-                .contentShape(Rectangle())
-                .simultaneousGesture(
-                    SimultaneousGesture(
-                        MagnificationGesture()
-                            .onChanged { value in
-                                seatMapScale = min(max(seatMapLastScale * value, seatMapFitScale), 4.0)
-                            }
-                            .onEnded { _ in
-                                seatMapLastScale = seatMapScale
-                                if seatMapScale <= seatMapFitScale + 0.01 {
-                                    seatMapScale = seatMapFitScale
-                                    seatMapLastScale = seatMapFitScale
-                                    seatMapOffset = .zero
-                                    seatMapLastOffset = .zero
-                                }
-                            },
-                        DragGesture()
-                            .onChanged { value in
-                                seatMapOffset = CGSize(
-                                    width: seatMapLastOffset.width + value.translation.width,
-                                    height: seatMapLastOffset.height + value.translation.height
-                                )
-                            }
-                            .onEnded { _ in
-                                seatMapLastOffset = seatMapOffset
-                            }
-                    )
-                )
-                .onTapGesture(count: 2) {
-                    withAnimation(.spring()) {
-                        seatMapScale = seatMapFitScale
-                        seatMapLastScale = seatMapFitScale
-                        seatMapOffset = .zero
-                        seatMapLastOffset = .zero
-                    }
+    // Fixed vertically, scrollable horizontally — matches Android's SeatGrid
+    // (a Column with .horizontalScroll(), no vertical scroll or zoom of its
+    // own). The entry label, all four rows, and the footer labels are one
+    // continuous piece of content here so they all move together as the user
+    // swipes left/right; nothing is a separately-positioned sibling that
+    // could drift out of alignment with the aisle.
+    private func seatGridScrollView(_ map: SeatMapDto) -> some View {
+        ScrollView(.horizontal, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 4) {
+                // "ENTRY" label pinned above the aisle column
+                HStack(spacing: 0) {
+                    Color.clear.frame(width: rowLabelWidth + seatGap)
+                    Color.clear.frame(width: sectionWidth)
+                    Text("ENTRY")
+                        .font(.system(size: 7, weight: .medium))
+                        .foregroundColor(.textMuted)
+                        .tracking(1)
+                        .frame(width: aisleWidth)
                 }
-                .onPreferenceChange(SeatGridSizeKey.self) { size in
-                    guard size.width > 0, size.height > 0,
-                          geo.size.width > 0, geo.size.height > 0 else { return }
-                    // Only used as the pinch-out floor / double-tap reset target —
-                    // the displayed scale starts at its natural 1.0 default (see
-                    // seatMapScale's declaration) so the grid is scrollable right
-                    // away, not auto-fitted-and-static on load.
-                    seatMapFitScale = min(geo.size.width / size.width, geo.size.height / size.height, 1.0)
+
+                ForEach(seatMapRowLabels, id: \.self) { row in
+                    let rowSeats = map.seatsByRow[row] ?? []
+                    HStack(alignment: .center, spacing: 0) {
+                        Text(row)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.textSub)
+                            .frame(width: rowLabelWidth)
+                        Color.clear.frame(width: seatGap)
+
+                        seatSection(row: row, topSeats: leftTopSeats, bottomSeats: leftBottomSeats, rowSeats: rowSeats)
+
+                        // Aisle with a vertical divider line, like Android's SeatGrid
+                        ZStack {
+                            Rectangle().fill(Color.dividerColor.opacity(0.3)).frame(width: 1)
+                        }
+                        .frame(width: aisleWidth, height: sectionHeight)
+
+                        seatSection(row: row, topSeats: rightTopSeats, bottomSeats: rightBottomSeats, rowSeats: rowSeats)
+                    }
+                    .padding(.bottom, 20)
                 }
+
+                // Footer: labels for what's beyond row D
+                HStack(spacing: 4) {
+                    Color.clear.frame(width: rowLabelWidth + seatGap)
+                    floorPlanLabel("EXIT")
+                    floorPlanLabel("RO / PANTRY")
+                    floorPlanLabel("WASHROOM")
+                }
+            }
+            .padding(16)
         }
-        .frame(height: 340)
     }
 
-    private func adminSeatGrid(_ map: SeatMapDto) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            ForEach(seatMapRowLabels, id: \.self) { row in
-                let rowSeats = map.seatsByRow[row] ?? []
-                HStack(alignment: .top, spacing: 6) {
-                    Text(row).font(.labelSmall).foregroundColor(.textMuted)
-                        .frame(width: 14).padding(.top, 4)
-
-                    VStack(spacing: 3) {
-                        HStack(spacing: 3) {
-                            ForEach(leftTopSeats, id: \.self) { n in seatCell(row: row, number: n, rowSeats: rowSeats) }
-                        }
-                        HStack(spacing: 3) {
-                            ForEach(leftBottomSeats, id: \.self) { n in seatCell(row: row, number: n, rowSeats: rowSeats) }
-                        }
-                    }
-
-                    Rectangle().fill(Color.clear).frame(width: 14)
-
-                    VStack(spacing: 3) {
-                        HStack(spacing: 3) {
-                            ForEach(rightTopSeats, id: \.self) { n in seatCell(row: row, number: n, rowSeats: rowSeats) }
-                        }
-                        HStack(spacing: 3) {
-                            ForEach(rightBottomSeats, id: \.self) { n in seatCell(row: row, number: n, rowSeats: rowSeats) }
-                        }
-                    }
-                }
+    // One seven-seat-by-two-sub-row block (left or right half of a row), with
+    // a thin divider between the sub-rows matching Android's SeatGrid.
+    private func seatSection(row: String, topSeats: [Int], bottomSeats: [Int], rowSeats: [SeatInfoItem]) -> some View {
+        VStack(spacing: 2) {
+            HStack(spacing: seatGap) {
+                ForEach(topSeats, id: \.self) { n in seatCell(row: row, number: n, rowSeats: rowSeats) }
+            }
+            Rectangle().fill(Color.dividerColor.opacity(0.4)).frame(height: 0.5)
+            HStack(spacing: seatGap) {
+                ForEach(bottomSeats, id: \.self) { n in seatCell(row: row, number: n, rowSeats: rowSeats) }
             }
         }
     }
@@ -372,9 +316,10 @@ struct AdminSeatsView: View {
     private func seatCell(row: String, number: Int, rowSeats: [SeatInfoItem]) -> some View {
         let seatNumber = "\(row)\(number)"
         if inactiveSeatNumbers.contains(seatNumber) {
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color.navyMid.opacity(0.5))
-                .frame(width: 22, height: 22)
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.navyDeep.opacity(0.5))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.dividerColor.opacity(0.2), lineWidth: 0.5))
+                .frame(width: seatSize, height: seatSize)
         } else {
             adminSeatCell(seat(row: row, number: number, in: rowSeats))
         }
@@ -382,21 +327,19 @@ struct AdminSeatsView: View {
 
     @ViewBuilder
     private func adminSeatCell(_ seat: SeatInfoItem) -> some View {
-        // Seat cells respond to a double tap, not a single tap — plain views
-        // with onTapGesture(count: 2) rather than Button, since a Button's
-        // own single-tap recognizer would otherwise fire on the first tap of
-        // any double tap anyway.
+        // Single tap, matching Android's SeatGrid — there's no zoom gesture
+        // here for a tap to conflict with any more.
         if viewMode == .expiry, seat.isOccupied, let days = daysToExpiry(seat.membershipEnd) {
             let color = expiryColor(days)
             Text("\(days)")
-                .font(.system(size: 7, weight: .bold))
+                .font(.system(size: 9, weight: .bold))
                 .foregroundColor(color)
-                .frame(width: 22, height: 22)
+                .frame(width: seatSize, height: seatSize)
                 .background(color.opacity(0.18))
                 .overlay(Circle().stroke(color, lineWidth: 1))
                 .clipShape(Circle())
                 .contentShape(Circle())
-                .onTapGesture(count: 2) { tappedSeat = seat }
+                .onTapGesture { tappedSeat = seat }
         } else {
             // Standard view: available seats are muted emerald, occupied seats
             // are colored by gender (matching the web admin seat map) —
@@ -405,14 +348,14 @@ struct AdminSeatsView: View {
             let fg: Color = seat.isOccupied ? (isFemale ? .fuchsia : .redAlert) : .emerald
             let bg: Color = seat.isOccupied ? (isFemale ? Color.fuchsiaFaint : Color.redFaint) : Color.emeraldFaint
             Text(viewMode == .expiry ? "" : String(seat.seatNumber.dropFirst()))
-                .font(.system(size: 7, weight: .medium))
+                .font(.system(size: 9, weight: .medium))
                 .foregroundColor(fg)
-                .frame(width: 22, height: 22)
+                .frame(width: seatSize, height: seatSize)
                 .background(bg)
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(fg, lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(fg, lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
                 .contentShape(Rectangle())
-                .onTapGesture(count: 2) { if seat.isOccupied { tappedSeat = seat } }
+                .onTapGesture { if seat.isOccupied { tappedSeat = seat } }
         }
     }
 
