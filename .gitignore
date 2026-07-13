@@ -9,6 +9,11 @@
 **/*.war
 **/*.class
 
+# Gradle Wrapper jar is a checked-in tool, not a build output — the blanket
+# **/*.jar rule above would otherwise exclude it, breaking any fresh clone
+# (including CI) since ./gradlew has nothing to invoke.
+!android/gradle/wrapper/gradle-wrapper.jar
+
 # ── Node / Frontend ────────────────────────────────────────────────────────────
 frontend/node_modules/
 frontend/dist/
