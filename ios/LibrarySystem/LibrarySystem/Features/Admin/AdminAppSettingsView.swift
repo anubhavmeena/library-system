@@ -88,6 +88,8 @@ struct AdminAppSettingsView: View {
                                 waterTankerRate: Double(waterTankerRate) ?? 0,
                                 couponsEnabled: couponsEnabled)
                         }
+
+                        VersionFooter()
                     }
                     .padding(16)
                 }

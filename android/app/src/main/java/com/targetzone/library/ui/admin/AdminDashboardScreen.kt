@@ -11,8 +11,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.targetzone.library.BuildConfig
 import com.targetzone.library.ui.components.*
 import com.targetzone.library.ui.haptics.rememberLibraryHaptics
 import com.targetzone.library.ui.theme.*
@@ -128,5 +130,14 @@ fun AdminDashboardScreen(vm: AdminViewModel, onNavigate: (String) -> Unit) {
                 }
             }
         }
+
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+            color = TextMuted,
+            fontSize = 12.sp,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
     }
 }

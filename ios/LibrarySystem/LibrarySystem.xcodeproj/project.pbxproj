@@ -52,6 +52,7 @@
 		59146E39058E4CBD8AF4F90F /* AppTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F1E243682784CC7A4E3AFF5 /* AppTextField.swift */; };
 		AD384C14989E4D08B3DB1BE6 /* StatCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1C4CF2C4DB4A1FBDA2D380 /* StatCard.swift */; };
 		1B918BD4DF934086A5DB31DB /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E48096A32644A57AD9E509E /* StatusChip.swift */; };
+		281F04C712D66230755BA0D1 /* VersionFooter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EBE6BF335595CE280E8FA16 /* VersionFooter.swift */; };
 		7F5EAAE638D5434DA13CEE2D /* InfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE35E55B89E24E8C90B4152A /* InfoRow.swift */; };
 		74215C01F8A34914B943E8FB /* SeatGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54ACD5DC40FF4DE0A3C7276D /* SeatGridView.swift */; };
 		D2D4C0A80A1E43019358D14B /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29977CB9597F4948B4B8D622 /* LoadingView.swift */; };
@@ -124,6 +125,7 @@
 		8F1E243682784CC7A4E3AFF5 /* AppTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTextField.swift; sourceTree = "<group>"; };
 		5B1C4CF2C4DB4A1FBDA2D380 /* StatCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatCard.swift; sourceTree = "<group>"; };
 		1E48096A32644A57AD9E509E /* StatusChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusChip.swift; sourceTree = "<group>"; };
+		5EBE6BF335595CE280E8FA16 /* VersionFooter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionFooter.swift; sourceTree = "<group>"; };
 		EE35E55B89E24E8C90B4152A /* InfoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoRow.swift; sourceTree = "<group>"; };
 		54ACD5DC40FF4DE0A3C7276D /* SeatGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatGridView.swift; sourceTree = "<group>"; };
 		29977CB9597F4948B4B8D622 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
@@ -330,6 +332,7 @@
 				8F1E243682784CC7A4E3AFF5 /* AppTextField.swift */,
 				5B1C4CF2C4DB4A1FBDA2D380 /* StatCard.swift */,
 				1E48096A32644A57AD9E509E /* StatusChip.swift */,
+				5EBE6BF335595CE280E8FA16 /* VersionFooter.swift */,
 				EE35E55B89E24E8C90B4152A /* InfoRow.swift */,
 				54ACD5DC40FF4DE0A3C7276D /* SeatGridView.swift */,
 				29977CB9597F4948B4B8D622 /* LoadingView.swift */,
@@ -482,6 +485,7 @@
 				59146E39058E4CBD8AF4F90F /* AppTextField.swift in Sources */,
 				AD384C14989E4D08B3DB1BE6 /* StatCard.swift in Sources */,
 				1B918BD4DF934086A5DB31DB /* StatusChip.swift in Sources */,
+				281F04C712D66230755BA0D1 /* VersionFooter.swift in Sources */,
 				7F5EAAE638D5434DA13CEE2D /* InfoRow.swift in Sources */,
 				74215C01F8A34914B943E8FB /* SeatGridView.swift in Sources */,
 				D2D4C0A80A1E43019358D14B /* LoadingView.swift in Sources */,

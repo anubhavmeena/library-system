@@ -29,6 +29,7 @@ struct ProfileView: View {
                         if editMode { editForm } else { infoSection }
                         uploadSection
                         logoutButton
+                        VersionFooter()
                     }
                     .padding(16)
                 }

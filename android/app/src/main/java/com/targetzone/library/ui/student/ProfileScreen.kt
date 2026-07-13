@@ -3,6 +3,7 @@ package com.targetzone.library.ui.student
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import com.targetzone.library.BuildConfig
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -27,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -219,6 +221,14 @@ fun ProfileScreen(vm: StudentViewModel, onLogout: () -> Unit) {
             tone = ButtonTone.Danger,
             icon = Icons.Default.Logout,
             modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+            color = TextMuted,
+            fontSize = 12.sp,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(32.dp))
     }
