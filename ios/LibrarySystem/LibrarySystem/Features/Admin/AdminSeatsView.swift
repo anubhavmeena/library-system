@@ -9,8 +9,6 @@ struct AdminSeatsView: View {
     @State private var tappedSeat:   SeatInfoItem?
     @State private var showSeatHistory = false
     @State private var viewMode: SeatViewMode = .standard
-    @State private var showStudentDetail = false
-    @State private var tappedStudentId = ""
 
     private enum SeatViewMode { case standard, expiry }
 
@@ -86,14 +84,6 @@ struct AdminSeatsView: View {
             .sheet(item: $tappedSeat, onDismiss: {
                 showSeatHistory = false
                 vm.seatHistory = []
-                // showStudentDetail/tappedStudentId live on this outer view, but the
-                // navigationDestination that reads them is inside the sheet's own
-                // NavigationStack, torn down and recreated fresh each time the sheet
-                // opens. Without resetting here, a still-true showStudentDetail from
-                // a previous seat leaks into the next sheet and immediately
-                // auto-navigates into that stale student before anything is tapped.
-                showStudentDetail = false
-                tappedStudentId = ""
             }) { seat in seatDetailSheet(seat) }
         }
         .onAppear { vm.loadSeatMap(shift: selectedShift, date: dateString) }
@@ -457,9 +447,8 @@ struct AdminSeatsView: View {
                                 Divider().background(Color.dividerColor)
                                 if let name = seat.studentName {
                                     if let sid = seat.studentId {
-                                        Button {
-                                            tappedStudentId = sid
-                                            showStudentDetail = true
+                                        NavigationLink {
+                                            AdminStudentDetailView(vm: vm, studentId: sid)
                                         } label: {
                                             HStack {
                                                 Text("Student").font(.bodySmall).foregroundColor(.textMuted)
@@ -535,9 +524,6 @@ struct AdminSeatsView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { tappedSeat = nil }.foregroundColor(.amber)
                 }
-            }
-            .navigationDestination(isPresented: $showStudentDetail) {
-                AdminStudentDetailView(vm: vm, studentId: tappedStudentId)
             }
         }
     }
