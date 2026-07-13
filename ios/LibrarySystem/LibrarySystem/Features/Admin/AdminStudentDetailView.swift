@@ -186,6 +186,21 @@ struct AdminStudentDetailView: View {
         URL(string: baseURL + urlStr + "?v=\(photoCacheBuster)")
     }
 
+    // Mirrors AdminStudentsView's statusColor(_:) — same six-value mapping,
+    // kept local rather than shared since that file documents this as
+    // intentionally distinct from the coarser shared StatusChip component.
+    private func displayStatusColor(_ status: String) -> Color {
+        switch status {
+        case "NEW":      return .blueSoft
+        case "PAID":     return .emerald
+        case "PENDING":  return .yellowWarn
+        case "GRACE":    return .orange
+        case "EXPIRED":  return .redAlert
+        case "RELEASED": return .redDeep
+        default:         return .textMuted
+        }
+    }
+
     // Mirrors AdminPaymentVerificationsView's screenshot preview sheet.
     private func photoPreviewSheet(_ s: StudentDetail) -> some View {
         NavigationStack {
@@ -239,7 +254,14 @@ struct AdminStudentDetailView: View {
                 }
 
                 editableNameHeader(s)
-                StatusChip(status: s.isActive ? "ACTIVE" : "INACTIVE")
+                if let status = s.displayStatus {
+                    Text(status)
+                        .font(.labelSmall).foregroundColor(displayStatusColor(status))
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(displayStatusColor(status).opacity(0.15))
+                        .overlay(Capsule().stroke(displayStatusColor(status).opacity(0.4)))
+                        .clipShape(Capsule())
+                }
 
                 Text("Long-press a field below to edit it")
                     .font(.labelSmall).foregroundColor(.textMuted)
