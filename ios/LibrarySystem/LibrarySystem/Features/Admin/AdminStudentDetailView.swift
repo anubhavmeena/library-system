@@ -43,6 +43,12 @@ struct AdminStudentDetailView: View {
     @State private var photoCaptureStage: StudentPhotoCaptureStage = .camera
     @State private var photoCaptureError:   String?
     @State private var showPhotoPreview     = false
+    // The backend saves every re-upload to the same deterministic filename
+    // (photo_student_<id>.jpg), so photoUrl itself never changes on a
+    // retake — AsyncImage keys its cache on the URL, so without this it
+    // would keep showing the old photo after a successful re-upload.
+    // Bumped right before each upload so the displayed URL is always fresh.
+    @State private var photoCacheBuster     = UUID().uuidString
 
     private let baseURL = "https://targetzone.co.in"
 
@@ -104,6 +110,7 @@ struct AdminStudentDetailView: View {
                     PassportCropView(image: raw, aspect: 1) { cropped in
                         showPhotoCapture = false
                         if let jpeg = cropped.jpegData(compressionQuality: 0.85), let s = vm.selectedStudent {
+                            photoCacheBuster = UUID().uuidString
                             vm.uploadStudentPhoto(id: s.id, photoData: jpeg)
                         }
                     } onCancel: {
@@ -175,12 +182,16 @@ struct AdminStudentDetailView: View {
         showPhotoCapture = true
     }
 
+    private func photoURL(_ urlStr: String) -> URL? {
+        URL(string: baseURL + urlStr + "?v=\(photoCacheBuster)")
+    }
+
     // Mirrors AdminPaymentVerificationsView's screenshot preview sheet.
     private func photoPreviewSheet(_ s: StudentDetail) -> some View {
         NavigationStack {
             ZStack {
                 Color.black.ignoresSafeArea()
-                if let urlStr = s.photoUrl, let url = URL(string: baseURL + urlStr) {
+                if let urlStr = s.photoUrl, let url = photoURL(urlStr) {
                     AsyncImage(url: url) { phase in
                         if case .success(let img) = phase {
                             img.resizable().scaledToFit()
@@ -203,7 +214,7 @@ struct AdminStudentDetailView: View {
         AppCard(accentColor: .amber) {
             VStack(spacing: 12) {
                 ZStack(alignment: .bottomTrailing) {
-                    if let urlStr = s.photoUrl, let url = URL(string: baseURL + urlStr) {
+                    if let urlStr = s.photoUrl, let url = photoURL(urlStr) {
                         AsyncImage(url: url) { img in img.resizable().scaledToFill() }
                         placeholder: { Color.navyLight }
                             .frame(width: 72, height: 72).clipShape(Circle())

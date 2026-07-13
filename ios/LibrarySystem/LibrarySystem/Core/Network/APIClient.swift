@@ -133,11 +133,23 @@ actor APIClient {
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
         request.httpBody = body
 
-        let (responseData, _) = try await URLSession.shared.data(for: request)
-        let envelope = try decoder.decode(ApiResponse<[String: String]>.self, from: responseData)
-        // Backend returns {"url": "..."} — photoUrl/aadhaarUrl kept only as a fallback
-        // in case an older server build is still returning those keys.
-        return envelope.data?["url"] ?? envelope.data?["photoUrl"] ?? envelope.data?["aadhaarUrl"] ?? ""
+        let (responseData, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+            throw APIError.unauthorized
+        }
+        do {
+            let envelope = try decoder.decode(ApiResponse<[String: String]>.self, from: responseData)
+            guard envelope.success else {
+                throw APIError.serverError(envelope.message ?? "Upload failed")
+            }
+            // Backend returns {"url": "..."} — photoUrl/aadhaarUrl kept only as a fallback
+            // in case an older server build is still returning those keys.
+            return envelope.data?["url"] ?? envelope.data?["photoUrl"] ?? envelope.data?["aadhaarUrl"] ?? ""
+        } catch let e as APIError {
+            throw e
+        } catch {
+            throw APIError.decodingError(error)
+        }
     }
 
     // Multipart upload that decodes the response payload into any Decodable type

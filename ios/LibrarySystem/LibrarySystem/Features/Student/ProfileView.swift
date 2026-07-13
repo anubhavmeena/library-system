@@ -16,6 +16,11 @@ struct ProfileView: View {
     @State private var photoItem:   PhotosPickerItem?
     @State private var aadhaarItem: PhotosPickerItem?
     @State private var showLogoutAlert = false
+    // The backend saves every re-upload to the same deterministic filename
+    // (photo_<userId>.jpg), so photoUrl itself never changes when the photo
+    // is replaced — AsyncImage keys its cache on the URL, so without this it
+    // would keep showing the old photo after a successful re-upload.
+    @State private var photoCacheBuster = UUID().uuidString
 
     private let baseURL = "https://targetzone.co.in"
 
@@ -62,6 +67,7 @@ struct ProfileView: View {
         .onChange(of: photoItem) { item in
             Task {
                 if let data = try? await item?.loadTransferable(type: Data.self) {
+                    photoCacheBuster = UUID().uuidString
                     vm.uploadPhoto(data: data)
                 }
             }
@@ -80,7 +86,7 @@ struct ProfileView: View {
     private var profileHeader: some View {
         VStack(spacing: 12) {
             ZStack(alignment: .bottomTrailing) {
-                if let urlStr = vm.photoUrl, let url = URL(string: baseURL + urlStr) {
+                if let urlStr = vm.photoUrl, let url = URL(string: baseURL + urlStr + "?v=\(photoCacheBuster)") {
                     AsyncImage(url: url) { img in img.resizable().scaledToFill() }
                     placeholder: { Color.navyLight }
                         .frame(width: 90, height: 90)
