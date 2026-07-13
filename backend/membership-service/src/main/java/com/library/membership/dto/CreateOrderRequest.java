@@ -12,4 +12,8 @@ public class CreateOrderRequest {
     private String seatNumber;  // e.g. "A12" — stored denormalised for display
     private String shift;       // MORNING | EVENING | FULL_DAY
     // Required when planType = HALF_DAY
+
+    // Only valid for a fresh booking — rejected if this call turns out to be
+    // a queued renewal (see PaymentService.createOrder).
+    private String couponCode;
 }

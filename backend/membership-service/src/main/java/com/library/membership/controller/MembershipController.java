@@ -1,6 +1,7 @@
 package com.library.membership.controller;
 
 import com.library.membership.dto.*;
+import com.library.membership.service.CouponService;
 import com.library.membership.service.IdCardService;
 import com.library.membership.service.MembershipService;
 import com.library.common.dto.ApiResponse;
@@ -24,6 +25,7 @@ public class MembershipController {
     private final PlanService       planService;
     private final PaymentService    paymentService;
     private final IdCardService     idCardService;
+    private final CouponService     couponService;
 
     // ── Plans (public — no auth needed) ───────────────────────────────────────
 
@@ -125,5 +127,18 @@ public class MembershipController {
             @Valid @RequestBody PaymentVerifyRequest request) {
         return ResponseEntity.ok(
                 ApiResponse.success(paymentService.verifyAndPayDues(userId, request)));
+    }
+
+    // ── Coupons (student-facing) ─────────────────────────────────────────────
+
+    @GetMapping("/api/payments/coupons/active")
+    public ResponseEntity<ApiResponse<List<CouponDto>>> getActiveCoupons() {
+        return ResponseEntity.ok(ApiResponse.success(couponService.listActiveCoupons()));
+    }
+
+    @PostMapping("/api/payments/validate-coupon")
+    public ResponseEntity<ApiResponse<CouponDto>> validateCoupon(
+            @Valid @RequestBody ValidateCouponRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(CouponDto.fromEntity(couponService.validateCoupon(request.getCode()))));
     }
 }

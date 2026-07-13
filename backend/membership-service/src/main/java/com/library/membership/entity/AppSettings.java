@@ -30,4 +30,7 @@ public class AppSettings {
 
     @Column(name = "grace_days")
     private Integer graceDays;
+
+    @Column(name = "coupons_enabled")
+    private boolean couponsEnabled;
 }

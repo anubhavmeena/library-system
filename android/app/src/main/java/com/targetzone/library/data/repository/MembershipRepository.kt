@@ -21,9 +21,19 @@ class MembershipRepository {
         res.body()?.data ?: emptyList()
     }
 
-    suspend fun createOrder(planId: String, seatNumber: String, shift: String): Result<PaymentOrder> = runCatching {
-        val res = api.createOrder(CreateOrderRequest(planId = planId, seatNumber = seatNumber, shift = shift))
+    suspend fun createOrder(planId: String, seatNumber: String, shift: String, couponCode: String? = null): Result<PaymentOrder> = runCatching {
+        val res = api.createOrder(CreateOrderRequest(planId = planId, seatNumber = seatNumber, shift = shift, couponCode = couponCode))
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to create order")
+    }
+
+    suspend fun getActiveCoupons(): Result<List<Coupon>> = runCatching {
+        val res = api.getActiveCoupons()
+        res.body()?.data ?: emptyList()
+    }
+
+    suspend fun validateCoupon(code: String): Result<Coupon> = runCatching {
+        val res = api.validateCoupon(ValidateCouponRequest(code))
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Invalid or inactive coupon code")
     }
 
     suspend fun verifyPayment(req: VerifyPaymentRequest): Result<Membership> = runCatching {

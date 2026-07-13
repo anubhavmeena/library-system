@@ -18,6 +18,7 @@ final class AdminViewModel: ObservableObject {
     @Published var paymentBreakdown: [PaymentBreakdownItem] = []
     @Published var appSettings = AppSettings()
     @Published var appSettingsLoaded = false
+    @Published var coupons: [Coupon] = []
     @Published var importResult: ImportResult?
     @Published var studentDeleted = false
     @Published var feedback:          [FeedbackItem] = []
@@ -255,16 +256,73 @@ final class AdminViewModel: ObservableObject {
     }
 
     func saveAppSettings(wifiName: String?, wifiPassword: String?, upiId: String?, graceDays: Int,
-                        convenienceFee: Double, waterTankerRate: Double) {
+                        convenienceFee: Double, waterTankerRate: Double, couponsEnabled: Bool) {
         isLoading = true
         Task {
             do {
                 appSettings = try await repo.saveAppSettings(
                     wifiName: wifiName, wifiPassword: wifiPassword, upiId: upiId, graceDays: graceDays,
-                    convenienceFee: convenienceFee, waterTankerRate: waterTankerRate)
+                    convenienceFee: convenienceFee, waterTankerRate: waterTankerRate, couponsEnabled: couponsEnabled)
                 successMsg = "Settings saved"
             } catch { self.error = error.localizedDescription }
             isLoading = false
+        }
+    }
+
+    // The backend saves app_settings as one whole object — always fetch the
+    // latest copy right before flipping this one field so we never clobber a
+    // value changed elsewhere (e.g. the App Settings screen) in the meantime.
+    func setCouponsEnabled(_ enabled: Bool) {
+        Task {
+            do {
+                let current = try await repo.getAppSettings()
+                appSettings = try await repo.saveAppSettings(
+                    wifiName: current.wifiName, wifiPassword: current.wifiPassword, upiId: current.upiId,
+                    graceDays: current.graceDays ?? 10, convenienceFee: current.convenienceFee ?? 0,
+                    waterTankerRate: current.waterTankerRate ?? 0, couponsEnabled: enabled)
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    // MARK: - Coupons
+
+    func loadCoupons() {
+        isLoading = true
+        Task {
+            do { coupons = try await repo.getCoupons() }
+            catch { self.error = error.localizedDescription }
+            isLoading = false
+        }
+    }
+
+    func createCoupon(code: String?, discountPercent: Int) {
+        Task {
+            do {
+                let coupon = try await repo.createCoupon(code: code, discountPercent: discountPercent)
+                coupons.insert(coupon, at: 0)
+                successMsg = "Coupon created"
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func setCouponActive(_ coupon: Coupon, active: Bool) {
+        guard let id = coupon.id else { return }
+        Task {
+            do {
+                let updated = try await repo.updateCoupon(id: id, isActive: active)
+                if let idx = coupons.firstIndex(where: { $0.id == updated.id }) { coupons[idx] = updated }
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func deleteCoupon(_ coupon: Coupon) {
+        guard let id = coupon.id else { return }
+        Task {
+            do {
+                try await repo.deleteCoupon(id: id)
+                coupons.removeAll { $0.id == coupon.id }
+                successMsg = "Coupon deleted"
+            } catch { self.error = error.localizedDescription }
         }
     }
 

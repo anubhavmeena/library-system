@@ -36,6 +36,7 @@ export default function AdminLayout() {
         { to: '/admin/gallery',         icon: '◼', label: t('admin.sidebar.nav.gallery') },
         { to: '/admin/inbox',           icon: '✉', label: t('admin.sidebar.nav.inbox'), badge: inboxUnread },
         { to: '/admin/settings',        icon: '⚙', label: t('admin.sidebar.nav.settings') },
+        { to: '/admin/coupons',         icon: '%', label: t('admin.sidebar.nav.coupons') },
         { to: '/admin/cron-jobs',       icon: '⏱', label: t('admin.sidebar.nav.cronJobs') },
     ]
 

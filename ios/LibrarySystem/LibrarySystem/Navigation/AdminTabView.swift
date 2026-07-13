@@ -83,6 +83,11 @@ struct AdminTabView: View {
                         }
                         .buttonStyle(.plain)
 
+                        NavigationLink { AdminCouponsView(vm: vm) } label: {
+                            moreActionRow(icon: "percent", label: "Coupons")
+                        }
+                        .buttonStyle(.plain)
+
                         Button { showRunExpiryConfirm = true } label: {
                             moreActionRow(icon: "clock.arrow.circlepath", label: "Run Expiry Check")
                         }

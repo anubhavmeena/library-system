@@ -411,6 +411,10 @@ export default function AdminSettingsPage() {
     const [graceDays,       setGraceDays]       = useState('')
     const [convenienceFee,  setConvenienceFee]  = useState('')
     const [waterTankerRate, setWaterTankerRate] = useState('')
+    // No UI control here — coupons live on their own admin page — but this
+    // must round-trip through load()/save() unchanged or saving any other
+    // setting here would silently clobber whatever AdminCouponsPage last set.
+    const [couponsEnabled,  setCouponsEnabled]  = useState(true)
 
     const num = v => parseFloat(v) || 0
 
@@ -425,6 +429,7 @@ export default function AdminSettingsPage() {
             setGraceDays(d.graceDays ?? 10)
             setConvenienceFee(d.convenienceFee ?? 0)
             setWaterTankerRate(d.waterTankerRate ?? 0)
+            setCouponsEnabled(d.couponsEnabled ?? true)
         } catch {
             toast.error(t('adminSettings.loadFailed'))
         } finally {
@@ -444,6 +449,7 @@ export default function AdminSettingsPage() {
                 graceDays: parseInt(graceDays || '0', 10),
                 convenienceFee: num(convenienceFee),
                 waterTankerRate: num(waterTankerRate),
+                couponsEnabled,
             })
             toast.success(t('adminSettings.saved'))
         } catch (e) {

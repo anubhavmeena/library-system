@@ -4,6 +4,7 @@ struct BookingView: View {
     @ObservedObject var vm: StudentViewModel
     @State private var step = 1  // 1=plan, 2=seat, 3=confirm
     @State private var showPayment = false
+    @State private var couponInput = ""
 
     private let shifts = ["MORNING", "EVENING", "FULL_DAY"]
 
@@ -33,7 +34,7 @@ struct BookingView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
-        .onAppear { vm.loadPlans() }
+        .onAppear { vm.loadPlans(); vm.loadActiveCoupons() }
         .onChange(of: vm.membership) { _ in step = 1 }
     }
 
@@ -105,7 +106,7 @@ struct BookingView: View {
 
     private func planCard(_ plan: Plan) -> some View {
         let isSelected = vm.selectedPlan?.id == plan.id
-        return Button { vm.selectedPlan = plan } label: {
+        return Button { vm.selectedPlan = plan; vm.clearCoupon() } label: {
             AppCard(accentColor: isSelected ? .amber : nil) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
@@ -208,20 +209,76 @@ struct BookingView: View {
                     }
                     InfoRow(label: "Seat",  value: vm.selectedSeat ?? "—")
                     InfoRow(label: "Shift", value: (vm.selectedPlan?.planType == "FULL_DAY" ? "FULL_DAY" : vm.selectedShift).capitalized)
+                    if let coupon = vm.appliedCoupon {
+                        InfoRow(label: "Discount (\(coupon.code))", value: "− ₹\(String(format: "%.0f", discountAmount))")
+                        Divider().background(Color.dividerColor)
+                        InfoRow(label: "Total", value: "₹\(String(format: "%.0f", totalAmount))")
+                    }
+                }
+            }
+
+            AppCard {
+                if let coupon = vm.appliedCoupon {
+                    HStack {
+                        Text("Coupon \(coupon.code) applied")
+                            .font(.bodyMedium)
+                            .foregroundColor(.emerald)
+                        Spacer()
+                        Button("Remove") { vm.clearCoupon(); couponInput = "" }
+                            .font(.labelMedium)
+                            .foregroundColor(.textSub)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if !vm.activeCoupons.isEmpty {
+                            Text("Available Coupons").font(.labelSmall).foregroundColor(.textMuted)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(vm.activeCoupons, id: \.code) { c in
+                                        Button { couponInput = c.code; vm.applyCoupon(c.code) } label: {
+                                            Text("\(c.code) · \(c.discountPercent)% off")
+                                                .font(.labelSmall)
+                                                .foregroundColor(.amber)
+                                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                                .background(Color.amber.opacity(0.15))
+                                                .clipShape(Capsule())
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        AppTextField(label: "Coupon Code", text: $couponInput, placeholder: "Enter coupon code")
+                            .onChange(of: couponInput) { couponInput = $0.uppercased() }
+                        OutlineButton(vm.applyingCoupon ? "Applying…" : "Apply") {
+                            vm.applyCoupon(couponInput)
+                        }
+                        if let err = vm.couponError {
+                            Text(err).font(.labelSmall).foregroundColor(.redAlert)
+                        }
+                    }
                 }
             }
 
             if let err = vm.error { ErrorBanner(message: err) }
 
-            PrimaryButton("Pay Now", isLoading: vm.isLoading) {
+            PrimaryButton(vm.isLoading ? "Processing…" : "Pay ₹\(String(format: "%.0f", totalAmount))", isLoading: vm.isLoading) {
                 guard let plan = vm.selectedPlan, let seat = vm.selectedSeat else { return }
                 let shift = plan.planType == "FULL_DAY" ? "FULL_DAY" : vm.selectedShift
-                vm.startPayment(planId: plan.id, seatNumber: seat, shift: shift)
+                vm.startPayment(planId: plan.id, seatNumber: seat, shift: shift, couponCode: vm.appliedCoupon?.code)
             }
             .onChange(of: vm.pendingOrder) { order in
                 if order != nil { showPayment = true }
             }
         }
+    }
+
+    private var discountAmount: Double {
+        guard let plan = vm.selectedPlan, let coupon = vm.appliedCoupon else { return 0 }
+        return (plan.price * Double(coupon.discountPercent) / 100).rounded()
+    }
+
+    private var totalAmount: Double {
+        (vm.selectedPlan?.price ?? 0) - discountAmount
     }
 
     // MARK: - Payment Sheet

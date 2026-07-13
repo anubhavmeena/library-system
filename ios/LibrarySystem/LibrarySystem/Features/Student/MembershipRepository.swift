@@ -21,9 +21,18 @@ struct MembershipRepository {
         try await api.request(.getPlans)
     }
 
-    func createOrder(planId: String, seatNumber: String, shift: String) async throws -> PaymentOrder {
-        let req = CreateOrderRequest(planId: planId, seatNumber: seatNumber, shift: shift)
+    func createOrder(planId: String, seatNumber: String, shift: String, couponCode: String? = nil) async throws -> PaymentOrder {
+        let req = CreateOrderRequest(planId: planId, seatNumber: seatNumber, shift: shift, couponCode: couponCode)
         return try await api.request(.createOrder(req), token: token)
+    }
+
+    func getActiveCoupons() async -> [Coupon] {
+        (try? await api.request(.getActiveCoupons, token: token)) ?? []
+    }
+
+    func validateCoupon(code: String) async throws -> Coupon {
+        let req = ValidateCouponRequest(code: code)
+        return try await api.request(.validateCoupon(req), token: token)
     }
 
     func verifyPayment(gatewayOrderId: String, gatewayPaymentId: String,

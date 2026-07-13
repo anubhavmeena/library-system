@@ -20,6 +20,7 @@ pub async fn create_order(
             membership_id,
             amount,
             gateway: "RAZORPAY".into(),
+            discount_amount: None,
         });
     }
 
@@ -61,6 +62,7 @@ pub async fn create_order(
         membership_id,
         amount,
         gateway: "RAZORPAY".into(),
+        discount_amount: None,
     })
 }
 

@@ -69,7 +69,26 @@ data class AppSettings(
     val upiId: String? = null,
     val graceDays: Int = 10,
     val convenienceFee: Double = 0.0,
-    val waterTankerRate: Double = 0.0
+    val waterTankerRate: Double = 0.0,
+    val couponsEnabled: Boolean = true
+)
+
+data class SaveAppSettingsRequest(
+    val wifiName: String?,
+    val wifiPassword: String?,
+    val upiId: String?,
+    val graceDays: Int,
+    val convenienceFee: Double,
+    val waterTankerRate: Double,
+    val couponsEnabled: Boolean
+)
+
+data class Coupon(
+    val id: String = "",
+    val code: String = "",
+    val discountPercent: Int = 0,
+    val isActive: Boolean = true,
+    val createdAt: String? = null
 )
 
 data class Seat(
@@ -129,7 +148,8 @@ data class PaymentOrder(
     val amount: Double = 0.0,
     val gateway: String = "",             // "CASHFREE" | "RAZORPAY"
     val paymentSessionId: String? = null, // Cashfree only
-    val razorpayKeyId: String = ""        // Razorpay only
+    val razorpayKeyId: String = "",       // Razorpay only
+    val discountAmount: Double? = null    // non-null when a coupon was applied
 )
 
 data class AdminStats(
@@ -261,7 +281,10 @@ data class VerifyOtpRequest(val contact: String, val otp: String)
 data class RegisterRequest(val name: String, val email: String?, val sessionToken: String, val dateOfBirth: String? = null, val gender: String? = null, val address: String? = null)
 data class LoginRequest(val sessionToken: String)
 data class AdminLoginRequest(val contact: String, val otp: String)
-data class CreateOrderRequest(val planId: String, val seatNumber: String, val shift: String)
+data class CreateOrderRequest(val planId: String, val seatNumber: String, val shift: String, val couponCode: String? = null)
+data class ValidateCouponRequest(val code: String)
+data class CreateCouponRequest(val code: String?, val discountPercent: Int)
+data class UpdateCouponRequest(val discountPercent: Int? = null, val isActive: Boolean? = null)
 data class VerifyPaymentRequest(val gatewayOrderId: String, val gatewayPaymentId: String, val signature: String, val membershipId: String)
 data class BookSeatRequest(val seatNumber: String, val membershipId: String, val shift: String, val startDate: String, val endDate: String)
 data class UpdateProfileRequest(val name: String, val fatherName: String?, val address: String?, val gender: String?, val dateOfBirth: String?, val email: String?)

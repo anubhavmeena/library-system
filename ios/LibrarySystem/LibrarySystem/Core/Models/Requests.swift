@@ -42,6 +42,25 @@ struct CreateOrderRequest: Codable {
     let planId: String
     let seatNumber: String
     let shift: String
+    let couponCode: String?
+
+    init(planId: String, seatNumber: String, shift: String, couponCode: String? = nil) {
+        self.planId = planId; self.seatNumber = seatNumber; self.shift = shift; self.couponCode = couponCode
+    }
+}
+
+struct ValidateCouponRequest: Codable {
+    let code: String
+}
+
+struct CreateCouponRequest: Codable {
+    let code: String?
+    let discountPercent: Int
+}
+
+struct UpdateCouponRequest: Codable {
+    let discountPercent: Int?
+    let isActive: Bool?
 }
 
 struct VerifyPaymentRequest: Codable {
@@ -165,6 +184,7 @@ struct SaveAppSettingsRequest: Codable {
     let graceDays: Int
     let convenienceFee: Double
     let waterTankerRate: Double
+    let couponsEnabled: Bool
 }
 
 // Backs the admin's ad-hoc "Send Payment Request" on Create Membership —

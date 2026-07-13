@@ -47,7 +47,9 @@ CREATE TABLE IF NOT EXISTS memberships (
     created_at    TIMESTAMP,
     dues_amount    NUMERIC(10,2),             -- set when a membership enters GRACE
     gateway_order_id  VARCHAR(255),           -- in-flight checkout correlation key for PaymentService.verify*()
-    checkout_amount   NUMERIC(10,2)           -- amount snapshotted at createOrder() time, read back on verify
+    checkout_amount   NUMERIC(10,2),          -- amount snapshotted at createOrder() time, read back on verify
+    coupon_code       VARCHAR(30),            -- coupon applied at createOrder() time (fresh bookings only), read back on verify
+    discount_amount   NUMERIC(10,2)           -- discount snapshotted at createOrder() time, read back on verify
 );
 
 -- payments (owned by membership-service)
@@ -61,7 +63,18 @@ CREATE TABLE IF NOT EXISTS payments (
     gateway_payment_id  VARCHAR(255),
     status              VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     created_at          TIMESTAMP,
-    updated_at          TIMESTAMP
+    updated_at          TIMESTAMP,
+    coupon_code         VARCHAR(30),          -- copied from memberships.coupon_code once payment succeeds — permanent audit trail
+    discount_amount     NUMERIC(10,2)
+);
+
+-- coupons (owned by admin-service; read-only mirror in membership-service for checkout validation)
+CREATE TABLE IF NOT EXISTS coupons (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code              VARCHAR(30) UNIQUE NOT NULL,
+    discount_percent  SMALLINT NOT NULL,
+    is_active         BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at        TIMESTAMP
 );
 
 -- seats (owned by seat-service)

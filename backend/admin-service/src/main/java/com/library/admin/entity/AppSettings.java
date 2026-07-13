@@ -33,6 +33,9 @@ public class AppSettings {
     @Column(name = "water_tanker_rate", nullable = false, precision = 10, scale = 2)
     private BigDecimal waterTankerRate;
 
+    @Column(name = "coupons_enabled", nullable = false)
+    private boolean couponsEnabled;
+
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;

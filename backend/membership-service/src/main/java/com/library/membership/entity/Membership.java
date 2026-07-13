@@ -41,6 +41,11 @@ public class Membership {
     @Column(name = "gateway_order_id") private String gatewayOrderId;
     @Column(name = "checkout_amount", precision = 10, scale = 2) private BigDecimal checkoutAmount;
 
+    // Coupon applied at createOrder() time (fresh bookings only), staged here
+    // until verifyAndActivateMembership() copies it onto the Payment row.
+    @Column(name = "coupon_code") private String couponCode;
+    @Column(name = "discount_amount", precision = 10, scale = 2) private BigDecimal discountAmount;
+
     @Column(name = "created_at", updatable = false) private LocalDateTime createdAt;
     @PrePersist protected void onCreate() { createdAt = LocalDateTime.now(); }
 

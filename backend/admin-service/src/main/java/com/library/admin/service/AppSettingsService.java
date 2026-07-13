@@ -35,6 +35,7 @@ public class AppSettingsService {
         settings.setGraceDays(req.getGraceDays());
         settings.setConvenienceFee(req.getConvenienceFee());
         settings.setWaterTankerRate(req.getWaterTankerRate());
+        settings.setCouponsEnabled(req.getCouponsEnabled());
         settings = appSettingsRepository.save(settings);
         return toDto(settings);
     }
@@ -48,6 +49,7 @@ public class AppSettingsService {
                     .graceDays(DEFAULT_GRACE_DAYS)
                     .convenienceFee(BigDecimal.ZERO)
                     .waterTankerRate(BigDecimal.ZERO)
+                    .couponsEnabled(true)
                     .build();
             return appSettingsRepository.save(defaults);
         });
@@ -60,6 +62,7 @@ public class AppSettingsService {
                 .graceDays(s.getGraceDays())
                 .convenienceFee(s.getConvenienceFee())
                 .waterTankerRate(s.getWaterTankerRate())
+                .couponsEnabled(s.isCouponsEnabled())
                 .updatedAt(s.getUpdatedAt() != null ? s.getUpdatedAt().toString() : null)
                 .build();
     }

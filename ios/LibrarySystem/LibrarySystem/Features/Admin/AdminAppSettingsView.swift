@@ -9,6 +9,7 @@ struct AdminAppSettingsView: View {
     @State private var graceDays       = ""
     @State private var convenienceFee  = ""
     @State private var waterTankerRate = ""
+    @State private var couponsEnabled  = true
     @State private var loaded          = false
 
     var body: some View {
@@ -64,6 +65,17 @@ struct AdminAppSettingsView: View {
                             }
                         }
 
+                        AppCard {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Toggle(isOn: $couponsEnabled) {
+                                    Text("Enable Discount Coupons").font(.labelMedium).foregroundColor(.textPrimary)
+                                }
+                                .tint(.amber)
+                                Text("Turning this off immediately hides all coupons from students and disables discounts, without deleting any coupons. Manage coupon codes from Admin → Coupons.")
+                                    .font(.caption).foregroundColor(.textMuted)
+                            }
+                        }
+
                         if let err = vm.error { ErrorBanner(message: err) }
 
                         PrimaryButton("Save Settings", isLoading: vm.isLoading) {
@@ -73,7 +85,8 @@ struct AdminAppSettingsView: View {
                                 upiId: upiId.isEmpty ? nil : upiId,
                                 graceDays: Int(graceDays) ?? 0,
                                 convenienceFee: Double(convenienceFee) ?? 0,
-                                waterTankerRate: Double(waterTankerRate) ?? 0)
+                                waterTankerRate: Double(waterTankerRate) ?? 0,
+                                couponsEnabled: couponsEnabled)
                         }
                     }
                     .padding(16)
@@ -97,6 +110,7 @@ struct AdminAppSettingsView: View {
             graceDays = vm.appSettings.graceDays.map { "\($0)" } ?? "10"
             convenienceFee = vm.appSettings.convenienceFee.map { String(format: "%.0f", $0) } ?? "0"
             waterTankerRate = vm.appSettings.waterTankerRate.map { String(format: "%.0f", $0) } ?? "0"
+            couponsEnabled = vm.appSettings.couponsEnabled ?? true
         }
     }
 }

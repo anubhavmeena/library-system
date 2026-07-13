@@ -12,4 +12,5 @@ public class CreateOrderResponse {
     private String     gateway;           // "CASHFREE" | "RAZORPAY"
     private String     paymentSessionId;  // Cashfree payment_session_id; null for Razorpay
     private String     razorpayKeyId;     // Razorpay publishable key; null for Cashfree
+    private BigDecimal discountAmount;    // non-null when a coupon was applied
 }

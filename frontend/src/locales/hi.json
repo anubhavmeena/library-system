@@ -184,6 +184,7 @@
         "gallery": "फोटो गैलरी",
         "inbox": "इनबॉक्स",
         "settings": "सेटिंग्स",
+        "coupons": "कूपन",
         "cronJobs": "क्रॉन जॉब्स"
       },
       "logout": "लॉग आउट"
@@ -307,14 +308,24 @@
       "disclaimer": "आगे बढ़ने पर, आपको WhatsApp और ईमेल पुष्टि प्राप्त होगी। सदस्यता सक्रिय होने के बाद वापसी नहीं होगी।",
       "payBtn": "₹{{amount}} भुगतान करें →",
       "processing": "प्रोसेस हो रहा है...",
-      "changeSeat": "← सीट बदलें"
+      "changeSeat": "← सीट बदलें",
+      "availableCoupons": "उपलब्ध कूपन",
+      "coupon": "कूपन कोड",
+      "couponPlaceholder": "कूपन कोड दर्ज करें",
+      "couponApply": "लागू करें",
+      "couponApplying": "लागू हो रहा है…",
+      "couponRemove": "हटाएं",
+      "couponApplied": "कूपन {{code}} लागू किया गया",
+      "discount": "छूट"
     },
     "toasts": {
       "selectSeat": "कृपया एक सीट चुनें",
       "paymentFailed": "भुगतान विफल",
       "verifyFailed": "भुगतान सत्यापन विफल",
       "confirmed": "बुकिंग पुष्टि हुई! 🎉",
-      "seatBookingFailed": "भुगतान सफल रहा, लेकिन हम आपकी सीट आरक्षित नहीं कर सके"
+      "seatBookingFailed": "भुगतान सफल रहा, लेकिन हम आपकी सीट आरक्षित नहीं कर सके",
+      "couponApplied": "कूपन लागू — आपने ₹{{amount}} बचाए",
+      "couponInvalid": "अमान्य या निष्क्रिय कूपन कोड"
     },
     "seatFailed": {
       "title": "भुगतान प्राप्त हुआ — सीट आरक्षण विफल",
@@ -935,6 +946,36 @@
     "saved": "सेटिंग्स सफलतापूर्वक सहेजी गईं",
     "loadFailed": "सेटिंग्स लोड करने में विफल",
     "saveFailed": "सेटिंग्स सहेजने में विफल"
+  },
+  "adminCoupons": {
+    "title": "कूपन",
+    "subtitle": "छात्र बुकिंग के लिए प्रचार छूट कोड बनाएं और प्रबंधित करें",
+    "globalToggle": "छूट कूपन सक्षम करें",
+    "globalToggleHint": "इसे बंद करने पर तुरंत सभी कूपन छात्रों से छिप जाते हैं और छूट अक्षम हो जाती है, बिना किसी कूपन को हटाए।",
+    "createTitle": "कूपन बनाएं",
+    "codeLabel": "कूपन कोड (वैकल्पिक)",
+    "codePlaceholder": "स्वतः जनरेट करने के लिए खाली छोड़ें",
+    "discountLabel": "छूट %",
+    "createBtn": "कूपन बनाएं",
+    "creating": "बनाया जा रहा है…",
+    "listTitle": "सभी कूपन",
+    "noCoupons": "अभी तक कोई कूपन नहीं बनाया गया।",
+    "colCode": "कोड",
+    "colDiscount": "छूट",
+    "colStatus": "स्थिति",
+    "colCreated": "बनाया गया",
+    "colActions": "कार्रवाई",
+    "active": "सक्रिय",
+    "inactive": "निष्क्रिय",
+    "deleteConfirm": "यह कूपन हटाएं? इसे पूर्ववत नहीं किया जा सकता।",
+    "deleteBtn": "हटाएं",
+    "createSuccess": "कूपन बनाया गया",
+    "createFailed": "कूपन बनाने में विफल",
+    "updateFailed": "कूपन अपडेट करने में विफल",
+    "deleteSuccess": "कूपन हटाया गया",
+    "deleteFailed": "कूपन हटाने में विफल",
+    "toggleFailed": "सेटिंग अपडेट करने में विफल",
+    "loadFailed": "कूपन लोड करने में विफल"
   },
   "adminRevenue": {
     "title": "राजस्व रिपोर्ट",

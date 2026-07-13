@@ -27,6 +27,8 @@ public class Payment {
     @Column(name = "gateway_order_id")   private String gatewayOrderId;
     @Column(name = "gateway_payment_id") private String gatewayPaymentId;
     @Column(name = "invoice_id") private String invoiceId;
+    @Column(name = "coupon_code") private String couponCode;
+    @Column(name = "discount_amount", precision = 10, scale = 2) private BigDecimal discountAmount;
 
     @Column(nullable = false) @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING;

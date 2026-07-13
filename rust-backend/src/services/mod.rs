@@ -1,5 +1,6 @@
 pub mod admin;
 pub mod auth;
+pub mod coupon;
 pub mod idcard;
 pub mod ids;
 pub mod jwt;

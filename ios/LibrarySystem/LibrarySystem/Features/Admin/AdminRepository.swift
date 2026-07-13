@@ -219,11 +219,30 @@ struct AdminRepository {
     }
 
     func saveAppSettings(wifiName: String?, wifiPassword: String?, upiId: String?, graceDays: Int,
-                        convenienceFee: Double, waterTankerRate: Double) async throws -> AppSettings {
+                        convenienceFee: Double, waterTankerRate: Double, couponsEnabled: Bool) async throws -> AppSettings {
         let req = SaveAppSettingsRequest(wifiName: wifiName, wifiPassword: wifiPassword, upiId: upiId,
                                          graceDays: graceDays, convenienceFee: convenienceFee,
-                                         waterTankerRate: waterTankerRate)
+                                         waterTankerRate: waterTankerRate, couponsEnabled: couponsEnabled)
         return try await api.request(.saveAppSettings(req), token: token)
+    }
+
+    // MARK: - Coupons (admin CRUD)
+    func getCoupons() async throws -> [Coupon] {
+        try await api.request(.getAdminCoupons, token: token)
+    }
+
+    func createCoupon(code: String?, discountPercent: Int) async throws -> Coupon {
+        let req = CreateCouponRequest(code: code, discountPercent: discountPercent)
+        return try await api.request(.createCoupon(req), token: token)
+    }
+
+    func updateCoupon(id: String, discountPercent: Int? = nil, isActive: Bool? = nil) async throws -> Coupon {
+        let req = UpdateCouponRequest(discountPercent: discountPercent, isActive: isActive)
+        return try await api.request(.updateCoupon(id: id, req: req), token: token)
+    }
+
+    func deleteCoupon(id: String) async throws {
+        try await api.requestVoid(.deleteCoupon(id: id), token: token)
     }
 
     // MARK: - UPI Pay Links & Payment Verification

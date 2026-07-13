@@ -44,6 +44,10 @@ class StudentViewModel(
     val galleryPhotos     = MutableStateFlow<List<GalleryPhoto>>(emptyList())
     val adminContact      = MutableStateFlow<AdminContact?>(null)
     val callAdminSent     = MutableStateFlow(false)
+    val activeCoupons     = MutableStateFlow<List<Coupon>>(emptyList())
+    val appliedCoupon     = MutableStateFlow<Coupon?>(null)
+    val couponError       = MutableStateFlow<String?>(null)
+    val applyingCoupon    = MutableStateFlow(false)
 
     val isLoading     = MutableStateFlow(false)
     val error         = MutableStateFlow<String?>(null)
@@ -73,6 +77,24 @@ class StudentViewModel(
         membershipRepo.getPlans().onSuccess { plans.value = it }
     }
 
+    fun loadActiveCoupons() = viewModelScope.launch {
+        membershipRepo.getActiveCoupons().onSuccess { activeCoupons.value = it }
+    }
+
+    fun applyCoupon(code: String) {
+        if (code.isBlank()) return
+        applyingCoupon.value = true
+        couponError.value = null
+        viewModelScope.launch {
+            membershipRepo.validateCoupon(code.trim())
+                .onSuccess { appliedCoupon.value = it }
+                .onFailure { couponError.value = it.message ?: "Invalid or inactive coupon code"; appliedCoupon.value = null }
+            applyingCoupon.value = false
+        }
+    }
+
+    fun clearCoupon() { appliedCoupon.value = null; couponError.value = null }
+
     fun loadSeats(shift: String) = viewModelScope.launch {
         isLoading.value = true
         seats.value = emptyList()
@@ -84,10 +106,10 @@ class StudentViewModel(
 
     fun selectSeat(seat: Seat?) { selectedSeat.value = seat }
 
-    fun startPayment(planId: String, seatNumber: String, shift: String) = viewModelScope.launch {
+    fun startPayment(planId: String, seatNumber: String, shift: String, couponCode: String? = null) = viewModelScope.launch {
         isLoading.value = true
         error.value = null
-        membershipRepo.createOrder(planId, seatNumber, shift)
+        membershipRepo.createOrder(planId, seatNumber, shift, couponCode)
             .onSuccess { order ->
                 isLoading.value = false
                 if (order.orderId.startsWith("dev_")) {

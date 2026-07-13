@@ -1,4 +1,5 @@
 pub mod admin;
+pub mod coupon;
 pub mod membership;
 pub mod payment_claim;
 pub mod seat;

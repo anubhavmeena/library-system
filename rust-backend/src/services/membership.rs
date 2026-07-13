@@ -294,6 +294,7 @@ pub async fn create_order(
     plan_id: Uuid,
     shift: Option<&str>,
     seat_number: Option<&str>,
+    coupon_code: Option<&str>,
 ) -> crate::error::Result<CreateOrderResponse> {
     let has_grace: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM memberships WHERE user_id = $1 AND status = 'GRACE')",
@@ -338,6 +339,14 @@ pub async fn create_order(
 
     let membership_status = if status == "QUEUED" { "QUEUED" } else { "PENDING" };
 
+    // Coupons only apply to a fresh booking, never a queued renewal — both
+    // create_order and create_cash_membership share this same insert path, so
+    // this guard is the only thing standing between a crafted API request and
+    // a renewal silently getting a discount it was never meant to have.
+    if membership_status == "QUEUED" && coupon_code.is_some() {
+        return Err(AppError::BadRequest("Coupons only apply to new bookings, not renewals".into()));
+    }
+
     // Queued renewal: inherit seat/shift from the current membership regardless
     // of what the request sent. Fresh booking: the request must supply a shift.
     let (resolved_shift, resolved_seat) = if membership_status == "QUEUED" {
@@ -368,10 +377,21 @@ pub async fn create_order(
     .fetch_one(&state.db)
     .await?;
 
-    let convenience_fee = settings::get_app_settings(state).await?.convenience_fee;
-    let charge_amount = plan.price + convenience_fee;
+    // Discount applies to the plan price only — the convenience fee is added
+    // after, unaffected, matching the admin-configured surcharge's role as a
+    // flat gateway-handling cost rather than part of the "price" being discounted.
+    let (applied_coupon_code, discount_amount) = if let Some(code) = coupon_code {
+        let coupon = crate::services::coupon::validate_coupon_code(state, code).await?;
+        let discount = (plan.price * Decimal::from(coupon.discount_percent) / Decimal::from(100)).round();
+        (Some(coupon.code), discount)
+    } else {
+        (None, Decimal::ZERO)
+    };
 
-    let order = payment::create_order(
+    let convenience_fee = settings::get_app_settings(state).await?.convenience_fee;
+    let charge_amount = (plan.price - discount_amount) + convenience_fee;
+
+    let mut order = payment::create_order(
         state,
         membership.id,
         user_id,
@@ -387,13 +407,19 @@ pub async fn create_order(
     // gateway confirms SUCCESS in verify_payment(). An abandoned/failed
     // checkout this way leaves zero Payment rows.
     sqlx::query(
-        "UPDATE memberships SET gateway_order_id = $2, checkout_amount = $3 WHERE id = $1",
+        "UPDATE memberships SET gateway_order_id = $2, checkout_amount = $3, coupon_code = $4, discount_amount = $5 WHERE id = $1",
     )
     .bind(membership.id)
     .bind(&order.order_id)
     .bind(charge_amount)
+    .bind(&applied_coupon_code)
+    .bind(if applied_coupon_code.is_some() { Some(discount_amount) } else { None })
     .execute(&state.db)
     .await?;
+
+    if applied_coupon_code.is_some() {
+        order.discount_amount = Some(discount_amount);
+    }
 
     Ok(order)
 }
@@ -440,8 +466,8 @@ pub async fn verify_payment(
     let charge_amount = membership.checkout_amount.unwrap_or_default();
 
     let payment_rec = sqlx::query_as::<_, Payment>(
-        "INSERT INTO payments (membership_id, user_id, amount, payment_gateway, gateway_order_id, gateway_payment_id, invoice_id, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'SUCCESS') RETURNING *",
+        "INSERT INTO payments (membership_id, user_id, amount, payment_gateway, gateway_order_id, gateway_payment_id, invoice_id, status, coupon_code, discount_amount)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'SUCCESS', $8, $9) RETURNING *",
     )
     .bind(membership_id)
     .bind(user_id)
@@ -450,6 +476,8 @@ pub async fn verify_payment(
     .bind(order_id)
     .bind(payment_id)
     .bind(ids::generate_invoice_id())
+    .bind(&membership.coupon_code)
+    .bind(membership.discount_amount)
     .fetch_one(&state.db)
     .await?;
 

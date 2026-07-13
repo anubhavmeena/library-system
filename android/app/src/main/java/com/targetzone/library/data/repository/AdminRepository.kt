@@ -177,6 +177,31 @@ class AdminRepository {
         res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to load settings")
     }
 
+    suspend fun saveAppSettings(req: SaveAppSettingsRequest): Result<AppSettings> = runCatching {
+        val res = api.saveAppSettings(req)
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to save settings")
+    }
+
+    suspend fun getCoupons(): Result<List<Coupon>> = runCatching {
+        val res = api.getAdminCoupons()
+        res.body()?.data ?: emptyList()
+    }
+
+    suspend fun createCoupon(code: String?, discountPercent: Int): Result<Coupon> = runCatching {
+        val res = api.createCoupon(CreateCouponRequest(code = code?.takeIf { it.isNotBlank() }, discountPercent = discountPercent))
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to create coupon")
+    }
+
+    suspend fun updateCoupon(id: String, discountPercent: Int? = null, isActive: Boolean? = null): Result<Coupon> = runCatching {
+        val res = api.updateCoupon(id, UpdateCouponRequest(discountPercent = discountPercent, isActive = isActive))
+        res.body()?.data ?: throw Exception(res.body()?.message ?: "Failed to update coupon")
+    }
+
+    suspend fun deleteCoupon(id: String): Result<Unit> = runCatching {
+        api.deleteCoupon(id)
+        Unit
+    }
+
     suspend fun getStudentsWithPendingFees(): Result<List<StudentDetail>> = runCatching {
         val res = api.getStudentsWithPendingFees()
         res.body()?.data ?: emptyList()

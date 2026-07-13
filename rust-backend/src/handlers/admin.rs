@@ -2,9 +2,13 @@ use crate::{
     app_state::AppState,
     error::AppError,
     middleware::AdminUser,
-    models::{admin::*, settings::{SaveAppSettingsRequest, UpdateNotificationSettingRequest}},
+    models::{
+        admin::*,
+        coupon::{CreateCouponRequest, UpdateCouponRequest},
+        settings::{SaveAppSettingsRequest, UpdateNotificationSettingRequest},
+    },
     response::ApiResponse,
-    services::{admin as svc, settings as settings_svc, user as user_svc},
+    services::{admin as svc, coupon as coupon_svc, settings as settings_svc, user as user_svc},
 };
 use axum::{
     extract::{Path, Query, State},
@@ -455,6 +459,44 @@ pub async fn update_notification_setting(
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let updated = settings_svc::update_notification_setting(&state, &key, &req).await?;
     Ok(ApiResponse::success("Notification setting updated", updated))
+}
+
+// ── Coupons ───────────────────────────────────────────────────────────────────
+
+pub async fn list_coupons(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let coupons = coupon_svc::list_coupons(&state).await?;
+    Ok(ApiResponse::success("Coupons retrieved", coupons))
+}
+
+pub async fn create_coupon(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Json(req): Json<CreateCouponRequest>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let coupon = coupon_svc::create_coupon(&state, &req).await?;
+    Ok(ApiResponse::success("Coupon created", coupon))
+}
+
+pub async fn update_coupon(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(id): Path<Uuid>,
+    Json(req): Json<UpdateCouponRequest>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let coupon = coupon_svc::update_coupon(&state, id, &req).await?;
+    Ok(ApiResponse::success("Coupon updated", coupon))
+}
+
+pub async fn delete_coupon(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(id): Path<Uuid>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    coupon_svc::delete_coupon(&state, id).await?;
+    Ok(ApiResponse::ok("Coupon deleted"))
 }
 
 // ── Grace / dues admin actions ───────────────────────────────────────────────

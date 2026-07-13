@@ -22,4 +22,7 @@ public class SaveAppSettingsRequest {
 
     @NotNull @DecimalMin("0.00")
     private BigDecimal waterTankerRate;
+
+    @NotNull
+    private Boolean couponsEnabled;
 }

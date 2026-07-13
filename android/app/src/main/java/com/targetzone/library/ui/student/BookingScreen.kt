@@ -31,10 +31,15 @@ fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit, onNavigate: (Stri
     val isLoading    by vm.isLoading.collectAsState()
     val error        by vm.error.collectAsState()
     val bookingDone  by vm.bookingSuccess.collectAsState()
+    val activeCoupons  by vm.activeCoupons.collectAsState()
+    val appliedCoupon  by vm.appliedCoupon.collectAsState()
+    val couponError    by vm.couponError.collectAsState()
+    val applyingCoupon by vm.applyingCoupon.collectAsState()
 
     var step         by remember { mutableIntStateOf(1) }
     var selectedPlan by remember { mutableStateOf<Plan?>(null) }
     var shift        by remember { mutableStateOf("MORNING") }
+    var couponInput  by remember { mutableStateOf("") }
 
     val context = LocalContext.current
     val activity = context as? MainActivity
@@ -63,7 +68,7 @@ fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit, onNavigate: (Stri
             }
         }
     }
-    LaunchedEffect(Unit) { vm.loadDashboard(); vm.loadPlans() }
+    LaunchedEffect(Unit) { vm.loadDashboard(); vm.loadPlans(); vm.loadActiveCoupons() }
     LaunchedEffect(bookingDone) { if (bookingDone) { vm.resetBooking(); onSuccess() } }
     LaunchedEffect(selectedPlan, shift) {
         selectedPlan?.let {
@@ -133,7 +138,7 @@ fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit, onNavigate: (Stri
             } else {
                 plans.forEach { plan ->
                     PlanCard(plan, selectedPlan?.id == plan.id) {
-                        selectedPlan = plan; vm.selectSeat(null); step = 2
+                        selectedPlan = plan; vm.selectSeat(null); vm.clearCoupon(); couponInput = ""; step = 2
                     }
                     Spacer(Modifier.height(12.dp))
                 }
@@ -181,6 +186,9 @@ fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit, onNavigate: (Stri
 
         // Step 3 — summary & pay
         if (step == 3 && selectedPlan != null && selectedSeat != null) {
+            val discountAmount = appliedCoupon?.let { (selectedPlan!!.price * it.discountPercent / 100.0).let(Math::round) } ?: 0L
+            val totalAmount = (selectedPlan!!.price - discountAmount).toInt()
+
             Spacer(Modifier.height(12.dp))
             AppCard(Modifier.fillMaxWidth()) {
                 Text("Order Summary", style = MaterialTheme.typography.titleMedium)
@@ -190,23 +198,72 @@ fun BookingScreen(vm: StudentViewModel, onSuccess: () -> Unit, onNavigate: (Stri
                 InfoRow("Shift", if (selectedPlan!!.planType == "FULL_DAY") "Full Day" else shift)
                 InfoRow("Duration", "30 days")
                 InfoRow("Start Date", java.text.SimpleDateFormat("yyyy-MM-dd").format(java.util.Date()))
+                if (appliedCoupon != null) {
+                    InfoRow("Discount (${appliedCoupon!!.code})", "− ₹$discountAmount")
+                }
                 Spacer(Modifier.height(12.dp))
                 HorizontalDivider(color = DividerColor)
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Total", fontWeight = FontWeight.SemiBold, color = TextPrimary)
-                    Text("₹${selectedPlan!!.price.toInt()}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Amber)
+                    Text("₹$totalAmount", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Amber)
                 }
             }
+
+            Spacer(Modifier.height(12.dp))
+            AppCard(Modifier.fillMaxWidth()) {
+                if (appliedCoupon != null) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Coupon ${appliedCoupon!!.code} applied", color = Emerald, fontSize = 13.sp)
+                        TextButton(onClick = { vm.clearCoupon(); couponInput = "" }) { Text("Remove", color = TextSub) }
+                    }
+                } else {
+                    if (activeCoupons.isNotEmpty()) {
+                        Text("Available Coupons", color = TextSub, fontSize = 11.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            activeCoupons.forEach { c ->
+                                AssistChip(
+                                    onClick = { couponInput = c.code; vm.applyCoupon(c.code) },
+                                    label = { Text("${c.code} · ${c.discountPercent}% off", fontSize = 12.sp) },
+                                    colors = AssistChipDefaults.assistChipColors(labelColor = Amber, containerColor = AmberFaint)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AppTextField(
+                            value = couponInput,
+                            onValueChange = { couponInput = it.uppercase() },
+                            label = "Coupon Code",
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        OutlineButton(
+                            text = if (applyingCoupon) "…" else "Apply",
+                            onClick = { vm.applyCoupon(couponInput) },
+                            enabled = !applyingCoupon && couponInput.isNotBlank(),
+                            height = 50.dp
+                        )
+                    }
+                    couponError?.let {
+                        Spacer(Modifier.height(6.dp))
+                        Text(it, color = RedAlert, fontSize = 12.sp)
+                    }
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
             PrimaryButton(
-                text = if (isLoading) "Processing…" else "Pay ₹${selectedPlan!!.price.toInt()}",
+                text = if (isLoading) "Processing…" else "Pay ₹$totalAmount",
                 enabled = !isLoading,
                 onClick = {
                     vm.startPayment(
                         planId = selectedPlan!!.id,
                         seatNumber = selectedSeat!!.seatNumber,
-                        shift = if (selectedPlan!!.planType == "FULL_DAY") "FULL_DAY" else shift
+                        shift = if (selectedPlan!!.planType == "FULL_DAY") "FULL_DAY" else shift,
+                        couponCode = appliedCoupon?.code
                     )
                 },
                 modifier = Modifier.fillMaxWidth()

@@ -51,6 +51,10 @@ pub struct Membership {
     pub gateway_order_id: Option<String>,
     /// Amount snapshotted at dues-order-creation time, read back on verify.
     pub checkout_amount: Option<Decimal>,
+    /// Coupon applied at create_order time (fresh bookings only), staged here
+    /// until verify_payment copies it onto the resulting `payments` row.
+    pub coupon_code: Option<String>,
+    pub discount_amount: Option<Decimal>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -69,6 +73,8 @@ pub struct Payment {
     #[serde(rename = "createdAt")]
     pub created_at: Option<NaiveDateTime>,
     pub updated_at: Option<NaiveDateTime>,
+    pub coupon_code: Option<String>,
+    pub discount_amount: Option<Decimal>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -126,6 +132,9 @@ pub struct CreateOrderRequest {
     /// inherited server-side. Required for a fresh (non-renewal) booking.
     pub shift: Option<String>,
     pub seat_number: Option<String>,
+    /// Only valid for a fresh booking — rejected if this call turns out to be
+    /// a queued renewal (see `services::membership::create_order`).
+    pub coupon_code: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -136,6 +145,7 @@ pub struct CreateOrderResponse {
     pub membership_id: Uuid,
     pub amount: Decimal,
     pub gateway: String,
+    pub discount_amount: Option<Decimal>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -229,6 +239,7 @@ mod tests {
             membership_id: Uuid::new_v4(),
             amount: "999.00".parse::<Decimal>().unwrap(),
             gateway: "CASHFREE".to_string(),
+            discount_amount: None,
         };
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("orderId"), "Expected camelCase orderId");

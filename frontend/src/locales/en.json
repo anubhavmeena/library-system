@@ -188,6 +188,7 @@
         "gallery": "Photo Gallery",
         "inbox": "Inbox",
         "settings": "Settings",
+        "coupons": "Coupons",
         "cronJobs": "Cron Jobs"
       },
       "logout": "Logout"
@@ -311,14 +312,24 @@
       "disclaimer": "By proceeding, you'll receive a WhatsApp and email confirmation. Membership is non-refundable once activated.",
       "payBtn": "Pay ₹{{amount}} →",
       "processing": "Processing...",
-      "changeSeat": "← Change seat"
+      "changeSeat": "← Change seat",
+      "availableCoupons": "Available Coupons",
+      "coupon": "Coupon Code",
+      "couponPlaceholder": "Enter coupon code",
+      "couponApply": "Apply",
+      "couponApplying": "Applying…",
+      "couponRemove": "Remove",
+      "couponApplied": "Coupon {{code}} applied",
+      "discount": "Discount"
     },
     "toasts": {
       "selectSeat": "Please select a seat",
       "paymentFailed": "Payment failed",
       "verifyFailed": "Payment verification failed",
       "confirmed": "Booking confirmed! 🎉",
-      "seatBookingFailed": "Payment succeeded, but we couldn't reserve your seat"
+      "seatBookingFailed": "Payment succeeded, but we couldn't reserve your seat",
+      "couponApplied": "Coupon applied — you saved ₹{{amount}}",
+      "couponInvalid": "Invalid or inactive coupon code"
     },
     "seatFailed": {
       "title": "Payment received — seat reservation failed",
@@ -956,6 +967,36 @@
     "saved": "Settings saved successfully",
     "loadFailed": "Failed to load settings",
     "saveFailed": "Failed to save settings"
+  },
+  "adminCoupons": {
+    "title": "Coupons",
+    "subtitle": "Create and manage promotional discount codes for student bookings",
+    "globalToggle": "Enable Discount Coupons",
+    "globalToggleHint": "Turning this off immediately hides all coupons from students and disables discounts, without deleting any coupons.",
+    "createTitle": "Create Coupon",
+    "codeLabel": "Coupon Code (optional)",
+    "codePlaceholder": "Leave blank to auto-generate",
+    "discountLabel": "Discount %",
+    "createBtn": "Create Coupon",
+    "creating": "Creating…",
+    "listTitle": "All Coupons",
+    "noCoupons": "No coupons created yet.",
+    "colCode": "Code",
+    "colDiscount": "Discount",
+    "colStatus": "Status",
+    "colCreated": "Created",
+    "colActions": "Actions",
+    "active": "Active",
+    "inactive": "Inactive",
+    "deleteConfirm": "Delete this coupon? This cannot be undone.",
+    "deleteBtn": "Delete",
+    "createSuccess": "Coupon created",
+    "createFailed": "Failed to create coupon",
+    "updateFailed": "Failed to update coupon",
+    "deleteSuccess": "Coupon deleted",
+    "deleteFailed": "Failed to delete coupon",
+    "toggleFailed": "Failed to update setting",
+    "loadFailed": "Failed to load coupons"
   },
   "adminRevenue": {
     "title": "Revenue Report",

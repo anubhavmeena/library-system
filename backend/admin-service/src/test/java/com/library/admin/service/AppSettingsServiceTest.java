@@ -38,6 +38,7 @@ class AppSettingsServiceTest {
         assertThat(dto.getGraceDays()).isEqualTo(AppSettingsService.DEFAULT_GRACE_DAYS);
         assertThat(dto.getConvenienceFee()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(dto.getWaterTankerRate()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(dto.isCouponsEnabled()).isTrue();
 
         ArgumentCaptor<AppSettings> captor = ArgumentCaptor.forClass(AppSettings.class);
         verify(appSettingsRepository).save(captor.capture());
@@ -78,6 +79,7 @@ class AppSettingsServiceTest {
         req.setGraceDays(20);
         req.setConvenienceFee(new BigDecimal("30.00"));
         req.setWaterTankerRate(new BigDecimal("600.00"));
+        req.setCouponsEnabled(false);
 
         AppSettingsDto dto = appSettingsService.saveSettings(req);
 
@@ -85,6 +87,7 @@ class AppSettingsServiceTest {
         assertThat(dto.getGraceDays()).isEqualTo(20);
         assertThat(dto.getConvenienceFee()).isEqualByComparingTo("30.00");
         assertThat(dto.getWaterTankerRate()).isEqualByComparingTo("600.00");
+        assertThat(dto.isCouponsEnabled()).isFalse();
 
         ArgumentCaptor<AppSettings> captor = ArgumentCaptor.forClass(AppSettings.class);
         verify(appSettingsRepository).save(captor.capture());
@@ -102,6 +105,7 @@ class AppSettingsServiceTest {
         req.setGraceDays(7);
         req.setConvenienceFee(new BigDecimal("10.00"));
         req.setWaterTankerRate(new BigDecimal("400.00"));
+        req.setCouponsEnabled(true);
 
         AppSettingsDto dto = appSettingsService.saveSettings(req);
 

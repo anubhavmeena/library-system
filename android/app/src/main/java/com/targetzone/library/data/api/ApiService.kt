@@ -81,6 +81,12 @@ interface ApiService {
     @POST("payments/dues/verify")
     suspend fun verifyDuesPayment(@Body req: VerifyPaymentRequest): Response<ApiResponse<Membership>>
 
+    @GET("payments/coupons/active")
+    suspend fun getActiveCoupons(): Response<ApiResponse<List<Coupon>>>
+
+    @POST("payments/validate-coupon")
+    suspend fun validateCoupon(@Body req: ValidateCouponRequest): Response<ApiResponse<Coupon>>
+
     // Seats
     @GET("seats/availability")
     suspend fun getSeatAvailability(
@@ -239,6 +245,21 @@ interface ApiService {
 
     @GET("admin/settings")
     suspend fun getAppSettings(): Response<ApiResponse<AppSettings>>
+
+    @POST("admin/settings")
+    suspend fun saveAppSettings(@Body req: SaveAppSettingsRequest): Response<ApiResponse<AppSettings>>
+
+    @GET("admin/coupons")
+    suspend fun getAdminCoupons(): Response<ApiResponse<List<Coupon>>>
+
+    @POST("admin/coupons")
+    suspend fun createCoupon(@Body req: CreateCouponRequest): Response<ApiResponse<Coupon>>
+
+    @PATCH("admin/coupons/{id}")
+    suspend fun updateCoupon(@Path("id") id: String, @Body req: UpdateCouponRequest): Response<ApiResponse<Coupon>>
+
+    @DELETE("admin/coupons/{id}")
+    suspend fun deleteCoupon(@Path("id") id: String): Response<ApiResponse<String?>>
 
     @Multipart
     @POST("admin/students/import")

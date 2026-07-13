@@ -13,6 +13,7 @@ pub struct AppSettings {
     pub grace_days: i32,
     pub convenience_fee: Decimal,
     pub water_tanker_rate: Decimal,
+    pub coupons_enabled: bool,
     pub updated_at: Option<NaiveDateTime>,
 }
 
@@ -25,6 +26,7 @@ pub struct SaveAppSettingsRequest {
     pub grace_days: i32,
     pub convenience_fee: Decimal,
     pub water_tanker_rate: Decimal,
+    pub coupons_enabled: bool,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -148,6 +150,7 @@ mod tests {
             grace_days: 10,
             convenience_fee: Decimal::from(20),
             water_tanker_rate: Decimal::from(150),
+            coupons_enabled: true,
             updated_at: None,
         };
         let json = serde_json::to_string(&s).unwrap();
@@ -155,16 +158,18 @@ mod tests {
         assert!(json.contains("graceDays"));
         assert!(json.contains("convenienceFee"));
         assert!(json.contains("waterTankerRate"));
+        assert!(json.contains("couponsEnabled"));
         assert!(!json.contains("wifi_name"));
     }
 
     #[test]
     fn save_app_settings_request_deserializes_camel_case() {
-        let json = r#"{"wifiName":"x","wifiPassword":null,"upiId":"a@b","graceDays":7,"convenienceFee":"15","waterTankerRate":"100"}"#;
+        let json = r#"{"wifiName":"x","wifiPassword":null,"upiId":"a@b","graceDays":7,"convenienceFee":"15","waterTankerRate":"100","couponsEnabled":false}"#;
         let req: SaveAppSettingsRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.wifi_name, Some("x".to_string()));
         assert_eq!(req.grace_days, 7);
         assert_eq!(req.convenience_fee, Decimal::from(15));
+        assert_eq!(req.coupons_enabled, false);
     }
 
     #[test]

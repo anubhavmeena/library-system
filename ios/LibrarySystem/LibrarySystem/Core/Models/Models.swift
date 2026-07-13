@@ -330,9 +330,10 @@ struct PaymentOrder: Codable, Equatable {
     let gateway: String?          // "CASHFREE" | "RAZORPAY"
     let paymentSessionId: String? // Cashfree only
     let razorpayKeyId: String?    // Razorpay only
+    let discountAmount: Double?   // non-null when a coupon was applied
 
     private enum CodingKeys: String, CodingKey {
-        case orderId, membershipId, amount, currency, gateway, paymentSessionId, razorpayKeyId
+        case orderId, membershipId, amount, currency, gateway, paymentSessionId, razorpayKeyId, discountAmount
     }
 
     init(from decoder: Decoder) throws {
@@ -344,6 +345,7 @@ struct PaymentOrder: Codable, Equatable {
         gateway          = try c.decodeIfPresent(String.self, forKey: .gateway)
         paymentSessionId = try c.decodeIfPresent(String.self, forKey: .paymentSessionId)
         razorpayKeyId    = try c.decodeIfPresent(String.self, forKey: .razorpayKeyId)
+        discountAmount   = try c.decodeMoneyIfPresent(forKey: .discountAmount)
     }
 }
 
@@ -900,17 +902,19 @@ struct AppSettings: Codable {
     var graceDays: Int?
     var convenienceFee: Double?
     var waterTankerRate: Double?
+    var couponsEnabled: Bool?
     let updatedAt: String?
 
     init(wifiName: String? = nil, wifiPassword: String? = nil, upiId: String? = nil, graceDays: Int? = nil,
-         convenienceFee: Double? = nil, waterTankerRate: Double? = nil, updatedAt: String? = nil) {
+         convenienceFee: Double? = nil, waterTankerRate: Double? = nil, couponsEnabled: Bool? = nil, updatedAt: String? = nil) {
         self.wifiName = wifiName; self.wifiPassword = wifiPassword; self.upiId = upiId; self.graceDays = graceDays
         self.convenienceFee = convenienceFee; self.waterTankerRate = waterTankerRate
+        self.couponsEnabled = couponsEnabled
         self.updatedAt = updatedAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case wifiName, wifiPassword, upiId, graceDays, convenienceFee, waterTankerRate, updatedAt
+        case wifiName, wifiPassword, upiId, graceDays, convenienceFee, waterTankerRate, couponsEnabled, updatedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -921,7 +925,21 @@ struct AppSettings: Codable {
         graceDays       = try c.decodeIfPresent(Int.self, forKey: .graceDays)
         convenienceFee  = try c.decodeMoneyIfPresent(forKey: .convenienceFee)
         waterTankerRate = try c.decodeMoneyIfPresent(forKey: .waterTankerRate)
+        couponsEnabled  = try c.decodeIfPresent(Bool.self, forKey: .couponsEnabled)
         updatedAt       = try c.decodeIfPresent(String.self, forKey: .updatedAt)
+    }
+}
+
+struct Coupon: Codable, Identifiable, Equatable {
+    let id: String?
+    let code: String
+    let discountPercent: Int
+    let isActive: Bool
+    let createdAt: String?
+
+    init(id: String? = nil, code: String, discountPercent: Int, isActive: Bool = true, createdAt: String? = nil) {
+        self.id = id; self.code = code; self.discountPercent = discountPercent
+        self.isActive = isActive; self.createdAt = createdAt
     }
 }
 

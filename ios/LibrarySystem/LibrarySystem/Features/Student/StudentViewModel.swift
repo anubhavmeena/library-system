@@ -15,6 +15,10 @@ final class StudentViewModel: ObservableObject {
     @Published var seats: [Seat] = []
     @Published var selectedSeat: String?
     @Published var pendingOrder: PaymentOrder?
+    @Published var activeCoupons: [Coupon] = []
+    @Published var appliedCoupon: Coupon?
+    @Published var couponError: String?
+    @Published var applyingCoupon = false
 
     // Renew/queue next plan (kept separate from pendingOrder above so the
     // Booking tab's payment sheet never reacts to an order created from the
@@ -91,16 +95,32 @@ final class StudentViewModel: ObservableObject {
 
     // MARK: - Payment
 
-    func startPayment(planId: String, seatNumber: String, shift: String) {
+    func startPayment(planId: String, seatNumber: String, shift: String, couponCode: String? = nil) {
         isLoading = true; error = nil
         Task {
             do {
                 pendingOrder = try await membershipRepo.createOrder(
-                    planId: planId, seatNumber: seatNumber, shift: shift)
+                    planId: planId, seatNumber: seatNumber, shift: shift, couponCode: couponCode)
             } catch { self.error = error.localizedDescription }
             isLoading = false
         }
     }
+
+    func loadActiveCoupons() {
+        Task { activeCoupons = await membershipRepo.getActiveCoupons() }
+    }
+
+    func applyCoupon(_ code: String) {
+        guard !code.isEmpty else { return }
+        applyingCoupon = true; couponError = nil
+        Task {
+            do { appliedCoupon = try await membershipRepo.validateCoupon(code: code) }
+            catch { couponError = error.localizedDescription; appliedCoupon = nil }
+            applyingCoupon = false
+        }
+    }
+
+    func clearCoupon() { appliedCoupon = nil; couponError = nil }
 
     func verifyPayment(gatewayOrderId: String, gatewayPaymentId: String,
                        signature: String, membershipId: String) {

@@ -60,6 +60,10 @@ extension Endpoint {
     static func verifyDuesPayment(_ req: VerifyPaymentRequest) -> Endpoint {
         Endpoint(path: "payments/dues/verify", method: .POST, body: encode(req))
     }
+    static let getActiveCoupons = Endpoint(path: "payments/coupons/active")
+    static func validateCoupon(_ req: ValidateCouponRequest) -> Endpoint {
+        Endpoint(path: "payments/validate-coupon", method: .POST, body: encode(req))
+    }
 
     // MARK: - Seats
     static func getSeatAvailability(shift: String, date: String? = nil) -> Endpoint {
@@ -199,6 +203,18 @@ extension Endpoint {
     static let getAppSettings = Endpoint(path: "admin/settings")
     static func saveAppSettings(_ req: SaveAppSettingsRequest) -> Endpoint {
         Endpoint(path: "admin/settings", method: .POST, body: encode(req))
+    }
+
+    // MARK: - Admin: Coupons
+    static let getAdminCoupons = Endpoint(path: "admin/coupons")
+    static func createCoupon(_ req: CreateCouponRequest) -> Endpoint {
+        Endpoint(path: "admin/coupons", method: .POST, body: encode(req))
+    }
+    static func updateCoupon(id: String, req: UpdateCouponRequest) -> Endpoint {
+        Endpoint(path: "admin/coupons/\(id)", method: .PATCH, body: encode(req))
+    }
+    static func deleteCoupon(id: String) -> Endpoint {
+        Endpoint(path: "admin/coupons/\(id)", method: .DELETE)
     }
 
     // MARK: - Admin: UPI Pay Links & Payment Verification

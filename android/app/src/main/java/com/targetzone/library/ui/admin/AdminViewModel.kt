@@ -30,6 +30,7 @@ class AdminViewModel(
     val paymentClaims = MutableStateFlow<List<AdminPaymentClaimItem>>(emptyList())
     val plans        = MutableStateFlow<List<Plan>>(emptyList())
     val appSettings  = MutableStateFlow<AppSettings?>(null)
+    val coupons      = MutableStateFlow<List<Coupon>>(emptyList())
 
     val expense      = MutableStateFlow<MonthlyExpense?>(null)
     val importResult = MutableStateFlow<ImportResult?>(null)
@@ -295,6 +296,50 @@ class AdminViewModel(
 
     fun loadAppSettings() = viewModelScope.launch {
         adminRepo.getAppSettings().onSuccess { appSettings.value = it }
+    }
+
+    // The backend saves app_settings as one whole object — always fetch the
+    // latest copy right before flipping this one field so we never clobber a
+    // value changed elsewhere (e.g. the Settings screen) in the meantime.
+    fun setCouponsEnabled(enabled: Boolean) = viewModelScope.launch {
+        val current = adminRepo.getAppSettings().getOrNull() ?: return@launch
+        adminRepo.saveAppSettings(
+            SaveAppSettingsRequest(
+                wifiName = current.wifiName,
+                wifiPassword = current.wifiPassword,
+                upiId = current.upiId,
+                graceDays = current.graceDays,
+                convenienceFee = current.convenienceFee,
+                waterTankerRate = current.waterTankerRate,
+                couponsEnabled = enabled
+            )
+        )
+            .onSuccess { appSettings.value = it }
+            .onFailure { error.value = it.message ?: "Failed to update setting" }
+    }
+
+    fun loadCoupons() = viewModelScope.launch {
+        isLoading.value = true
+        adminRepo.getCoupons().onSuccess { coupons.value = it }.onFailure { error.value = it.message }
+        isLoading.value = false
+    }
+
+    fun createCoupon(code: String?, discountPercent: Int) = viewModelScope.launch {
+        adminRepo.createCoupon(code, discountPercent)
+            .onSuccess { coupons.value = listOf(it) + coupons.value; successMsg.value = "Coupon created" }
+            .onFailure { error.value = it.message ?: "Failed to create coupon" }
+    }
+
+    fun setCouponActive(coupon: Coupon, active: Boolean) = viewModelScope.launch {
+        adminRepo.updateCoupon(coupon.id, isActive = active)
+            .onSuccess { updated -> coupons.value = coupons.value.map { if (it.id == updated.id) updated else it } }
+            .onFailure { error.value = it.message ?: "Failed to update coupon" }
+    }
+
+    fun deleteCoupon(coupon: Coupon) = viewModelScope.launch {
+        adminRepo.deleteCoupon(coupon.id)
+            .onSuccess { coupons.value = coupons.value.filter { it.id != coupon.id }; successMsg.value = "Coupon deleted" }
+            .onFailure { error.value = it.message ?: "Failed to delete coupon" }
     }
 
     fun createCashMembership(req: CreateCashMembershipRequest, onDone: () -> Unit) = viewModelScope.launch {

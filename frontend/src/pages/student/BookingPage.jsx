@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { useTranslation } from 'react-i18next'
 import { fetchSeatAvailability, selectSeat, bookSeat } from '../../store/slices/seatSlice'
 import { fetchMyMembership, fetchPlans, createPaymentOrder, verifyPayment } from '../../store/slices/membershipSlice'
+import { fetchActiveCoupons, validateCoupon, clearAppliedCoupon } from '../../store/slices/couponSlice'
 import { formatCurrency, formatNumber } from '../../utils/currency'
 
 // Physical obstructions — not bookable seats
@@ -104,12 +105,15 @@ export default function BookingPage() {
     const { t } = useTranslation()
     const { seats, selectedSeat, isLoading: seatsLoading } = useSelector(s => s.seat)
     const { plans, current, isLoading: planLoading } = useSelector(s => s.membership)
+    const { activeCoupons, applied: appliedCoupon } = useSelector(s => s.coupon)
 
     const [step, setStep] = useState(1)
     const [selectedPlan, setSelectedPlan] = useState(null)
     const [selectedShift, setSelectedShift] = useState('MORNING')
     const [paying, setPaying] = useState(false)
     const [membershipChecked, setMembershipChecked] = useState(false)
+    const [couponInput, setCouponInput] = useState('')
+    const [applyingCoupon, setApplyingCoupon] = useState(false)
     // Payment succeeds and activates the membership before the seat is actually
     // reserved (a separate call to seat-service) — if that second call fails
     // (seat-conflict race, transient error), we must not tell the student their
@@ -123,12 +127,49 @@ export default function BookingPage() {
     useEffect(() => {
         dispatch(fetchMyMembership()).finally(() => setMembershipChecked(true))
         dispatch(fetchPlans())
+        dispatch(fetchActiveCoupons())
     }, [])
     useEffect(() => {
         if (selectedPlan) dispatch(fetchSeatAvailability({ shift: selectedPlan.planType === 'HALF_DAY' ? selectedShift : 'FULL_DAY' }))
     }, [selectedPlan, selectedShift])
 
-    const handlePlanSelect = (plan) => { setSelectedPlan(plan); dispatch(selectSeat(null)); setStep(2) }
+    const handlePlanSelect = (plan) => {
+        setSelectedPlan(plan)
+        dispatch(selectSeat(null))
+        dispatch(clearAppliedCoupon())
+        setCouponInput('')
+        setStep(2)
+    }
+
+    const discountAmount = appliedCoupon && selectedPlan
+        ? Math.round(Number(selectedPlan.price) * appliedCoupon.discountPercent / 100)
+        : 0
+    const totalAmount = selectedPlan
+        ? Number(selectedPlan.price) - discountAmount + Number(selectedPlan.convenienceFee || 0)
+        : 0
+
+    const handleApplyCoupon = async (code) => {
+        const trimmed = (code || '').trim()
+        if (!trimmed) return
+        setApplyingCoupon(true)
+        try {
+            const res = await dispatch(validateCoupon(trimmed))
+            if (validateCoupon.fulfilled.match(res)) {
+                setCouponInput(res.payload.code)
+                const savedAmount = Math.round(Number(selectedPlan.price) * res.payload.discountPercent / 100)
+                toast.success(t('booking.toasts.couponApplied', { amount: formatNumber(savedAmount) }))
+            } else {
+                toast.error(res.payload || t('booking.toasts.couponInvalid'))
+            }
+        } finally {
+            setApplyingCoupon(false)
+        }
+    }
+
+    const handleRemoveCoupon = () => {
+        dispatch(clearAppliedCoupon())
+        setCouponInput('')
+    }
 
     const shiftLabel = (planType, shift) => {
         if (planType === 'FULL_DAY') return t('booking.seat.shiftFullDay')
@@ -191,6 +232,7 @@ export default function BookingPage() {
                 seatId: selectedSeat.id || null,
                 seatNumber: selectedSeat.seatNumber,
                 shift: selectedPlan.planType === 'HALF_DAY' ? selectedShift : 'FULL_DAY',
+                couponCode: appliedCoupon?.code || undefined,
             }))
             if (!createPaymentOrder.fulfilled.match(orderRes)) throw new Error(orderRes.payload)
 
@@ -428,17 +470,72 @@ export default function BookingPage() {
                                     <span className="text-white font-medium">{v}</span>
                                 </div>
                             ))}
+                            {appliedCoupon && (
+                                <div className="flex justify-between items-center py-2 border-b border-primary-700/30">
+                                    <span className="text-emerald-400 text-sm">{t('booking.summary.discount')} ({appliedCoupon.code})</span>
+                                    <span className="text-emerald-400 font-medium">− {formatCurrency(discountAmount)}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between items-center pt-2">
                                 <span className="text-white font-semibold">{t('booking.summary.totalAmount')}</span>
-                                <span className="text-2xl font-bold text-amber-400">{formatCurrency(Number(selectedPlan.price) + Number(selectedPlan.convenienceFee || 0))}</span>
+                                <span className="text-2xl font-bold text-amber-400">{formatCurrency(totalAmount)}</span>
                             </div>
                         </div>
                     </div>
+
+                    <div className="card p-4 mb-6">
+                        {appliedCoupon ? (
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm text-emerald-400">{t('booking.summary.couponApplied', { code: appliedCoupon.code })}</p>
+                                <button onClick={handleRemoveCoupon} className="text-primary-400 text-xs hover:text-white transition-colors">
+                                    {t('booking.summary.couponRemove')}
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                {activeCoupons.length > 0 && (
+                                    <div className="mb-3">
+                                        <p className="text-primary-500 text-[11px] uppercase tracking-wide mb-2">{t('booking.summary.availableCoupons')}</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {activeCoupons.map(c => (
+                                                <button
+                                                    key={c.code}
+                                                    onClick={() => handleApplyCoupon(c.code)}
+                                                    disabled={applyingCoupon}
+                                                    className="px-3 py-1.5 rounded-full text-xs font-medium border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors"
+                                                >
+                                                    {c.code} · {c.discountPercent}% off
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                <label className="label">{t('booking.summary.coupon')}</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        className="input flex-1"
+                                        placeholder={t('booking.summary.couponPlaceholder')}
+                                        value={couponInput}
+                                        onChange={e => setCouponInput(e.target.value.toUpperCase())}
+                                    />
+                                    <button
+                                        onClick={() => handleApplyCoupon(couponInput)}
+                                        disabled={applyingCoupon || !couponInput.trim()}
+                                        className="btn-outline px-4 text-sm"
+                                    >
+                                        {applyingCoupon ? t('booking.summary.couponApplying') : t('booking.summary.couponApply')}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
                     <div className="card p-4 mb-6 bg-primary-800/30 text-primary-400 text-xs leading-relaxed">
                         {t('booking.summary.disclaimer')}
                     </div>
                     <button onClick={handlePayment} disabled={paying} className="btn-primary w-full py-4 text-base mb-3">
-                        {paying ? t('booking.summary.processing') : t('booking.summary.payBtn', { amount: formatNumber(Number(selectedPlan.price) + Number(selectedPlan.convenienceFee || 0)) })}
+                        {paying ? t('booking.summary.processing') : t('booking.summary.payBtn', { amount: formatNumber(totalAmount) })}
                     </button>
                     <button onClick={()=>setStep(2)} className="w-full text-primary-400 text-sm hover:text-white transition-colors">{t('booking.summary.changeSeat')}</button>
                 </div>

@@ -1,11 +1,14 @@
 use crate::{
     app_state::AppState,
     middleware::AuthUser,
-    models::membership::{
-        CreateOrderRequest, VerifyDuesPaymentRequest, VerifyPaymentRequest, VerifyPendingPaymentRequest,
+    models::{
+        coupon::ValidateCouponRequest,
+        membership::{
+            CreateOrderRequest, VerifyDuesPaymentRequest, VerifyPaymentRequest, VerifyPendingPaymentRequest,
+        },
     },
     response::ApiResponse,
-    services::membership as svc,
+    services::{coupon as coupon_svc, membership as svc},
 };
 use axum::{extract::State, Json};
 use std::sync::Arc;
@@ -29,6 +32,7 @@ pub async fn create_order(
         req.plan_id,
         req.shift.as_deref(),
         req.seat_number.as_deref(),
+        req.coupon_code.as_deref(),
     )
     .await?;
     Ok(ApiResponse::success("Order created", order))
@@ -99,4 +103,21 @@ pub async fn verify_pending_payment(
     )
     .await?;
     Ok(ApiResponse::success("Pending amount cleared", membership))
+}
+
+pub async fn list_active_coupons(
+    State(state): State<Arc<AppState>>,
+    _user: AuthUser,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let coupons = coupon_svc::list_active_coupons(&state).await?;
+    Ok(ApiResponse::success("Active coupons retrieved", coupons))
+}
+
+pub async fn validate_coupon(
+    State(state): State<Arc<AppState>>,
+    _user: AuthUser,
+    Json(req): Json<ValidateCouponRequest>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let coupon = coupon_svc::validate_coupon_code(&state, &req.code).await?;
+    Ok(ApiResponse::success("Coupon is valid", coupon))
 }

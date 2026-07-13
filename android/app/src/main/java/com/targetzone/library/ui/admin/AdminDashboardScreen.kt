@@ -117,7 +117,8 @@ fun AdminDashboardScreen(vm: AdminViewModel, onNavigate: (String) -> Unit) {
             "revenue"        to "📊  Revenue & Reports",
             "inbox"          to "📬  Inbox",
             "memberships/new" to "➕  Create Membership",
-            "import"         to "🧑‍🎓  Import Student"
+            "import"         to "🧑‍🎓  Import Student",
+            "coupons"        to "%  Coupons"
         )
         links.forEach { (route, label) ->
             AppCard(Modifier.fillMaxWidth().padding(bottom = 8.dp), onClick = { onNavigate(route) }) {

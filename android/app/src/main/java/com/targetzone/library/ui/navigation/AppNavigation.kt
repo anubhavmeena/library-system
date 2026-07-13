@@ -220,6 +220,9 @@ fun AppNavigation(tokenManager: TokenManager) {
             composable("admin/inbox") {
                 AdminScaffold("Inbox", onLogout = logout) { AdminInboxScreen(adminVm) }
             }
+            composable("admin/coupons") {
+                AdminScaffold("Coupons", onLogout = logout) { AdminCouponsScreen(adminVm) }
+            }
         }
     }
 }

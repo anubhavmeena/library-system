@@ -22,8 +22,8 @@ pub async fn get_app_settings(state: &Arc<AppState>) -> crate::error::Result<App
     }
 
     let inserted = sqlx::query_as::<_, AppSettings>(
-        "INSERT INTO app_settings (id, grace_days, convenience_fee, water_tanker_rate)
-         VALUES (1, $1, 0, 0)
+        "INSERT INTO app_settings (id, grace_days, convenience_fee, water_tanker_rate, coupons_enabled)
+         VALUES (1, $1, 0, 0, true)
          ON CONFLICT (id) DO NOTHING
          RETURNING *",
     )
@@ -47,11 +47,11 @@ pub async fn save_app_settings(
     req: &SaveAppSettingsRequest,
 ) -> crate::error::Result<AppSettings> {
     sqlx::query_as::<_, AppSettings>(
-        "INSERT INTO app_settings (id, wifi_name, wifi_password, upi_id, grace_days, convenience_fee, water_tanker_rate, updated_at)
-         VALUES (1, $1, $2, $3, $4, $5, $6, NOW())
+        "INSERT INTO app_settings (id, wifi_name, wifi_password, upi_id, grace_days, convenience_fee, water_tanker_rate, coupons_enabled, updated_at)
+         VALUES (1, $1, $2, $3, $4, $5, $6, $7, NOW())
          ON CONFLICT (id) DO UPDATE SET
              wifi_name = $1, wifi_password = $2, upi_id = $3, grace_days = $4,
-             convenience_fee = $5, water_tanker_rate = $6, updated_at = NOW()
+             convenience_fee = $5, water_tanker_rate = $6, coupons_enabled = $7, updated_at = NOW()
          RETURNING *",
     )
     .bind(&req.wifi_name)
@@ -60,6 +60,7 @@ pub async fn save_app_settings(
     .bind(req.grace_days)
     .bind(req.convenience_fee)
     .bind(req.water_tanker_rate)
+    .bind(req.coupons_enabled)
     .fetch_one(&state.db)
     .await
     .map_err(AppError::Database)

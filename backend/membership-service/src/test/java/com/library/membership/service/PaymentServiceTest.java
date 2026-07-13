@@ -6,6 +6,7 @@ import com.library.membership.dto.MembershipDto;
 import com.library.membership.dto.PaymentVerifyRequest;
 import com.library.membership.dto.UserApiResponse;
 import com.library.membership.dto.UserProfileDto;
+import com.library.membership.entity.Coupon;
 import com.library.membership.entity.Membership;
 import com.library.membership.entity.Payment;
 import com.library.membership.entity.Plan;
@@ -55,6 +56,7 @@ class PaymentServiceTest {
     @Mock PaymentRepository    paymentRepository;
     @Mock PlanRepository       planRepository;
     @Mock AppSettingsRepository appSettingsRepository;
+    @Mock CouponService couponService;
     @Mock KafkaTemplate<String, Object> kafkaTemplate;
     @Mock RestTemplate restTemplate;
     @InjectMocks PaymentService paymentService;
@@ -948,5 +950,126 @@ class PaymentServiceTest {
         ArgumentCaptor<Membership> cap = ArgumentCaptor.forClass(Membership.class);
         verify(membershipRepository).save(cap.capture());
         assertThat(cap.getValue().getStatus()).isEqualTo(Membership.Status.QUEUED);
+    }
+
+    // ── createOrder — coupons ────────────────────────────────────────────────
+
+    @Test
+    void createOrder_withValidCoupon_discountAppliedToChargeAmountNotConvenienceFee() {
+        Plan plan = buildFullDayPlan(); // price = 600
+        when(planRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
+        when(membershipRepository.save(any())).thenReturn(buildSavedMembership(UUID.randomUUID(), plan));
+        when(appSettingsRepository.findById(1L)).thenReturn(Optional.of(
+                com.library.membership.entity.AppSettings.builder().id(1L).convenienceFee(BigDecimal.TEN).build()));
+        when(couponService.validateCoupon("SAVE10")).thenReturn(
+                Coupon.builder().id(UUID.randomUUID()).code("SAVE10").discountPercent(10).isActive(true).build());
+
+        CreateOrderRequest req = new CreateOrderRequest();
+        req.setPlanId(plan.getId().toString());
+        req.setCouponCode("SAVE10");
+        CreateOrderResponse resp = paymentService.createOrder(userId, req);
+
+        // 600 - 10% (=60) + convenienceFee(10) = 550
+        assertThat(resp.getAmount()).isEqualByComparingTo(BigDecimal.valueOf(550));
+        assertThat(resp.getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(60));
+
+        ArgumentCaptor<Membership> cap = ArgumentCaptor.forClass(Membership.class);
+        verify(membershipRepository, atLeastOnce()).save(cap.capture());
+        Membership lastSaved = cap.getValue();
+        assertThat(lastSaved.getCouponCode()).isEqualTo("SAVE10");
+        assertThat(lastSaved.getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(60));
+    }
+
+    @Test
+    void createOrder_noCoupon_discountAmountNullOnMembershipAndResponse() {
+        Plan plan = buildFullDayPlan();
+        when(planRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
+        when(membershipRepository.save(any())).thenReturn(buildSavedMembership(UUID.randomUUID(), plan));
+
+        CreateOrderRequest req = new CreateOrderRequest();
+        req.setPlanId(plan.getId().toString());
+        CreateOrderResponse resp = paymentService.createOrder(userId, req);
+
+        assertThat(resp.getDiscountAmount()).isNull();
+        verifyNoInteractions(couponService);
+
+        ArgumentCaptor<Membership> cap = ArgumentCaptor.forClass(Membership.class);
+        verify(membershipRepository, atLeastOnce()).save(cap.capture());
+        assertThat(cap.getValue().getCouponCode()).isNull();
+    }
+
+    @Test
+    void createOrder_couponOnRenewal_throwsIllegalArgument() {
+        Plan plan = buildFullDayPlan();
+        Membership active = Membership.builder()
+                .id(UUID.randomUUID())
+                .userId(UUID.fromString(userId))
+                .plan(plan)
+                .shift("FULL_DAY")
+                .endDate(LocalDate.now().plusDays(10))
+                .status(Membership.Status.ACTIVE)
+                .build();
+
+        when(planRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
+        when(membershipRepository.findActiveByUserId(UUID.fromString(userId))).thenReturn(Optional.of(active));
+        when(membershipRepository.findQueuedByUserId(UUID.fromString(userId))).thenReturn(Optional.empty());
+
+        CreateOrderRequest req = new CreateOrderRequest();
+        req.setPlanId(plan.getId().toString());
+        req.setCouponCode("SAVE10");
+
+        assertThatThrownBy(() -> paymentService.createOrder(userId, req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("renewals");
+
+        verifyNoInteractions(couponService);
+        verifyNoInteractions(paymentRepository);
+    }
+
+    @Test
+    void createOrder_invalidCoupon_propagatesIllegalArgumentFromCouponService() {
+        Plan plan = buildFullDayPlan();
+        when(planRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
+        when(couponService.validateCoupon("BADCODE"))
+                .thenThrow(new IllegalArgumentException("Invalid or inactive coupon code"));
+
+        CreateOrderRequest req = new CreateOrderRequest();
+        req.setPlanId(plan.getId().toString());
+        req.setCouponCode("BADCODE");
+
+        assertThatThrownBy(() -> paymentService.createOrder(userId, req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid or inactive coupon code");
+
+        // Coupon validation happens before the membership row is ever built —
+        // an invalid code must not leave a stray PENDING membership behind.
+        verify(membershipRepository, never()).save(any());
+        verifyNoInteractions(paymentRepository);
+    }
+
+    // ── verifyAndActivateMembership — coupon audit trail ─────────────────────
+
+    @Test
+    void verify_success_copiesCouponFieldsFromMembershipOntoPayment() {
+        String orderId = "dev_order_coupon";
+        UUID memId = UUID.randomUUID();
+
+        Plan plan = buildFullDayPlan();
+        Membership membership = buildMembershipAwaitingVerify(memId, plan, orderId, BigDecimal.valueOf(550));
+        membership.setCouponCode("SAVE10");
+        membership.setDiscountAmount(BigDecimal.valueOf(60));
+        when(membershipRepository.findByGatewayOrderId(orderId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.save(any())).thenReturn(membership);
+
+        PaymentVerifyRequest req = new PaymentVerifyRequest();
+        req.setGatewayOrderId(orderId);
+        req.setGatewayPaymentId("pay_coupon");
+
+        paymentService.verifyAndActivateMembership(userId, req);
+
+        ArgumentCaptor<Payment> cap = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(cap.capture());
+        assertThat(cap.getValue().getCouponCode()).isEqualTo("SAVE10");
+        assertThat(cap.getValue().getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(60));
     }
 }

@@ -11,5 +11,6 @@ public class AppSettingsDto {
     private Integer graceDays;
     private BigDecimal convenienceFee;
     private BigDecimal waterTankerRate;
+    private boolean couponsEnabled;
     private String updatedAt;
 }

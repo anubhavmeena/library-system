@@ -2,6 +2,7 @@ package com.library.membership.service;
 
 import com.library.membership.dto.*;
 import com.library.membership.entity.AppSettings;
+import com.library.membership.entity.Coupon;
 import com.library.membership.entity.Membership;
 import com.library.membership.entity.Payment;
 import com.library.membership.entity.Plan;
@@ -43,6 +44,7 @@ public class PaymentService {
     private final PaymentRepository             paymentRepository;
     private final PlanRepository                planRepository;
     private final AppSettingsRepository         appSettingsRepository;
+    private final CouponService                 couponService;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final RestTemplate                  restTemplate;
 
@@ -103,6 +105,14 @@ public class PaymentService {
                 throw new IllegalArgumentException(
                         "You already have a plan queued starting " + q.getStartDate() + ".");
             });
+            // Coupons only apply to a fresh booking, never a queued renewal —
+            // this guard is the only thing standing between a crafted API
+            // request and a renewal silently getting a discount it was never
+            // meant to have.
+            if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
+                throw new IllegalArgumentException("Coupons only apply to new bookings, not renewals");
+            }
+
             Membership active = activeOpt.get();
             startDate = active.getEndDate().plusDays(1);
             // Inherit seat and shift from current active membership
@@ -120,6 +130,20 @@ public class PaymentService {
                 throw new IllegalArgumentException(
                         "Half-day plan requires shift selection: MORNING or EVENING");
             }
+        }
+
+        // 3b. Validate the coupon (if any) before touching the DB — discount
+        // applies to the plan price only, the convenience fee is added after,
+        // unaffected, matching its role as a flat gateway-handling cost rather
+        // than part of the "price" being discounted.
+        String couponCode = null;
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
+            Coupon coupon = couponService.validateCoupon(request.getCouponCode());
+            couponCode = coupon.getCode();
+            discountAmount = plan.getPrice()
+                    .multiply(BigDecimal.valueOf(coupon.getDiscountPercent()))
+                    .divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.HALF_UP);
         }
 
         // 4. Create membership in PENDING state (set to ACTIVE or QUEUED after payment)
@@ -145,7 +169,7 @@ public class PaymentService {
         BigDecimal convenienceFee = appSettingsRepository.findById(1L)
                 .map(AppSettings::getConvenienceFee)
                 .orElse(BigDecimal.ZERO);
-        BigDecimal chargeAmount = plan.getPrice().add(convenienceFee);
+        BigDecimal chargeAmount = plan.getPrice().subtract(discountAmount).add(convenienceFee);
 
         // 5. Create gateway order — or generate a dev mock if credentials absent
         String gatewayOrderId;
@@ -165,6 +189,8 @@ public class PaymentService {
         // no Payment row is ever written for an order that's never confirmed.
         membership.setGatewayOrderId(gatewayOrderId);
         membership.setCheckoutAmount(chargeAmount);
+        membership.setCouponCode(couponCode);
+        membership.setDiscountAmount(couponCode != null ? discountAmount : null);
         membershipRepository.save(membership);
 
         // 7. Return order details to frontend
@@ -176,6 +202,7 @@ public class PaymentService {
                 .gateway(activeGateway)
                 .paymentSessionId(paymentSessionId)
                 .razorpayKeyId("RAZORPAY".equals(activeGateway) ? razorpayKeyId : null)
+                .discountAmount(couponCode != null ? discountAmount : null)
                 .build();
     }
 
@@ -204,6 +231,8 @@ public class PaymentService {
                 .gatewayPaymentId(request.getGatewayPaymentId())
                 .status(Payment.Status.SUCCESS)
                 .invoiceId(generateInvoiceId())
+                .couponCode(membership.getCouponCode())
+                .discountAmount(membership.getDiscountAmount())
                 .build();
         paymentRepository.save(payment);
 

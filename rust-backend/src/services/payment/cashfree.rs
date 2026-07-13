@@ -22,6 +22,7 @@ pub async fn create_order(
             membership_id,
             amount,
             gateway: "CASHFREE".into(),
+            discount_amount: None,
         });
     }
 
@@ -83,6 +84,7 @@ pub async fn create_order(
         membership_id,
         amount,
         gateway: "CASHFREE".into(),
+        discount_amount: None,
     })
 }
 
