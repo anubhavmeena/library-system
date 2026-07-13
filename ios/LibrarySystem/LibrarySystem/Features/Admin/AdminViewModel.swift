@@ -616,4 +616,9 @@ final class AdminViewModel: ObservableObject {
 
     func clearError()   { error = nil }
     func clearSuccess() { successMsg = nil }
+    // error/successMsg are shared across every admin screen (one AdminViewModel
+    // instance for the whole session) — call this from each screen's onAppear
+    // so a message left over from whatever screen the admin was on before
+    // never bleeds into this one.
+    func clearMessages() { error = nil; successMsg = nil }
 }

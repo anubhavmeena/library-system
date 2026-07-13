@@ -44,7 +44,7 @@ struct AdminBroadcastView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
-        .onAppear { vm.loadBroadcastHistory() }
+        .onAppear { vm.clearMessages(); vm.loadBroadcastHistory() }
     }
 
     private var warningCard: some View {

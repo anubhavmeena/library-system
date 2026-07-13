@@ -43,7 +43,7 @@ struct AdminRevenueView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
-        .onAppear { loadDefaultRange() }
+        .onAppear { vm.clearMessages(); loadDefaultRange() }
     }
 
     // fromDate/toDate stay "yyyy-MM-dd" strings (what vm.loadRevenueReport expects),

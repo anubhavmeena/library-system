@@ -35,7 +35,7 @@ struct AdminCouponsView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
-        .onAppear { vm.loadCoupons(); vm.loadAppSettings() }
+        .onAppear { vm.clearMessages(); vm.loadCoupons(); vm.loadAppSettings() }
         .alert("Delete coupon \(deleteTarget?.code ?? "")?", isPresented: Binding(
             get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }
         )) {

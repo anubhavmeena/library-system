@@ -37,7 +37,7 @@ struct AdminInboxView: View {
                 }
             }
         }
-        .onAppear { vm.loadInbox() }
+        .onAppear { vm.clearMessages(); vm.loadInbox() }
     }
 
     private var emptyInbox: some View {

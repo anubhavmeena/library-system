@@ -125,7 +125,7 @@ struct AdminStudentDetailView: View {
         .toolbarBackground(Color.navyMid, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .onAppear { vm.loadStudentDetail(id: studentId) }
+        .onAppear { vm.clearMessages(); vm.loadStudentDetail(id: studentId) }
         .onChange(of: vm.studentDeleted) { deleted in
             if deleted { vm.studentDeleted = false; dismiss() }
         }

@@ -45,7 +45,7 @@ struct AdminExpensesView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
-        .onAppear { vm.loadExpenses(year: selectedYear, month: selectedMonth) }
+        .onAppear { vm.clearMessages(); vm.loadExpenses(year: selectedYear, month: selectedMonth) }
         .onChange(of: vm.expense) { _ in populateFields() }
     }
 

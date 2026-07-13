@@ -78,10 +78,10 @@ struct AdminCreateMembershipView: View {
             }
         }
         .onAppear {
-            // vm is shared across the whole admin session — clear out any error left
-            // over from an unrelated screen visited before this sheet was opened, so
-            // step 4's error banner can only ever reflect this wizard's own submit.
-            vm.clearError()
+            // vm is shared across the whole admin session — clear out any error/success
+            // left over from an unrelated screen visited before this sheet was opened,
+            // so step 4's error banner can only ever reflect this wizard's own submit.
+            vm.clearMessages()
             loadPlans()
             loadStudents()
             vm.loadAppSettings()

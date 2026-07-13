@@ -34,6 +34,7 @@ struct AdminRemindersView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .onAppear {
+            vm.clearMessages()
             vm.loadExpiring(withinDays: withinDays)
             vm.loadPendingFeeStudents()
             vm.loadGraceDuesStudents()

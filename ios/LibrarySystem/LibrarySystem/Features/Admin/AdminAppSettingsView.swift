@@ -102,7 +102,7 @@ struct AdminAppSettingsView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
-        .onAppear { vm.loadAppSettings() }
+        .onAppear { vm.clearMessages(); vm.loadAppSettings() }
         .onChange(of: vm.appSettingsLoaded) { isLoaded in
             guard isLoaded, !loaded else { return }
             loaded = true
