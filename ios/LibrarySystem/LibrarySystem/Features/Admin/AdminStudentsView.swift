@@ -9,8 +9,9 @@ struct AdminStudentsView: View {
     @State private var showDetail       = false
     @State private var selectedId       = ""
     @State private var searchDebounceTask: Task<Void, Never>?
+    @State private var pageSize = 20
 
-    private let pageSize = 20
+    private let pageSizeOptions = [20, 50, 100, 200]
     private let baseURL = "https://targetzone.co.in"
 
     // Mirrors the web admin students page (frontend/src/pages/admin/AdminStudentsPage.jsx)
@@ -59,6 +60,28 @@ struct AdminStudentsView: View {
             Text("\(vm.students.count) of \(vm.studentsTotal) students")
                 .font(.bodySmall).foregroundColor(.textSub)
             Spacer()
+            Menu {
+                ForEach(pageSizeOptions, id: \.self) { size in
+                    Button {
+                        pageSize = size
+                        page = 0
+                        loadStudents()
+                    } label: {
+                        if size == pageSize {
+                            Label("\(size) per page", systemImage: "checkmark")
+                        } else {
+                            Text("\(size) per page")
+                        }
+                    }
+                }
+            } label: {
+                Text("\(pageSize) / page ▾")
+                    .font(.labelSmall).foregroundColor(.textSub)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Color.cardBg)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(Color.cardBorder))
+            }
             Button { loadStudents() } label: {
                 Text("↻ Refresh")
                     .font(.labelSmall).foregroundColor(.textSub)
@@ -307,7 +330,7 @@ struct AdminStudentsView: View {
     }
 
     private func loadStudents() {
-        vm.loadStudents(page: page,
+        vm.loadStudents(page: page, size: pageSize,
                         membershipStatus: membershipFilter.isEmpty ? nil : membershipFilter,
                         search: search.isEmpty ? nil : search)
     }
