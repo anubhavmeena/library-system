@@ -97,7 +97,10 @@ struct SeatGridView: View {
     private func actualSeatCell(_ seat: Seat) -> some View {
         let state = seatState(seat)
         return Button {
-            if !readOnly && state != .booked { onSelect(seat) }
+            if !readOnly && state != .booked {
+                Haptics.selection()
+                onSelect(seat)
+            }
         } label: {
             Text(shortNumber(seat.seatNumber))
                 .font(.system(size: 8, weight: .medium))

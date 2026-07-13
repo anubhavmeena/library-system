@@ -47,7 +47,7 @@ final class StudentViewModel: ObservableObject {
     // UI State
     @Published var isLoading = false
     @Published var error: String?
-    @Published var successMsg: String?
+    @Published var successMsg: String? { didSet { if successMsg != nil { Haptics.success() } } }
     @Published var idCardData: Data?
     @Published var showIdCardShare = false
 

@@ -56,5 +56,6 @@ struct ErrorBanner: View {
                 .stroke(Color.redAlert.opacity(0.4), lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .onAppear { Haptics.error() }
     }
 }

@@ -22,19 +22,23 @@ final class AuthViewModel: ObservableObject {
 
     var canResend: Bool { secondsSinceSend >= 10 }
     var secondsLeft: Int { max(0, 10 - secondsSinceSend) }
-    var showSmsOption: Bool { !smsOptionUsed && otpSendCount >= 2 && canResend }
+    // SMS fallback only makes sense for a phone contact — mirrors the web
+    // LoginPage's showSmsOption, which gates the same way.
+    var showSmsOption: Bool { contactType == "MOBILE" && !smsOptionUsed && otpSendCount >= 2 && canResend }
 
     private let repo = AuthRepository.shared
     private let tokenManager = TokenManager.shared
 
     var contact = ""
+    var contactType = "MOBILE"   // "MOBILE" | "EMAIL" — mirrors the web LoginPage's toggle
 
-    func sendOtp(contact: String) {
+    func sendOtp(contact: String, contactType: String = "MOBILE") {
         self.contact = contact
+        self.contactType = contactType
         isLoading = true; error = nil
         Task {
             do {
-                try await repo.sendOtp(contact: contact)
+                try await repo.sendOtp(contact: contact, contactType: contactType)
                 otpSent = true
                 otpSendCount = 1
                 startResendTimer()
@@ -47,7 +51,7 @@ final class AuthViewModel: ObservableObject {
         isLoading = true; error = nil
         Task {
             do {
-                try await repo.sendOtp(contact: contact)
+                try await repo.sendOtp(contact: contact, contactType: contactType)
                 otpSendCount += 1
                 startResendTimer()
             } catch { self.error = error.localizedDescription }
@@ -59,7 +63,7 @@ final class AuthViewModel: ObservableObject {
         isLoading = true; error = nil
         Task {
             do {
-                try await repo.sendOtp(contact: contact, channel: "SMS")
+                try await repo.sendOtp(contact: contact, contactType: contactType, channel: "SMS")
                 smsOptionUsed = true
                 otpSendCount += 1
                 startResendTimer()
@@ -147,6 +151,7 @@ final class AuthViewModel: ObservableObject {
         isNewUser = false
         error = nil
         contact = ""
+        contactType = "MOBILE"
         otpSendCount = 0
         secondsSinceSend = 0
         smsOptionUsed = false

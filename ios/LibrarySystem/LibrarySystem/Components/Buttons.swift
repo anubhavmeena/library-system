@@ -12,7 +12,10 @@ struct PrimaryButton: View {
     }
 
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            Haptics.tap()
+            action()
+        }) {
             ZStack {
                 if isLoading {
                     ProgressView().tint(.navyDeep)
@@ -42,7 +45,10 @@ struct OutlineButton: View {
     }
 
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            Haptics.tap()
+            action()
+        }) {
             Text(title)
                 .font(.headlineSmall)
                 .foregroundColor(.amber)

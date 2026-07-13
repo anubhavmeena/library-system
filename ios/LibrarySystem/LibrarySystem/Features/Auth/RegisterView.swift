@@ -7,6 +7,7 @@ struct RegisterView: View {
     @State private var name        = ""
     @State private var email       = ""
     @State private var dateOfBirth = ""
+    @State private var hasDateOfBirth = false
     @State private var gender      = ""
     @State private var address     = ""
 
@@ -39,8 +40,7 @@ struct RegisterView: View {
                                      keyboardType: .emailAddress,
                                      leadingIcon: "envelope")
 
-                        AppTextField(label: "Date of Birth (yyyy-MM-dd)", text: $dateOfBirth,
-                                     placeholder: "2000-01-31", leadingIcon: "calendar")
+                        dateOfBirthField
 
                         // Gender picker
                         VStack(alignment: .leading, spacing: 4) {
@@ -88,5 +88,50 @@ struct RegisterView: View {
         }
         .dismissKeyboardOnTap()
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    // Date of birth is optional, but a DatePicker always carries a concrete
+    // Date — the toggle is what actually represents "not set" vs. "set",
+    // since a plain free-text field let a mistyped yyyy-MM-dd silently fail
+    // whatever the backend does with an unparseable string.
+    private var dateOfBirthField: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle(isOn: $hasDateOfBirth) {
+                Text("Date of Birth (optional)").font(.labelMedium).foregroundColor(.textSub)
+            }
+            .tint(.amber)
+            .onChange(of: hasDateOfBirth) { on in
+                dateOfBirth = on ? Self.formatYMD(Self.parseYMD(dateOfBirth) ?? Self.defaultDOB) : ""
+            }
+            if hasDateOfBirth {
+                DatePicker("", selection: Binding(
+                    get: { Self.parseYMD(dateOfBirth) ?? Self.defaultDOB },
+                    set: { dateOfBirth = Self.formatYMD($0) }
+                ), in: ...Date(), displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                    .tint(.amber)
+                    .colorScheme(.dark)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(12)
+        .background(Color.cardBg)
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cardBorder))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private static var defaultDOB: Date {
+        Calendar.current.date(byAdding: .year, value: -18, to: Date()) ?? Date()
+    }
+
+    private static func parseYMD(_ s: String) -> Date? {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current
+        return f.date(from: s)
+    }
+
+    private static func formatYMD(_ date: Date) -> String {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current
+        return f.string(from: date)
     }
 }

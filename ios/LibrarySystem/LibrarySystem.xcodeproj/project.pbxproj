@@ -55,6 +55,7 @@
 		7F5EAAE638D5434DA13CEE2D /* InfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE35E55B89E24E8C90B4152A /* InfoRow.swift */; };
 		74215C01F8A34914B943E8FB /* SeatGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54ACD5DC40FF4DE0A3C7276D /* SeatGridView.swift */; };
 		D2D4C0A80A1E43019358D14B /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29977CB9597F4948B4B8D622 /* LoadingView.swift */; };
+		42F3F2EED06B6FF78055C93B /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01B98FDEEB1F12E01BDA4668 /* Haptics.swift */; };
 		F07CBC65A5D94444ABCCA604 /* RazorpayWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A8A57ADF4544C78A8C7C6EA /* RazorpayWebView.swift */; };
 		35C93F79A6D34DF58931EDB6 /* razorpay_checkout.html in Resources */ = {isa = PBXBuildFile; fileRef = 1DC8AB397735418F8BD21A44 /* razorpay_checkout.html */; };
 		5115F879ED5C41D0917F979F /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E02F05CD608649028D063B95 /* SplashView.swift */; };
@@ -125,6 +126,7 @@
 		EE35E55B89E24E8C90B4152A /* InfoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoRow.swift; sourceTree = "<group>"; };
 		54ACD5DC40FF4DE0A3C7276D /* SeatGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatGridView.swift; sourceTree = "<group>"; };
 		29977CB9597F4948B4B8D622 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
+		01B98FDEEB1F12E01BDA4668 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
 		0A8A57ADF4544C78A8C7C6EA /* RazorpayWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RazorpayWebView.swift; sourceTree = "<group>"; };
 		1DC8AB397735418F8BD21A44 /* razorpay_checkout.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = razorpay_checkout.html; sourceTree = "<group>"; };
 		E02F05CD608649028D063B95 /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
@@ -206,6 +208,7 @@
 				6458A9F43200432A91393DC1 /* Network */,
 				3DBAC09BE73D4F568D133D88 /* Auth */,
 				BB377AB3532C4788B051B53B /* Models */,
+				01B98FDEEB1F12E01BDA4668 /* Haptics.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -479,6 +482,7 @@
 				7F5EAAE638D5434DA13CEE2D /* InfoRow.swift in Sources */,
 				74215C01F8A34914B943E8FB /* SeatGridView.swift in Sources */,
 				D2D4C0A80A1E43019358D14B /* LoadingView.swift in Sources */,
+				42F3F2EED06B6FF78055C93B /* Haptics.swift in Sources */,
 				F07CBC65A5D94444ABCCA604 /* RazorpayWebView.swift in Sources */,
 				22A0814E666B86257BF35B30 /* GalleryRepository.swift in Sources */,
 				4BDC8CB2671A6ADF92710FF4 /* ContactAdminView.swift in Sources */,

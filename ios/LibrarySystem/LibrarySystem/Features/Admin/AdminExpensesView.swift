@@ -128,16 +128,16 @@ struct AdminExpensesView: View {
 
             HStack(spacing: 12) {
                 AppTextField(label: "Water Tankers (qty)", text: $waterTankerQty,
-                             placeholder: "0", leadingIcon: "drop")
+                             placeholder: "0", keyboardType: .numberPad, leadingIcon: "drop")
                 AppTextField(label: "Total Water Cost (₹)", text: $waterTankerPrice,
-                             placeholder: "0", leadingIcon: "indianrupeesign")
+                             placeholder: "0", keyboardType: .decimalPad, leadingIcon: "indianrupeesign")
             }
 
             AppTextField(label: "Electricity Bill (₹)", text: $electricityBill,
-                         placeholder: "0", leadingIcon: "bolt")
+                         placeholder: "0", keyboardType: .decimalPad, leadingIcon: "bolt")
 
             AppTextField(label: "Internet Bill (₹)", text: $internetBill,
-                         placeholder: "0", leadingIcon: "wifi")
+                         placeholder: "0", keyboardType: .decimalPad, leadingIcon: "wifi")
 
             miscSection
         }
@@ -165,7 +165,7 @@ struct AdminExpensesView: View {
                     AppTextField(label: "", text: Binding(
                         get: { miscItems[i].amt },
                         set: { miscItems[i].amt = $0 }
-                    ), placeholder: "₹", leadingIcon: "indianrupeesign")
+                    ), placeholder: "₹", keyboardType: .decimalPad, leadingIcon: "indianrupeesign")
                     .frame(width: 100)
 
                     Button {

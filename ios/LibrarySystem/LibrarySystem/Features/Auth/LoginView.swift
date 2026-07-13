@@ -2,8 +2,13 @@ import SwiftUI
 
 struct LoginView: View {
     @StateObject private var vm = AuthViewModel()
-    @State private var mobile = ""
-    @State private var otp    = ""
+    @State private var contact     = ""
+    @State private var contactType = "MOBILE"   // "MOBILE" | "EMAIL"
+    @State private var otp         = ""
+
+    private var isContactValid: Bool {
+        contactType == "MOBILE" ? contact.count == 10 : contact.contains("@")
+    }
 
     var body: some View {
         ZStack {
@@ -27,14 +32,22 @@ struct LoginView: View {
                     // Form
                     VStack(spacing: 16) {
                         if !vm.otpSent {
-                            AppTextField(label: "Mobile Number", text: $mobile,
-                                         placeholder: "10-digit mobile",
-                                         keyboardType: .numberPad,
-                                         leadingIcon: "phone")
+                            Picker("Contact Type", selection: $contactType) {
+                                Text("Mobile").tag("MOBILE")
+                                Text("Email").tag("EMAIL")
+                            }
+                            .pickerStyle(.segmented)
+                            .onChange(of: contactType) { _ in contact = "" }
+
+                            AppTextField(label: contactType == "MOBILE" ? "Mobile Number" : "Email",
+                                         text: $contact,
+                                         placeholder: contactType == "MOBILE" ? "10-digit mobile" : "you@example.com",
+                                         keyboardType: contactType == "MOBILE" ? .numberPad : .emailAddress,
+                                         leadingIcon: contactType == "MOBILE" ? "phone" : "envelope")
 
                             PrimaryButton("Send OTP", isLoading: vm.isLoading) {
-                                guard mobile.count == 10 else { return }
-                                vm.sendOtp(contact: mobile)
+                                guard isContactValid else { return }
+                                vm.sendOtp(contact: contact, contactType: contactType)
                             }
 
                             NavigationLink("Login as Admin") {
@@ -44,10 +57,10 @@ struct LoginView: View {
                             .foregroundColor(.textSub)
                         } else {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("OTP sent to \(mobile)")
+                                Text("OTP sent to \(contact)")
                                     .font(.bodySmall)
                                     .foregroundColor(.textSub)
-                                Button("Change") { vm.resetOtpState(); mobile = "" }
+                                Button("Change") { vm.resetOtpState(); contact = "" }
                                     .font(.labelSmall)
                                     .foregroundColor(.amber)
                             }

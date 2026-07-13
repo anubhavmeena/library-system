@@ -237,9 +237,9 @@ struct AdminStudentDetailView: View {
                 editableInfoRow(s, label: "Mobile", value: s.mobile, field: .mobile, keyboard: .phonePad)
                 editableInfoRow(s, label: "Email", value: s.email ?? "", field: .email, keyboard: .emailAddress)
                 editableGenderRow(s, value: s.gender ?? "")
-                editableInfoRow(s, label: "DOB", value: s.dateOfBirth ?? "", field: .dateOfBirth, placeholder: "yyyy-MM-dd")
+                editableDateRow(s, label: "DOB", value: s.dateOfBirth ?? "", field: .dateOfBirth)
                 editableInfoRow(s, label: "Address", value: s.address ?? "", field: .address)
-                editableInfoRow(s, label: "Joined", value: String(s.joinedAt?.prefix(10) ?? ""), field: .joinedAt, placeholder: "yyyy-MM-dd")
+                editableDateRow(s, label: "Joined", value: String(s.joinedAt?.prefix(10) ?? ""), field: .joinedAt)
             }
         }
     }
@@ -361,6 +361,54 @@ struct AdminStudentDetailView: View {
                     }
             }
         }
+    }
+
+    // Dates have no keyboard to submit either — like gender, picking a day
+    // commits immediately. Free-text yyyy-MM-dd entry (the old editableInfoRow
+    // path) let a mistyped date silently fail whatever the backend does with
+    // an unparseable string; a DatePicker can't produce an invalid one.
+    private func editableDateRow(_ s: StudentDetail, label: String, value: String, field: ProfileField) -> some View {
+        Group {
+            if editingField == field {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(label).font(.bodySmall).foregroundColor(.textMuted)
+                    DatePicker("", selection: Binding(
+                        get: { Self.parseYMD(editBuffer) ?? Date() },
+                        set: { newDate in
+                            editBuffer = Self.formatYMD(newDate)
+                            saveEditingField(s)
+                        }
+                    ), in: ...Date(), displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                        .labelsHidden()
+                        .tint(.amber)
+                        .colorScheme(.dark)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.vertical, 8)
+                Divider().background(Color.dividerColor)
+            } else {
+                InfoRow(label: label, value: value.isEmpty ? "—" : value)
+                    .contentShape(Rectangle())
+                    .contextMenu {
+                        Button {
+                            beginEditing(s, field: field, value: value)
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                    }
+            }
+        }
+    }
+
+    private static func parseYMD(_ s: String) -> Date? {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current
+        return f.date(from: s)
+    }
+
+    private static func formatYMD(_ date: Date) -> String {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current
+        return f.string(from: date)
     }
 
     private func saveEditingField(_ s: StudentDetail) {

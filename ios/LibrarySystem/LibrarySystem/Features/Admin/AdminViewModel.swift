@@ -32,7 +32,7 @@ final class AdminViewModel: ObservableObject {
 
     @Published var isLoading  = false
     @Published var error:      String?
-    @Published var successMsg: String?
+    @Published var successMsg: String? { didSet { if successMsg != nil { Haptics.success() } } }
 
     private let repo = AdminRepository.shared
 

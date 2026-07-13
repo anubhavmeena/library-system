@@ -4,8 +4,8 @@ struct AuthRepository {
     static let shared = AuthRepository()
     private let api = APIClient.shared
 
-    func sendOtp(contact: String, channel: String? = nil) async throws {
-        let req = SendOtpRequest(contact: contact, channel: channel)
+    func sendOtp(contact: String, contactType: String = "MOBILE", channel: String? = nil) async throws {
+        let req = SendOtpRequest(contact: contact, contactType: contactType, channel: channel)
         try await api.requestVoid(.sendOtp(req))
     }
 
