@@ -33,6 +33,15 @@ const DATE_PICKER_POPPER_SX = {
     '& .MuiPickersYear-yearButton.Mui-selected': { backgroundColor: '#f59e0b', color: '#1a2a68' },
 }
 
+const STATUS_BADGE_CLASSES = {
+    NEW:      'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    PAID:     'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    PENDING:  'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    GRACE:         'bg-orange-500/20 text-orange-400 border-orange-500/30',
+    GRACE_OVERDUE: 'bg-red-500/20 text-red-400 border-red-500/30',
+    RELEASED:      'bg-red-950/70 text-red-300 border-red-900',
+}
+
 const ROWS = ['A', 'B', 'C', 'D']
 const INACTIVE_SEATS = new Set(['B8', 'B18'])
 const L_TOP    = [13, 11, 9, 7, 5, 3, 1]
@@ -291,7 +300,14 @@ export default function AdminSeatsPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setSelected(null)}>
                     <div className="card p-6 w-72 border-red-500/30" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-white font-semibold">{t('adminSeats.modal.seat', { seatNumber: selected.seatNumber })}</h3>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-white font-semibold">{t('adminSeats.modal.seat', { seatNumber: selected.seatNumber })}</h3>
+                                {selected.displayStatus && (
+                                    <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_BADGE_CLASSES[selected.displayStatus] || 'bg-primary-700/30 text-primary-400 border-primary-700/40'}`}>
+                                        {t(`adminStudents.statusLabels.${selected.displayStatus}`)}
+                                    </span>
+                                )}
+                            </div>
                             <button onClick={() => setSelected(null)} className="text-primary-400 hover:text-white">✕</button>
                         </div>
                         <div className="space-y-2">

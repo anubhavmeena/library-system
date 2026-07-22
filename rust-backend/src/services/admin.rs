@@ -1053,8 +1053,11 @@ pub async fn get_seat_map(
     // sb.end_date is reported separately from m.end_date because a GRACE membership's
     // seat_bookings.end_date is pushed to the far-future 9999-12-31 sentinel to hold the
     // seat indefinitely — the membership's real end_date is what expiry views must show.
-    let occupants = sqlx::query_as::<_, (Uuid, String, Uuid, String, Option<String>, Option<String>, NaiveDate, NaiveDate)>(
-        "SELECT sb.seat_id, sb.shift, u.id, u.name, u.mobile, u.gender, sb.end_date, m.end_date
+    let occupants = sqlx::query_as::<_, (Uuid, String, Uuid, String, Option<String>, Option<String>, NaiveDate, NaiveDate, String, Option<Decimal>)>(
+        "SELECT sb.seat_id, sb.shift, u.id, u.name, u.mobile, u.gender, sb.end_date, m.end_date, m.status,
+                (SELECT p.pending_amount FROM payments p
+                 WHERE p.membership_id = m.id AND p.status = 'SUCCESS'
+                 ORDER BY p.created_at DESC LIMIT 1) AS pending_amount
          FROM seat_bookings sb
          JOIN users u ON u.id = sb.user_id
          JOIN memberships m ON m.id = sb.membership_id
@@ -1071,10 +1074,10 @@ pub async fn get_seat_map(
     .fetch_all(&state.db)
     .await?;
 
-    let occupant_map: HashMap<Uuid, (Uuid, String, Option<String>, Option<String>, String, NaiveDate)> = occupants
+    let occupant_map: HashMap<Uuid, (Uuid, String, Option<String>, Option<String>, String, NaiveDate, String, Option<Decimal>)> = occupants
         .into_iter()
-        .map(|(seat_id, sb_shift, student_id, name, mobile, gender, _sb_end, membership_end)| {
-            (seat_id, (student_id, name, mobile, gender, sb_shift, membership_end))
+        .map(|(seat_id, sb_shift, student_id, name, mobile, gender, _sb_end, membership_end, m_status, pending_amount)| {
+            (seat_id, (student_id, name, mobile, gender, sb_shift, membership_end, m_status, pending_amount))
         })
         .collect();
 
@@ -1110,6 +1113,8 @@ pub async fn get_seat_map(
         std::collections::HashSet::new()
     };
 
+    let grace_days = settings::grace_days(state).await;
+
     let mut seats_by_row: HashMap<String, Vec<SeatMapSeat>> = HashMap::new();
     let mut occupied_count = 0i64;
     let total = seats.len() as i64;
@@ -1123,13 +1128,23 @@ pub async fn get_seat_map(
         let map_seat = SeatMapSeat {
             seat_number: seat.seat_number.clone(),
             is_occupied,
-            student_id: occ.map(|(id, _, _, _, _, _)| *id),
-            student_name: occ.map(|(_, n, _, _, _, _)| n.clone()),
-            student_mobile: occ.and_then(|(_, _, m, _, _, _)| m.clone()),
-            student_gender: occ.and_then(|(_, _, _, g, _, _)| g.clone()),
-            shift: occ.map(|(_, _, _, _, s, _)| s.clone()),
-            membership_end: occ.map(|(_, _, _, _, _, e)| *e),
+            student_id: occ.map(|(id, _, _, _, _, _, _, _)| *id),
+            student_name: occ.map(|(_, n, _, _, _, _, _, _)| n.clone()),
+            student_mobile: occ.and_then(|(_, _, m, _, _, _, _, _)| m.clone()),
+            student_gender: occ.and_then(|(_, _, _, g, _, _, _, _)| g.clone()),
+            shift: occ.map(|(_, _, _, _, s, _, _, _)| s.clone()),
+            membership_end: occ.map(|(_, _, _, _, _, e, _, _)| *e),
             other_shift_occupied: !is_occupied && other_shift_seat_ids.contains(&seat.id),
+            display_status: occ.map(|(_, _, _, _, _, end, status, pending)| {
+                crate::services::membership::resolve_display_status(
+                    Some(status),
+                    Some(*end),
+                    *pending,
+                    None,
+                    grace_days,
+                )
+                .to_string()
+            }),
         };
         seats_by_row
             .entry(seat.row_label.clone())
