@@ -492,6 +492,15 @@ pub async fn send_broadcast(
     if !state.config.admin_whatsapp.is_empty() {
         send_whatsapp(state, &state.config.admin_whatsapp.clone(), &echo).await;
     }
+    // ADMIN_WHATSAPP is a single "ops" number and is often left unset (as it
+    // currently is in prod); ADMIN_PHONES is the actual admin-login allowlist,
+    // so mirror the echo there too — every real admin gets a WhatsApp copy,
+    // not just whoever's mailbox ADMIN_EMAIL points at.
+    for phone in &state.config.admin_phones {
+        if phone != &state.config.admin_whatsapp {
+            send_whatsapp(state, phone, &echo).await;
+        }
+    }
     send_email(state, &state.config.admin_email.clone(), "Broadcast Sent", &echo).await;
 
     count
