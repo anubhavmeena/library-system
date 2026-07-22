@@ -1145,6 +1145,7 @@ pub async fn get_seat_map(
                 )
                 .to_string()
             }),
+            pending_amount: occ.and_then(|(_, _, _, _, _, _, _, pending)| *pending),
         };
         seats_by_row
             .entry(seat.row_label.clone())

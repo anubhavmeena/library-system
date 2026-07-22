@@ -7,6 +7,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3'
 import { parseISO, format } from 'date-fns'
+import { formatCurrency } from '../../utils/currency'
 
 const DATE_PICKER_SX = {
     '& .MuiOutlinedInput-root': {
@@ -305,6 +306,14 @@ export default function AdminSeatsPage() {
                                 {selected.displayStatus && (
                                     <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_BADGE_CLASSES[selected.displayStatus] || 'bg-primary-700/30 text-primary-400 border-primary-700/40'}`}>
                                         {t(`adminStudents.statusLabels.${selected.displayStatus}`)}
+                                    </span>
+                                )}
+                                {selected.displayStatus === 'PENDING' && selected.pendingAmount > 0 && (
+                                    <span className="text-xs text-red-400 font-medium">{formatCurrency(selected.pendingAmount)}</span>
+                                )}
+                                {(selected.displayStatus === 'GRACE' || selected.displayStatus === 'GRACE_OVERDUE') && (
+                                    <span className="text-xs text-orange-400 font-medium">
+                                        {Math.abs(daysToExpiry(selected.membershipEnd, date))}d overdue
                                     </span>
                                 )}
                             </div>
