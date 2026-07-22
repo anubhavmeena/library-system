@@ -926,7 +926,18 @@
       "namePlaceholder": "e.g. Rahul Sharma",
       "phonePlaceholder": "10-digit mobile number",
       "feesPlaceholder": "e.g. 1500",
-      "seatPlaceholder": "e.g. B14"
+      "seatPlaceholder": "e.g. B14",
+      "photo": {
+        "label": "Profile Photo",
+        "takeAction": "Take Photo",
+        "retakeAction": "Retake Photo",
+        "remove": "Remove",
+        "cropTitle": "Adjust Photo",
+        "cancel": "Cancel",
+        "retake": "Retake",
+        "usePhoto": "Use Photo",
+        "zoom": "Zoom"
+      }
     }
   },
   "adminExpenses": {

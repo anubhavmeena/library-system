@@ -2,12 +2,14 @@ import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+import CropPhotoModal from '../../components/CropPhotoModal'
 
 const EMPTY_FORM = { name: '', phone: '' }
 
 export default function AdminImportPage() {
     const { t } = useTranslation()
-    const inputRef = useRef(null)
+    const inputRef  = useRef(null)
+    const cameraRef = useRef(null)
 
     const [file,      setFile]      = useState(null)
     const [dragging,  setDragging]  = useState(false)
@@ -18,6 +20,10 @@ export default function AdminImportPage() {
     const [form,        setForm]        = useState(EMPTY_FORM)
     const [submitting,  setSubmitting]  = useState(false)
     const [formError,   setFormError]   = useState(null)
+
+    const [photo,         setPhoto]        = useState(null)  // cropped Blob
+    const [photoPreview,  setPhotoPreview] = useState(null)  // object URL
+    const [rawPhotoSrc,   setRawPhotoSrc]  = useState(null)  // object URL of the just-captured, uncropped photo
 
     const accept = '.csv,.xlsx,.xls'
 
@@ -65,12 +71,23 @@ export default function AdminImportPage() {
         setFormError(null)
         setSubmitting(true)
         try {
-            await api.post('/admin/students/import/single', {
-                name:  form.name.trim(),
-                phone: form.phone.trim(),
-            })
+            if (photo) {
+                const fd = new FormData()
+                fd.append('name', form.name.trim())
+                fd.append('phone', form.phone.trim())
+                fd.append('photo', photo, 'photo.jpg')
+                await api.post('/admin/students/import/single-with-photo', fd, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                })
+            } else {
+                await api.post('/admin/students/import/single', {
+                    name:  form.name.trim(),
+                    phone: form.phone.trim(),
+                })
+            }
             toast.success(t('adminImport.manual.success'))
             setForm(EMPTY_FORM)
+            clearPhoto()
         } catch (err) {
             const msg = err.response?.data?.message || 'Failed to add student'
             setFormError(msg)
@@ -81,6 +98,31 @@ export default function AdminImportPage() {
     }
 
     const field = (key, value) => setForm(f => ({ ...f, [key]: value }))
+
+    const onCameraFile = e => {
+        const f = e.target.files?.[0]
+        e.target.value = '' // allow re-selecting the same shot (e.g. after retake)
+        if (!f) return
+        setRawPhotoSrc(url => { if (url) URL.revokeObjectURL(url); return URL.createObjectURL(f) })
+    }
+
+    const closeCrop = () => {
+        setRawPhotoSrc(url => { if (url) URL.revokeObjectURL(url); return null })
+    }
+
+    const onCropConfirm = blob => {
+        setPhoto(blob)
+        setPhotoPreview(url => {
+            if (url) URL.revokeObjectURL(url)
+            return URL.createObjectURL(blob)
+        })
+        closeCrop()
+    }
+
+    const clearPhoto = () => {
+        setPhoto(null)
+        setPhotoPreview(url => { if (url) URL.revokeObjectURL(url); return null })
+    }
 
     return (
         <div className="max-w-3xl mx-auto">
@@ -118,6 +160,39 @@ export default function AdminImportPage() {
                                 maxLength={10}
                                 required
                             />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="label">{t('adminImport.manual.photo.label')}</label>
+                        <div className="flex items-center gap-4">
+                            {photoPreview ? (
+                                <img src={photoPreview} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-primary-700/40" />
+                            ) : (
+                                <div className="w-16 h-16 rounded-full bg-primary-800/60 border-2 border-primary-700/30 flex items-center justify-center text-2xl">
+                                    📷
+                                </div>
+                            )}
+                            <input
+                                ref={cameraRef}
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                className="hidden"
+                                onChange={onCameraFile}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => cameraRef.current?.click()}
+                                className="btn-outline text-sm px-4 py-2"
+                            >
+                                {photoPreview ? t('adminImport.manual.photo.retakeAction') : t('adminImport.manual.photo.takeAction')}
+                            </button>
+                            {photoPreview && (
+                                <button type="button" onClick={clearPhoto} className="text-primary-500 text-xs hover:text-red-400 transition-colors">
+                                    {t('adminImport.manual.photo.remove')}
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -248,6 +323,15 @@ export default function AdminImportPage() {
                         </div>
                     )}
                 </div>
+            )}
+
+            {rawPhotoSrc && (
+                <CropPhotoModal
+                    imageSrc={rawPhotoSrc}
+                    onConfirm={onCropConfirm}
+                    onCancel={closeCrop}
+                    onRetake={() => { closeCrop(); cameraRef.current?.click() }}
+                />
             )}
         </div>
     )

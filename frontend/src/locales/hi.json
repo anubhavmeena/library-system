@@ -905,7 +905,18 @@
       "namePlaceholder": "जैसे राहुल शर्मा",
       "phonePlaceholder": "10 अंकों का मोबाइल नंबर",
       "feesPlaceholder": "जैसे 1500",
-      "seatPlaceholder": "जैसे B14"
+      "seatPlaceholder": "जैसे B14",
+      "photo": {
+        "label": "प्रोफ़ाइल फ़ोटो",
+        "takeAction": "फ़ोटो लें",
+        "retakeAction": "फिर से फ़ोटो लें",
+        "remove": "हटाएं",
+        "cropTitle": "फ़ोटो समायोजित करें",
+        "cancel": "रद्द करें",
+        "retake": "फिर से लें",
+        "usePhoto": "यह फ़ोटो उपयोग करें",
+        "zoom": "ज़ूम"
+      }
     }
   },
   "adminExpenses": {
