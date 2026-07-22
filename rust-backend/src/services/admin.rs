@@ -1574,6 +1574,17 @@ pub async fn get_broadcast_history(
     .map_err(AppError::Database)
 }
 
+pub async fn delete_broadcast(state: &Arc<AppState>, id: Uuid) -> crate::error::Result<()> {
+    let result = sqlx::query("DELETE FROM broadcast_messages WHERE id = $1")
+        .bind(id)
+        .execute(&state.db)
+        .await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("Broadcast message not found".into()));
+    }
+    Ok(())
+}
+
 // ── Cash membership ───────────────────────────────────────────────────────────
 
 /// Admin-selectable payment mode for the three cash-desk write paths

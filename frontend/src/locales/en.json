@@ -787,7 +787,10 @@
     "history": {
       "title": "Recent Broadcasts",
       "recipients": "{{count}} members",
-      "load": "Load"
+      "load": "Load",
+      "delete": "Delete",
+      "deleteConfirm": "Remove this broadcast from history?",
+      "deleteFailed": "Failed to delete broadcast"
     },
     "toasts": {
       "sent": "Message queued for {{count}} members",

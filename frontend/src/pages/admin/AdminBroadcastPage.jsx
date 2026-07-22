@@ -23,6 +23,16 @@ export default function AdminBroadcastPage() {
         }
     }
 
+    const handleDeleteHistory = async (item) => {
+        if (!window.confirm(t('adminBroadcast.history.deleteConfirm'))) return
+        try {
+            await api.delete(`/admin/broadcast/${item.id}`)
+            setHistory(prev => prev.filter(h => h.id !== item.id))
+        } catch {
+            toast.error(t('adminBroadcast.history.deleteFailed'))
+        }
+    }
+
     const handleSend = async () => {
         if (message.trim().length < 5) {
             toast.error(t('adminBroadcast.toasts.tooShort'))
@@ -131,11 +141,19 @@ export default function AdminBroadcastPage() {
                                         </span>
                                     </p>
                                 </div>
-                                <button
-                                    onClick={() => setMessage(item.message)}
-                                    className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 transition-all whitespace-nowrap">
-                                    {t('adminBroadcast.history.load')}
-                                </button>
+                                <div className="flex-shrink-0 flex items-center gap-2">
+                                    <button
+                                        onClick={() => setMessage(item.message)}
+                                        className="text-xs px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 transition-all whitespace-nowrap">
+                                        {t('adminBroadcast.history.load')}
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteHistory(item)}
+                                        title={t('adminBroadcast.history.delete')}
+                                        className="text-xs px-2.5 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-all">
+                                        ✕
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>

@@ -266,6 +266,15 @@ pub async fn broadcast_history(
     Ok(ApiResponse::success("Broadcast history", history))
 }
 
+pub async fn delete_broadcast(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(id): Path<Uuid>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    svc::delete_broadcast(&state, id).await?;
+    Ok(ApiResponse::ok("Broadcast deleted"))
+}
+
 pub async fn create_cash_membership(
     State(state): State<Arc<AppState>>,
     _admin: AdminUser,
