@@ -1164,25 +1164,44 @@ pub async fn get_seat_map(
 }
 
 /// History of every non-abandoned booking a physical seat has ever had.
-/// Known accepted gap (matches the Java backend): `change_membership_seat`
-/// mutates a membership's seat in place rather than inserting a new row, so
-/// a student moved off this seat via admin "Change Seat" won't appear here
-/// afterward.
+///
+/// Sourced from `seat_bookings` (keyed by the physical `seat_id`), not
+/// `memberships.seat_number` — the latter is mutated in place by
+/// `change_membership_seat`, so a student moved off this seat via admin
+/// "Change Seat" would otherwise vanish from its history entirely once
+/// their membership's `seat_number` column pointed elsewhere.
+///
+/// `end_date` is clamped to the day before the next booking on this same
+/// seat/shift begins, when that's earlier than the booking's own stored
+/// `end_date`. A booking released early (e.g. via admin "Release Seat")
+/// keeps its original, un-shortened `end_date` in the DB — without this
+/// clamp, a released booking's row would visually overlap whoever the seat
+/// was actually reassigned to.
 pub async fn get_seat_history(
     state: &Arc<AppState>,
     seat_number: &str,
 ) -> crate::error::Result<Vec<SeatHistoryEntryDto>> {
     sqlx::query_as::<_, SeatHistoryEntryDto>(
-        r#"SELECT m.id AS membership_id, u.name AS student_name, u.mobile AS student_mobile,
-                  m.shift, m.start_date, m.end_date, m.status,
-                  s.seat_number, mp.name AS plan_name
-           FROM memberships m
-           JOIN users u ON u.id = m.user_id
-           JOIN seats s ON s.seat_number = $1
+        r#"SELECT sb.membership_id, u.name AS student_name, u.mobile AS student_mobile,
+                  sb.shift, sb.booking_date AS start_date,
+                  LEAST(sb.end_date, COALESCE(next_booking.booking_date - 1, sb.end_date)) AS end_date,
+                  m.status, s.seat_number, mp.name AS plan_name
+           FROM seat_bookings sb
+           JOIN seats s ON s.id = sb.seat_id
+           JOIN memberships m ON m.id = sb.membership_id
+           JOIN users u ON u.id = sb.user_id
            LEFT JOIN membership_plans mp ON mp.id = m.plan_id
-           WHERE COALESCE(m.seat_number, '') = $1
+           LEFT JOIN LATERAL (
+               SELECT MIN(sb2.booking_date) AS booking_date
+               FROM seat_bookings sb2
+               WHERE sb2.seat_id = sb.seat_id
+                 AND sb2.id != sb.id
+                 AND sb2.booking_date > sb.booking_date
+                 AND (sb2.shift = sb.shift OR sb2.shift = 'FULL_DAY' OR sb.shift = 'FULL_DAY')
+           ) next_booking ON true
+           WHERE s.seat_number = $1
              AND m.status NOT IN ('PENDING', 'CANCELLED')
-           ORDER BY m.start_date DESC"#,
+           ORDER BY sb.booking_date DESC"#,
     )
     .bind(seat_number)
     .fetch_all(&state.db)
