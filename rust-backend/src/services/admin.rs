@@ -1307,20 +1307,73 @@ pub async fn send_renewal_reminders(
         count += 1;
     }
 
-    if count > 0 {
-        let admin_msg = format!(
-            "Renewal Reminders Sent! {count} student(s) notified about upcoming membership expiry."
-        );
-        if !state.config.admin_whatsapp.is_empty() {
-            notification::send_whatsapp_to(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
-        }
-        notification::send_email_to(
-            state,
-            &state.config.admin_email.clone(),
-            &format!("Renewal Reminders Sent — {count} student(s)"),
-            &admin_msg,
-        ).await;
+    notify_admin_reminders_sent(state, count).await;
+
+    Ok(count)
+}
+
+async fn notify_admin_reminders_sent(state: &Arc<AppState>, count: i64) {
+    if count == 0 {
+        return;
     }
+    let admin_msg = format!(
+        "Renewal Reminders Sent! {count} student(s) notified about upcoming membership expiry."
+    );
+    if !state.config.admin_whatsapp.is_empty() {
+        notification::send_whatsapp_to(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
+    }
+    notification::send_email_to(
+        state,
+        &state.config.admin_email.clone(),
+        &format!("Renewal Reminders Sent — {count} student(s)"),
+        &admin_msg,
+    ).await;
+}
+
+/// Automatic daily reminder run (see `run_expiry_reminder_job`). Unlike
+/// `send_renewal_reminders` above (the admin manual/bulk-send button, which
+/// always sends to everyone expiring within 7 days, ignoring `reminder_sent`
+/// — matches Java's `sendBulkReminders`), this only fires at the 7-day and
+/// 3-day checkpoints and sets `reminder_sent` right after sending so the
+/// same membership is never reminded twice by the unattended scheduler.
+/// Mirrors Java's `ExpiryReminderScheduler.sendExpiryReminders`.
+async fn send_scheduled_renewal_reminders(state: &Arc<AppState>) -> crate::error::Result<i64> {
+    let rows: Vec<(Uuid, String, Option<String>, Option<String>, NaiveDate)> = sqlx::query_as(
+        "SELECT m.id, u.name, u.mobile, u.email, m.end_date
+         FROM memberships m JOIN users u ON u.id = m.user_id
+         WHERE m.status = 'ACTIVE'
+           AND m.reminder_sent = false
+           AND m.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'",
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    let mut count = 0i64;
+    let today = chrono::Local::now().date_naive();
+
+    for (mid, name, mobile, email, end_date) in &rows {
+        let days_left = (*end_date - today).num_days();
+        if days_left != 7 && days_left != 3 {
+            continue;
+        }
+
+        sqlx::query("UPDATE memberships SET reminder_sent = true WHERE id = $1")
+            .bind(mid)
+            .execute(&state.db)
+            .await?;
+
+        let s = state.clone();
+        let n = name.clone();
+        let m = mobile.clone();
+        let e = email.clone();
+        let ed = *end_date;
+        tokio::spawn(async move {
+            notification::send_renewal_reminder(&s, &n, m.as_deref(), e.as_deref(), days_left, ed).await;
+        });
+        count += 1;
+    }
+
+    notify_admin_reminders_sent(state, count).await;
 
     Ok(count)
 }
@@ -2823,7 +2876,7 @@ pub async fn save_expense(
 
 pub async fn run_expiry_reminder_job(state: Arc<AppState>) {
     tracing::info!("Running expiry reminder scheduler job");
-    match send_renewal_reminders(&state, None).await {
+    match send_scheduled_renewal_reminders(&state).await {
         Ok(n) => tracing::info!("Sent {n} renewal reminders"),
         Err(e) => tracing::error!("Reminder job error: {e}"),
     }
