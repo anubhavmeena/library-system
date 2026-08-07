@@ -2864,10 +2864,55 @@ pub async fn mark_expired_and_start_grace(state: &Arc<AppState>) -> crate::error
                 .bind(mem_id)
                 .execute(&state.db)
                 .await?;
-            sqlx::query("UPDATE memberships SET status = 'ACTIVE' WHERE id = $1")
-                .bind(queued_id)
+            let promoted = sqlx::query_as::<_, Membership>(
+                "UPDATE memberships SET status = 'ACTIVE' WHERE id = $1 RETURNING *",
+            )
+            .bind(queued_id)
+            .fetch_one(&state.db)
+            .await?;
+
+            // The queued renewal inherited its seat_number from the expiring
+            // membership at queue time but never got its own seat_bookings row
+            // (it stayed QUEUED through payment on purpose — see verify_payment).
+            // Promoting it to ACTIVE without creating that row here leaves the
+            // seat map/availability cache blind to a real, paying occupant.
+            sqlx::query("UPDATE seat_bookings SET status = 'RELEASED' WHERE membership_id = $1 AND status = 'ACTIVE'")
+                .bind(mem_id)
                 .execute(&state.db)
                 .await?;
+
+            if let (Some(seat_num), Some(promoted_shift)) = (&promoted.seat_number, &promoted.shift) {
+                if let Some(seat) = sqlx::query_as::<_, crate::models::seat::Seat>(
+                    "SELECT * FROM seats WHERE seat_number = $1",
+                )
+                .bind(seat_num)
+                .fetch_optional(&state.db)
+                .await?
+                {
+                    sqlx::query(
+                        "INSERT INTO seat_bookings (seat_id, user_id, membership_id, shift, booking_date, end_date)
+                         VALUES ($1, $2, $3, $4, $5, $6)
+                         ON CONFLICT (seat_id, shift, booking_date) DO UPDATE SET
+                             status = 'ACTIVE', user_id = EXCLUDED.user_id,
+                             membership_id = EXCLUDED.membership_id, end_date = EXCLUDED.end_date
+                         WHERE seat_bookings.status != 'ACTIVE'",
+                    )
+                    .bind(seat.id)
+                    .bind(user_id)
+                    .bind(queued_id)
+                    .bind(promoted_shift)
+                    .bind(promoted.start_date)
+                    .bind(promoted.end_date)
+                    .execute(&state.db)
+                    .await?;
+
+                    crate::services::seat::invalidate_seat_cache(
+                        state, promoted_shift, today, today + chrono::Duration::days(14),
+                    )
+                    .await;
+                }
+            }
+
             tracing::info!("Activated queued plan {queued_id} for user {user_id}");
             continue;
         }
