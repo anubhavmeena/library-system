@@ -1450,44 +1450,165 @@ pub async fn send_grace_dues_reminders(
     let app_settings = settings::get_app_settings(state).await.ok();
     let upi_id = app_settings.as_ref().and_then(|s| s.upi_id.clone()).filter(|v| !v.is_empty());
     for (user_id, membership_id, name, mobile, email, dues) in &rows {
-        let mut text = format!(
-            "Grace Period Reminder - Hi {name}, your library membership is in its grace period with Rs.{dues:.0} \
-in outstanding dues. Please clear your dues soon to avoid losing your seat. - Target Zone Library Team"
-        );
-        if let Some(vpa) = &upi_id {
-            let payload = upi_pay::PayLinkPayload {
-                user_id: *user_id,
-                claim_type: Some("DUES".to_string()),
-                membership_id: Some(*membership_id),
-                amount: *dues,
-                vpa: vpa.clone(),
-                payee_name: "Target Zone Library".to_string(),
-                note: format!("Grace dues - {name}"),
-            };
-            if let Ok(link) = upi_pay::create_pay_link(state, &payload).await {
-                text.push_str(&format!("\n\nPay via UPI: {link}"));
-            }
-        }
-        let msg = settings::apply_hindi(&text, &setting, true);
-        if setting.send_to_student {
-            notification::send_direct_message(state, mobile.as_deref(), email.as_deref(), &msg).await;
-        }
-    }
-
-    if count > 0 {
-        let admin_msg = format!("Grace Dues Reminders Sent! {count} student(s) notified about grace-period dues.");
-        if !state.config.admin_whatsapp.is_empty() {
-            notification::send_whatsapp_to(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
-        }
-        notification::send_email_to(
-            state,
-            &state.config.admin_email.clone(),
-            &format!("Grace Dues Reminders Sent — {count} student(s)"),
-            &admin_msg,
+        send_one_grace_dues_reminder(
+            state, *user_id, *membership_id, name, mobile.as_deref(), email.as_deref(), *dues,
+            &setting, upi_id.as_deref(),
         ).await;
     }
 
+    notify_admin_grace_reminders_sent(state, count).await;
+
     Ok(count)
+}
+
+/// Shared by the admin manual bulk-send (`send_grace_dues_reminders`) and the
+/// automatic scheduled job (`send_scheduled_grace_dues_reminders`) so both
+/// build the exact same message + UPI pay link instead of duplicating it.
+async fn send_one_grace_dues_reminder(
+    state: &Arc<AppState>,
+    user_id: Uuid,
+    membership_id: Uuid,
+    name: &str,
+    mobile: Option<&str>,
+    email: Option<&str>,
+    dues: Decimal,
+    setting: &crate::models::settings::NotificationSettingDto,
+    upi_id: Option<&str>,
+) {
+    let mut text = format!(
+        "Grace Period Reminder - Hi {name}, your library membership is in its grace period with Rs.{dues:.0} \
+in outstanding dues. Please clear your dues soon to avoid losing your seat. - Target Zone Library Team"
+    );
+    if let Some(vpa) = upi_id {
+        let payload = upi_pay::PayLinkPayload {
+            user_id,
+            claim_type: Some("DUES".to_string()),
+            membership_id: Some(membership_id),
+            amount: dues,
+            vpa: vpa.to_string(),
+            payee_name: "Target Zone Library".to_string(),
+            note: format!("Grace dues - {name}"),
+        };
+        if let Ok(link) = upi_pay::create_pay_link(state, &payload).await {
+            text.push_str(&format!("\n\nPay via UPI: {link}"));
+        }
+    }
+    let msg = settings::apply_hindi(&text, setting, true);
+    if setting.send_to_student {
+        notification::send_direct_message(state, mobile, email, &msg).await;
+    }
+}
+
+async fn notify_admin_grace_reminders_sent(state: &Arc<AppState>, count: i64) {
+    if count == 0 {
+        return;
+    }
+    let admin_msg = format!("Grace Dues Reminders Sent! {count} student(s) notified about grace-period dues.");
+    if !state.config.admin_whatsapp.is_empty() {
+        notification::send_whatsapp_to(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
+    }
+    notification::send_email_to(
+        state,
+        &state.config.admin_email.clone(),
+        &format!("Grace Dues Reminders Sent — {count} student(s)"),
+        &admin_msg,
+    ).await;
+}
+
+/// Whether a GRACE membership should get the automatic recurring dues
+/// reminder today, given how many days it's been since grace began: day 1,
+/// then every 3rd day after (3, 6, 9, ...). The one-time "you're now in
+/// grace" alert already covers day 0, so this starts at day 1.
+fn grace_reminder_due(days_since_grace: i64) -> bool {
+    days_since_grace == 1 || (days_since_grace >= 3 && days_since_grace % 3 == 0)
+}
+
+/// Automatic recurring grace-dues reminder (see `run_grace_dues_reminder_job`).
+/// Unlike `send_grace_dues_reminders` above (the admin manual/bulk-send
+/// button, which unconditionally messages every GRACE student on every call),
+/// this only fires on the `grace_reminder_due` checkpoints. `memberships.end_date`
+/// doubles as "date grace began" here — it's left untouched by both GRACE-entry
+/// paths (`mark_expired_and_start_grace`, `mark_membership_grace`) for as long
+/// as the membership stays GRACE, matching the same days-since-end_date basis
+/// `resolve_display_status` already uses for the GRACE/GRACE_OVERDUE split.
+/// Known accepted gap: an admin editing a GRACE membership's end_date via
+/// `update_membership_plan` (which doesn't gate on status) would shift this
+/// checkpoint math — not guarded against, same spirit as other documented
+/// gaps in this file.
+pub async fn send_scheduled_grace_dues_reminders(state: &Arc<AppState>) -> crate::error::Result<i64> {
+    let rows: Vec<(Uuid, Uuid, String, Option<String>, Option<String>, Decimal, NaiveDate)> = sqlx::query_as(
+        "SELECT u.id, m.id, u.name, u.mobile, u.email, COALESCE(m.dues_amount, 0), m.end_date
+         FROM memberships m JOIN users u ON u.id = m.user_id
+         WHERE m.status = 'GRACE'",
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    let today = chrono::Local::now().date_naive();
+    let due: Vec<_> = rows
+        .into_iter()
+        .filter(|(_, _, _, _, _, _, end_date)| grace_reminder_due((today - *end_date).num_days()))
+        .collect();
+
+    let count = due.len() as i64;
+    let setting = settings::setting_for(state, "GRACE_DUES_REMINDER").await;
+    let app_settings = settings::get_app_settings(state).await.ok();
+    let upi_id = app_settings.as_ref().and_then(|s| s.upi_id.clone()).filter(|v| !v.is_empty());
+    for (user_id, membership_id, name, mobile, email, dues, _end_date) in &due {
+        send_one_grace_dues_reminder(
+            state, *user_id, *membership_id, name, mobile.as_deref(), email.as_deref(), *dues,
+            &setting, upi_id.as_deref(),
+        ).await;
+    }
+
+    notify_admin_grace_reminders_sent(state, count).await;
+
+    Ok(count)
+}
+
+pub async fn run_grace_dues_reminder_job(state: Arc<AppState>) {
+    tracing::info!("Running grace dues reminder scheduler job");
+    match send_scheduled_grace_dues_reminders(&state).await {
+        Ok(n) => tracing::info!("Sent {n} grace dues reminders"),
+        Err(e) => tracing::error!("Grace dues reminder job error: {e}"),
+    }
+}
+
+#[cfg(test)]
+mod grace_reminder_tests {
+    use super::grace_reminder_due;
+
+    #[test]
+    fn day_zero_is_not_due() {
+        assert!(!grace_reminder_due(0));
+    }
+
+    #[test]
+    fn day_one_is_due() {
+        assert!(grace_reminder_due(1));
+    }
+
+    #[test]
+    fn day_two_is_not_due() {
+        assert!(!grace_reminder_due(2));
+    }
+
+    #[test]
+    fn day_three_is_due() {
+        assert!(grace_reminder_due(3));
+    }
+
+    #[test]
+    fn day_four_and_five_are_not_due() {
+        assert!(!grace_reminder_due(4));
+        assert!(!grace_reminder_due(5));
+    }
+
+    #[test]
+    fn day_six_and_nine_are_due() {
+        assert!(grace_reminder_due(6));
+        assert!(grace_reminder_due(9));
+    }
 }
 
 pub async fn send_pending_fee_reminders(
