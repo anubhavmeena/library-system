@@ -970,6 +970,8 @@
     "paymentsSection": "Payments",
     "upiId": "UPI ID (VPA)",
     "upiIdHint": "Used to generate UPI QR codes and payment-request links on the Create Membership screen.",
+    "upiPayeeName": "UPI Payee Name",
+    "upiPayeeNameHint": "Must exactly match the name registered to the UPI ID above — GPay/PhonePe block the payment as a security risk if it doesn't match, especially for personal (non-merchant) UPI IDs.",
     "gracePeriodSection": "Grace Period",
     "graceDays": "Grace Period (days)",
     "convenienceFeeSection": "Convenience Fee",

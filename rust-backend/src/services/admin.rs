@@ -1449,10 +1449,11 @@ pub async fn send_grace_dues_reminders(
     let setting = settings::setting_for(state, "GRACE_DUES_REMINDER").await;
     let app_settings = settings::get_app_settings(state).await.ok();
     let upi_id = app_settings.as_ref().and_then(|s| s.upi_id.clone()).filter(|v| !v.is_empty());
+    let payee_name = settings::upi_payee_name(app_settings.as_ref());
     for (user_id, membership_id, name, mobile, email, dues) in &rows {
         send_one_grace_dues_reminder(
             state, *user_id, *membership_id, name, mobile.as_deref(), email.as_deref(), *dues,
-            &setting, upi_id.as_deref(),
+            &setting, upi_id.as_deref(), &payee_name,
         ).await;
     }
 
@@ -1474,6 +1475,7 @@ async fn send_one_grace_dues_reminder(
     dues: Decimal,
     setting: &crate::models::settings::NotificationSettingDto,
     upi_id: Option<&str>,
+    payee_name: &str,
 ) {
     let mut text = format!(
         "Grace Period Reminder - Hi {name}, your library membership is in its grace period with Rs.{dues:.0} \
@@ -1486,7 +1488,7 @@ in outstanding dues. Please clear your dues soon to avoid losing your seat. - Ta
             membership_id: Some(membership_id),
             amount: dues,
             vpa: vpa.to_string(),
-            payee_name: "Target Zone Library".to_string(),
+            payee_name: payee_name.to_string(),
             note: format!("Grace dues - {name}"),
         };
         if let Ok(link) = upi_pay::create_pay_link(state, &payload).await {
@@ -1554,10 +1556,11 @@ pub async fn send_scheduled_grace_dues_reminders(state: &Arc<AppState>) -> crate
     let setting = settings::setting_for(state, "GRACE_DUES_REMINDER").await;
     let app_settings = settings::get_app_settings(state).await.ok();
     let upi_id = app_settings.as_ref().and_then(|s| s.upi_id.clone()).filter(|v| !v.is_empty());
+    let payee_name = settings::upi_payee_name(app_settings.as_ref());
     for (user_id, membership_id, name, mobile, email, dues, _end_date) in &due {
         send_one_grace_dues_reminder(
             state, *user_id, *membership_id, name, mobile.as_deref(), email.as_deref(), *dues,
-            &setting, upi_id.as_deref(),
+            &setting, upi_id.as_deref(), &payee_name,
         ).await;
     }
 
@@ -1657,6 +1660,7 @@ pub async fn send_pending_fee_reminders(
     let count = rows.len() as i64;
     let app_settings = settings::get_app_settings(state).await.ok();
     let upi_id = app_settings.as_ref().and_then(|s| s.upi_id.clone()).filter(|v| !v.is_empty());
+    let payee_name = settings::upi_payee_name(app_settings.as_ref());
     for (user_id, name, mobile, email, pending) in &rows {
         let amount = pending.unwrap_or_default();
         let mut msg = format!(
@@ -1670,7 +1674,7 @@ Please visit the library or contact us to clear your dues. - Target Zone Library
                 membership_id: None,
                 amount,
                 vpa: vpa.clone(),
-                payee_name: "Target Zone Library".to_string(),
+                payee_name: payee_name.clone(),
                 note: format!("Pending fee - {name}"),
             };
             if let Ok(link) = upi_pay::create_pay_link(state, &payload).await {

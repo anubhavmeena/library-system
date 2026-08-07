@@ -47,16 +47,17 @@ pub async fn save_app_settings(
     req: &SaveAppSettingsRequest,
 ) -> crate::error::Result<AppSettings> {
     sqlx::query_as::<_, AppSettings>(
-        "INSERT INTO app_settings (id, wifi_name, wifi_password, upi_id, grace_days, convenience_fee, water_tanker_rate, coupons_enabled, updated_at)
-         VALUES (1, $1, $2, $3, $4, $5, $6, $7, NOW())
+        "INSERT INTO app_settings (id, wifi_name, wifi_password, upi_id, upi_payee_name, grace_days, convenience_fee, water_tanker_rate, coupons_enabled, updated_at)
+         VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, NOW())
          ON CONFLICT (id) DO UPDATE SET
-             wifi_name = $1, wifi_password = $2, upi_id = $3, grace_days = $4,
-             convenience_fee = $5, water_tanker_rate = $6, coupons_enabled = $7, updated_at = NOW()
+             wifi_name = $1, wifi_password = $2, upi_id = $3, upi_payee_name = $4, grace_days = $5,
+             convenience_fee = $6, water_tanker_rate = $7, coupons_enabled = $8, updated_at = NOW()
          RETURNING *",
     )
     .bind(&req.wifi_name)
     .bind(&req.wifi_password)
     .bind(&req.upi_id)
+    .bind(&req.upi_payee_name)
     .bind(req.grace_days)
     .bind(req.convenience_fee)
     .bind(req.water_tanker_rate)
@@ -64,6 +65,17 @@ pub async fn save_app_settings(
     .fetch_one(&state.db)
     .await
     .map_err(AppError::Database)
+}
+
+/// The UPI payee name to send in payment-request deep links — the
+/// bank/PSP-registered name for `upi_id` must match this, or GPay/PhonePe
+/// block the payment as a security risk. Falls back to "Target Zone Library"
+/// only until an admin explicitly sets one in Settings.
+pub fn upi_payee_name(app_settings: Option<&AppSettings>) -> String {
+    app_settings
+        .and_then(|s| s.upi_payee_name.clone())
+        .filter(|v| !v.trim().is_empty())
+        .unwrap_or_else(|| "Target Zone Library".to_string())
 }
 
 /// Current grace-period length in days, falling back to the default if the

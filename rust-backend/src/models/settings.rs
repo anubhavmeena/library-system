@@ -10,6 +10,13 @@ pub struct AppSettings {
     pub wifi_name: Option<String>,
     pub wifi_password: Option<String>,
     pub upi_id: Option<String>,
+    /// Name sent as the UPI payee in payment-request deep links. Must match
+    /// the name actually registered to `upi_id` at the bank/PSP — GPay/PhonePe
+    /// block the payment as a security risk if it doesn't match, which is
+    /// especially likely when `upi_id` is a personal (non-merchant) handle.
+    /// Falls back to "Target Zone Library" via `settings::upi_payee_name`
+    /// when unset.
+    pub upi_payee_name: Option<String>,
     pub grace_days: i32,
     pub convenience_fee: Decimal,
     pub water_tanker_rate: Decimal,
@@ -23,6 +30,7 @@ pub struct SaveAppSettingsRequest {
     pub wifi_name: Option<String>,
     pub wifi_password: Option<String>,
     pub upi_id: Option<String>,
+    pub upi_payee_name: Option<String>,
     pub grace_days: i32,
     pub convenience_fee: Decimal,
     pub water_tanker_rate: Decimal,
@@ -147,6 +155,7 @@ mod tests {
             wifi_name: Some("lib-wifi".into()),
             wifi_password: None,
             upi_id: Some("lib@ybl".into()),
+            upi_payee_name: Some("Target Zone Library".into()),
             grace_days: 10,
             convenience_fee: Decimal::from(20),
             water_tanker_rate: Decimal::from(150),

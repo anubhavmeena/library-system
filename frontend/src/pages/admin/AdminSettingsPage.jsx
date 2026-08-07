@@ -408,6 +408,7 @@ export default function AdminSettingsPage() {
     const [wifiPassword,    setWifiPassword]    = useState('')
     const [showPassword,    setShowPassword]    = useState(false)
     const [upiId,           setUpiId]           = useState('')
+    const [upiPayeeName,    setUpiPayeeName]    = useState('')
     const [graceDays,       setGraceDays]       = useState('')
     const [convenienceFee,  setConvenienceFee]  = useState('')
     const [waterTankerRate, setWaterTankerRate] = useState('')
@@ -426,6 +427,7 @@ export default function AdminSettingsPage() {
             setWifiName(d.wifiName ?? '')
             setWifiPassword(d.wifiPassword ?? '')
             setUpiId(d.upiId ?? '')
+            setUpiPayeeName(d.upiPayeeName ?? '')
             setGraceDays(d.graceDays ?? 10)
             setConvenienceFee(d.convenienceFee ?? 0)
             setWaterTankerRate(d.waterTankerRate ?? 0)
@@ -446,6 +448,7 @@ export default function AdminSettingsPage() {
                 wifiName,
                 wifiPassword,
                 upiId,
+                upiPayeeName,
                 graceDays: parseInt(graceDays || '0', 10),
                 convenienceFee: num(convenienceFee),
                 waterTankerRate: num(waterTankerRate),
@@ -509,16 +512,29 @@ export default function AdminSettingsPage() {
                     {/* UPI Payments */}
                     <div className="card p-5 mb-4">
                         <p className="text-primary-400 text-xs uppercase tracking-widest mb-3">{t('adminSettings.paymentsSection')}</p>
-                        <div>
-                            <label className="label">{t('adminSettings.upiId')}</label>
-                            <input
-                                type="text"
-                                placeholder="yourname@upi"
-                                className="input w-full"
-                                value={upiId}
-                                onChange={e => setUpiId(e.target.value)}
-                            />
-                            <p className="text-primary-500 text-xs mt-1">{t('adminSettings.upiIdHint')}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="label">{t('adminSettings.upiId')}</label>
+                                <input
+                                    type="text"
+                                    placeholder="yourname@upi"
+                                    className="input w-full"
+                                    value={upiId}
+                                    onChange={e => setUpiId(e.target.value)}
+                                />
+                                <p className="text-primary-500 text-xs mt-1">{t('adminSettings.upiIdHint')}</p>
+                            </div>
+                            <div>
+                                <label className="label">{t('adminSettings.upiPayeeName')}</label>
+                                <input
+                                    type="text"
+                                    placeholder="Target Zone Library"
+                                    className="input w-full"
+                                    value={upiPayeeName}
+                                    onChange={e => setUpiPayeeName(e.target.value)}
+                                />
+                                <p className="text-primary-500 text-xs mt-1">{t('adminSettings.upiPayeeNameHint')}</p>
+                            </div>
                         </div>
                     </div>
 

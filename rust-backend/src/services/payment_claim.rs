@@ -109,6 +109,7 @@ pub async fn create_ad_hoc_pay_link(
     amount: rust_decimal::Decimal,
 ) -> crate::error::Result<String> {
     let app_settings = crate::services::settings::get_app_settings(state).await?;
+    let payee_name = crate::services::settings::upi_payee_name(Some(&app_settings));
     let vpa = app_settings.upi_id.filter(|v| !v.is_empty()).ok_or_else(|| {
         AppError::BadRequest("Set a UPI ID in Settings first".into())
     })?;
@@ -124,7 +125,7 @@ pub async fn create_ad_hoc_pay_link(
         membership_id: None,
         amount,
         vpa,
-        payee_name: "Target Zone Library".into(),
+        payee_name,
         note: format!("Library fee - {student_name}"),
     }).await
 }
