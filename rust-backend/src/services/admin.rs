@@ -1718,6 +1718,70 @@ pub async fn send_direct_message(
     Ok(())
 }
 
+/// Re-sends the student's most recent successful payment receipt on demand
+/// (admin "Send Payment Receipt" action) — same PDF/WhatsApp-template pipeline
+/// `clear_pending_fees`/`create_membership` fire automatically after a payment.
+pub async fn send_latest_receipt(state: &Arc<AppState>, user_id: Uuid) -> crate::error::Result<()> {
+    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".into()))?;
+    if user.mobile.is_none() {
+        return Err(AppError::BadRequest("Student has no mobile number on file".into()));
+    }
+
+    let payment = sqlx::query_as::<_, crate::models::membership::Payment>(
+        "SELECT * FROM payments WHERE user_id = $1 AND status = 'SUCCESS' ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::BadRequest("No payment records found for this student".into()))?;
+
+    let membership = crate::services::membership::find_current_membership(state, user_id).await?;
+
+    let receipt_event = notification::PaymentReceiptInfo {
+        user_id,
+        user_name: user.name.clone(),
+        user_mobile: user.mobile.clone(),
+        user_email: user.email.clone(),
+        invoice_id: payment.invoice_id.clone().unwrap_or_default(),
+        amount_paid: payment.amount,
+        amount_pending: payment.pending_amount.unwrap_or_default(),
+        plan_name: membership.as_ref().map(|m| m.plan_name.clone()).unwrap_or_default(),
+        seat_number: membership.as_ref().and_then(|m| m.seat_number.clone()),
+        valid_upto: membership.as_ref().map(|m| m.end_date),
+        payment_method: payment.payment_gateway.clone().unwrap_or_default(),
+    };
+    notification::send_payment_receipt_typed(state, &receipt_event, "ADMIN_RESEND").await;
+    Ok(())
+}
+
+/// Sends the student's ID card on demand (admin "Send ID Card" action) —
+/// requires a current ACTIVE/GRACE membership, since the ID number and card
+/// layout are derived from it.
+pub async fn send_id_card(state: &Arc<AppState>, user_id: Uuid) -> crate::error::Result<()> {
+    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".into()))?;
+    let Some(mobile) = user.mobile.clone() else {
+        return Err(AppError::BadRequest("Student has no mobile number on file".into()));
+    };
+
+    let membership = crate::services::membership::find_current_membership(state, user_id)
+        .await?
+        .ok_or_else(|| AppError::BadRequest("Student has no active or grace membership to issue an ID card for".into()))?;
+
+    notification::send_student_id_card(
+        state, user_id, membership.id, &user.name, Some(&mobile), user.email.as_deref(),
+    )
+    .await
+    .map_err(AppError::BadRequest)
+}
+
 pub async fn broadcast(
     state: &Arc<AppState>,
     message: &str,

@@ -246,6 +246,24 @@ pub async fn send_direct_message(
     Ok(ApiResponse::ok("Message sent"))
 }
 
+pub async fn send_receipt(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(user_id): Path<Uuid>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    svc::send_latest_receipt(&state, user_id).await?;
+    Ok(ApiResponse::ok("Payment receipt sent"))
+}
+
+pub async fn send_id_card(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(user_id): Path<Uuid>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    svc::send_id_card(&state, user_id).await?;
+    Ok(ApiResponse::ok("ID card sent"))
+}
+
 pub async fn broadcast(
     State(state): State<Arc<AppState>>,
     _admin: AdminUser,

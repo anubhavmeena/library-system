@@ -108,13 +108,28 @@ https://targetzone.co.in",
 
 async fn send_student_id_card_best_effort(state: &Arc<AppState>, info: &BookingInfo) {
     let Some(ref mobile) = info.user_mobile else { return };
-    let user_id = info.user_id;
-    let membership_id = info.membership_id;
+    if let Err(e) = send_student_id_card(
+        state, info.user_id, info.membership_id, &info.user_name,
+        Some(mobile.as_str()), info.user_email.as_deref(),
+    ).await {
+        tracing::warn!("{e}");
+    }
+}
 
-    let pdf = match crate::services::idcard::generate(state, user_id).await {
-        Ok(bytes) => bytes,
-        Err(e) => { tracing::warn!("ID card generation failed for {user_id}: {e}"); return; }
-    };
+/// Renders and sends a student's ID card (WhatsApp image template + email PDF
+/// attachment). Shared by the automatic post-booking send above and the
+/// admin-triggered on-demand resend in `services::admin::send_id_card`.
+pub async fn send_student_id_card(
+    state: &Arc<AppState>,
+    user_id: Uuid,
+    membership_id: Uuid,
+    user_name: &str,
+    mobile: Option<&str>,
+    email: Option<&str>,
+) -> Result<(), String> {
+    let pdf = crate::services::idcard::generate(state, user_id)
+        .await
+        .map_err(|e| format!("ID card generation failed for {user_id}: {e}"))?;
 
     let settings = settings::setting_for(state, "STUDENT_ID_CARD").await;
     let id_number = ids::member_id(membership_id);
@@ -131,14 +146,16 @@ async fn send_student_id_card_best_effort(state: &Arc<AppState>, info: &BookingI
     };
 
     if let Some(link) = image_link {
-        let params = vec![info.user_name.clone()];
+        let params = vec![user_name.to_string()];
         if settings.send_to_student {
-            send_image_template(
-                state, mobile, &link, &params,
-                &state.config.meta_id_card_image_template_name.clone(),
-                &state.config.meta_id_card_image_language.clone(),
-                Some(user_id), "STUDENT_ID_CARD",
-            ).await;
+            if let Some(mobile) = mobile {
+                send_image_template(
+                    state, mobile, &link, &params,
+                    &state.config.meta_id_card_image_template_name.clone(),
+                    &state.config.meta_id_card_image_language.clone(),
+                    Some(user_id), "STUDENT_ID_CARD",
+                ).await;
+            }
         }
         if settings.send_to_admin {
             for number in admin_whatsapp_numbers(state) {
@@ -155,14 +172,16 @@ async fn send_student_id_card_best_effort(state: &Arc<AppState>, info: &BookingI
     }
 
     if settings.send_to_student {
-        if let Some(ref email) = info.user_email {
+        if let Some(email) = email {
             let body = settings::apply_hindi(
-                &format!("Dear {},\n\nPlease find your library ID card attached.\n\nID No.: {id_number}", info.user_name),
+                &format!("Dear {user_name},\n\nPlease find your library ID card attached.\n\nID No.: {id_number}"),
                 &settings, true,
             );
             send_email_with_attachment(state, email, "Your Target Zone Library ID Card", &body, &pdf, &pdf_name).await;
         }
     }
+
+    Ok(())
 }
 
 fn admin_whatsapp_numbers(state: &Arc<AppState>) -> Vec<String> {

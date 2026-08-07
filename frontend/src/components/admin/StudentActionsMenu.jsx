@@ -63,6 +63,9 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
     const [msgText, setMsgText]       = useState('')
     const [msgSending, setMsgSending] = useState(false)
 
+    const [sendingReceipt, setSendingReceipt] = useState(false)
+    const [sendingIdCard, setSendingIdCard]   = useState(false)
+
     useEffect(() => {
         const close = (e) => {
             if (containerRef.current && !containerRef.current.contains(e.target)) {
@@ -307,6 +310,32 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
         }
     }
 
+    const handleSendReceipt = async () => {
+        if (!window.confirm(`WhatsApp ${student.name}'s latest payment receipt to them?`)) return
+        setSendingReceipt(true)
+        try {
+            await api.post(`/admin/students/${student.id}/send-receipt`)
+            toast.success('Payment receipt sent')
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Failed to send receipt')
+        } finally {
+            setSendingReceipt(false)
+        }
+    }
+
+    const handleSendIdCard = async () => {
+        if (!window.confirm(`WhatsApp ${student.name}'s student ID card to them?`)) return
+        setSendingIdCard(true)
+        try {
+            await api.post(`/admin/students/${student.id}/send-id-card`)
+            toast.success('ID card sent')
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Failed to send ID card')
+        } finally {
+            setSendingIdCard(false)
+        }
+    }
+
     const handleDeleteStudent = async () => {
         setDeleting(true)
         try {
@@ -441,6 +470,18 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
                                     onClick={() => { setMsgOpen(true); closeMenu() }}
                                     className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors">
                                     Message
+                                </button>
+                                <button
+                                    disabled={sendingReceipt}
+                                    onClick={() => { handleSendReceipt(); closeMenu() }}
+                                    className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors disabled:opacity-50">
+                                    {sendingReceipt ? 'Sending…' : 'Send Payment Receipt'}
+                                </button>
+                                <button
+                                    disabled={sendingIdCard}
+                                    onClick={() => { handleSendIdCard(); closeMenu() }}
+                                    className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors disabled:opacity-50">
+                                    {sendingIdCard ? 'Sending…' : 'Send ID Card'}
                                 </button>
                             </>
                         )}
