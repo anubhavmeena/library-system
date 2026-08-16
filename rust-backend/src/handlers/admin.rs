@@ -8,7 +8,9 @@ use crate::{
         settings::{SaveAppSettingsRequest, UpdateNotificationSettingRequest},
     },
     response::ApiResponse,
-    services::{admin as svc, coupon as coupon_svc, settings as settings_svc, user as user_svc},
+    services::{
+        activity_log as alog, admin as svc, coupon as coupon_svc, settings as settings_svc, user as user_svc,
+    },
 };
 use axum::{
     extract::{Path, Query, State},
@@ -61,30 +63,38 @@ pub async fn get_student(
 
 pub async fn update_student_status(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(user_id): Path<Uuid>,
     Json(req): Json<UpdateStudentStatusRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     svc::update_student_status(&state, user_id, req.is_active).await?;
+    let label = alog::user_label(&state, user_id).await;
+    alog::log_activity(&state, &admin.0, "UPDATE_STATUS", "student", Some(user_id.to_string()),
+        format!("Marked {label} as {}", if req.is_active { "active" } else { "inactive" })).await;
     Ok(ApiResponse::ok("Status updated"))
 }
 
 pub async fn update_student(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(user_id): Path<Uuid>,
     Json(req): Json<AdminUpdateStudentRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let user = svc::update_student(&state, user_id, &req).await?;
+    alog::log_activity(&state, &admin.0, "UPDATE_STUDENT", "student", Some(user_id.to_string()),
+        format!("Updated profile for {}", user.name)).await;
     Ok(ApiResponse::success("Student updated", user))
 }
 
 pub async fn delete_student(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(user_id): Path<Uuid>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let label = alog::user_label(&state, user_id).await;
     svc::delete_student(&state, user_id).await?;
+    alog::log_activity(&state, &admin.0, "DELETE_STUDENT", "student", Some(user_id.to_string()),
+        format!("Deleted student {label}")).await;
     Ok(ApiResponse::ok("Student deleted"))
 }
 
@@ -107,26 +117,32 @@ pub async fn get_pending_fees(
 
 pub async fn clear_pending_fees(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(user_id): Path<Uuid>,
     Json(req): Json<ClearPendingFeesRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     svc::clear_pending_fees(&state, user_id, req.amount_cleared, req.payment_mode.as_deref()).await?;
+    let label = alog::user_label(&state, user_id).await;
+    alog::log_activity(&state, &admin.0, "CLEAR_PENDING_FEES", "student", Some(user_id.to_string()),
+        format!("Cleared ₹{} pending fees for {label}{}", req.amount_cleared,
+            req.payment_mode.as_deref().map(|m| format!(" (mode: {m})")).unwrap_or_default())).await;
     Ok(ApiResponse::ok("Pending fees cleared"))
 }
 
 pub async fn import_student(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Json(req): Json<ImportStudentRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let user = svc::import_student(&state, &req).await?;
+    alog::log_activity(&state, &admin.0, "ADD_STUDENT", "student", Some(user.id.to_string()),
+        format!("Added new student {}", user.name)).await;
     Ok(ApiResponse::success("Student imported", user))
 }
 
 pub async fn import_student_with_photo(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     mut multipart: axum::extract::Multipart,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let mut name: Option<String> = None;
@@ -150,6 +166,8 @@ pub async fn import_student_with_photo(
     let phone = phone.ok_or_else(|| AppError::BadRequest("Phone is required".into()))?;
 
     let result = svc::import_student_with_photo(&state, &name, &phone, photo).await?;
+    alog::log_activity(&state, &admin.0, "ADD_STUDENT", "student", None,
+        format!("Added new student {name} ({phone}) with photo")).await;
     Ok(ApiResponse::success("Student added successfully", result))
 }
 
@@ -158,7 +176,7 @@ pub async fn import_student_with_photo(
 // attaches a photo at find-or-create time for a brand-new/matched student.
 pub async fn upload_student_photo(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(user_id): Path<Uuid>,
     mut multipart: axum::extract::Multipart,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
@@ -177,6 +195,9 @@ pub async fn upload_student_photo(
             )?;
             let url = user_svc::save_file(&state.config.upload_dir, user_id, "photo", &filename, &data).await?;
             user_svc::update_photo_url(&state, user_id, &url).await?;
+            let label = alog::user_label(&state, user_id).await;
+            alog::log_activity(&state, &admin.0, "UPDATE_PHOTO", "student", Some(user_id.to_string()),
+                format!("Updated photo for {label}")).await;
             return Ok(ApiResponse::success("Photo uploaded", serde_json::json!({ "url": url })));
         }
     }
@@ -213,10 +234,12 @@ pub async fn expiring_memberships(
 
 pub async fn send_reminders(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Json(req): Json<SendRemindersRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let count = svc::send_renewal_reminders(&state, req.user_ids).await?;
+    alog::log_activity(&state, &admin.0, "SEND_REMINDERS", "membership", None,
+        format!("Sent renewal reminders to {count} student(s)")).await;
     Ok(ApiResponse::success(
         "Reminders sent",
         format!("Sent renewal reminders to {} student(s)", count),
@@ -225,11 +248,13 @@ pub async fn send_reminders(
 
 pub async fn send_pending_fee_reminders(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     body: Option<Json<SendRemindersRequest>>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let user_ids = body.and_then(|Json(b)| b.user_ids);
     let count = svc::send_pending_fee_reminders(&state, user_ids).await?;
+    alog::log_activity(&state, &admin.0, "SEND_REMINDERS", "student", None,
+        format!("Sent pending-fee reminders to {count} student(s)")).await;
     Ok(ApiResponse::success(
         "Pending fee reminders sent",
         format!("Sent pending fee reminders to {} student(s)", count),
@@ -238,38 +263,49 @@ pub async fn send_pending_fee_reminders(
 
 pub async fn send_direct_message(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(user_id): Path<Uuid>,
     Json(req): Json<DirectMessageRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     svc::send_direct_message(&state, user_id, &req.message).await?;
+    let label = alog::user_label(&state, user_id).await;
+    alog::log_activity(&state, &admin.0, "SEND_MESSAGE", "student", Some(user_id.to_string()),
+        format!("Sent a direct message to {label}")).await;
     Ok(ApiResponse::ok("Message sent"))
 }
 
 pub async fn send_receipt(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(user_id): Path<Uuid>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     svc::send_latest_receipt(&state, user_id).await?;
+    let label = alog::user_label(&state, user_id).await;
+    alog::log_activity(&state, &admin.0, "SEND_RECEIPT", "student", Some(user_id.to_string()),
+        format!("Sent payment receipt to {label}")).await;
     Ok(ApiResponse::ok("Payment receipt sent"))
 }
 
 pub async fn send_id_card(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(user_id): Path<Uuid>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     svc::send_id_card(&state, user_id).await?;
+    let label = alog::user_label(&state, user_id).await;
+    alog::log_activity(&state, &admin.0, "SEND_ID_CARD", "student", Some(user_id.to_string()),
+        format!("Sent ID card to {label}")).await;
     Ok(ApiResponse::ok("ID card sent"))
 }
 
 pub async fn broadcast(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Json(req): Json<BroadcastRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let bcast = svc::broadcast(&state, &req.message).await?;
+    alog::log_activity(&state, &admin.0, "BROADCAST", "broadcast", Some(bcast.id.to_string()),
+        format!("Sent broadcast message to {} member(s)", bcast.recipient_count)).await;
     Ok(ApiResponse::success(
         "Broadcast sent",
         format!("Broadcast sent to {} member(s)", bcast.recipient_count),
@@ -286,49 +322,66 @@ pub async fn broadcast_history(
 
 pub async fn delete_broadcast(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(id): Path<Uuid>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     svc::delete_broadcast(&state, id).await?;
+    alog::log_activity(&state, &admin.0, "DELETE_BROADCAST", "broadcast", Some(id.to_string()),
+        "Deleted a broadcast message").await;
     Ok(ApiResponse::ok("Broadcast deleted"))
 }
 
 pub async fn create_cash_membership(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Json(req): Json<CashMembershipRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let result = svc::create_cash_membership(&state, &req).await?;
+    let label = alog::user_label(&state, req.user_id).await;
+    alog::log_activity(&state, &admin.0, "CREATE_MEMBERSHIP", "membership",
+        result.get("membership_id").and_then(|v| v.as_str()).map(String::from),
+        format!("Created cash membership for {label}{}",
+            req.seat_number.as_deref().map(|s| format!(" (seat {s})")).unwrap_or_default())).await;
     Ok(ApiResponse::success("Cash membership created", result))
 }
 
 pub async fn change_membership_seat(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(membership_id): Path<Uuid>,
     Json(req): Json<ChangeSeatRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     svc::change_membership_seat(&state, membership_id, &req.seat_number).await?;
+    let label = alog::membership_label(&state, membership_id).await;
+    alog::log_activity(&state, &admin.0, "CHANGE_SEAT", "membership", Some(membership_id.to_string()),
+        format!("Changed seat for {label} to {}", req.seat_number)).await;
     Ok(ApiResponse::ok("Seat changed"))
 }
 
 pub async fn swap_membership_seat(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(membership_id): Path<Uuid>,
     Json(req): Json<SwapSeatRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     svc::swap_membership_seats(&state, membership_id, req.other_user_id).await?;
+    let label = alog::membership_label(&state, membership_id).await;
+    let other_label = alog::user_label(&state, req.other_user_id).await;
+    alog::log_activity(&state, &admin.0, "SWAP_SEAT", "membership", Some(membership_id.to_string()),
+        format!("Swapped seats between {label} and {other_label}")).await;
     Ok(ApiResponse::ok("Seats exchanged"))
 }
 
 pub async fn update_membership_plan(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(membership_id): Path<Uuid>,
     Json(req): Json<UpdatePlanRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let membership = svc::update_membership_plan(&state, membership_id, &req).await?;
+    let label = alog::membership_label(&state, membership_id).await;
+    alog::log_activity(&state, &admin.0, "UPDATE_PLAN", "membership", Some(membership_id.to_string()),
+        format!("Updated plan for {label}")).await;
     Ok(ApiResponse::success("Membership updated", membership))
 }
 
@@ -345,11 +398,14 @@ pub async fn list_feedback(
 
 pub async fn update_feedback(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(feedback_id): Path<Uuid>,
     Json(req): Json<UpdateFeedbackRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let feedback = svc::update_feedback(&state, feedback_id, &req).await?;
+    let label = alog::user_label(&state, feedback.user_id).await;
+    alog::log_activity(&state, &admin.0, "UPDATE_FEEDBACK", "feedback", Some(feedback_id.to_string()),
+        format!("Updated feedback from {label} to status {}", feedback.status)).await;
     Ok(ApiResponse::success("Feedback updated", feedback))
 }
 
@@ -428,7 +484,7 @@ pub async fn get_expenses(
 
 pub async fn bulk_import(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     mut multipart: axum::extract::Multipart,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     while let Some(field) = multipart.next_field().await.map_err(|e| AppError::BadRequest(e.to_string()))? {
@@ -437,6 +493,8 @@ pub async fn bulk_import(
         let filename = field.file_name().unwrap_or("import.csv").to_string();
         let data = field.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
         let result = svc::bulk_import_students(&state, &data, &filename).await?;
+        alog::log_activity(&state, &admin.0, "BULK_IMPORT", "student", None,
+            format!("Bulk-imported students from {filename}: {} imported, {} skipped", result.imported, result.skipped)).await;
         return Ok(ApiResponse::success("Import complete", result));
     }
     Err(AppError::BadRequest("No file provided".into()))
@@ -444,10 +502,12 @@ pub async fn bulk_import(
 
 pub async fn save_expense(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Json(req): Json<SaveExpenseRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let expense = svc::save_expense(&state, &req).await?;
+    alog::log_activity(&state, &admin.0, "SAVE_EXPENSE", "expense", None,
+        format!("Saved expense entry for {}/{}", req.month, req.year)).await;
     Ok(ApiResponse::success("Expense saved", expense))
 }
 
@@ -463,10 +523,12 @@ pub async fn get_app_settings(
 
 pub async fn save_app_settings(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Json(req): Json<SaveAppSettingsRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let settings = settings_svc::save_app_settings(&state, &req).await?;
+    alog::log_activity(&state, &admin.0, "SAVE_SETTINGS", "settings", None,
+        "Updated app settings").await;
     Ok(ApiResponse::success("Settings saved", settings))
 }
 
@@ -480,11 +542,13 @@ pub async fn get_notification_settings(
 
 pub async fn update_notification_setting(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(key): Path<String>,
     Json(req): Json<UpdateNotificationSettingRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let updated = settings_svc::update_notification_setting(&state, &key, &req).await?;
+    alog::log_activity(&state, &admin.0, "UPDATE_NOTIFICATION_SETTING", "settings", Some(key.clone()),
+        format!("Updated notification setting '{key}'")).await;
     Ok(ApiResponse::success("Notification setting updated", updated))
 }
 
@@ -500,29 +564,35 @@ pub async fn list_coupons(
 
 pub async fn create_coupon(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Json(req): Json<CreateCouponRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let coupon = coupon_svc::create_coupon(&state, &req).await?;
+    alog::log_activity(&state, &admin.0, "CREATE_COUPON", "coupon", Some(coupon.id.to_string()),
+        format!("Created coupon '{}' ({}% off)", coupon.code, coupon.discount_percent)).await;
     Ok(ApiResponse::success("Coupon created", coupon))
 }
 
 pub async fn update_coupon(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateCouponRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let coupon = coupon_svc::update_coupon(&state, id, &req).await?;
+    alog::log_activity(&state, &admin.0, "UPDATE_COUPON", "coupon", Some(id.to_string()),
+        format!("Updated coupon '{}'", coupon.code)).await;
     Ok(ApiResponse::success("Coupon updated", coupon))
 }
 
 pub async fn delete_coupon(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(id): Path<Uuid>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     coupon_svc::delete_coupon(&state, id).await?;
+    alog::log_activity(&state, &admin.0, "DELETE_COUPON", "coupon", Some(id.to_string()),
+        "Deleted a coupon").await;
     Ok(ApiResponse::ok("Coupon deleted"))
 }
 
@@ -530,57 +600,75 @@ pub async fn delete_coupon(
 
 pub async fn release_seat(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(membership_id): Path<Uuid>,
     Json(req): Json<ReleaseSeatRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let label = alog::membership_label(&state, membership_id).await;
     svc::release_seat(&state, membership_id, req.notify_student).await?;
+    alog::log_activity(&state, &admin.0, "RELEASE_SEAT", "membership", Some(membership_id.to_string()),
+        format!("Released seat for {label}")).await;
     Ok(ApiResponse::ok("Seat released"))
 }
 
 pub async fn renew_seat(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(membership_id): Path<Uuid>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let membership = svc::renew_seat(&state, membership_id).await?;
+    let label = alog::membership_label(&state, membership_id).await;
+    alog::log_activity(&state, &admin.0, "RENEW_SEAT", "membership", Some(membership_id.to_string()),
+        format!("Renewed membership for {label}")).await;
     Ok(ApiResponse::success("Membership renewed", membership))
 }
 
 pub async fn mark_membership_pending(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(membership_id): Path<Uuid>,
     Json(req): Json<MarkPendingRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     svc::mark_membership_pending(&state, membership_id, req.pending_amount).await?;
+    let label = alog::membership_label(&state, membership_id).await;
+    alog::log_activity(&state, &admin.0, "MARK_PENDING", "membership", Some(membership_id.to_string()),
+        format!("Marked {label}'s membership pending (₹{})", req.pending_amount)).await;
     Ok(ApiResponse::ok("Membership marked pending"))
 }
 
 pub async fn mark_membership_grace(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(membership_id): Path<Uuid>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     svc::mark_membership_grace(&state, membership_id).await?;
+    let label = alog::membership_label(&state, membership_id).await;
+    alog::log_activity(&state, &admin.0, "MARK_GRACE", "membership", Some(membership_id.to_string()),
+        format!("Marked {label}'s membership as grace")).await;
     Ok(ApiResponse::ok("Membership marked grace"))
 }
 
 pub async fn clear_dues(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(membership_id): Path<Uuid>,
     Json(req): Json<ClearAmountRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     svc::clear_dues(&state, membership_id, req.amount_cleared, req.payment_mode.as_deref()).await?;
+    let label = alog::membership_label(&state, membership_id).await;
+    alog::log_activity(&state, &admin.0, "CLEAR_DUES", "membership", Some(membership_id.to_string()),
+        format!("Cleared ₹{} dues for {label}{}", req.amount_cleared,
+            req.payment_mode.as_deref().map(|m| format!(" (mode: {m})")).unwrap_or_default())).await;
     Ok(ApiResponse::ok("Dues cleared"))
 }
 
 pub async fn run_expiry_check(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let count = svc::run_expiry_check(&state).await?;
+    alog::log_activity(&state, &admin.0, "RUN_EXPIRY_CHECK", "membership", None,
+        format!("Ran manual expiry check ({count} membership(s) transitioned to grace)")).await;
     Ok(ApiResponse::success(
         "Expiry check complete",
         format!("{count} membership(s) transitioned to grace"),
@@ -605,11 +693,13 @@ pub async fn grace_dues_students(
 
 pub async fn send_grace_dues_reminders(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     body: Option<Json<SendRemindersRequest>>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let user_ids = body.and_then(|Json(b)| b.user_ids);
     let count = svc::send_grace_dues_reminders(&state, user_ids).await?;
+    alog::log_activity(&state, &admin.0, "SEND_REMINDERS", "membership", None,
+        format!("Sent grace-dues reminders to {count} student(s)")).await;
     Ok(ApiResponse::success(
         "Grace dues reminders sent",
         format!("Sent grace dues reminders to {count} student(s)"),
@@ -634,6 +724,28 @@ pub async fn student_seat_history(
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let data = svc::get_student_seat_history(&state, user_id).await?;
     Ok(ApiResponse::success("Student seat history retrieved", data))
+}
+
+// ── Activity log ──────────────────────────────────────────────────────────────
+
+/// `size` accepts "25"/"50"/"100"/"all" (case-insensitive); anything else
+/// falls back to the 100 default, matching the admin panel's dropdown.
+pub async fn list_activity_logs(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Query(q): Query<std::collections::HashMap<String, String>>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let page = q.get("page").and_then(|p| p.parse::<i64>().ok()).unwrap_or(0).max(0);
+    let size = match q.get("size").map(|s| s.as_str()) {
+        Some(s) if s.eq_ignore_ascii_case("all") => None,
+        Some(s) => Some(s.parse::<i64>().unwrap_or(100).clamp(1, 1000)),
+        None => Some(100),
+    };
+    let (logs, total) = alog::list_activity_logs(&state, page, size).await?;
+    Ok(ApiResponse::success(
+        "Activity logs retrieved",
+        serde_json::json!({ "logs": logs, "total": total, "page": page, "size": size }),
+    ))
 }
 
 #[cfg(test)]
@@ -1643,5 +1755,42 @@ mod integration_tests {
         assert_eq!(body["data"]["imported"], 1, "the blank-seat row should be skipped, not imported");
         assert_eq!(body["data"]["skipped"], 1);
         assert_eq!(body["data"]["errors"][0]["reason"], "Seat is blank");
+    }
+
+    // ── Activity log ────────────────────────────────────────────────────
+
+    #[tokio::test]
+    #[ignore]
+    async fn activity_log_records_admin_actions_and_supports_paging() {
+        let state = test_state().await;
+        let router = test_router(state.clone());
+        let admin = admin_token(&state).await;
+        let (user_id, _t) = create_test_user(&state, "STUDENT", "Activity Log Target").await;
+
+        // A mutating admin action must show up in the log afterwards.
+        let resp = router.clone().oneshot(json_request(
+            "PATCH", &format!("/api/admin/students/{user_id}/status"), Some(&admin), json!({ "active": false }),
+        )).await.unwrap();
+        assert_eq!(resp.status(), 200);
+
+        let resp = router.clone().oneshot(get_request("/api/admin/activity-logs?size=all", Some(&admin))).await.unwrap();
+        assert_eq!(resp.status(), 200);
+        let body = body_json(resp).await;
+        let logs = body["data"]["logs"].as_array().unwrap();
+        assert!(logs.iter().any(|l| l["action"] == "UPDATE_STATUS" && l["entityId"] == user_id.to_string()),
+            "the status change must be recorded in the activity log");
+
+        // Default size is 100, and an explicit small size actually limits the page.
+        let resp = router.clone().oneshot(get_request("/api/admin/activity-logs?page=0&size=1", Some(&admin))).await.unwrap();
+        assert_eq!(resp.status(), 200);
+        let body = body_json(resp).await;
+        assert_eq!(body["data"]["logs"].as_array().unwrap().len(), 1);
+        assert_eq!(body["data"]["size"], 1);
+        assert!(body["data"]["total"].as_i64().unwrap() >= 1);
+
+        // Non-admin cannot read the activity log.
+        let (_id2, token2) = create_test_user(&state, "STUDENT", "Not Admin Activity Log").await;
+        let resp = router.clone().oneshot(get_request("/api/admin/activity-logs", Some(&token2))).await.unwrap();
+        assert_eq!(resp.status(), 403);
     }
 }

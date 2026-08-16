@@ -41,6 +41,7 @@ import AdminMailboxPage   from './pages/admin/AdminMailboxPage'
 import AdminSettingsPage  from './pages/admin/AdminSettingsPage'
 import AdminCouponsPage   from './pages/admin/AdminCouponsPage'
 import AdminCronJobsPage  from './pages/admin/AdminCronJobsPage'
+import AdminActivityLogsPage from './pages/admin/AdminActivityLogsPage'
 
 import FeedbackPage       from './pages/student/FeedbackPage'
 import StudentGalleryPage from './pages/student/StudentGalleryPage'
@@ -118,6 +119,7 @@ export default function App() {
                 <Route path="settings"        element={<AdminSettingsPage />} />
                 <Route path="coupons"         element={<AdminCouponsPage />} />
                 <Route path="cron-jobs"       element={<AdminCronJobsPage />} />
+                <Route path="activity-logs"   element={<AdminActivityLogsPage />} />
             </Route>
 
             <Route path="*" element={<NotFoundPage />} />

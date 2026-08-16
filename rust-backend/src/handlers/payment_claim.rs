@@ -4,7 +4,7 @@ use crate::{
     middleware::AdminUser,
     models::payment_claim::{CreatePayLinkRequest, ReviewPaymentClaimRequest},
     response::ApiResponse,
-    services::payment_claim as svc,
+    services::{activity_log as alog, payment_claim as svc},
 };
 use axum::{
     extract::{Multipart, Path, Query, State},
@@ -58,10 +58,13 @@ pub async fn get_pay_link(
 /// WhatsApp message itself via the existing generic message endpoint.
 pub async fn create_pay_link(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Json(req): Json<CreatePayLinkRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let link = svc::create_ad_hoc_pay_link(&state, req.student_id, req.amount).await?;
+    let label = alog::user_label(&state, req.student_id).await;
+    alog::log_activity(&state, &admin.0, "CREATE_PAY_LINK", "student", Some(req.student_id.to_string()),
+        format!("Created a ₹{} payment link for {label}", req.amount)).await;
     Ok(ApiResponse::success("Payment link created", serde_json::json!({ "link": link })))
 }
 
@@ -82,6 +85,9 @@ pub async fn review_claim(
     Json(req): Json<ReviewPaymentClaimRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let claim = svc::review_claim(&state, id, admin.0.user_id, &req.status).await?;
+    let label = alog::user_label(&state, claim.user_id).await;
+    alog::log_activity(&state, &admin.0, "REVIEW_PAYMENT_CLAIM", "payment_claim", Some(id.to_string()),
+        format!("Reviewed payment claim from {label}: {}", claim.status)).await;
     Ok(ApiResponse::success("Payment claim reviewed", claim))
 }
 

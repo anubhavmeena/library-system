@@ -38,6 +38,7 @@ export default function AdminLayout() {
         { to: '/admin/settings',        icon: '⚙', label: t('admin.sidebar.nav.settings') },
         { to: '/admin/coupons',         icon: '%', label: t('admin.sidebar.nav.coupons') },
         { to: '/admin/cron-jobs',       icon: '⏱', label: t('admin.sidebar.nav.cronJobs') },
+        { to: '/admin/activity-logs',   icon: '▤', label: t('admin.sidebar.nav.activityLogs') },
     ]
 
     return (

@@ -189,7 +189,8 @@
         "inbox": "Inbox",
         "settings": "Settings",
         "coupons": "Coupons",
-        "cronJobs": "Cron Jobs"
+        "cronJobs": "Cron Jobs",
+        "activityLogs": "Activity Logs"
       },
       "logout": "Logout"
     }
@@ -809,6 +810,29 @@
     "running": "Running...",
     "toasts": {
       "failed": "Failed to run expiry check"
+    }
+  },
+  "adminActivityLogs": {
+    "title": "Activity Logs",
+    "subtitle": "{{count}} recorded actions",
+    "refresh": "Refresh",
+    "table": {
+      "action": "Action",
+      "admin": "Admin",
+      "description": "Description",
+      "date": "Date"
+    },
+    "empty": {
+      "title": "No activity yet",
+      "desc": "Admin actions will show up here as they happen"
+    },
+    "perPage": "Per page",
+    "all": "All",
+    "page": "Page {{page}}",
+    "prev": "Prev",
+    "next": "Next",
+    "toasts": {
+      "loadFailed": "Failed to load activity logs"
     }
   },
   "adminNewMembership": {

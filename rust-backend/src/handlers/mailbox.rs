@@ -1,6 +1,6 @@
 use crate::{
     app_state::AppState, middleware::AdminUser, models::admin::ReplyRequest, response::ApiResponse,
-    services::mailbox as svc,
+    services::{activity_log as alog, mailbox as svc},
 };
 use axum::{
     extract::{Path, State},
@@ -27,10 +27,12 @@ pub async fn get_message(
 
 pub async fn delete_message(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(message_number): Path<u32>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     svc::delete_message(state.config.clone(), message_number).await?;
+    alog::log_activity(&state, &admin.0, "DELETE_INBOX_MESSAGE", "inbox_message", Some(message_number.to_string()),
+        format!("Deleted inbox message #{message_number}")).await;
     Ok(ApiResponse::ok("Message deleted"))
 }
 
@@ -57,10 +59,12 @@ pub async fn get_attachment(
 
 pub async fn reply(
     State(state): State<Arc<AppState>>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(message_number): Path<u32>,
     axum::Json(req): axum::Json<ReplyRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     svc::reply_to_message(state.config.clone(), message_number, req.body).await?;
+    alog::log_activity(&state, &admin.0, "REPLY_INBOX_MESSAGE", "inbox_message", Some(message_number.to_string()),
+        format!("Replied to inbox message #{message_number}")).await;
     Ok(ApiResponse::ok("Reply sent"))
 }

@@ -1,3 +1,4 @@
+pub mod activity_log;
 pub mod admin;
 pub mod auth;
 pub mod coupon;

@@ -120,6 +120,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/admin/notification-settings/:key",      patch(admin::update_notification_setting))
         .route("/api/admin/coupons",                         get(admin::list_coupons).post(admin::create_coupon))
         .route("/api/admin/coupons/:id",                     patch(admin::update_coupon).delete(admin::delete_coupon))
+        .route("/api/admin/activity-logs",                   get(admin::list_activity_logs))
         .route("/api/admin/payment-claims",                  get(payment_claim::list_claims))
         .route("/api/admin/payment-claims/:id",               patch(payment_claim::review_claim))
         .route("/api/admin/pay-links",                       post(payment_claim::create_pay_link))

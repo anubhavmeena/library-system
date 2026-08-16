@@ -185,7 +185,8 @@
         "inbox": "इनबॉक्स",
         "settings": "सेटिंग्स",
         "coupons": "कूपन",
-        "cronJobs": "क्रॉन जॉब्स"
+        "cronJobs": "क्रॉन जॉब्स",
+        "activityLogs": "गतिविधि लॉग"
       },
       "logout": "लॉग आउट"
     }
@@ -788,6 +789,29 @@
     "running": "चल रहा है...",
     "toasts": {
       "failed": "एक्सपायरी चेक चलाने में विफल"
+    }
+  },
+  "adminActivityLogs": {
+    "title": "गतिविधि लॉग",
+    "subtitle": "{{count}} दर्ज की गई कार्रवाइयाँ",
+    "refresh": "रिफ्रेश करें",
+    "table": {
+      "action": "कार्रवाई",
+      "admin": "एडमिन",
+      "description": "विवरण",
+      "date": "तारीख"
+    },
+    "empty": {
+      "title": "अभी तक कोई गतिविधि नहीं",
+      "desc": "एडमिन की कार्रवाइयाँ यहाँ दिखाई देंगी"
+    },
+    "perPage": "प्रति पृष्ठ",
+    "all": "सभी",
+    "page": "पृष्ठ {{page}}",
+    "prev": "पिछला",
+    "next": "अगला",
+    "toasts": {
+      "loadFailed": "गतिविधि लॉग लोड करने में विफल"
     }
   },
   "adminNewMembership": {
