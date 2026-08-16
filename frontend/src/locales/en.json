@@ -820,7 +820,7 @@
       "action": "Action",
       "admin": "Admin",
       "description": "Description",
-      "date": "Date"
+      "date": "Date (IST)"
     },
     "empty": {
       "title": "No activity yet",

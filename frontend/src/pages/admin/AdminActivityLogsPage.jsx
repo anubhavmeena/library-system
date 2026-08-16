@@ -5,6 +5,22 @@ import toast from 'react-hot-toast'
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 'all']
 
+// The backend sends a naive "YYYY-MM-DDTHH:MM:SS[.ffffff]" timestamp that is
+// actually UTC (rust-backend stores plain TIMESTAMP columns as UTC wall-clock
+// -- see rust-backend/CLAUDE.md). Appending "Z" before parsing tells the
+// browser it's UTC instead of guessing local time, so the Asia/Kolkata
+// conversion below lands on the real IST moment.
+function formatIST(createdAt) {
+    if (!createdAt) return ''
+    const date = new Date(createdAt.endsWith('Z') ? createdAt : `${createdAt}Z`)
+    if (Number.isNaN(date.getTime())) return createdAt
+    return date.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    })
+}
+
 export default function AdminActivityLogsPage() {
     const { t } = useTranslation()
     const [logs, setLogs]         = useState([])
@@ -74,7 +90,7 @@ export default function AdminActivityLogsPage() {
                                 {logs.map(entry => (
                                     <tr key={entry.id} className="hover:bg-primary-800/30 transition-colors">
                                         <td className="p-4 text-primary-400 text-xs whitespace-nowrap align-top">
-                                            {entry.createdAt?.replace('T', ' ').slice(0, 19)}
+                                            {formatIST(entry.createdAt)}
                                         </td>
                                         <td className="p-4 text-white font-medium whitespace-nowrap align-top">
                                             {entry.adminName}{entry.adminMobile ? ` (${entry.adminMobile})` : ''}
