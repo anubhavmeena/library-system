@@ -16,11 +16,12 @@ pub async fn log_activity(
 ) {
     let description = description.into();
     let result = sqlx::query(
-        r#"INSERT INTO activity_log (admin_id, admin_name, action, entity_type, entity_id, description)
-           VALUES ($1, $2, $3, $4, $5, $6)"#,
+        r#"INSERT INTO activity_log (admin_id, admin_name, admin_mobile, action, entity_type, entity_id, description)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
     )
     .bind(admin.user_id)
     .bind(&admin.name)
+    .bind(&admin.mobile)
     .bind(action)
     .bind(entity_type)
     .bind(&entity_id)
@@ -47,7 +48,7 @@ pub async fn list_activity_logs(
 
     let logs = match size {
         Some(size) => sqlx::query_as::<_, ActivityLogEntry>(
-            r#"SELECT id, admin_id, admin_name, action, entity_type, entity_id, description, created_at
+            r#"SELECT id, admin_id, admin_name, admin_mobile, action, entity_type, entity_id, description, created_at
                FROM activity_log ORDER BY created_at DESC LIMIT $1 OFFSET $2"#,
         )
         .bind(size)
@@ -56,7 +57,7 @@ pub async fn list_activity_logs(
         .await
         .map_err(AppError::Database)?,
         None => sqlx::query_as::<_, ActivityLogEntry>(
-            r#"SELECT id, admin_id, admin_name, action, entity_type, entity_id, description, created_at
+            r#"SELECT id, admin_id, admin_name, admin_mobile, action, entity_type, entity_id, description, created_at
                FROM activity_log ORDER BY created_at DESC"#,
         )
         .fetch_all(&state.db)

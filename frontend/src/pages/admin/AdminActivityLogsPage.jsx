@@ -77,7 +77,7 @@ export default function AdminActivityLogsPage() {
                                             {entry.createdAt?.replace('T', ' ').slice(0, 19)}
                                         </td>
                                         <td className="p-4 text-white font-medium whitespace-nowrap align-top">
-                                            {entry.adminName}
+                                            {entry.adminName}{entry.adminMobile ? ` (${entry.adminMobile})` : ''}
                                         </td>
                                         <td className="p-4 align-top">
                                             <span className="text-xs px-2 py-1 rounded-full border font-medium whitespace-nowrap bg-red-500/20 text-red-400 border-red-500/30">

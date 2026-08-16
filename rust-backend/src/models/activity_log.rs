@@ -9,6 +9,7 @@ pub struct ActivityLogEntry {
     pub id: Uuid,
     pub admin_id: Uuid,
     pub admin_name: String,
+    pub admin_mobile: Option<String>,
     pub action: String,
     pub entity_type: Option<String>,
     pub entity_id: Option<String>,
