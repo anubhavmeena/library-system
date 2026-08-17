@@ -9,7 +9,8 @@ use crate::{
     },
     response::ApiResponse,
     services::{
-        activity_log as alog, admin as svc, coupon as coupon_svc, settings as settings_svc, user as user_svc,
+        activity_log as alog, admin as svc, coupon as coupon_svc, renewal_poll as poll_svc,
+        settings as settings_svc, user as user_svc,
     },
 };
 use axum::{
@@ -746,6 +747,46 @@ pub async fn list_activity_logs(
         "Activity logs retrieved",
         serde_json::json!({ "logs": logs, "total": total, "page": page, "size": size }),
     ))
+}
+
+// ── Renewal polls ────────────────────────────────────────────────────────────
+
+/// `size` accepts "25"/"50"/"100"/"all" (case-insensitive), same convention
+/// as list_activity_logs.
+pub async fn list_renewal_polls(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Query(q): Query<std::collections::HashMap<String, String>>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let page = q.get("page").and_then(|p| p.parse::<i64>().ok()).unwrap_or(0).max(0);
+    let size = match q.get("size").map(|s| s.as_str()) {
+        Some(s) if s.eq_ignore_ascii_case("all") => None,
+        Some(s) => Some(s.parse::<i64>().unwrap_or(100).clamp(1, 1000)),
+        None => Some(100),
+    };
+    let (polls, total) = poll_svc::list_renewal_polls(&state, page, size).await?;
+    Ok(ApiResponse::success(
+        "Renewal polls retrieved",
+        serde_json::json!({ "logs": polls, "total": total, "page": page, "size": size }),
+    ))
+}
+
+pub async fn resend_renewal_poll(
+    State(state): State<Arc<AppState>>,
+    admin: AdminUser,
+    Path(poll_id): Path<Uuid>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    poll_svc::resend_poll(&state, poll_id).await?;
+    alog::log_activity(
+        &state,
+        &admin.0,
+        "RESEND_RENEWAL_POLL",
+        "membership",
+        None,
+        format!("Resent renewal poll {poll_id}"),
+    )
+    .await;
+    Ok(ApiResponse::ok("Renewal poll resent"))
 }
 
 #[cfg(test)]

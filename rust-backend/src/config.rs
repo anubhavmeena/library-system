@@ -25,6 +25,10 @@ pub struct Config {
     pub meta_receipt_language: String,
     pub meta_id_card_image_template_name: String,
     pub meta_id_card_image_language: String,
+    pub meta_whatsapp_poll_template_name: String,
+    pub meta_whatsapp_poll_language: String,
+    pub meta_webhook_verify_token: String,
+    pub meta_app_secret: String,
     // apitxt SMS (OTP fallback channel between Meta WhatsApp and Twilio)
     pub apitxt_auth_key: String,
     // Public base URL used to build links Meta's servers fetch (receipt/ID-card documents)
@@ -103,6 +107,12 @@ impl Config {
                 .unwrap_or_else(|_| "id_card".to_string()),
             meta_id_card_image_language: env::var("META_WHATSAPP_ID_CARD_LANGUAGE")
                 .unwrap_or_else(|_| "en".to_string()),
+            meta_whatsapp_poll_template_name: env::var("META_WHATSAPP_POLL_TEMPLATE_NAME")
+                .unwrap_or_else(|_| "seat_renewal_confirmation".to_string()),
+            meta_whatsapp_poll_language: env::var("META_WHATSAPP_POLL_LANGUAGE")
+                .unwrap_or_else(|_| "en".to_string()),
+            meta_webhook_verify_token: env::var("META_WEBHOOK_VERIFY_TOKEN").unwrap_or_default(),
+            meta_app_secret: env::var("META_APP_SECRET").unwrap_or_default(),
             apitxt_auth_key: env::var("APITXT_AUTH_KEY").unwrap_or_default(),
             frontend_url: env::var("FRONTEND_URL")
                 .unwrap_or_else(|_| "https://targetzone.co.in".to_string()),
@@ -170,6 +180,10 @@ impl Config {
     pub fn is_cashfree_dev(&self) -> bool {
         self.cashfree_app_id.is_empty()
     }
+
+    pub fn is_meta_app_secret_dev(&self) -> bool {
+        self.meta_app_secret.is_empty()
+    }
 }
 
 #[cfg(test)]
@@ -195,6 +209,10 @@ pub(crate) fn test_config() -> Config {
         meta_receipt_language: "en".to_string(),
         meta_id_card_image_template_name: "id_card".to_string(),
         meta_id_card_image_language: "en".to_string(),
+        meta_whatsapp_poll_template_name: "seat_renewal_confirmation".to_string(),
+        meta_whatsapp_poll_language: "en".to_string(),
+        meta_webhook_verify_token: "".to_string(),
+        meta_app_secret: "".to_string(),
         apitxt_auth_key: "".to_string(),
         frontend_url: "https://targetzone.co.in".to_string(),
         payment_gateway: "CASHFREE".to_string(),

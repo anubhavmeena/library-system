@@ -190,7 +190,8 @@
         "settings": "Settings",
         "coupons": "Coupons",
         "cronJobs": "Cron Jobs",
-        "activityLogs": "Activity Logs"
+        "activityLogs": "Activity Logs",
+        "renewalPolls": "Renewal Polls"
       },
       "logout": "Logout"
     }
@@ -834,6 +835,40 @@
     "next": "Next",
     "toasts": {
       "loadFailed": "Failed to load activity logs"
+    }
+  },
+  "adminRenewalPolls": {
+    "title": "Renewal Polls",
+    "subtitle": "{{count}} polls sent",
+    "refresh": "Refresh",
+    "table": {
+      "student": "Student",
+      "endDate": "Membership End Date",
+      "sentAt": "Sent (IST)",
+      "response": "Response",
+      "respondedAt": "Responded (IST)",
+      "actions": "Actions"
+    },
+    "resend": "Resend",
+    "resendConfirm": "Resend the renewal poll to {{name}}?",
+    "empty": {
+      "title": "No renewal polls yet",
+      "desc": "Polls sent 3 days before a membership expires will show up here"
+    },
+    "response": {
+      "yes": "Yes",
+      "no": "No",
+      "pending": "Pending"
+    },
+    "perPage": "Per page",
+    "all": "All",
+    "page": "Page {{page}}",
+    "prev": "Prev",
+    "next": "Next",
+    "toasts": {
+      "loadFailed": "Failed to load renewal polls",
+      "resendSuccess": "Renewal poll resent",
+      "resendFailed": "Failed to resend renewal poll"
     }
   },
   "adminNewMembership": {

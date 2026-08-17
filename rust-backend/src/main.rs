@@ -99,8 +99,18 @@ async fn start_scheduler(state: Arc<AppState>) {
     })
     .expect("Failed to create grace dues reminder cron job");
 
+    let s4 = state.clone();
+    let poll_job = Job::new_async("0 0 9 * * *", move |_uuid, _lock| {
+        let s = s4.clone();
+        Box::pin(async move {
+            services::renewal_poll::run_renewal_poll_job(s).await;
+        })
+    })
+    .expect("Failed to create renewal poll cron job");
+
     sched.add(reminder_job).await.expect("Failed to add reminder job");
     sched.add(expiry_job).await.expect("Failed to add expiry job");
     sched.add(grace_reminder_job).await.expect("Failed to add grace dues reminder job");
+    sched.add(poll_job).await.expect("Failed to add renewal poll job");
     sched.start().await.expect("Failed to start scheduler");
 }

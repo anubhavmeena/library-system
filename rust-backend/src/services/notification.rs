@@ -389,6 +389,60 @@ async fn send_meta_document_or_image(
     let _ = user_id;
 }
 
+/// Sends the "seat_renewal_confirmation" Meta template (Yes/No quick-reply
+/// poll) 3 days before a membership's end_date. Unlike the other Meta send
+/// functions in this file, this one returns the response's wamid so the
+/// caller can persist it onto the `renewal_polls` row and later correlate
+/// an inbound webhook button-tap reply back to this exact send. The header
+/// ("Seat Renewal") is static text baked into the approved template and the
+/// Yes/No buttons have no configured payload, so only a body component is
+/// needed — no header/button components like send_meta_document_or_image.
+pub async fn send_renewal_poll(
+    state: &Arc<AppState>,
+    mobile: &str,
+    student_name: &str,
+) -> Option<String> {
+    if state.config.meta_whatsapp_token.is_empty() {
+        tracing::info!("[DEV] WhatsApp (renewal poll) → {mobile} | student={student_name}");
+        return None;
+    }
+
+    let clean_to = mobile.trim_start_matches('+');
+    let to = if clean_to.len() == 10 { format!("91{clean_to}") } else { clean_to.to_string() };
+
+    let body = json!({
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "template",
+        "template": {
+            "name": state.config.meta_whatsapp_poll_template_name,
+            "language": { "code": state.config.meta_whatsapp_poll_language },
+            "components": [
+                { "type": "body", "parameters": [{ "type": "text", "text": sanitize_param(student_name) }] }
+            ]
+        }
+    });
+
+    let url = format!("https://graph.facebook.com/v18.0/{}/messages", state.config.meta_whatsapp_phone_id);
+    match state.http.post(&url).bearer_auth(&state.config.meta_whatsapp_token).json(&body).send().await {
+        Err(e) => { tracing::error!("Meta renewal poll send network error to {mobile}: {e}"); None }
+        Ok(r) if !r.status().is_success() => {
+            let status = r.status();
+            let resp_body = r.text().await.unwrap_or_default();
+            tracing::error!("Meta renewal poll rejected: {status} for {mobile} — {resp_body}");
+            None
+        }
+        Ok(r) => {
+            let resp_body = r.text().await.unwrap_or_default();
+            let wamid = serde_json::from_str::<serde_json::Value>(&resp_body)
+                .ok()
+                .and_then(|v| v["messages"][0]["id"].as_str().map(|s| s.to_string()));
+            tracing::info!("Meta renewal poll sent to {mobile} | wamid={wamid:?}");
+            wamid
+        }
+    }
+}
+
 fn sanitize_param(param: &str) -> String {
     param.replace(['\n', '\r', '\t'], " ").split_whitespace().collect::<Vec<_>>().join(" ")
 }

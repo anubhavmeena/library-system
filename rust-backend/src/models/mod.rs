@@ -3,6 +3,7 @@ pub mod admin;
 pub mod coupon;
 pub mod membership;
 pub mod payment_claim;
+pub mod renewal_poll;
 pub mod seat;
 pub mod settings;
 pub mod user;

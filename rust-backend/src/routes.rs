@@ -1,6 +1,6 @@
 use crate::{
     app_state::AppState,
-    handlers::{admin, auth, gallery, mailbox, membership, payment, payment_claim, seat, user, visitor},
+    handlers::{admin, auth, gallery, mailbox, membership, payment, payment_claim, seat, user, visitor, webhook},
 };
 use axum::{
     extract::DefaultBodyLimit,
@@ -121,6 +121,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/admin/coupons",                         get(admin::list_coupons).post(admin::create_coupon))
         .route("/api/admin/coupons/:id",                     patch(admin::update_coupon).delete(admin::delete_coupon))
         .route("/api/admin/activity-logs",                   get(admin::list_activity_logs))
+        .route("/api/admin/renewal-polls",                   get(admin::list_renewal_polls))
+        .route("/api/admin/renewal-polls/:id/resend",        post(admin::resend_renewal_poll))
         .route("/api/admin/payment-claims",                  get(payment_claim::list_claims))
         .route("/api/admin/payment-claims/:id",               patch(payment_claim::review_claim))
         .route("/api/admin/pay-links",                       post(payment_claim::create_pay_link))
@@ -133,6 +135,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
 
         // ── Visitor tracking (public) ─────────────────────────────────────────
         .route("/api/visitor/track", post(visitor::track))
+
+        // ── WhatsApp webhook (public — Meta calls this directly, no JWT) ───────
+        .route("/api/whatsapp/webhook", get(webhook::verify_webhook).post(webhook::receive_webhook))
 
         // ── Static file serving for uploads ──────────────────────────────────
         .nest_service("/uploads", ServeDir::new(&upload_dir))

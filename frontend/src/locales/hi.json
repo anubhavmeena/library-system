@@ -186,7 +186,8 @@
         "settings": "सेटिंग्स",
         "coupons": "कूपन",
         "cronJobs": "क्रॉन जॉब्स",
-        "activityLogs": "गतिविधि लॉग"
+        "activityLogs": "गतिविधि लॉग",
+        "renewalPolls": "नवीनीकरण पोल"
       },
       "logout": "लॉग आउट"
     }
@@ -813,6 +814,40 @@
     "next": "अगला",
     "toasts": {
       "loadFailed": "गतिविधि लॉग लोड करने में विफल"
+    }
+  },
+  "adminRenewalPolls": {
+    "title": "नवीनीकरण पोल",
+    "subtitle": "{{count}} पोल भेजे गए",
+    "refresh": "रिफ्रेश करें",
+    "table": {
+      "student": "छात्र",
+      "endDate": "सदस्यता समाप्ति तिथि",
+      "sentAt": "भेजा गया (IST)",
+      "response": "प्रतिक्रिया",
+      "respondedAt": "उत्तर दिया (IST)",
+      "actions": "कार्रवाई"
+    },
+    "resend": "पुनः भेजें",
+    "resendConfirm": "{{name}} को नवीनीकरण पोल पुनः भेजें?",
+    "empty": {
+      "title": "अभी तक कोई नवीनीकरण पोल नहीं",
+      "desc": "सदस्यता समाप्त होने से 3 दिन पहले भेजे गए पोल यहाँ दिखाई देंगे"
+    },
+    "response": {
+      "yes": "हाँ",
+      "no": "नहीं",
+      "pending": "लंबित"
+    },
+    "perPage": "प्रति पृष्ठ",
+    "all": "सभी",
+    "page": "पृष्ठ {{page}}",
+    "prev": "पिछला",
+    "next": "अगला",
+    "toasts": {
+      "loadFailed": "नवीनीकरण पोल लोड करने में विफल",
+      "resendSuccess": "नवीनीकरण पोल पुनः भेजा गया",
+      "resendFailed": "नवीनीकरण पोल पुनः भेजने में विफल"
     }
   },
   "adminNewMembership": {

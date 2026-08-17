@@ -8,3 +8,4 @@ pub mod payment_claim;
 pub mod seat;
 pub mod user;
 pub mod visitor;
+pub mod webhook;
