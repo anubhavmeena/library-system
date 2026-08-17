@@ -1,4 +1,7 @@
-use crate::{app_state::AppState, error::AppError, models::renewal_poll::RenewalPollEntry, services::notification};
+use crate::{
+    app_state::AppState, error::AppError, models::renewal_poll::RenewalPollEntry, models::user::User,
+    services::notification,
+};
 use chrono::NaiveDate;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -165,6 +168,60 @@ pub async fn resend_poll(state: &Arc<AppState>, poll_id: Uuid) -> crate::error::
     .map_err(AppError::Database)?;
 
     if let Some(wamid) = notification::send_renewal_poll(state, &mobile, &name).await {
+        sqlx::query("UPDATE renewal_polls SET wa_message_id = $1 WHERE id = $2")
+            .bind(&wamid)
+            .bind(poll_id)
+            .execute(&state.db)
+            .await
+            .map_err(AppError::Database)?;
+    }
+
+    Ok(())
+}
+
+/// On-demand admin send for one specific student — the "Send Renewal Poll"
+/// action on the admin Students page. Unlike the scheduler, this always
+/// inserts a fresh `renewal_polls` row regardless of days-left or whether
+/// one was already sent for this cycle (same "explicit admin action
+/// bypasses gating" convention as send_renewal_reminders bypassing
+/// reminder_sent) — an admin deliberately triggering a send wants a record
+/// of that send, not a silent no-op because the scheduler already fired.
+pub async fn send_individual_poll(state: &Arc<AppState>, user_id: Uuid) -> crate::error::Result<()> {
+    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::NotFound("User not found".into()))?;
+    let mobile = user
+        .mobile
+        .clone()
+        .ok_or_else(|| AppError::BadRequest("Student has no mobile number on file".into()))?;
+
+    // Only ACTIVE — a GRACE membership is already overdue and has its own
+    // separate dues-clearing flow (grace-dues reminders), not "continue for
+    // next month" renewal semantics.
+    let membership: Option<(Uuid, NaiveDate)> = sqlx::query_as(
+        "SELECT id, end_date FROM memberships WHERE user_id = $1 AND status = 'ACTIVE' ORDER BY end_date DESC LIMIT 1",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AppError::Database)?;
+    let (membership_id, end_date) = membership
+        .ok_or_else(|| AppError::BadRequest("Student has no active membership to send a renewal poll for".into()))?;
+
+    let poll_id: Uuid = sqlx::query_scalar(
+        "INSERT INTO renewal_polls (membership_id, user_id, end_date) VALUES ($1, $2, $3) RETURNING id",
+    )
+    .bind(membership_id)
+    .bind(user_id)
+    .bind(end_date)
+    .fetch_one(&state.db)
+    .await
+    .map_err(AppError::Database)?;
+
+    if let Some(wamid) = notification::send_renewal_poll(state, &mobile, &user.name).await {
         sqlx::query("UPDATE renewal_polls SET wa_message_id = $1 WHERE id = $2")
             .bind(&wamid)
             .bind(poll_id)

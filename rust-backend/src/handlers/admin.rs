@@ -299,6 +299,18 @@ pub async fn send_id_card(
     Ok(ApiResponse::ok("ID card sent"))
 }
 
+pub async fn send_individual_renewal_poll(
+    State(state): State<Arc<AppState>>,
+    admin: AdminUser,
+    Path(user_id): Path<Uuid>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    poll_svc::send_individual_poll(&state, user_id).await?;
+    let label = alog::user_label(&state, user_id).await;
+    alog::log_activity(&state, &admin.0, "SEND_RENEWAL_POLL", "student", Some(user_id.to_string()),
+        format!("Sent renewal poll to {label}")).await;
+    Ok(ApiResponse::ok("Renewal poll sent"))
+}
+
 pub async fn broadcast(
     State(state): State<Arc<AppState>>,
     admin: AdminUser,

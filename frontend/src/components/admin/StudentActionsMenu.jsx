@@ -65,6 +65,7 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
 
     const [sendingReceipt, setSendingReceipt] = useState(false)
     const [sendingIdCard, setSendingIdCard]   = useState(false)
+    const [sendingPoll, setSendingPoll]       = useState(false)
 
     useEffect(() => {
         const close = (e) => {
@@ -84,6 +85,7 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
     const canClearDues = student.membershipId && student.membershipStatus === 'GRACE'
     const canClearFees = student.pendingAmount > 0
     const canChangeStatus = student.membershipId && student.membershipStatus === 'ACTIVE'
+    const canSendRenewalPoll = student.membershipId && student.membershipStatus === 'ACTIVE'
     const showSeatGroup = canRenew || canChangeSeat || canExchangeSeat || canReleaseSeat
     const showBillingGroup = canClearDues || canClearFees
 
@@ -336,6 +338,19 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
         }
     }
 
+    const handleSendRenewalPoll = async () => {
+        if (!window.confirm(`Send ${student.name} a renewal poll (Yes/No) via WhatsApp?`)) return
+        setSendingPoll(true)
+        try {
+            await api.post(`/admin/students/${student.id}/send-renewal-poll`)
+            toast.success('Renewal poll sent')
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Failed to send renewal poll')
+        } finally {
+            setSendingPoll(false)
+        }
+    }
+
     const handleDeleteStudent = async () => {
         setDeleting(true)
         try {
@@ -483,6 +498,14 @@ export default function StudentActionsMenu({ student, onMutated, onDeleted }) {
                                     className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors disabled:opacity-50">
                                     {sendingIdCard ? 'Sending…' : 'Send ID Card'}
                                 </button>
+                                {canSendRenewalPoll && (
+                                    <button
+                                        disabled={sendingPoll}
+                                        onClick={() => { handleSendRenewalPoll(); closeMenu() }}
+                                        className="w-full text-left text-xs px-3 py-2.5 text-emerald-400 hover:bg-primary-700/60 transition-colors disabled:opacity-50">
+                                        {sendingPoll ? 'Sending…' : 'Send Renewal Poll'}
+                                    </button>
+                                )}
                             </>
                         )}
                     </div>

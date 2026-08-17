@@ -90,6 +90,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/admin/students/:id/message",            post(admin::send_direct_message))
         .route("/api/admin/students/:id/send-receipt",       post(admin::send_receipt))
         .route("/api/admin/students/:id/send-id-card",       post(admin::send_id_card))
+        .route("/api/admin/students/:id/send-renewal-poll",  post(admin::send_individual_renewal_poll))
         .route("/api/admin/seats/map",                       get(admin::seat_map))
         .route("/api/admin/seats/:seatNumber/history",       get(admin::seat_history))
         .route("/api/admin/memberships/expiring",            get(admin::expiring_memberships))
