@@ -158,13 +158,6 @@ export default function AdminSeatsPage() {
                                 : 'border-primary-700/40 text-primary-400 hover:text-white'}`}>
                     📅 {t('adminSeats.expiryView')}
                 </button>
-                <button onClick={() => setRotated(r => !r)}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all
-                            ${rotated
-                                ? 'bg-amber-500/20 border-amber-400/60 text-amber-400'
-                                : 'border-primary-700/40 text-primary-400 hover:text-white'}`}>
-                    ⟳ {t('adminSeats.rotate')}
-                </button>
             </div>
 
             <div className="grid grid-cols-3 gap-4 mb-6">
@@ -201,15 +194,20 @@ export default function AdminSeatsPage() {
                             <div className="flex gap-1">{L_TOP.map(n => <div key={n} className="w-8 h-0" />)}</div>
                         </div>
                         {rotated ? (
-                            <div className="flex-shrink-0 flex gap-1">
-                                <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40 text-[10px] tracking-widest uppercase text-primary-600">EXIT</div>
-                                <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40 text-[10px] tracking-widest uppercase text-primary-600">RO / PANTRY</div>
-                                <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40 text-[10px] tracking-widest uppercase text-primary-600">WASHROOM</div>
-                            </div>
+                            <>
+                                <div className="w-6 flex-shrink-0" />
+                                <div className="flex-shrink-0 flex gap-1">
+                                    <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40 text-[10px] tracking-widest uppercase text-primary-600">WASHROOM</div>
+                                    <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40 text-[10px] tracking-widest uppercase text-primary-600">RO / PANTRY</div>
+                                    <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40 text-[10px] tracking-widest uppercase text-primary-600">EXIT</div>
+                                </div>
+                            </>
                         ) : (
-                            <div className="w-6 flex-shrink-0 flex justify-center">
-                                <span className="text-primary-400 text-[10px] tracking-widest uppercase">ENTRY</span>
-                            </div>
+                            <button onClick={() => setRotated(r => !r)}
+                                    title={t('adminSeats.rotate')}
+                                    className="w-6 flex-shrink-0 flex justify-center text-primary-400 text-[10px] tracking-widest uppercase hover:text-amber-400 transition-colors cursor-pointer">
+                                ENTRY
+                            </button>
                         )}
                     </div>
                     <div className="space-y-7">
@@ -296,9 +294,16 @@ export default function AdminSeatsPage() {
                     <div className="flex gap-2 mt-3 text-[10px] tracking-widest uppercase text-primary-600">
                         <div className="w-5 flex-shrink-0" />
                         {rotated ? (
-                            <div className="w-6 flex-shrink-0 flex justify-center">
-                                <span className="text-primary-400">ENTRY</span>
-                            </div>
+                            <>
+                                <div className="invisible pointer-events-none">
+                                    <div className="flex gap-1">{L_TOP.map(n => <div key={n} className="w-8 h-0" />)}</div>
+                                </div>
+                                <button onClick={() => setRotated(r => !r)}
+                                        title={t('adminSeats.rotate')}
+                                        className="w-6 flex-shrink-0 flex justify-center text-primary-400 hover:text-amber-400 transition-colors cursor-pointer">
+                                    ENTRY
+                                </button>
+                            </>
                         ) : (
                             <div className="flex gap-1">
                                 <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40">EXIT</div>
