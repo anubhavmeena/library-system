@@ -843,13 +843,16 @@
     "refresh": "Refresh",
     "table": {
       "student": "Student",
+      "seat": "Seat",
       "endDate": "Membership End Date",
+      "daysLeft": "Days Left",
       "sentAt": "Sent (IST)",
       "response": "Response",
       "respondedAt": "Responded (IST)",
       "actions": "Actions"
     },
     "resend": "Resend",
+    "releaseSeat": "Release Seat",
     "resendConfirm": "Resend the renewal poll to {{name}}?",
     "empty": {
       "title": "No renewal polls yet",

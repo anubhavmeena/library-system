@@ -117,9 +117,20 @@ pub async fn list_renewal_polls(
         .await
         .map_err(AppError::Database)?;
 
+    // seat_number mirrors STUDENT_SELECT's projection (services/admin.rs) — only
+    // a currently-held (ACTIVE/GRACE) seat is shown, not one already released.
     let base = r#"SELECT rp.id, rp.membership_id, rp.user_id, u.name, u.mobile, u.email,
-                          rp.end_date, rp.sent_at, rp.response, rp.responded_at
-                   FROM renewal_polls rp JOIN users u ON u.id = rp.user_id
+                          rp.end_date, rp.sent_at, rp.response, rp.responded_at,
+                          m.status AS membership_status,
+                          CASE WHEN m.status IN ('ACTIVE', 'GRACE') THEN COALESCE(m.seat_number, (
+                              SELECT s.seat_number FROM seat_bookings sb
+                              JOIN seats s ON s.id = sb.seat_id
+                              WHERE sb.membership_id = m.id AND sb.status = 'ACTIVE'
+                              LIMIT 1
+                          )) END AS seat_number
+                   FROM renewal_polls rp
+                   JOIN users u ON u.id = rp.user_id
+                   JOIN memberships m ON m.id = rp.membership_id
                    ORDER BY rp.sent_at DESC"#;
 
     let logs = match size {

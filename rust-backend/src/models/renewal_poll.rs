@@ -16,4 +16,6 @@ pub struct RenewalPollEntry {
     pub sent_at: NaiveDateTime,
     pub response: Option<String>,
     pub responded_at: Option<NaiveDateTime>,
+    pub membership_status: String,
+    pub seat_number: Option<String>,
 }

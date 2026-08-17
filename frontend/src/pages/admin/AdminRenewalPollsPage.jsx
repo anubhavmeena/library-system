@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
@@ -26,6 +27,26 @@ function formatDate(value) {
     const date = new Date(value)
     if (Number.isNaN(date.getTime())) return value
     return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+// endDate is a plain "YYYY-MM-DD" calendar date, not a timestamp — compared
+// against local midnight so "days left" reads naturally (0 = expires today,
+// negative = already past) regardless of the time of day the page loads.
+function daysLeft(endDate) {
+    if (!endDate) return null
+    const end = new Date(endDate)
+    if (Number.isNaN(end.getTime())) return null
+    const today = new Date()
+    end.setHours(0, 0, 0, 0)
+    today.setHours(0, 0, 0, 0)
+    return Math.round((end - today) / 86400000)
+}
+
+function DaysLeftLabel({ endDate }) {
+    const n = daysLeft(endDate)
+    if (n === null) return '—'
+    const color = n <= 3 ? 'text-red-400' : n <= 7 ? 'text-amber-400' : 'text-primary-200'
+    return <span className={color}>{n}</span>
 }
 
 function ResponseBadge({ response, t }) {
@@ -58,6 +79,7 @@ export default function AdminRenewalPollsPage() {
     const [page, setPage]         = useState(0)
     const [pageSize, setPageSize] = useState(100)
     const [resendingId, setResendingId] = useState(null)
+    const [releasingId, setReleasingId] = useState(null)
 
     const fetchPolls = () => {
         setLoading(true)
@@ -87,6 +109,25 @@ export default function AdminRenewalPollsPage() {
             })
             .catch(() => toast.error(t('adminRenewalPolls.toasts.resendFailed')))
             .finally(() => setResendingId(null))
+    }
+
+    // Mirrors StudentActionsMenu's handleReleaseSeat: a first confirm for the
+    // release itself, then a second asking whether to notify the student —
+    // kept as separate window.confirm steps to match that existing UX exactly.
+    const handleReleaseSeat = (poll) => {
+        if (!window.confirm(`Release seat ${poll.seatNumber || ''} for ${poll.name}? This cannot be undone.`)) return
+        const notifyStudent = window.confirm(
+            `Send ${poll.name} a notification that their seat has expired due to non-renewal and been released?\n\n` +
+            `Click OK to notify them, or Cancel to release the seat quietly.`
+        )
+        setReleasingId(poll.id)
+        api.patch(`/admin/memberships/${poll.membershipId}/release`, { notifyStudent })
+            .then(() => {
+                toast.success(`Seat released${notifyStudent ? ' — student notified' : ''}`)
+                fetchPolls()
+            })
+            .catch(e => toast.error(e.response?.data?.message || 'Failed to release seat'))
+            .finally(() => setReleasingId(null))
     }
 
     return (
@@ -120,7 +161,9 @@ export default function AdminRenewalPollsPage() {
                                 <tr className="border-b border-primary-700/40">
                                     {[
                                         t('adminRenewalPolls.table.student'),
+                                        t('adminRenewalPolls.table.seat'),
                                         t('adminRenewalPolls.table.endDate'),
+                                        t('adminRenewalPolls.table.daysLeft'),
                                         t('adminRenewalPolls.table.sentAt'),
                                         t('adminRenewalPolls.table.response'),
                                         t('adminRenewalPolls.table.respondedAt'),
@@ -134,10 +177,19 @@ export default function AdminRenewalPollsPage() {
                                 {polls.map(poll => (
                                     <tr key={poll.id} className="hover:bg-primary-800/30 transition-colors">
                                         <td className="p-4 text-white font-medium whitespace-nowrap align-top">
-                                            {poll.name}{poll.mobile ? ` (${poll.mobile})` : ''}
+                                            <Link to={`/admin/students/${poll.userId}`} className="hover:text-amber-400 hover:underline transition-colors">
+                                                {poll.name}
+                                            </Link>
+                                            {poll.mobile ? ` (${poll.mobile})` : ''}
+                                        </td>
+                                        <td className="p-4 text-primary-200 font-mono whitespace-nowrap align-top">
+                                            {poll.seatNumber || '—'}
                                         </td>
                                         <td className="p-4 text-primary-200 whitespace-nowrap align-top">
                                             {formatDate(poll.endDate)}
+                                        </td>
+                                        <td className="p-4 whitespace-nowrap align-top">
+                                            <DaysLeftLabel endDate={poll.endDate} />
                                         </td>
                                         <td className="p-4 text-primary-400 text-xs whitespace-nowrap align-top">
                                             {formatIST(poll.sentAt)}
@@ -149,10 +201,18 @@ export default function AdminRenewalPollsPage() {
                                             {poll.respondedAt ? formatIST(poll.respondedAt) : '—'}
                                         </td>
                                         <td className="p-4 align-top">
-                                            <button onClick={() => handleResend(poll)} disabled={resendingId === poll.id}
-                                                className="text-xs px-3 py-1.5 rounded-lg border font-medium whitespace-nowrap bg-indigo-500/10 text-indigo-400 border-indigo-500/30 hover:bg-indigo-500/20 disabled:opacity-40">
-                                                {resendingId === poll.id ? '…' : t('adminRenewalPolls.resend')}
-                                            </button>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => handleResend(poll)} disabled={resendingId === poll.id}
+                                                    className="text-xs px-3 py-1.5 rounded-lg border font-medium whitespace-nowrap bg-indigo-500/10 text-indigo-400 border-indigo-500/30 hover:bg-indigo-500/20 disabled:opacity-40">
+                                                    {resendingId === poll.id ? '…' : t('adminRenewalPolls.resend')}
+                                                </button>
+                                                {poll.response === 'NO' && (poll.membershipStatus === 'ACTIVE' || poll.membershipStatus === 'GRACE') && (
+                                                    <button onClick={() => handleReleaseSeat(poll)} disabled={releasingId === poll.id}
+                                                        className="text-xs px-3 py-1.5 rounded-lg border font-medium whitespace-nowrap bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 disabled:opacity-40">
+                                                        {releasingId === poll.id ? '…' : t('adminRenewalPolls.releaseSeat')}
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

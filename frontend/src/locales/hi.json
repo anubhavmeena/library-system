@@ -822,13 +822,16 @@
     "refresh": "रिफ्रेश करें",
     "table": {
       "student": "छात्र",
+      "seat": "सीट",
       "endDate": "सदस्यता समाप्ति तिथि",
+      "daysLeft": "शेष दिन",
       "sentAt": "भेजा गया (IST)",
       "response": "प्रतिक्रिया",
       "respondedAt": "उत्तर दिया (IST)",
       "actions": "कार्रवाई"
     },
     "resend": "पुनः भेजें",
+    "releaseSeat": "सीट रिलीज़ करें",
     "resendConfirm": "{{name}} को नवीनीकरण पोल पुनः भेजें?",
     "empty": {
       "title": "अभी तक कोई नवीनीकरण पोल नहीं",
