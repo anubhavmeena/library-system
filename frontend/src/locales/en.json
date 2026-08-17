@@ -646,6 +646,7 @@
     "entrance": "← ENTRANCE / FRONT →",
     "expiryView": "Expiry View",
     "defaultView": "Default View",
+    "rotate": "Rotate 180°",
     "legend": {
       "available": "Available",
       "occupied": "Occupied (click for details)",

@@ -50,6 +50,17 @@ const L_BOTTOM = [14, 12, 10, 8, 6, 4, 2]
 const R_TOP    = [15, 17, 19, 21, 23, 25, 27]
 const R_BOTTOM = [16, 18, 20, 22, 24, 26, 28]
 
+// A 180° rotation reverses the row order (D at the physical top instead of
+// A) and, within each row, reverses the left/right blocks *and* flips which
+// sub-line (top/bottom) reads first — i.e. each line becomes the horizontal
+// reverse of the line diagonally opposite it. Seat numbers/labels never
+// change, only the position they're rendered in.
+const ROWS_ROTATED     = [...ROWS].reverse()
+const L_TOP_ROTATED    = [...R_BOTTOM].reverse()
+const R_TOP_ROTATED    = [...L_BOTTOM].reverse()
+const L_BOTTOM_ROTATED = [...R_TOP].reverse()
+const R_BOTTOM_ROTATED = [...L_TOP].reverse()
+
 const daysToExpiry = (membershipEnd, today) => {
     if (!membershipEnd) return null
     // Negative = overdue (membership in GRACE, seat held but past its endDate).
@@ -71,6 +82,7 @@ export default function AdminSeatsPage() {
     const [date, setDate]           = useState(new Date().toISOString().split('T')[0])
     const [selected, setSelected]   = useState(null)
     const [viewMode, setViewMode]   = useState('default') // 'default' | 'expiry'
+    const [rotated, setRotated]     = useState(false)
     const [historyOpen, setHistoryOpen]       = useState(false)
     const [seatHistory, setSeatHistory]       = useState([])
     const [historyLoading, setHistoryLoading] = useState(false)
@@ -146,6 +158,13 @@ export default function AdminSeatsPage() {
                                 : 'border-primary-700/40 text-primary-400 hover:text-white'}`}>
                     📅 {t('adminSeats.expiryView')}
                 </button>
+                <button onClick={() => setRotated(r => !r)}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all
+                            ${rotated
+                                ? 'bg-amber-500/20 border-amber-400/60 text-amber-400'
+                                : 'border-primary-700/40 text-primary-400 hover:text-white'}`}>
+                    ⟳ {t('adminSeats.rotate')}
+                </button>
             </div>
 
             <div className="grid grid-cols-3 gap-4 mb-6">
@@ -181,12 +200,20 @@ export default function AdminSeatsPage() {
                         <div className="invisible pointer-events-none">
                             <div className="flex gap-1">{L_TOP.map(n => <div key={n} className="w-8 h-0" />)}</div>
                         </div>
-                        <div className="w-6 flex-shrink-0 flex justify-center">
-                            <span className="text-primary-400 text-[10px] tracking-widest uppercase">ENTRY</span>
-                        </div>
+                        {rotated ? (
+                            <div className="flex-shrink-0 flex gap-1">
+                                <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40 text-[10px] tracking-widest uppercase text-primary-600">EXIT</div>
+                                <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40 text-[10px] tracking-widest uppercase text-primary-600">RO / PANTRY</div>
+                                <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40 text-[10px] tracking-widest uppercase text-primary-600">WASHROOM</div>
+                            </div>
+                        ) : (
+                            <div className="w-6 flex-shrink-0 flex justify-center">
+                                <span className="text-primary-400 text-[10px] tracking-widest uppercase">ENTRY</span>
+                            </div>
+                        )}
                     </div>
                     <div className="space-y-7">
-                        {ROWS.map(row => {
+                        {(rotated ? ROWS_ROTATED : ROWS).map(row => {
                             const rowSeats = seatMap.seatsByRow?.[row] || []
                             const find = (sn) => rowSeats.find(s => s.seatNumber === sn)
                             const renderSeat = (n) => {
@@ -242,21 +269,25 @@ export default function AdminSeatsPage() {
                                     </div>
                                 )
                             }
+                            const lTop    = rotated ? L_TOP_ROTATED    : L_TOP
+                            const lBottom = rotated ? L_BOTTOM_ROTATED : L_BOTTOM
+                            const rTop    = rotated ? R_TOP_ROTATED    : R_TOP
+                            const rBottom = rotated ? R_BOTTOM_ROTATED : R_BOTTOM
                             return (
                                 <div key={row} className="flex gap-2">
                                     <span className="text-primary-400 font-mono text-sm w-5 text-center self-start pt-2">{row}</span>
                                     <div>
-                                        <div className="flex gap-1">{L_TOP.map(renderSeat)}</div>
+                                        <div className="flex gap-1">{lTop.map(renderSeat)}</div>
                                         <div className="border-b border-primary-700/40 my-1" />
-                                        <div className="flex gap-1">{L_BOTTOM.map(renderSeat)}</div>
+                                        <div className="flex gap-1">{lBottom.map(renderSeat)}</div>
                                     </div>
                                     <div className="w-6 flex-shrink-0 relative">
                                         <div className="absolute inset-y-0 left-1/2 w-px bg-primary-700/30 -translate-x-1/2" />
                                     </div>
                                     <div>
-                                        <div className="flex gap-1">{R_TOP.map(renderSeat)}</div>
+                                        <div className="flex gap-1">{rTop.map(renderSeat)}</div>
                                         <div className="border-b border-primary-700/40 my-1" />
-                                        <div className="flex gap-1">{R_BOTTOM.map(renderSeat)}</div>
+                                        <div className="flex gap-1">{rBottom.map(renderSeat)}</div>
                                     </div>
                                 </div>
                             )
@@ -264,11 +295,17 @@ export default function AdminSeatsPage() {
                     </div>
                     <div className="flex gap-2 mt-3 text-[10px] tracking-widest uppercase text-primary-600">
                         <div className="w-5 flex-shrink-0" />
-                        <div className="flex gap-1">
-                            <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40">EXIT</div>
-                            <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40">RO / PANTRY</div>
-                            <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40">WASHROOM</div>
-                        </div>
+                        {rotated ? (
+                            <div className="w-6 flex-shrink-0 flex justify-center">
+                                <span className="text-primary-400">ENTRY</span>
+                            </div>
+                        ) : (
+                            <div className="flex gap-1">
+                                <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40">EXIT</div>
+                                <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40">RO / PANTRY</div>
+                                <div className="px-2 py-1 rounded border border-primary-800/30 bg-primary-900/40">WASHROOM</div>
+                            </div>
+                        )}
                     </div>
                     </div>
 
