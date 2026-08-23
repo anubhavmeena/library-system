@@ -521,12 +521,30 @@ pub async fn send_direct_message(
     email: Option<&str>,
     message: &str,
 ) {
+    send_direct_message_result(state, mobile, email, message).await;
+}
+
+/// Same as `send_direct_message` but reports whether every attempted
+/// channel (WhatsApp and/or email — whichever is `Some`) actually went out.
+/// A student with neither contact method on file counts as failure: there
+/// was nowhere to deliver the reminder.
+pub async fn send_direct_message_result(
+    state: &Arc<AppState>,
+    mobile: Option<&str>,
+    email: Option<&str>,
+    message: &str,
+) -> bool {
+    let mut attempted = false;
+    let mut all_ok = true;
     if let Some(m) = mobile {
-        send_whatsapp(state, m, message).await;
+        attempted = true;
+        all_ok &= send_whatsapp_result(state, m, message).await;
     }
     if let Some(e) = email {
-        send_email(state, e, "Message from Target Zone", message).await;
+        attempted = true;
+        all_ok &= send_email_result(state, e, "Message from Target Zone", message).await;
     }
+    attempted && all_ok
 }
 
 pub async fn send_seat_expired(state: &Arc<AppState>, user_name: &str, seat_number: &str) {
@@ -691,20 +709,34 @@ pub async fn send_email_to(state: &Arc<AppState>, to: &str, subject: &str, body:
 }
 
 async fn send_whatsapp(state: &Arc<AppState>, to: &str, message: &str) {
+    send_whatsapp_result(state, to, message).await;
+}
+
+/// Same as `send_whatsapp` but reports whether it actually went out, for
+/// callers (like bulk reminder jobs) that need to tally delivery outcomes.
+async fn send_whatsapp_result(state: &Arc<AppState>, to: &str, message: &str) -> bool {
     if !state.config.meta_whatsapp_token.is_empty() {
-        send_meta_whatsapp(state, to, message).await;
+        send_meta_whatsapp(state, to, message).await
     } else if !state.config.twilio_account_sid.is_empty() {
-        send_twilio_whatsapp(state, to, message).await;
+        send_twilio_whatsapp(state, to, message).await
     } else {
         tracing::info!("DEV WhatsApp → {to}: {message}");
+        true
     }
 }
 
 async fn send_email(state: &Arc<AppState>, to: &str, subject: &str, body: &str) {
+    send_email_result(state, to, subject, body).await;
+}
+
+/// Same as `send_email` but reports whether it actually went out, for
+/// callers (like bulk reminder jobs) that need to tally delivery outcomes.
+async fn send_email_result(state: &Arc<AppState>, to: &str, subject: &str, body: &str) -> bool {
     if !state.config.sendgrid_api_key.is_empty() {
-        send_sendgrid_email(state, to, subject, body).await;
+        send_sendgrid_email(state, to, subject, body).await
     } else {
         tracing::info!("DEV Email → {to} [{subject}]: {body}");
+        true
     }
 }
 
@@ -732,7 +764,7 @@ async fn send_twilio_sms(state: &Arc<AppState>, to: &str, message: &str) {
     }
 }
 
-async fn send_twilio_whatsapp(state: &Arc<AppState>, to: &str, message: &str) {
+async fn send_twilio_whatsapp(state: &Arc<AppState>, to: &str, message: &str) -> bool {
     let to_wa = if to.starts_with("whatsapp:") {
         to.to_string()
     } else {
@@ -755,13 +787,13 @@ async fn send_twilio_whatsapp(state: &Arc<AppState>, to: &str, message: &str) {
         .send()
         .await
     {
-        Err(e) => tracing::error!("Twilio WhatsApp network error: {e}"),
-        Ok(r) if !r.status().is_success() => tracing::error!("Twilio WhatsApp rejected: {} for {to}", r.status()),
-        Ok(_) => tracing::info!("Twilio WhatsApp sent to {to}"),
+        Err(e) => { tracing::error!("Twilio WhatsApp network error: {e}"); false }
+        Ok(r) if !r.status().is_success() => { tracing::error!("Twilio WhatsApp rejected: {} for {to}", r.status()); false }
+        Ok(_) => { tracing::info!("Twilio WhatsApp sent to {to}"); true }
     }
 }
 
-async fn send_meta_whatsapp(state: &Arc<AppState>, to: &str, message: &str) {
+async fn send_meta_whatsapp(state: &Arc<AppState>, to: &str, message: &str) -> bool {
     // Strip newlines/tabs — Meta template params reject them
     let param = message
         .replace(['\n', '\r', '\t'], " ")
@@ -803,20 +835,25 @@ async fn send_meta_whatsapp(state: &Arc<AppState>, to: &str, message: &str) {
         .send()
         .await
     {
-        Err(e) => tracing::error!("Meta WhatsApp network error: {e}"),
+        Err(e) => {
+            tracing::error!("Meta WhatsApp network error: {e}");
+            false
+        }
         Ok(r) if !r.status().is_success() => {
             let status = r.status();
             let resp_body = r.text().await.unwrap_or_default();
             tracing::error!("Meta WhatsApp rejected: {status} for {to} — {resp_body}");
+            false
         }
         Ok(r) => {
             let resp_body = r.text().await.unwrap_or_default();
             tracing::info!("Meta WhatsApp sent to {to} | response: {resp_body}");
+            true
         }
     }
 }
 
-async fn send_sendgrid_email(state: &Arc<AppState>, to: &str, subject: &str, body: &str) {
+async fn send_sendgrid_email(state: &Arc<AppState>, to: &str, subject: &str, body: &str) -> bool {
     let payload = json!({
         "personalizations": [{ "to": [{ "email": to }] }],
         "from": { "email": state.config.admin_email },
@@ -831,9 +868,9 @@ async fn send_sendgrid_email(state: &Arc<AppState>, to: &str, subject: &str, bod
         .send()
         .await
     {
-        Err(e) => tracing::error!("SendGrid network error: {e}"),
-        Ok(r) if !r.status().is_success() => tracing::error!("SendGrid rejected: {} for {to} [{subject}]", r.status()),
-        Ok(_) => tracing::info!("SendGrid email sent to {to} [{subject}]"),
+        Err(e) => { tracing::error!("SendGrid network error: {e}"); false }
+        Ok(r) if !r.status().is_success() => { tracing::error!("SendGrid rejected: {} for {to} [{subject}]", r.status()); false }
+        Ok(_) => { tracing::info!("SendGrid email sent to {to} [{subject}]"); true }
     }
 }
 

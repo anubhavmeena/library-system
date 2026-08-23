@@ -9,7 +9,7 @@ use crate::{
     },
     response::ApiResponse,
     services::{
-        activity_log as alog, admin as svc, coupon as coupon_svc, renewal_poll as poll_svc,
+        activity_log as alog, admin as svc, coupon as coupon_svc, reminder_jobs, renewal_poll as poll_svc,
         settings as settings_svc, user as user_svc,
     },
 };
@@ -257,8 +257,8 @@ pub async fn send_pending_fee_reminders(
     alog::log_activity(&state, &admin.0, "SEND_REMINDERS", "student", None,
         format!("Sent pending-fee reminders to {count} student(s)")).await;
     Ok(ApiResponse::success(
-        "Pending fee reminders sent",
-        format!("Sent pending fee reminders to {} student(s)", count),
+        "Pending fee reminders sending",
+        format!("Sending pending fee reminders to {} student(s)", count),
     ))
 }
 
@@ -714,9 +714,20 @@ pub async fn send_grace_dues_reminders(
     alog::log_activity(&state, &admin.0, "SEND_REMINDERS", "membership", None,
         format!("Sent grace-dues reminders to {count} student(s)")).await;
     Ok(ApiResponse::success(
-        "Grace dues reminders sent",
-        format!("Sent grace dues reminders to {count} student(s)"),
+        "Grace dues reminders sending",
+        format!("Sending grace dues reminders to {count} student(s)"),
     ))
+}
+
+/// Latest bulk-reminder job (grace-dues / pending-fee) of each type, so the
+/// admin page can show delivery outcome after the fact — see
+/// `services::reminder_jobs`.
+pub async fn reminder_job_status(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let jobs = reminder_jobs::get_latest_jobs(&state).await?;
+    Ok(ApiResponse::success("Reminder job status retrieved", jobs))
 }
 
 // ── Seat / student history ────────────────────────────────────────────────────

@@ -107,6 +107,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/admin/reminders/send",                  post(admin::send_reminders))
         .route("/api/admin/reminders/pending-fees",          post(admin::send_pending_fee_reminders))
         .route("/api/admin/reminders/grace-dues",            post(admin::send_grace_dues_reminders))
+        .route("/api/admin/reminders/jobs",                  get(admin::reminder_job_status))
         .route("/api/admin/broadcast",                       post(admin::broadcast))
         .route("/api/admin/broadcast/history",               get(admin::broadcast_history))
         .route("/api/admin/broadcast/:id",                   delete(admin::delete_broadcast))

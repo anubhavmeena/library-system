@@ -528,6 +528,24 @@ pub struct ReplyRequest {
     pub body: String,
 }
 
+/// Tracks one bulk-reminder send (grace-dues or pending-fee) so the admin
+/// panel can show its outcome after the fact — the HTTP response that
+/// kicks off the send returns immediately (the actual WhatsApp/email calls
+/// run in background tasks), so this row is the only record of whether
+/// those calls ultimately succeeded.
+#[derive(Debug, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct ReminderJob {
+    pub id: Uuid,
+    pub job_type: String,
+    pub total_count: i32,
+    pub success_count: i32,
+    pub failure_count: i32,
+    pub status: String,
+    pub started_at: NaiveDateTime,
+    pub completed_at: Option<NaiveDateTime>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

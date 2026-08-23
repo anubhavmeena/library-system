@@ -12,6 +12,7 @@ pub mod otp;
 pub mod payment;
 pub mod payment_claim;
 pub mod receipt;
+pub mod reminder_jobs;
 pub mod renewal_poll;
 pub mod seat;
 pub mod settings;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
@@ -11,6 +11,24 @@ const TABS = [
     { key: 'graceDues',  label: 'Grace Period Dues' },
     { key: 'needsSeat',  label: 'Needs Seat' },
 ]
+
+// The backend sends a naive "YYYY-MM-DDTHH:MM:SS[.ffffff]" timestamp that is
+// actually UTC (rust-backend stores plain TIMESTAMP columns as UTC wall-clock
+// -- see rust-backend/CLAUDE.md). Appending "Z" before parsing tells the
+// browser it's UTC instead of guessing local time, so the Asia/Kolkata
+// conversion below lands on the real IST moment.
+function formatIST(value) {
+    if (!value) return ''
+    const date = new Date(value.endsWith('Z') ? value : `${value}Z`)
+    if (Number.isNaN(date.getTime())) return value
+    return date.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true,
+    })
+}
+
+const JOB_POLL_INTERVAL_MS = 2500
 
 export default function AdminRemindersPage() {
     const [activeTab, setActiveTab] = useState('renewal')
@@ -33,7 +51,45 @@ export default function AdminRemindersPage() {
     const [orphanedStudents, setOrphanedStudents] = useState([])
     const [orphanedLoading, setOrphanedLoading]   = useState(true)
 
+    // Grace-dues and pending-fee sends fire in background tasks now (see
+    // rust-backend send_grace_dues_reminders/send_pending_fee_reminders) so
+    // the POST returns before delivery finishes. This tracks each job type's
+    // latest known status, polled after a send until it completes.
+    const [jobStatus, setJobStatus] = useState({})
+    const pollTimers = useRef({})
+
     const { t } = useTranslation()
+
+    const fetchJobStatus = async () => {
+        try {
+            const res = await api.get('/admin/reminders/jobs')
+            const byType = {}
+            for (const job of res.data.data || []) byType[job.jobType] = job
+            setJobStatus(prev => ({ ...prev, ...byType }))
+        } catch { /* status banner just won't show; not worth a toast for a background poll */ }
+    }
+
+    const pollJobUntilComplete = (jobType) => {
+        if (pollTimers.current[jobType]) clearInterval(pollTimers.current[jobType])
+        pollTimers.current[jobType] = setInterval(async () => {
+            try {
+                const res = await api.get('/admin/reminders/jobs')
+                const job = (res.data.data || []).find(j => j.jobType === jobType)
+                if (job) {
+                    setJobStatus(prev => ({ ...prev, [jobType]: job }))
+                    if (job.status === 'COMPLETED') {
+                        clearInterval(pollTimers.current[jobType])
+                        delete pollTimers.current[jobType]
+                    }
+                }
+            } catch { /* keep polling on a transient error */ }
+        }, JOB_POLL_INTERVAL_MS)
+    }
+
+    useEffect(() => {
+        fetchJobStatus()
+        return () => { Object.values(pollTimers.current).forEach(clearInterval) }
+    }, [])
 
     const fetchExpiring = async () => {
         setLoading(true)
@@ -111,6 +167,7 @@ export default function AdminRemindersPage() {
             const res = await api.post('/admin/reminders/pending-fees', { userIds: pendingSelected.size > 0 ? [...pendingSelected] : [] })
             toast.success(res.data.data)
             setPendingSelected(new Set())
+            pollJobUntilComplete('PENDING_FEE')
         } catch { toast.error('Failed to send pending fee reminders') }
         finally { setPendingSending(false) }
     }
@@ -121,8 +178,25 @@ export default function AdminRemindersPage() {
             const res = await api.post('/admin/reminders/grace-dues', { userIds: graceSelected.size > 0 ? [...graceSelected] : [] })
             toast.success(res.data.data)
             setGraceSelected(new Set())
+            pollJobUntilComplete('GRACE_DUES')
         } catch { toast.error('Failed to send grace dues reminders') }
         finally { setGraceSending(false) }
+    }
+
+    const renderJobStatus = (jobType) => {
+        const job = jobStatus[jobType]
+        if (!job) return null
+        if (job.status === 'RUNNING') {
+            const done = job.successCount + job.failureCount
+            return <p className="text-xs text-primary-400 mt-2">Sending… {done}/{job.totalCount} processed</p>
+        }
+        const failed = job.failureCount > 0
+        return (
+            <p className={`text-xs mt-2 ${failed ? 'text-amber-400' : 'text-emerald-400'}`}>
+                Last sent {formatIST(job.completedAt)} — {job.successCount}/{job.totalCount} delivered
+                {failed ? `, ${job.failureCount} failed` : ''}
+            </p>
+        )
     }
 
     const urgencyColor = (days) => {
@@ -286,6 +360,7 @@ export default function AdminRemindersPage() {
                         </button>
                     </div>
                 </div>
+                <div className="text-right">{renderJobStatus('PENDING_FEE')}</div>
 
                 {pendingLoading ? (
                     <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="shimmer h-16 rounded-xl" />)}</div>
@@ -375,6 +450,7 @@ export default function AdminRemindersPage() {
                         </button>
                     </div>
                 </div>
+                <div className="text-right">{renderJobStatus('GRACE_DUES')}</div>
 
                 {graceLoading ? (
                     <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="shimmer h-16 rounded-xl" />)}</div>

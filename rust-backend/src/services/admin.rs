@@ -6,7 +6,7 @@ use crate::{
         membership::{Membership, MembershipPlan},
         user::User,
     },
-    services::{ids, notification, settings, upi_pay},
+    services::{ids, notification, reminder_jobs, settings, upi_pay},
 };
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
@@ -1420,6 +1420,16 @@ pub async fn get_grace_dues_students(
     .map_err(AppError::Database)
 }
 
+/// Kicks off grace-dues reminders and returns as soon as the recipient list
+/// is known — the actual WhatsApp/email sends run in spawned background
+/// tasks (each recording its outcome via `reminder_jobs::record_result`)
+/// rather than being awaited here. With enough GRACE students this loop
+/// used to run past the frontend's 30s axios timeout (each recipient costs
+/// up to two sequential, un-timed-out external HTTP calls), which surfaced
+/// to the admin as "Failed to send grace dues reminders" even though the
+/// backend eventually finished sending. The returned job id (surfaced via
+/// `reminder_jobs::get_latest_jobs`) is what the admin panel polls to show
+/// the actual completion status once every task finishes.
 pub async fn send_grace_dues_reminders(
     state: &Arc<AppState>,
     user_ids: Option<Vec<Uuid>>,
@@ -1446,15 +1456,25 @@ pub async fn send_grace_dues_reminders(
     };
 
     let count = rows.len() as i64;
+    let job_id = reminder_jobs::create_job(state, reminder_jobs::GRACE_DUES, count).await?;
+
     let setting = settings::setting_for(state, "GRACE_DUES_REMINDER").await;
     let app_settings = settings::get_app_settings(state).await.ok();
     let upi_id = app_settings.as_ref().and_then(|s| s.upi_id.clone()).filter(|v| !v.is_empty());
     let payee_name = settings::upi_payee_name(app_settings.as_ref());
-    for (user_id, membership_id, name, mobile, email, dues) in &rows {
-        send_one_grace_dues_reminder(
-            state, *user_id, *membership_id, name, mobile.as_deref(), email.as_deref(), *dues,
-            &setting, upi_id.as_deref(), &payee_name,
-        ).await;
+
+    for (user_id, membership_id, name, mobile, email, dues) in rows {
+        let state = state.clone();
+        let setting = setting.clone();
+        let upi_id = upi_id.clone();
+        let payee_name = payee_name.clone();
+        tokio::spawn(async move {
+            let ok = send_one_grace_dues_reminder(
+                &state, user_id, membership_id, &name, mobile.as_deref(), email.as_deref(), dues,
+                &setting, upi_id.as_deref(), &payee_name,
+            ).await;
+            reminder_jobs::record_result(&state, job_id, ok).await;
+        });
     }
 
     notify_admin_grace_reminders_sent(state, count).await;
@@ -1476,7 +1496,7 @@ async fn send_one_grace_dues_reminder(
     setting: &crate::models::settings::NotificationSettingDto,
     upi_id: Option<&str>,
     payee_name: &str,
-) {
+) -> bool {
     let mut text = format!(
         "Grace Period Reminder - Hi {name}, your library membership is in its grace period with Rs.{dues:.0} \
 in outstanding dues. Please clear your dues soon to avoid losing your seat. - Target Zone Library Team"
@@ -1497,7 +1517,9 @@ in outstanding dues. Please clear your dues soon to avoid losing your seat. - Ta
     }
     let msg = settings::apply_hindi(&text, setting, true);
     if setting.send_to_student {
-        notification::send_direct_message(state, mobile, email, &msg).await;
+        notification::send_direct_message_result(state, mobile, email, &msg).await
+    } else {
+        true
     }
 }
 
@@ -1614,6 +1636,40 @@ mod grace_reminder_tests {
     }
 }
 
+/// Builds and sends one pending-fee reminder (with UPI pay link when
+/// configured), reporting whether delivery actually succeeded — shared by
+/// `send_pending_fee_reminders`'s spawned per-recipient tasks.
+async fn send_one_pending_fee_reminder(
+    state: &Arc<AppState>,
+    user_id: Uuid,
+    name: &str,
+    mobile: Option<&str>,
+    email: Option<&str>,
+    amount: Decimal,
+    upi_id: Option<&str>,
+    payee_name: &str,
+) -> bool {
+    let mut msg = format!(
+        "Pending Fee Reminder - Hi {name}, you have a pending library fee of Rs.{amount:.0}. \
+Please visit the library or contact us to clear your dues. - Target Zone Library Team"
+    );
+    if let Some(vpa) = upi_id {
+        let payload = upi_pay::PayLinkPayload {
+            user_id,
+            claim_type: Some("PENDING_FEE".to_string()),
+            membership_id: None,
+            amount,
+            vpa: vpa.to_string(),
+            payee_name: payee_name.to_string(),
+            note: format!("Pending fee - {name}"),
+        };
+        if let Ok(link) = upi_pay::create_pay_link(state, &payload).await {
+            msg.push_str(&format!("\n\nPay via UPI: {link}"));
+        }
+    }
+    notification::send_direct_message_result(state, mobile, email, &msg).await
+}
+
 pub async fn send_pending_fee_reminders(
     state: &Arc<AppState>,
     user_ids: Option<Vec<Uuid>>,
@@ -1658,30 +1714,23 @@ pub async fn send_pending_fee_reminders(
     };
 
     let count = rows.len() as i64;
+    let job_id = reminder_jobs::create_job(state, reminder_jobs::PENDING_FEE, count).await?;
+
     let app_settings = settings::get_app_settings(state).await.ok();
     let upi_id = app_settings.as_ref().and_then(|s| s.upi_id.clone()).filter(|v| !v.is_empty());
     let payee_name = settings::upi_payee_name(app_settings.as_ref());
-    for (user_id, name, mobile, email, pending) in &rows {
+    for (user_id, name, mobile, email, pending) in rows {
         let amount = pending.unwrap_or_default();
-        let mut msg = format!(
-            "Pending Fee Reminder - Hi {name}, you have a pending library fee of Rs.{amount:.0}. \
-Please visit the library or contact us to clear your dues. - Target Zone Library Team"
-        );
-        if let Some(vpa) = &upi_id {
-            let payload = upi_pay::PayLinkPayload {
-                user_id: *user_id,
-                claim_type: Some("PENDING_FEE".to_string()),
-                membership_id: None,
-                amount,
-                vpa: vpa.clone(),
-                payee_name: payee_name.clone(),
-                note: format!("Pending fee - {name}"),
-            };
-            if let Ok(link) = upi_pay::create_pay_link(state, &payload).await {
-                msg.push_str(&format!("\n\nPay via UPI: {link}"));
-            }
-        }
-        notification::send_direct_message(state, mobile.as_deref(), email.as_deref(), &msg).await;
+        let state = state.clone();
+        let upi_id = upi_id.clone();
+        let payee_name = payee_name.clone();
+        tokio::spawn(async move {
+            let ok = send_one_pending_fee_reminder(
+                &state, user_id, &name, mobile.as_deref(), email.as_deref(), amount,
+                upi_id.as_deref(), &payee_name,
+            ).await;
+            reminder_jobs::record_result(&state, job_id, ok).await;
+        });
     }
 
     // Admin summary copy
