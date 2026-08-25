@@ -1,9 +1,13 @@
 use crate::{
     app_state::AppState,
     error::AppError,
-    models::payment_claim::{AdminPaymentClaimItem, PaymentClaim},
+    models::{
+        membership::Membership,
+        payment_claim::{AdminPaymentClaimItem, PaymentClaim},
+    },
     services::{admin, notification, upi_pay, user as user_svc},
 };
+use rust_decimal::Decimal;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -184,10 +188,43 @@ pub async fn review_claim(
                 let membership_id = claim.membership_id.ok_or_else(|| {
                     AppError::Internal("DUES claim missing membership_id".into())
                 })?;
-                admin::clear_dues(state, membership_id, claim.amount_claimed, Some("UPI-QR")).await?;
+                let membership = sqlx::query_as::<_, Membership>(
+                    "SELECT * FROM memberships WHERE id = $1",
+                )
+                .bind(membership_id)
+                .fetch_optional(&state.db)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Linked membership not found".into()))?;
+
+                if membership.status == "GRACE" {
+                    admin::clear_dues(state, membership_id, claim.amount_claimed, Some("UPI-QR")).await?;
+                } else if membership.dues_amount.unwrap_or(Decimal::ZERO) <= Decimal::ZERO {
+                    // Dues were already cleared through another channel (e.g. a
+                    // cash payment taken at the desk) before this UPI proof got
+                    // reviewed. Don't re-run clear_dues — it would double-apply
+                    // the +1 month extension — just close this claim out as
+                    // verified since the underlying debt is already gone.
+                } else {
+                    return Err(AppError::Conflict(format!(
+                        "Linked membership is no longer in GRACE (now {}) and still has dues outstanding — resolve manually before verifying this claim",
+                        membership.status
+                    )));
+                }
             }
             "PENDING_FEE" => {
-                admin::clear_pending_fees(state, claim.user_id, claim.amount_claimed, Some("UPI-QR")).await?;
+                let total_pending: Option<Decimal> = sqlx::query_scalar(
+                    "SELECT SUM(pending_amount) FROM payments
+                     WHERE user_id = $1 AND status = 'SUCCESS' AND pending_amount > 0",
+                )
+                .bind(claim.user_id)
+                .fetch_one(&state.db)
+                .await?;
+
+                if total_pending.unwrap_or(Decimal::ZERO) > Decimal::ZERO {
+                    admin::clear_pending_fees(state, claim.user_id, claim.amount_claimed, Some("UPI-QR")).await?;
+                }
+                // else: pending fees already cleared through another channel —
+                // close the claim out as verified without re-applying anything.
             }
             other => return Err(AppError::Internal(format!("Unknown claim_type '{other}'"))),
         }
