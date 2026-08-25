@@ -329,8 +329,13 @@ fn reply_blocking(cfg: &Config, message_number: u32, reply_body: &str) -> anyhow
         .find(|h| h.get_key_ref().eq_ignore_ascii_case("Message-ID"))
         .map(|h| h.get_value());
 
+    // Reply from the actual monitored mailbox (ADMIN_EMAIL, same account as
+    // ADMIN_IMAP_USER), not FROM_EMAIL — that's the generic system-notification
+    // sender (noreply@) and unrelated to this inbox. Matches Java's
+    // MailboxService, which sends replies from `admin.inbox.from-email`
+    // (bound to ADMIN_EMAIL).
     let from_mailbox: lettre::message::Mailbox =
-        format!("{} <{}>", cfg.from_name, cfg.from_email).parse()?;
+        format!("{} <{}>", cfg.from_name, cfg.admin_email).parse()?;
     let to_mailbox: lettre::message::Mailbox = to.parse()?;
 
     let mut builder = lettre::Message::builder()
