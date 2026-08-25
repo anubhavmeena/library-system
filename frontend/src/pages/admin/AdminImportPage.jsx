@@ -126,11 +126,6 @@ export default function AdminImportPage() {
 
     return (
         <div className="max-w-3xl mx-auto">
-            <div className="mb-6">
-                <h1 className="page-header">{t('adminImport.title')}</h1>
-                <p className="text-primary-400">{t('adminImport.subtitle')}</p>
-            </div>
-
             {/* ── Manual entry form ──────────────────────────────────────────── */}
             <div className="border-b border-primary-700/30 pb-8 mb-8">
                 <div className="mb-5">
@@ -208,6 +203,11 @@ export default function AdminImportPage() {
                         {submitting ? t('adminImport.manual.submitting') : t('adminImport.manual.submit')}
                     </button>
                 </form>
+            </div>
+
+            <div className="mb-6">
+                <h1 className="page-header">{t('adminImport.title')}</h1>
+                <p className="text-primary-400">{t('adminImport.subtitle')}</p>
             </div>
 
             {/* Format hint */}
