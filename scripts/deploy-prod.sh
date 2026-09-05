@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# deploy-prod.sh — Deploy rust-backend and/or frontend to the production EC2
-# box in one go.
+# deploy-prod.sh — Deploy rust-backend and/or frontend to the production
+# Lightsail box in one go.
 #
 # Assumes your changes are already committed AND pushed to origin/master —
 # this script does not commit or push anything itself.
@@ -13,14 +13,14 @@
 # Backend:
 #   1. Runs `cargo test` locally — refuses to deploy if anything fails
 #   2. Cross-compiles a static musl binary locally (x86_64-unknown-linux-musl)
-#      — never build on the server itself: it's a memory-constrained t3.micro
+#      — never build on the server itself: it's a memory-constrained 1GB Lightsail box
 #      and a `cargo build --release` there has crashed/rebooted the instance
 #      before. Cross-compiling locally avoids that entirely.
 #   3. Backs up the server's current binary, transfers the new one, verifies
 #      the transfer with a checksum, restarts library-backend.service
 #
 # Frontend:
-#   1. Builds the frontend locally (same t3.micro-memory reasoning as above —
+#   1. Builds the frontend locally (same memory-constrained-box reasoning as above —
 #      `vite build` directly on the server has also crashed it once)
 #   2. Syncs dist/ to the server with `rsync --checksum` (not scp) — vite
 #      resets mtimes on every build even for byte-identical files, so a
@@ -34,11 +34,17 @@
 #
 # Both: pulls latest master on the server first (source only, never built
 # there) so migrations/config on disk match what's actually running.
+#
+# SSH transport: prod moved 2026-09-05 off the old EC2 box (which had gone
+# Cloudflare-Tunnel-only for SSH) to a new AWS Lightsail instance with a
+# static public IP — direct `ssh ubuntu@<IP>` works, no cloudflared/tunnel
+# needed. The old box is stopped (kept as a rollback target, not live) so
+# targetzone.co.in's DNS no longer points at it either.
 
 set -euo pipefail
 
 SSH_KEY="$HOME/.ssh/my-ec2-key.pem"
-SSH_HOST="ubuntu@targetzone.co.in"
+SSH_HOST="ubuntu@52.66.154.11"
 REMOTE_REPO="/home/ubuntu/library-system"
 REMOTE_WEBROOT="/var/www/library-frontend"
 SITE_HOST="targetzone.co.in"
@@ -64,7 +70,8 @@ info() { echo -e "${B}  ·  ${NC}$*"; }
 err()  { echo -e "${R}  ✗  ${NC}$*" >&2; exit 1; }
 step() { echo -e "\n${BLD}${B}━━━  $*  ━━━${NC}"; }
 
-ssh_cmd() { ssh -i "$SSH_KEY" -o ConnectTimeout=15 "$SSH_HOST" "$@"; }
+SSH_OPTS=(-i "$SSH_KEY" -o ConnectTimeout=15)
+ssh_cmd() { ssh "${SSH_OPTS[@]}" "$SSH_HOST" "$@"; }
 
 [[ -f "$SSH_KEY" ]] || err "SSH key not found at $SSH_KEY"
 if (( DO_FRONTEND )); then [[ -d "$FRONTEND_DIR" ]] || err "frontend/ not found at $FRONTEND_DIR"; fi
