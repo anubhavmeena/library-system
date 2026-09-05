@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Phone } from 'lucide-react'
+import { Phone, Camera } from 'lucide-react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import { paymentModeInfo } from '../../utils/paymentMode'
@@ -26,6 +26,8 @@ export default function AdminStudentDetailPage() {
     const [loading, setLoading] = useState(true)
     const [editForm, setEditForm] = useState({})
     const [saving, setSaving]   = useState(false)
+    const [uploadingPhoto, setUploadingPhoto] = useState(false)
+    const photoFileRef = useRef()
 
     const [payments, setPayments]               = useState([])
     const [paymentsLoading, setPaymentsLoading] = useState(true)
@@ -52,6 +54,25 @@ export default function AdminStudentDetailPage() {
     }
 
     useEffect(() => { fetchStudent() }, [userId])
+
+    const handlePhotoCapture = async (e) => {
+        const file = e.target.files?.[0]
+        e.target.value = ''
+        if (!file) return
+        if (file.size > 5 * 1024 * 1024) return toast.error(t('adminStudentDetail.toasts.photoTooLarge'))
+        const formData = new FormData()
+        formData.append('file', file)
+        setUploadingPhoto(true)
+        try {
+            const res = await api.post(`/admin/students/${userId}/photo`, formData)
+            setStudent(s => ({ ...s, photoUrl: res.data.data.url }))
+            toast.success(t('adminStudentDetail.toasts.photoUpdated'))
+        } catch (e) {
+            toast.error(e.response?.data?.message || t('adminStudentDetail.toasts.photoUploadFailed'))
+        } finally {
+            setUploadingPhoto(false)
+        }
+    }
 
     const fetchPayments = () => {
         setPaymentsLoading(true)
@@ -133,14 +154,29 @@ export default function AdminStudentDetailPage() {
 
             <div className="mb-6 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4 min-w-0">
-                    {student.photoUrl
-                        ? <img src={student.photoUrl} alt={student.name}
-                               onClick={() => setShowPhotoPreview(true)}
-                               className="w-16 h-16 rounded-full object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" />
-                        : <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-400 to-primary-600 flex items-center justify-center text-2xl font-bold text-white flex-shrink-0">
-                            {student.name?.[0]?.toUpperCase()}
-                        </div>
-                    }
+                    <div className="relative flex-shrink-0">
+                        {student.photoUrl
+                            ? <img src={student.photoUrl} alt={student.name}
+                                   onClick={() => setShowPhotoPreview(true)}
+                                   className="w-16 h-16 rounded-full object-cover cursor-pointer hover:opacity-80 transition-opacity" />
+                            : <div onClick={() => photoFileRef.current?.click()}
+                                   className="w-16 h-16 rounded-full bg-gradient-to-br from-red-400 to-primary-600 flex items-center justify-center text-2xl font-bold text-white cursor-pointer hover:opacity-80 transition-opacity">
+                                {student.name?.[0]?.toUpperCase()}
+                            </div>
+                        }
+                        {uploadingPhoto && (
+                            <div className="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center">
+                                <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                            </div>
+                        )}
+                        <input ref={photoFileRef} type="file" accept="image/jpeg,image/png,image/webp"
+                               capture="environment" className="hidden" onChange={handlePhotoCapture} />
+                        <button onClick={() => photoFileRef.current?.click()} disabled={uploadingPhoto}
+                                title={t(student.photoUrl ? 'adminStudentDetail.changePhoto' : 'adminStudentDetail.takePhoto')}
+                                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary-700 border-2 border-primary-900 flex items-center justify-center text-white hover:bg-primary-600 transition-colors disabled:opacity-50">
+                            <Camera size={12} />
+                        </button>
+                    </div>
                     <div className="min-w-0">
                         <h1 className="page-header truncate">{student.name}</h1>
                         <div className="flex items-center gap-2 mt-1">

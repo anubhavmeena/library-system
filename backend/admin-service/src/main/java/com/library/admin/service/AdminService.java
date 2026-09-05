@@ -9,11 +9,18 @@ import com.library.admin.repository.*;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -37,6 +44,12 @@ public class AdminService {
     private final AppSettingsRepository       appSettingsRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final EntityManager entityManager;
+
+    @Value("${app.upload.dir:/app/uploads}")
+    private String uploadDir;
+
+    @Value("${app.upload.allowed-types:image/jpeg,image/png,image/webp}")
+    private String allowedTypes;
 
     private static final Map<String, String> SORT_COLUMNS = Map.of(
         "name",          "u.name",
@@ -887,6 +900,51 @@ public class AdminService {
         }
         userRepository.save(user);
         return getStudentDetails(userId);
+    }
+
+    // Lets staff capture/replace a student's photo from the admin detail page (e.g. with
+    // their own phone camera at the front desk) without the student needing their own
+    // account to hit user-service's `/me/photo`. Same validate/store/delete-old-file
+    // pattern as UserService.uploadPhoto and ImportService.storeStudentPhoto — admin-service
+    // already has direct read-write access to the shared uploads volume and `users` table,
+    // same reasoning as the existing import-with-photo flow. Returns just {"url": ...},
+    // matching rust-backend's AdminController.uploadStudentPhoto response shape (the
+    // frontend is shared across both backends and reads res.data.data.url either way).
+    @Transactional
+    public Map<String, String> uploadStudentPhoto(String userId, MultipartFile file) throws IOException {
+        User user = userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + userId));
+
+        String contentType = file.getContentType();
+        if (contentType == null || !List.of(allowedTypes.split(",")).contains(contentType))
+            throw new IllegalArgumentException("Invalid file type. Only JPEG, PNG, WebP allowed.");
+        if (file.getSize() > 5_242_880)
+            throw new IllegalArgumentException("File must not exceed 5MB.");
+
+        Path uploadPath = Paths.get(uploadDir, "photos");
+        Files.createDirectories(uploadPath);
+
+        if (user.getPhotoUrl() != null) {
+            try {
+                Files.deleteIfExists(uploadPath.resolve(
+                        Paths.get(user.getPhotoUrl()).getFileName().toString()));
+            } catch (Exception ignored) {}
+        }
+
+        String ext      = getPhotoExtension(file.getOriginalFilename());
+        String fileName = "user_" + userId + "_" + UUID.randomUUID().toString().substring(0, 8) + ext;
+        Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+
+        user.setPhotoUrl("/uploads/photos/" + fileName);
+        userRepository.save(user);
+
+        log.info("Photo uploaded for student {} by admin: {}", userId, user.getPhotoUrl());
+        return Map.of("url", user.getPhotoUrl());
+    }
+
+    private String getPhotoExtension(String filename) {
+        if (filename == null || !filename.contains(".")) return ".jpg";
+        return filename.substring(filename.lastIndexOf(".")).toLowerCase();
     }
 
     // ── Student Payment History ───────────────────────────────────────────────

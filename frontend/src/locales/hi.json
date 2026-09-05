@@ -617,6 +617,8 @@
     "back": "छात्रों की सूची पर वापस जाएं",
     "notFound": "छात्र नहीं मिला",
     "callStudent": "छात्र को कॉल करें",
+    "takePhoto": "फ़ोटो लें",
+    "changePhoto": "फ़ोटो बदलें",
     "detailsTitle": "विवरण",
     "fields": { "name": "नाम", "dateOfBirth": "जन्म तिथि" },
     "save": "सहेजें",
@@ -631,7 +633,10 @@
     "toasts": {
       "loadFailed": "छात्र विवरण लोड करने में विफल",
       "saved": "छात्र विवरण सहेजा गया",
-      "saveFailed": "छात्र विवरण सहेजने में विफल"
+      "saveFailed": "छात्र विवरण सहेजने में विफल",
+      "photoTooLarge": "फ़ोटो 5MB से अधिक नहीं होनी चाहिए",
+      "photoUpdated": "फ़ोटो अपडेट की गई",
+      "photoUploadFailed": "फ़ोटो अपलोड करने में विफल"
     }
   },
   "adminSeats": {

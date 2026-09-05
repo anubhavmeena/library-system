@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 
 @RestController
@@ -61,6 +62,13 @@ public class AdminController {
             @PathVariable String userId,
             @RequestBody UpdateStudentRequest request) {
         return ResponseEntity.ok(ApiResponse.success(adminService.updateStudent(userId, request)));
+    }
+
+    @PostMapping(value = "/students/{userId}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<Map<String, String>>> uploadStudentPhoto(
+            @PathVariable String userId,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(ApiResponse.success(adminService.uploadStudentPhoto(userId, file)));
     }
 
     @GetMapping("/students/{userId}/payments")
