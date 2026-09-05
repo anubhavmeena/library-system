@@ -616,6 +616,7 @@
   "adminStudentDetail": {
     "back": "छात्रों की सूची पर वापस जाएं",
     "notFound": "छात्र नहीं मिला",
+    "callStudent": "छात्र को कॉल करें",
     "detailsTitle": "विवरण",
     "fields": { "name": "नाम", "dateOfBirth": "जन्म तिथि" },
     "save": "सहेजें",

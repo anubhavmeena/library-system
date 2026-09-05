@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Phone } from 'lucide-react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import { paymentModeInfo } from '../../utils/paymentMode'
@@ -144,6 +145,13 @@ export default function AdminStudentDetailPage() {
                         <h1 className="page-header truncate">{student.name}</h1>
                         <div className="flex items-center gap-2 mt-1">
                             <p className="text-primary-400">{student.mobile}</p>
+                            {student.mobile && (
+                                <a href={`tel:${student.mobile}`}
+                                   className="text-emerald-400 hover:text-emerald-300 transition-colors"
+                                   title={t('adminStudentDetail.callStudent')}>
+                                    <Phone size={16} />
+                                </a>
+                            )}
                             {student.displayStatus && (
                                 <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_BADGE_CLASSES[student.displayStatus] || 'bg-primary-700/30 text-primary-400 border-primary-700/40'}`}>
                                     {t(`adminStudents.statusLabels.${student.displayStatus}`)}
