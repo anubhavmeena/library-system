@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Phone } from 'lucide-react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
@@ -8,6 +9,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3'
 import { parseISO, format } from 'date-fns'
 import { formatCurrency } from '../../utils/currency'
+import { toDevanagari } from '../../utils/transliterate'
 
 const DATE_PICKER_SX = {
     '& .MuiOutlinedInput-root': {
@@ -86,7 +88,8 @@ export default function AdminSeatsPage() {
     const [historyOpen, setHistoryOpen]       = useState(false)
     const [seatHistory, setSeatHistory]       = useState([])
     const [historyLoading, setHistoryLoading] = useState(false)
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
+    const localizeName = (name) => (i18n.language?.startsWith('hi') ? toDevanagari(name) : name)
 
     const fetchMap = async () => {
         setLoading(true)
@@ -363,20 +366,29 @@ export default function AdminSeatsPage() {
                         </div>
                         <div className="space-y-2">
                             {[
-                                { l: t('adminSeats.modal.student'), v: selected.studentName, link: selected.studentId ? `/admin/students/${selected.studentId}` : null },
-                                { l: t('adminSeats.modal.mobile'),  v: selected.studentMobile || '—' },
+                                { l: t('adminSeats.modal.student'), v: localizeName(selected.studentName), link: selected.studentId ? `/admin/students/${selected.studentId}` : null },
+                                { l: t('adminSeats.modal.mobile'),  v: selected.studentMobile || '—', call: selected.studentMobile || null },
                                 { l: 'Gender',                       v: selected.studentGender || '—' },
                                 { l: t('adminSeats.modal.shift'),   v: shiftLabel(selected.shift) },
                                 { l: t('adminSeats.modal.expires'), v: selected.membershipEnd },
                                 { l: t('adminSeats.modal.daysLeft'), v: t('adminSeats.modal.daysLeftValue', { days: daysToExpiry(selected.membershipEnd, date) }) },
-                            ].map(({ l, v, link }) => (
-                                <div key={l} className="flex justify-between py-2 border-b border-primary-700/30 last:border-0 text-sm">
-                                    <span className="text-primary-400">{l}</span>
-                                    {link ? (
-                                        <Link to={link} className="text-amber-400 hover:text-amber-300 hover:underline">{v}</Link>
-                                    ) : (
-                                        <span className="text-white">{v}</span>
-                                    )}
+                            ].map(({ l, v, link, call }) => (
+                                <div key={l} className="flex justify-between items-center gap-2 py-2 border-b border-primary-700/30 last:border-0 text-sm">
+                                    <span className="text-primary-400 flex-shrink-0">{l}</span>
+                                    <span className="flex items-center gap-2 min-w-0">
+                                        {link ? (
+                                            <Link to={link} className="text-amber-400 hover:text-amber-300 hover:underline truncate">{v}</Link>
+                                        ) : (
+                                            <span className="text-white truncate">{v}</span>
+                                        )}
+                                        {call && (
+                                            <a href={`tel:${call}`}
+                                               className="text-emerald-400 hover:text-emerald-300 transition-colors flex-shrink-0"
+                                               title={t('adminStudentDetail.callStudent')}>
+                                                <Phone size={16} />
+                                            </a>
+                                        )}
+                                    </span>
                                 </div>
                             ))}
                         </div>
@@ -400,7 +412,7 @@ export default function AdminSeatsPage() {
                                                      className={`rounded-lg bg-primary-800/40 border px-3 py-2.5 text-xs ${
                                                          h.membershipId === selected.membershipId ? 'border-amber-400/50' : 'border-primary-700/30'}`}>
                                                     <div className="flex items-center justify-between mb-1.5">
-                                                        <span className="text-white font-semibold">{h.studentName}</span>
+                                                        <span className="text-white font-semibold">{localizeName(h.studentName)}</span>
                                                         {h.membershipId === selected.membershipId && (
                                                             <span className="px-2 py-0.5 rounded-full font-medium border bg-amber-500/20 text-amber-400 border-amber-500/30">
                                                                 {t('adminSeats.modal.current')}
