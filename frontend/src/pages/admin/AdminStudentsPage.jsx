@@ -5,6 +5,7 @@ import api from '../../services/api'
 import toast from 'react-hot-toast'
 import { formatCurrency } from '../../utils/currency'
 import { paymentModeInfo } from '../../utils/paymentMode'
+import { toDevanagari } from '../../utils/transliterate'
 import StudentActionsMenu from '../../components/admin/StudentActionsMenu'
 
 const STATUS_BADGE_CLASSES = {
@@ -32,7 +33,8 @@ export default function AdminStudentsPage() {
     const [studentPayments, setStudentPayments]               = useState([])
     const [studentPaymentsLoading, setStudentPaymentsLoading] = useState(false)
 
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
+    const localizeName = (name) => (i18n.language?.startsWith('hi') ? toDevanagari(name) : name)
 
     const fetchStudents = async () => {
         setLoading(true)
@@ -178,7 +180,7 @@ export default function AdminStudentsPage() {
                                             <div>
                                                 <Link to={`/admin/students/${s.id}`}
                                                     className="block text-white font-medium hover:text-amber-400 hover:underline transition-colors">
-                                                    {s.name}
+                                                    {localizeName(s.name)}
                                                 </Link>
                                                 <p className="text-primary-500 text-xs">{t('adminStudents.joined')} {s.joinedAt?.split('T')[0]}</p>
                                             </div>
@@ -293,7 +295,7 @@ export default function AdminStudentsPage() {
                                 </div>
                             }
                             <div className="min-w-0">
-                                <p className="text-white font-bold text-lg truncate">{detail.name}</p>
+                                <p className="text-white font-bold text-lg truncate">{localizeName(detail.name)}</p>
                                 <p className="text-primary-400 text-sm">{detail.mobile}</p>
                             </div>
                         </div>
