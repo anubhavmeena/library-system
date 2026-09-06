@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Phone } from 'lucide-react'
+import { Phone, Volume2 } from 'lucide-react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
@@ -128,6 +128,40 @@ export default function AdminSeatsPage() {
         if (s === 'MORNING')  return t('adminSeats.shifts.MORNING')
         if (s === 'EVENING')  return t('adminSeats.shifts.EVENING')
         return t('adminSeats.shifts.FULL_DAY')
+    }
+
+    // Speak "<seat>, <student>, <fee status>" aloud through the device
+    // speakers, in whichever language the site is currently set to.
+    const speakSeatDetails = (seat) => {
+        const synth = typeof window !== 'undefined' && window.speechSynthesis
+        if (!synth || typeof SpeechSynthesisUtterance === 'undefined') {
+            toast.error(t('adminSeats.modal.speechUnsupported'))
+            return
+        }
+        const hi = i18n.language?.startsWith('hi')
+        const overdueDays = Math.abs(daysToExpiry(seat.membershipEnd, date) ?? 0)
+        let fees
+        if (seat.displayStatus === 'PENDING') {
+            fees = t('adminSeats.modal.speech.feesPending')
+        } else if (seat.displayStatus === 'GRACE' || seat.displayStatus === 'GRACE_OVERDUE') {
+            fees = t('adminSeats.modal.speech.feesOverdue', { days: overdueDays })
+        } else {
+            fees = t('adminSeats.modal.speech.feesPaid')
+        }
+        const parts = [
+            t('adminSeats.modal.seat', { seatNumber: seat.seatNumber }),
+            seat.studentName ? localizeName(seat.studentName) : null,
+            fees,
+        ].filter(Boolean)
+
+        synth.cancel()
+        const utter = new SpeechSynthesisUtterance(parts.join('. ') + '.')
+        utter.lang = hi ? 'hi-IN' : 'en-IN'
+        const voices = synth.getVoices() || []
+        const voice = voices.find(v => v.lang === utter.lang)
+            || voices.find(v => v.lang?.toLowerCase().startsWith(hi ? 'hi' : 'en'))
+        if (voice) utter.voice = voice
+        synth.speak(utter)
     }
 
     return (
@@ -347,6 +381,12 @@ export default function AdminSeatsPage() {
                     <div className="card p-6 w-72 border-red-500/30" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
+                                <button onClick={() => speakSeatDetails(selected)}
+                                        title={t('adminSeats.modal.speak')}
+                                        aria-label={t('adminSeats.modal.speak')}
+                                        className="text-primary-300 hover:text-amber-400 transition-colors flex-shrink-0">
+                                    <Volume2 size={18} />
+                                </button>
                                 <h3 className="text-white font-semibold">{t('adminSeats.modal.seat', { seatNumber: selected.seatNumber })}</h3>
                                 {selected.displayStatus && (
                                     <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_BADGE_CLASSES[selected.displayStatus] || 'bg-primary-700/30 text-primary-400 border-primary-700/40'}`}>

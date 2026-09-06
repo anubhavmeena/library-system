@@ -668,7 +668,14 @@
       "seat": "Seat {{seatNumber}}",
       "student": "Student", "mobile": "Mobile", "shift": "Shift", "expires": "Expires",
       "daysLeft": "Days Left", "daysLeftValue": "{{days}} days",
-      "seatHistory": "Seat History", "noHistory": "No booking history for this seat.", "current": "Current"
+      "seatHistory": "Seat History", "noHistory": "No booking history for this seat.", "current": "Current",
+      "speak": "Read seat details aloud",
+      "speechUnsupported": "Audio is not supported on this device",
+      "speech": {
+        "feesPaid": "Fees paid",
+        "feesPending": "Fees pending",
+        "feesOverdue": "Fees overdue by {{days}} days"
+      }
     },
     "loadFailed": "Failed to load seat map"
   },

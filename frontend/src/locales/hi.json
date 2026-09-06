@@ -664,7 +664,14 @@
       "seat": "सीट {{seatNumber}}",
       "student": "छात्र", "mobile": "मोबाइल", "shift": "शिफ्ट", "expires": "समाप्ति",
       "daysLeft": "बचे दिन", "daysLeftValue": "{{days}} दिन",
-      "seatHistory": "सीट इतिहास", "noHistory": "इस सीट के लिए कोई बुकिंग इतिहास नहीं है।", "current": "वर्तमान"
+      "seatHistory": "सीट इतिहास", "noHistory": "इस सीट के लिए कोई बुकिंग इतिहास नहीं है।", "current": "वर्तमान",
+      "speak": "सीट का विवरण ज़ोर से सुनें",
+      "speechUnsupported": "इस डिवाइस पर ऑडियो समर्थित नहीं है",
+      "speech": {
+        "feesPaid": "शुल्क का भुगतान हो गया है",
+        "feesPending": "शुल्क लंबित है",
+        "feesOverdue": "शुल्क {{days}} दिन से बकाया है"
+      }
     },
     "loadFailed": "सीट मैप लोड करने में विफल"
   },
