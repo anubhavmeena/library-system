@@ -341,6 +341,10 @@ pub struct CashMembershipRequest {
     pub amount: Decimal,
     pub pending_amount: Option<Decimal>,
     pub payment_mode: Option<String>,
+    /// If true, any old GRACE dues / pending fees left over from a previously
+    /// released membership are written off instead of being folded into this
+    /// membership's total. Defaults to false (carry the debt forward).
+    pub waive_old_dues: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

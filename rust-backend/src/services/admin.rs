@@ -846,6 +846,10 @@ async fn process_import_row(
         amount: plan.price,
         pending_amount: Some(Decimal::ZERO),
         payment_mode: None, // bulk sheet imports are always treated as cash
+        // Bulk imports have no admin present to review/collect a carried-over
+        // balance, so any stale old dues found for this user are written off
+        // rather than silently inflating the amount this row is recorded as paying.
+        waive_old_dues: Some(true),
     };
     create_cash_membership(state, &req).await?;
     Ok(())
@@ -1981,15 +1985,6 @@ pub async fn create_cash_membership(
     .await?
     .ok_or_else(|| AppError::NotFound("Plan not found".into()))?;
 
-    // Guards against a stale client value double-counting an amount as both
-    // paid and owed (production incident this exact check was added for).
-    let pending = req.pending_amount.unwrap_or_default();
-    if req.amount + pending != plan.price {
-        return Err(AppError::BadRequest(
-            "Paid amount + pending amount must equal the plan price".into(),
-        ));
-    }
-
     let (mode_db, mode_label) = resolve_admin_payment_mode(req.payment_mode.as_deref())?;
 
     let blocked: bool = sqlx::query_scalar(
@@ -2002,6 +1997,43 @@ pub async fn create_cash_membership(
     if blocked {
         return Err(AppError::BadRequest(
             "This student already has an active membership or unresolved dues".into(),
+        ));
+    }
+
+    // A previously released membership's GRACE dues are never cleared by
+    // release_seat, and a separate partial-payment balance can linger on
+    // `payments.pending_amount` independent of membership status. By default,
+    // fold both into this new membership's total so the debt isn't silently
+    // lost; `waive_old_dues` lets the admin write it off instead.
+    let old_grace: Option<(Uuid, Decimal)> = sqlx::query_as(
+        "SELECT id, dues_amount FROM memberships
+         WHERE user_id = $1 AND status = 'EXPIRED' AND COALESCE(dues_amount, 0) > 0
+         ORDER BY end_date DESC LIMIT 1",
+    )
+    .bind(req.user_id)
+    .fetch_optional(&state.db)
+    .await?;
+
+    let old_pending_rows: Vec<(Uuid, Decimal)> = sqlx::query_as(
+        "SELECT id, pending_amount FROM payments
+         WHERE user_id = $1 AND status = 'SUCCESS' AND pending_amount > 0",
+    )
+    .bind(req.user_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let old_dues_amount = old_grace.as_ref().map(|(_, d)| *d).unwrap_or_default();
+    let old_pending_amount = old_pending_rows.iter().map(|(_, p)| *p).sum::<Decimal>();
+    let old_total = old_dues_amount + old_pending_amount;
+    let waive_old_dues = req.waive_old_dues.unwrap_or(false);
+    let effective_price = if waive_old_dues { plan.price } else { plan.price + old_total };
+
+    // Guards against a stale client value double-counting an amount as both
+    // paid and owed (production incident this exact check was added for).
+    let pending = req.pending_amount.unwrap_or_default();
+    if req.amount + pending != effective_price {
+        return Err(AppError::BadRequest(
+            "Paid amount + pending amount must equal the plan price (plus any carried-over old dues)".into(),
         ));
     }
 
@@ -2072,6 +2104,25 @@ pub async fn create_cash_membership(
     .bind(&invoice_id)
     .execute(&state.db)
     .await?;
+
+    // Resolve the old debt now that the new membership/payment exists — this is
+    // the same zero-it-out mechanism whether waived or carried over; the only
+    // difference is whether `old_total` was folded into `effective_price` above
+    // (and therefore actually collected in `req.amount`/`req.pending_amount`).
+    if old_total > Decimal::ZERO {
+        if let Some((old_membership_id, _)) = old_grace {
+            sqlx::query("UPDATE memberships SET dues_amount = 0 WHERE id = $1")
+                .bind(old_membership_id)
+                .execute(&state.db)
+                .await?;
+        }
+        for (payment_id, _) in &old_pending_rows {
+            sqlx::query("UPDATE payments SET pending_amount = 0, updated_at = NOW() WHERE id = $1")
+                .bind(payment_id)
+                .execute(&state.db)
+                .await?;
+        }
+    }
 
     // Assign seat — availability was already validated above, so this insert should
     // always succeed; the ON CONFLICT clause remains only as a defensive fallback for
@@ -2154,7 +2205,11 @@ pub async fn create_cash_membership(
         "membership_id": membership.id,
         "start_date": membership.start_date,
         "end_date": end_date,
-        "status": "ACTIVE"
+        "status": "ACTIVE",
+        "old_dues_amount": old_dues_amount,
+        "old_pending_amount": old_pending_amount,
+        "old_total": old_total,
+        "waived_old_dues": waive_old_dues
     }))
 }
 

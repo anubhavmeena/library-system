@@ -56,6 +56,7 @@ export default function AdminCreateMembershipPage() {
     const [selectedStudent, setSelectedStudent] = useState(null)
     const [bookingType, setBookingType]       = useState(null)  // null | 'renewal' | 'new'
     const [renewalLoading, setRenewalLoading] = useState(false)
+    const [waiveOldDues, setWaiveOldDues]     = useState(false)
 
     // step 2
     const [plans, setPlans]             = useState([])
@@ -94,8 +95,10 @@ export default function AdminCreateMembershipPage() {
     }, [])
 
     useEffect(() => {
-        if (selectedPlan) { setPaidAmount(String(selectedPlan.price)); setPendingAmount('0') }
-    }, [selectedPlan])
+        if (selectedPlan) { setPaidAmount(String(effectivePrice)); setPendingAmount('0') }
+    }, [selectedPlan, effectivePrice])
+
+    useEffect(() => { setWaiveOldDues(false) }, [selectedStudent?.id])
 
     useEffect(() => {
         api.get('/admin/settings')
@@ -120,6 +123,13 @@ export default function AdminCreateMembershipPage() {
         : '—'
 
     const resolvedShift = selectedPlan?.planType === 'FULL_DAY' ? 'FULL_DAY' : selectedShift
+
+    // Old GRACE dues + pending fees left over from a previously released
+    // membership — carried over into the new total by default, unless waived.
+    const oldDuesAmount  = Number(selectedStudent?.duesAmount || 0)
+    const oldPendingAmount = Number(selectedStudent?.pendingAmount || 0)
+    const oldDuesTotal   = oldDuesAmount + oldPendingAmount
+    const effectivePrice = (selectedPlan?.price || 0) + (waiveOldDues ? 0 : oldDuesTotal)
 
     const filteredStudents = students.filter(s =>
         (s.displayStatus === 'NEW' || s.displayStatus === 'RELEASED') && (
@@ -170,6 +180,7 @@ export default function AdminCreateMembershipPage() {
                 paidAmount:    parseFloat(paidAmount)    || 0,
                 pendingAmount: parseFloat(pendingAmount) || 0,
                 paymentMode,
+                waiveOldDues,
             })
             toast.success(t('adminNewMembership.toasts.created'))
             navigate('/admin/students')
@@ -303,6 +314,30 @@ export default function AdminCreateMembershipPage() {
                             <p className="text-xs text-primary-400 mb-4">
                                 <span className="text-white">{selectedStudent.name}</span> had a membership that ended. How would you like to proceed?
                             </p>
+
+                            {oldDuesTotal > 0 && (
+                                <div className="mb-4 p-4 rounded-xl border border-red-500/30 bg-red-500/5">
+                                    <p className="text-sm text-red-300 font-medium mb-1">
+                                        Outstanding from previous membership: {formatCurrency(oldDuesTotal)}
+                                    </p>
+                                    <p className="text-xs text-primary-400 mb-3">
+                                        {oldDuesAmount > 0 && `${formatCurrency(oldDuesAmount)} GRACE dues`}
+                                        {oldDuesAmount > 0 && oldPendingAmount > 0 && ' + '}
+                                        {oldPendingAmount > 0 && `${formatCurrency(oldPendingAmount)} pending fees`}
+                                        . By default this is added to the new membership's total.
+                                    </p>
+                                    <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-primary-300">
+                                        <input
+                                            type="checkbox"
+                                            checked={waiveOldDues}
+                                            onChange={e => setWaiveOldDues(e.target.checked)}
+                                            className="w-4 h-4 rounded border-primary-600 bg-primary-800 accent-amber-500"
+                                        />
+                                        Waive off old dues instead of adding to new membership total
+                                    </label>
+                                </div>
+                            )}
+
                             <div className="flex gap-3">
                                 <button
                                     onClick={handleSelectRenewal}
@@ -558,13 +593,24 @@ export default function AdminCreateMembershipPage() {
                                 { l: t('adminNewMembership.summary.seat'),     v: selectedSeat?.seatNumber },
                                 { l: t('adminNewMembership.summary.start'),    v: startDate },
                                 { l: t('adminNewMembership.summary.end'),      v: endDate },
-                                { l: t('adminNewMembership.summary.amount'),   v: selectedPlan ? formatCurrency(selectedPlan.price) : '' },
+                                { l: t('adminNewMembership.summary.amount'),   v: selectedPlan ? formatCurrency(effectivePrice) : '' },
                             ].map(({ l, v }) => (
                                 <div key={l} className="flex justify-between py-2 border-b border-primary-700/20 last:border-0 text-sm">
                                     <span className="text-primary-400">{l}</span>
                                     <span className="text-white font-medium">{v}</span>
                                 </div>
                             ))}
+
+                            {oldDuesTotal > 0 && (
+                                <div className="flex justify-between py-2 border-b border-primary-700/20 text-sm">
+                                    <span className="text-primary-400">Old dues</span>
+                                    <span className={waiveOldDues ? 'text-emerald-400 font-medium' : 'text-red-400 font-medium'}>
+                                        {waiveOldDues
+                                            ? `${formatCurrency(oldDuesTotal)} waived`
+                                            : `${formatCurrency(oldDuesTotal)} included above`}
+                                    </span>
+                                </div>
+                            )}
 
                             {/* Paid / Pending amount — editable */}
                             <div className="flex justify-between items-center py-2 border-b border-primary-700/20 text-sm gap-4">
@@ -578,7 +624,7 @@ export default function AdminCreateMembershipPage() {
                                         onChange={e => {
                                             setPaidAmount(e.target.value)
                                             const paid    = parseFloat(e.target.value) || 0
-                                            const pending = Math.max(0, (selectedPlan?.price || 0) - paid)
+                                            const pending = Math.max(0, effectivePrice - paid)
                                             setPendingAmount(String(pending))
                                         }}
                                     />
@@ -595,7 +641,7 @@ export default function AdminCreateMembershipPage() {
                                         onChange={e => {
                                             setPendingAmount(e.target.value)
                                             const pending = parseFloat(e.target.value) || 0
-                                            const paid    = Math.max(0, (selectedPlan?.price || 0) - pending)
+                                            const paid    = Math.max(0, effectivePrice - pending)
                                             setPaidAmount(String(paid))
                                         }}
                                     />

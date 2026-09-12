@@ -368,9 +368,19 @@ pub async fn create_cash_membership(
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let result = svc::create_cash_membership(&state, &req).await?;
     let label = alog::user_label(&state, req.user_id).await;
+    let old_total = result.get("old_total").and_then(|v| v.as_str()).unwrap_or("0");
+    let old_dues_note = if old_total.parse::<f64>().unwrap_or(0.0) > 0.0 {
+        let waived = result.get("waived_old_dues").and_then(|v| v.as_bool()).unwrap_or(false);
+        let old_dues = result.get("old_dues_amount").and_then(|v| v.as_str()).unwrap_or("0");
+        let old_pending = result.get("old_pending_amount").and_then(|v| v.as_str()).unwrap_or("0");
+        format!(" — {} ₹{old_total} old dues (₹{old_dues} GRACE + ₹{old_pending} pending)",
+            if waived { "waived" } else { "carried over" })
+    } else {
+        String::new()
+    };
     alog::log_activity(&state, &admin.0, "CREATE_MEMBERSHIP", "membership",
         result.get("membership_id").and_then(|v| v.as_str()).map(String::from),
-        format!("Created cash membership for {label}{}",
+        format!("Created cash membership for {label}{}{old_dues_note}",
             req.seat_number.as_deref().map(|s| format!(" (seat {s})")).unwrap_or_default())).await;
     Ok(ApiResponse::success("Cash membership created", result))
 }
