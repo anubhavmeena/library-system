@@ -221,6 +221,23 @@ pub async fn seat_map(
     Ok(ApiResponse::success("Seat map retrieved", map))
 }
 
+pub async fn set_seat_active(
+    State(state): State<Arc<AppState>>,
+    admin: AdminUser,
+    Path(seat_number): Path<String>,
+    Json(req): Json<crate::models::admin::SetSeatActiveRequest>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    svc::set_seat_active(&state, &seat_number, req.is_active).await?;
+    let action = if req.is_active { "ACTIVATE_SEAT" } else { "DEACTIVATE_SEAT" };
+    let description = if req.is_active {
+        format!("Marked seat {seat_number} as available")
+    } else {
+        format!("Marked seat {seat_number} as unavailable")
+    };
+    alog::log_activity(&state, &admin.0, action, "seat", Some(seat_number), description).await;
+    Ok(ApiResponse::ok(if req.is_active { "Seat marked available" } else { "Seat marked unavailable" }))
+}
+
 // ── Memberships ───────────────────────────────────────────────────────────────
 
 pub async fn expiring_memberships(

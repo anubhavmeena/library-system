@@ -88,6 +88,8 @@ export default function AdminSeatsPage() {
     const [historyOpen, setHistoryOpen]       = useState(false)
     const [seatHistory, setSeatHistory]       = useState([])
     const [historyLoading, setHistoryLoading] = useState(false)
+    const [historyFetchedFor, setHistoryFetchedFor] = useState(null) // seatNumber the cached seatHistory belongs to
+    const [seatActionLoading, setSeatActionLoading] = useState(false)
     const { t, i18n } = useTranslation()
     const localizeName = (name) => (i18n.language?.startsWith('hi') ? toDevanagari(name) : name)
 
@@ -108,17 +110,64 @@ export default function AdminSeatsPage() {
         setSeatHistory([])
     }, [selected?.seatNumber])
 
+    // Keyed on seatNumber (not a plain "fetched" boolean) so this stays
+    // correct even when the reset effect above and the eager-fetch effect
+    // below fire in the same commit — a boolean reset there could still be
+    // read stale here since effects in one commit don't see each other's
+    // setState calls until the next render.
+    const fetchSeatHistory = () => {
+        if (!selected || historyFetchedFor === selected.seatNumber || historyLoading) return
+        setHistoryLoading(true)
+        api.get(`/admin/seats/${selected.seatNumber}/history`)
+            .then(r => setSeatHistory(r.data.data || []))
+            .catch(() => setSeatHistory([]))
+            .finally(() => { setHistoryLoading(false); setHistoryFetchedFor(selected.seatNumber) })
+    }
+
+    // For a vacant seat, the "days vacant" figure needs the last booking's
+    // end date up front (not lazily on expand like the occupied modal),
+    // since it's shown in the modal body rather than behind the toggle.
+    useEffect(() => {
+        if (selected && !selected.isOccupied) fetchSeatHistory()
+    }, [selected])
+
     const toggleSeatHistory = () => {
-        const opening = !historyOpen
-        setHistoryOpen(opening)
-        if (opening && seatHistory.length === 0 && !historyLoading) {
-            setHistoryLoading(true)
-            api.get(`/admin/seats/${selected.seatNumber}/history`)
-                .then(r => setSeatHistory(r.data.data || []))
-                .catch(() => setSeatHistory([]))
-                .finally(() => setHistoryLoading(false))
+        setHistoryOpen(o => !o)
+        fetchSeatHistory()
+    }
+
+    // Blocks/unblocks a vacant seat from being booked at all (backed by the
+    // same `seats.is_active` flag the booking flow already checks). Only
+    // reachable from the vacant-seat modal, so the seat is never occupied
+    // when this fires.
+    const toggleSeatActive = async () => {
+        if (!selected || seatActionLoading) return
+        const activating = selected.isActive === false
+        if (!activating && !window.confirm(t('adminSeats.modal.confirmUnavailable', { seatNumber: selected.seatNumber }))) return
+
+        setSeatActionLoading(true)
+        try {
+            await api.patch(`/admin/seats/${selected.seatNumber}/active`, { isActive: activating })
+            setSelected(s => (s ? { ...s, isActive: activating } : s))
+            fetchMap()
+            toast.success(t(activating ? 'adminSeats.modal.madeAvailable' : 'adminSeats.modal.madeUnavailable', { seatNumber: selected.seatNumber }))
+        } catch (err) {
+            toast.error(err.response?.data?.message || t('adminSeats.modal.actionFailed'))
+        } finally {
+            setSeatActionLoading(false)
         }
     }
+
+    // Most recent (non-abandoned) booking on this seat, if any — history is
+    // ordered booking_date DESC and entries never overlap, so [0] is also the
+    // one with the latest end_date, i.e. the last day the seat was occupied.
+    const lastOccupancy = seatHistory[0]
+    const daysVacant = lastOccupancy
+        ? Math.max(0, Math.floor((new Date(date) - new Date(lastOccupancy.endDate)) / 86400000))
+        : null
+    const vacantSince = lastOccupancy
+        ? format(new Date(new Date(lastOccupancy.endDate).getTime() + 86400000), 'yyyy-MM-dd')
+        : null
 
     const occupied = seatMap?.occupiedSeats ?? 0
     const total    = seatMap?.totalSeats ?? 110
@@ -139,6 +188,27 @@ export default function AdminSeatsPage() {
             return
         }
         const hi = i18n.language?.startsWith('hi')
+
+        if (!seat.isOccupied) {
+            const vacancy = daysVacant === null
+                ? t('adminSeats.modal.neverOccupied')
+                : t('adminSeats.modal.daysVacantValue', { days: daysVacant })
+            const parts = [
+                t('adminSeats.modal.seat', { seatNumber: seat.seatNumber }),
+                t('adminSeats.modal.vacant'),
+                vacancy,
+            ]
+            synth.cancel()
+            const utter = new SpeechSynthesisUtterance(parts.join('. ') + '.')
+            utter.lang = hi ? 'hi-IN' : 'en-IN'
+            const voices = synth.getVoices() || []
+            const voice = voices.find(v => v.lang === utter.lang)
+                || voices.find(v => v.lang?.toLowerCase().startsWith(hi ? 'hi' : 'en'))
+            if (voice) utter.voice = voice
+            synth.speak(utter)
+            return
+        }
+
         const overdueDays = Math.abs(daysToExpiry(seat.membershipEnd, date) ?? 0)
         let fees
         if (seat.displayStatus === 'PENDING') {
@@ -278,18 +348,22 @@ export default function AdminSeatsPage() {
 
                                 return (
                                     <div key={sn} className="relative">
-                                        <button onClick={() => setSelected(seat.isOccupied ? seat : null)}
+                                        <button onClick={() => setSelected(seat)}
                                                 title={seat.isOccupied
                                                     ? `${seat.studentName} — ${shiftLabel(seat.shift)}`
-                                                    : isOtherShiftOccupied
-                                                        ? `${sn} (Available — booked for ${shiftLabel(otherShift)})`
-                                                        : `${sn} (${t('adminSeats.legend.available')})`}
-                                                className={`w-8 h-8 rounded-lg text-xs font-medium border transition-all
+                                                    : seat.isActive === false
+                                                        ? `${sn} (${t('adminSeats.modal.unavailable')})`
+                                                        : isOtherShiftOccupied
+                                                            ? `${sn} (Available — booked for ${shiftLabel(otherShift)})`
+                                                            : `${sn} (${t('adminSeats.legend.available')})`}
+                                                className={`w-8 h-8 rounded-lg text-xs font-medium border transition-all cursor-pointer
                                                     ${seat.isOccupied
                                                         ? seat.studentGender === 'Female'
-                                                            ? 'bg-fuchsia-500/30 border-fuchsia-500/50 text-fuchsia-300 hover:bg-fuchsia-500/50 cursor-pointer'
-                                                            : 'bg-red-500/30 border-red-500/50 text-red-300 hover:bg-red-500/50 cursor-pointer'
-                                                        : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 cursor-default'}`}>
+                                                            ? 'bg-fuchsia-500/30 border-fuchsia-500/50 text-fuchsia-300 hover:bg-fuchsia-500/50'
+                                                            : 'bg-red-500/30 border-red-500/50 text-red-300 hover:bg-red-500/50'
+                                                        : seat.isActive === false
+                                                            ? 'bg-primary-800/60 border-primary-600/40 text-primary-500 hover:bg-primary-800/80'
+                                                            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 hover:bg-emerald-500/20'}`}>
                                             {viewMode === 'expiry' ? '' : isFullDayOccupant ? '' : sn.substring(1)}
                                         </button>
                                         {isFullDayOccupant && (
@@ -359,10 +433,12 @@ export default function AdminSeatsPage() {
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-yellow-500/40 border border-yellow-400/60" />{t('adminSeats.legend.expiry.soon')}</div>
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/30 border border-emerald-400/50" />{t('adminSeats.legend.expiry.safe')}</div>
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/10 border border-emerald-500/20" />{t('adminSeats.legend.available')}</div>
+                            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-primary-800/60 border border-primary-600/40" />{t('adminSeats.modal.unavailable')}</div>
                         </div>
                     ) : (
                         <div className="flex flex-wrap gap-6 mt-6 text-xs text-primary-400">
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/10 border border-emerald-500/20" />{t('adminSeats.legend.available')}</div>
+                            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-primary-800/60 border border-primary-600/40" />{t('adminSeats.modal.unavailable')}</div>
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-500/30 border border-red-500/50" />Male occupied</div>
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-fuchsia-500/30 border border-fuchsia-500/50" />Female occupied</div>
                             {shift !== 'FULL_DAY' && (
@@ -378,7 +454,7 @@ export default function AdminSeatsPage() {
 
             {selected && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setSelected(null)}>
-                    <div className="card p-6 w-72 border-red-500/30" onClick={e => e.stopPropagation()}>
+                    <div className={`card p-6 w-72 ${selected.isOccupied ? 'border-red-500/30' : selected.isActive === false ? 'border-primary-600/40' : 'border-emerald-500/30'}`} onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
                                 <button onClick={() => speakSeatDetails(selected)}
@@ -388,31 +464,49 @@ export default function AdminSeatsPage() {
                                     <Volume2 size={18} />
                                 </button>
                                 <h3 className="text-white font-semibold">{t('adminSeats.modal.seat', { seatNumber: selected.seatNumber })}</h3>
-                                {selected.displayStatus && (
-                                    <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_BADGE_CLASSES[selected.displayStatus] || 'bg-primary-700/30 text-primary-400 border-primary-700/40'}`}>
-                                        {t(`adminStudents.statusLabels.${selected.displayStatus}`)}
+                                {selected.isOccupied ? (
+                                    <>
+                                        {selected.displayStatus && (
+                                            <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_BADGE_CLASSES[selected.displayStatus] || 'bg-primary-700/30 text-primary-400 border-primary-700/40'}`}>
+                                                {t(`adminStudents.statusLabels.${selected.displayStatus}`)}
+                                            </span>
+                                        )}
+                                        {selected.displayStatus === 'PENDING' && selected.pendingAmount > 0 && (
+                                            <span className="text-xs text-red-400 font-medium">{formatCurrency(selected.pendingAmount)}</span>
+                                        )}
+                                        {(selected.displayStatus === 'GRACE' || selected.displayStatus === 'GRACE_OVERDUE') && (
+                                            <span className="text-xs text-orange-400 font-medium">
+                                                {Math.abs(daysToExpiry(selected.membershipEnd, date))}d overdue
+                                            </span>
+                                        )}
+                                    </>
+                                ) : selected.isActive === false ? (
+                                    <span className="text-xs px-2 py-0.5 rounded-full border bg-primary-700/40 text-primary-300 border-primary-600/40">
+                                        {t('adminSeats.modal.unavailable')}
                                     </span>
-                                )}
-                                {selected.displayStatus === 'PENDING' && selected.pendingAmount > 0 && (
-                                    <span className="text-xs text-red-400 font-medium">{formatCurrency(selected.pendingAmount)}</span>
-                                )}
-                                {(selected.displayStatus === 'GRACE' || selected.displayStatus === 'GRACE_OVERDUE') && (
-                                    <span className="text-xs text-orange-400 font-medium">
-                                        {Math.abs(daysToExpiry(selected.membershipEnd, date))}d overdue
+                                ) : (
+                                    <span className="text-xs px-2 py-0.5 rounded-full border bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                                        {t('adminSeats.modal.vacant')}
                                     </span>
                                 )}
                             </div>
                             <button onClick={() => setSelected(null)} className="text-primary-400 hover:text-white">✕</button>
                         </div>
                         <div className="space-y-2">
-                            {[
+                            {(selected.isOccupied ? [
                                 { l: t('adminSeats.modal.student'), v: localizeName(selected.studentName), link: selected.studentId ? `/admin/students/${selected.studentId}` : null },
                                 { l: t('adminSeats.modal.mobile'),  v: selected.studentMobile || '—', call: selected.studentMobile || null },
                                 { l: 'Gender',                       v: selected.studentGender || '—' },
                                 { l: t('adminSeats.modal.shift'),   v: shiftLabel(selected.shift) },
                                 { l: t('adminSeats.modal.expires'), v: selected.membershipEnd },
                                 { l: t('adminSeats.modal.daysLeft'), v: t('adminSeats.modal.daysLeftValue', { days: daysToExpiry(selected.membershipEnd, date) }) },
-                            ].map(({ l, v, link, call }) => (
+                            ] : [
+                                { l: t('adminSeats.modal.vacantSince'), v: vacantSince || '—' },
+                                { l: t('adminSeats.modal.daysVacant'),
+                                  v: historyLoading
+                                      ? '…'
+                                      : daysVacant === null ? t('adminSeats.modal.neverOccupied') : t('adminSeats.modal.daysVacantValue', { days: daysVacant }) },
+                            ]).map(({ l, v, link, call }) => (
                                 <div key={l} className="flex justify-between items-center gap-2 py-2 border-b border-primary-700/30 last:border-0 text-sm">
                                     <span className="text-primary-400 flex-shrink-0">{l}</span>
                                     <span className="flex items-center gap-2 min-w-0">
@@ -432,6 +526,17 @@ export default function AdminSeatsPage() {
                                 </div>
                             ))}
                         </div>
+
+                        {!selected.isOccupied && (
+                            <button onClick={toggleSeatActive}
+                                    disabled={seatActionLoading}
+                                    className={`w-full mt-4 py-2 rounded-xl text-sm font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+                                        ${selected.isActive === false
+                                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30'
+                                            : 'bg-red-500/20 text-red-400 border-red-500/40 hover:bg-red-500/30'}`}>
+                                {selected.isActive === false ? t('adminSeats.modal.makeAvailable') : t('adminSeats.modal.makeUnavailable')}
+                            </button>
+                        )}
 
                         <div className="mt-5 pt-5 border-t border-primary-700/30">
                             <button onClick={toggleSeatHistory}

@@ -1117,6 +1117,7 @@ pub async fn get_seat_map(
 
     let mut seats_by_row: HashMap<String, Vec<SeatMapSeat>> = HashMap::new();
     let mut occupied_count = 0i64;
+    let mut blocked_count = 0i64;
     let total = seats.len() as i64;
 
     for seat in seats {
@@ -1124,10 +1125,13 @@ pub async fn get_seat_map(
         let is_occupied = occ.is_some();
         if is_occupied {
             occupied_count += 1;
+        } else if !seat.is_active {
+            blocked_count += 1;
         }
         let map_seat = SeatMapSeat {
             seat_number: seat.seat_number.clone(),
             is_occupied,
+            is_active: seat.is_active,
             student_id: occ.map(|(id, _, _, _, _, _, _, _)| *id),
             student_name: occ.map(|(_, n, _, _, _, _, _, _)| n.clone()),
             student_mobile: occ.and_then(|(_, _, m, _, _, _, _, _)| m.clone()),
@@ -1158,9 +1162,58 @@ pub async fn get_seat_map(
         date,
         seats_by_row,
         occupied_seats: occupied_count,
-        available_seats: total - occupied_count,
+        available_seats: total - occupied_count - blocked_count,
         total_seats: total,
     })
+}
+
+/// Admin-only manual block/unblock of a physical seat, independent of any
+/// booking — reuses `seats.is_active`, the same flag `book_seat` and the
+/// admin seat-change/swap flows already require to be true, so a blocked
+/// seat is immediately unbookable everywhere without any extra checks.
+pub async fn set_seat_active(
+    state: &Arc<AppState>,
+    seat_number: &str,
+    is_active: bool,
+) -> crate::error::Result<()> {
+    let seat = sqlx::query_as::<_, crate::models::seat::Seat>(
+        "SELECT * FROM seats WHERE seat_number = $1",
+    )
+    .bind(seat_number)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound(format!("Seat {seat_number} not found")))?;
+
+    if !is_active {
+        let occupied: bool = sqlx::query_scalar(
+            "SELECT EXISTS(
+                SELECT 1 FROM seat_bookings sb
+                WHERE sb.seat_id = $1
+                  AND sb.status = 'ACTIVE'
+                  AND sb.booking_date <= CURRENT_DATE
+                  AND sb.end_date >= CURRENT_DATE
+             )",
+        )
+        .bind(seat.id)
+        .fetch_one(&state.db)
+        .await?;
+        if occupied {
+            return Err(AppError::Conflict(format!(
+                "Seat {seat_number} is currently occupied and cannot be made unavailable"
+            )));
+        }
+    }
+
+    sqlx::query("UPDATE seats SET is_active = $2 WHERE id = $1")
+        .bind(seat.id)
+        .bind(is_active)
+        .execute(&state.db)
+        .await?;
+
+    let today = chrono::Local::now().date_naive();
+    crate::services::seat::invalidate_seat_cache(state, "FULL_DAY", today, today + chrono::Duration::days(60)).await;
+
+    Ok(())
 }
 
 /// History of every non-abandoned booking a physical seat has ever had.

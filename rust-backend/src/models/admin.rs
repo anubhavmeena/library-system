@@ -178,6 +178,7 @@ pub struct AdminMembershipSummary {
 pub struct SeatMapSeat {
     pub seat_number: String,
     pub is_occupied: bool,
+    pub is_active: bool,
     pub student_id: Option<Uuid>,
     pub student_name: Option<String>,
     pub student_mobile: Option<String>,
@@ -187,6 +188,12 @@ pub struct SeatMapSeat {
     pub other_shift_occupied: bool,
     pub display_status: Option<String>,
     pub pending_amount: Option<Decimal>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetSeatActiveRequest {
+    pub is_active: bool,
 }
 
 #[derive(Debug, Serialize)]
