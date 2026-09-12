@@ -174,18 +174,27 @@ export default function AdminSeatsPage() {
     // clamp against, get_seat_history has nothing to shorten it against and
     // the sentinel leaks through as this seat's "last" end date. Since this
     // modal only exists because the seat reads as vacant on `date`, any
-    // endDate on or after `date` is never trustworthy as a real vacate
+    // endDate strictly AFTER `date` is never trustworthy as a real vacate
     // date — treat it as unknown rather than computing a nonsense future
-    // "vacant since" (e.g. 10000-01-01) from it.
+    // "vacant since" (e.g. 10000-01-01) from it. endDate == date is fine
+    // (and common): occupancy is driven by the booking's status, not its
+    // end_date, so a released/expired booking can legitimately carry an
+    // end_date of today while the seat already reads as vacant today.
     const lastOccupancy = seatHistory[0]
-    const lastVacatedDate = lastOccupancy && new Date(lastOccupancy.endDate) < new Date(date)
+    const lastVacatedDate = lastOccupancy && new Date(lastOccupancy.endDate) <= new Date(date)
         ? lastOccupancy.endDate
         : null
     const daysVacant = lastVacatedDate
         ? Math.max(0, Math.floor((new Date(date) - new Date(lastVacatedDate)) / 86400000))
         : null
+    // "Vacant since" is the day after the last occupied day, clamped to
+    // never exceed the viewed date — otherwise a lastVacatedDate of exactly
+    // `date` would render as tomorrow, a date that hasn't happened yet.
     const vacantSince = lastVacatedDate
-        ? format(new Date(new Date(lastVacatedDate).getTime() + 86400000), 'yyyy-MM-dd')
+        ? format(
+            new Date(Math.min(new Date(lastVacatedDate).getTime() + 86400000, new Date(date).getTime())),
+            'yyyy-MM-dd',
+          )
         : null
     // Distinguishes "we have history, just not a trustworthy end date" from
     // a seat that has genuinely never been booked.
