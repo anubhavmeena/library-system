@@ -2271,9 +2271,13 @@ pub async fn change_membership_seat(
         )));
     }
 
-    // Release old bookings
+    // Release old booking — end_date = LEAST(end_date, CURRENT_DATE) so the
+    // old seat's history shows today (when the student actually left it),
+    // not the membership's original future end_date, which is still ACTIVE
+    // and legitimately in the future at this point (see release_seat, which
+    // fixes the same class of stale-end_date bug for the GRACE sentinel).
     sqlx::query(
-        "UPDATE seat_bookings SET status = 'RELEASED'
+        "UPDATE seat_bookings SET status = 'RELEASED', end_date = LEAST(end_date, CURRENT_DATE)
          WHERE membership_id = $1 AND status = 'ACTIVE'",
     )
     .bind(membership_id)
@@ -2368,12 +2372,15 @@ pub async fn swap_membership_seats(
 
     // Release both current bookings first so the unique (seat_id, shift, booking_date)
     // constraint never has to reconcile two ACTIVE rows for the same seat at once.
-    sqlx::query("UPDATE seat_bookings SET status = 'RELEASED' WHERE membership_id = $1 AND status = 'ACTIVE'")
+    // end_date = LEAST(end_date, CURRENT_DATE): each old seat's history should
+    // show today (when the swap happened), not the membership's own future
+    // end_date — see change_membership_seat / release_seat for the same fix.
+    sqlx::query("UPDATE seat_bookings SET status = 'RELEASED', end_date = LEAST(end_date, CURRENT_DATE) WHERE membership_id = $1 AND status = 'ACTIVE'")
         .bind(membership_a.id)
         .execute(&mut *tx)
         .await
         .map_err(AppError::Database)?;
-    sqlx::query("UPDATE seat_bookings SET status = 'RELEASED' WHERE membership_id = $1 AND status = 'ACTIVE'")
+    sqlx::query("UPDATE seat_bookings SET status = 'RELEASED', end_date = LEAST(end_date, CURRENT_DATE) WHERE membership_id = $1 AND status = 'ACTIVE'")
         .bind(membership_b.id)
         .execute(&mut *tx)
         .await

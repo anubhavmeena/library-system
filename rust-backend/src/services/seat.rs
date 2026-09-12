@@ -230,8 +230,11 @@ pub async fn release_booking(
     state: &Arc<AppState>,
     membership_id: Uuid,
 ) -> crate::error::Result<()> {
+    // end_date = LEAST(end_date, CURRENT_DATE): an early self-release
+    // otherwise leaves the booking's original (still-future) end_date in
+    // place — see admin::release_seat for the same fix on the admin side.
     let bookings = sqlx::query_as::<_, SeatBooking>(
-        "UPDATE seat_bookings SET status = 'RELEASED'
+        "UPDATE seat_bookings SET status = 'RELEASED', end_date = LEAST(end_date, CURRENT_DATE)
          WHERE membership_id = $1 AND status = 'ACTIVE' RETURNING *",
     )
     .bind(membership_id)
