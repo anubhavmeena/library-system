@@ -2546,8 +2546,18 @@ pub async fn release_seat(
         .execute(&state.db)
         .await?;
 
+    // LEAST(...) clamps end_date to today: a GRACE membership's booking sits
+    // at the 9999-12-31 hold-indefinitely sentinel (see mark_expired_and_
+    // start_grace / mark_membership_grace) and this is the standard way an
+    // admin resolves that hold, so leaving it unclamped would make this
+    // seat's most recent history entry permanently show a bogus far-future
+    // end date once nothing later comes along to clamp it in get_seat_history.
+    // Also correctly clamps a still-in-range ACTIVE booking released early.
     let bookings = sqlx::query_as::<_, crate::models::seat::SeatBooking>(
-        "UPDATE seat_bookings SET status = 'RELEASED' WHERE membership_id = $1 AND status = 'ACTIVE' RETURNING *",
+        "UPDATE seat_bookings
+         SET status = 'RELEASED', end_date = LEAST(end_date, CURRENT_DATE)
+         WHERE membership_id = $1 AND status = 'ACTIVE'
+         RETURNING *",
     )
     .bind(membership_id)
     .fetch_all(&state.db)
