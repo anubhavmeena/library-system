@@ -670,6 +670,7 @@
       "daysLeft": "Days Left", "daysLeftValue": "{{days}} days",
       "vacant": "Vacant", "vacantSince": "Vacant Since",
       "daysVacant": "Days Vacant", "daysVacantValue": "{{days}} days", "neverOccupied": "Never occupied",
+      "unknownVacancy": "Unknown", "ongoing": "Ongoing",
       "unavailable": "Unavailable",
       "makeUnavailable": "Make this seat unavailable", "makeAvailable": "Make this seat available",
       "confirmUnavailable": "Mark seat {{seatNumber}} as unavailable? Students won't be able to book it until you make it available again.",

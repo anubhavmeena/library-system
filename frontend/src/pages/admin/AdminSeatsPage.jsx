@@ -47,6 +47,11 @@ const STATUS_BADGE_CLASSES = {
 
 const ROWS = ['A', 'B', 'C', 'D']
 const INACTIVE_SEATS = new Set(['B8', 'B18'])
+// seat_bookings.end_date sentinel a GRACE membership is pushed to, to hold
+// the seat indefinitely — never a real calendar date (see rust-backend
+// CLAUDE.md); shown to admins as "Ongoing" wherever a raw booking end date
+// is rendered.
+const GRACE_SENTINEL_END_DATE = '9999-12-31'
 const L_TOP    = [13, 11, 9, 7, 5, 3, 1]
 const L_BOTTOM = [14, 12, 10, 8, 6, 4, 2]
 const R_TOP    = [15, 17, 19, 21, 23, 25, 27]
@@ -161,13 +166,30 @@ export default function AdminSeatsPage() {
     // Most recent (non-abandoned) booking on this seat, if any — history is
     // ordered booking_date DESC and entries never overlap, so [0] is also the
     // one with the latest end_date, i.e. the last day the seat was occupied.
+    //
+    // A GRACE membership's seat_bookings.end_date gets pushed to the
+    // 9999-12-31 sentinel to hold the seat indefinitely (see rust-backend's
+    // CLAUDE.md); if that membership later left GRACE (e.g. released, or
+    // marked EXPIRED) without a subsequent booking on the same seat to
+    // clamp against, get_seat_history has nothing to shorten it against and
+    // the sentinel leaks through as this seat's "last" end date. Since this
+    // modal only exists because the seat reads as vacant on `date`, any
+    // endDate on or after `date` is never trustworthy as a real vacate
+    // date — treat it as unknown rather than computing a nonsense future
+    // "vacant since" (e.g. 10000-01-01) from it.
     const lastOccupancy = seatHistory[0]
-    const daysVacant = lastOccupancy
-        ? Math.max(0, Math.floor((new Date(date) - new Date(lastOccupancy.endDate)) / 86400000))
+    const lastVacatedDate = lastOccupancy && new Date(lastOccupancy.endDate) < new Date(date)
+        ? lastOccupancy.endDate
         : null
-    const vacantSince = lastOccupancy
-        ? format(new Date(new Date(lastOccupancy.endDate).getTime() + 86400000), 'yyyy-MM-dd')
+    const daysVacant = lastVacatedDate
+        ? Math.max(0, Math.floor((new Date(date) - new Date(lastVacatedDate)) / 86400000))
         : null
+    const vacantSince = lastVacatedDate
+        ? format(new Date(new Date(lastVacatedDate).getTime() + 86400000), 'yyyy-MM-dd')
+        : null
+    // Distinguishes "we have history, just not a trustworthy end date" from
+    // a seat that has genuinely never been booked.
+    const vacancyUnknown = !!lastOccupancy && !lastVacatedDate
 
     const occupied = seatMap?.occupiedSeats ?? 0
     const total    = seatMap?.totalSeats ?? 110
@@ -190,9 +212,11 @@ export default function AdminSeatsPage() {
         const hi = i18n.language?.startsWith('hi')
 
         if (!seat.isOccupied) {
-            const vacancy = daysVacant === null
-                ? t('adminSeats.modal.neverOccupied')
-                : t('adminSeats.modal.daysVacantValue', { days: daysVacant })
+            const vacancy = vacancyUnknown
+                ? t('adminSeats.modal.unknownVacancy')
+                : daysVacant === null
+                    ? t('adminSeats.modal.neverOccupied')
+                    : t('adminSeats.modal.daysVacantValue', { days: daysVacant })
             const parts = [
                 t('adminSeats.modal.seat', { seatNumber: seat.seatNumber }),
                 t('adminSeats.modal.vacant'),
@@ -501,10 +525,11 @@ export default function AdminSeatsPage() {
                                 { l: t('adminSeats.modal.expires'), v: selected.membershipEnd },
                                 { l: t('adminSeats.modal.daysLeft'), v: t('adminSeats.modal.daysLeftValue', { days: daysToExpiry(selected.membershipEnd, date) }) },
                             ] : [
-                                { l: t('adminSeats.modal.vacantSince'), v: vacantSince || '—' },
+                                { l: t('adminSeats.modal.vacantSince'), v: historyLoading ? '…' : vacantSince || '—' },
                                 { l: t('adminSeats.modal.daysVacant'),
                                   v: historyLoading
                                       ? '…'
+                                      : vacancyUnknown ? t('adminSeats.modal.unknownVacancy')
                                       : daysVacant === null ? t('adminSeats.modal.neverOccupied') : t('adminSeats.modal.daysVacantValue', { days: daysVacant }) },
                             ]).map(({ l, v, link, call }) => (
                                 <div key={l} className="flex justify-between items-center gap-2 py-2 border-b border-primary-700/30 last:border-0 text-sm">
@@ -565,7 +590,7 @@ export default function AdminSeatsPage() {
                                                         )}
                                                     </div>
                                                     <div className="text-primary-400 space-y-0.5">
-                                                        <p>{h.startDate} → {h.endDate} · {shiftLabel(h.shift)}</p>
+                                                        <p>{h.startDate} → {h.endDate === GRACE_SENTINEL_END_DATE ? t('adminSeats.modal.ongoing') : h.endDate} · {shiftLabel(h.shift)}</p>
                                                         <p className="font-mono">{h.status}</p>
                                                     </div>
                                                 </div>

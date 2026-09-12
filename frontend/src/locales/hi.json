@@ -666,6 +666,7 @@
       "daysLeft": "बचे दिन", "daysLeftValue": "{{days}} दिन",
       "vacant": "खाली", "vacantSince": "कब से खाली",
       "daysVacant": "कितने दिन से खाली", "daysVacantValue": "{{days}} दिन", "neverOccupied": "कभी नहीं भरी",
+      "unknownVacancy": "अज्ञात", "ongoing": "जारी",
       "unavailable": "अनुपलब्ध",
       "makeUnavailable": "इस सीट को अनुपलब्ध करें", "makeAvailable": "इस सीट को उपलब्ध करें",
       "confirmUnavailable": "सीट {{seatNumber}} को अनुपलब्ध करें? जब तक आप इसे फिर से उपलब्ध नहीं करते, छात्र इसे बुक नहीं कर पाएंगे।",
