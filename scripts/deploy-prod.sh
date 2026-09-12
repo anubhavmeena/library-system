@@ -139,7 +139,11 @@ if (( DO_FRONTEND )); then
 
     step "Frontend — verifying"
     HTTP_CODE=$(ssh_cmd "curl -sk -o /dev/null -w '%{http_code}' -H 'Host: $SITE_HOST' https://localhost/")
-    LIVE_BUNDLE=$(ssh_cmd "curl -sk -H 'Host: $SITE_HOST' https://localhost/" | grep -o 'index-[A-Za-z0-9]*\.js' | head -1)
+    # Vite hashes are base64url-ish (can contain '_' and '-'), so the
+    # character class must allow those too or a matching hash silently fails
+    # to match; `|| true` keeps a genuine no-match from killing the script
+    # via pipefail before it reaches the explicit err() check below.
+    LIVE_BUNDLE=$(ssh_cmd "curl -sk -H 'Host: $SITE_HOST' https://localhost/" | { grep -o 'index-[A-Za-z0-9_-]*\.js' || true; } | head -1)
     [[ "$HTTP_CODE" == "200" ]] || err "Site returned HTTP $HTTP_CODE, expected 200."
     [[ "$LIVE_BUNDLE" == "$BUNDLE" ]] || err "Live site is serving $LIVE_BUNDLE, expected $BUNDLE."
     log "Frontend deployed and verified — production is serving $LIVE_BUNDLE"
