@@ -132,10 +132,14 @@
       "verifying": "जांच हो रही है...",
       "back": "← वापस",
       "backHome": "← होम पर वापस",
+      "resendOtp": "OTP दोबारा भेजें",
+      "resendIn": "{{seconds}} सेकंड में भेजें",
+      "sendViaSms": "फिर भी OTP नहीं मिला? SMS से भेजें",
       "toasts": {
         "enterContact": "एडमिन ईमेल या मोबाइल दर्ज करें",
         "enter6Otp": "6 अंकों का OTP दर्ज करें",
         "otpSent": "OTP भेजा गया!",
+        "otpSentSms": "OTP SMS द्वारा भेजा गया!",
         "loginSuccess": "एडमिन लॉगिन सफल",
         "failed": "विफल",
         "loginFailed": "लॉगिन विफल"

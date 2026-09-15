@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -13,12 +13,47 @@ export default function AdminLoginPage() {
     const [contact, setContact] = useState('')
     const [otp, setOtp] = useState('')
     const [step, setStep] = useState(1)
+    const isMobile = !contact.includes('@')
+
+    // Mirrors LoginPage.jsx's resend/SMS-fallback timing (backend's 10s resend
+    // cooldown). otpSendCount tracks how many times an OTP has been (re)sent on
+    // this screen; the "Send via SMS instead" option appears once that's >= 2
+    // (i.e. after one resend) and 10s have passed since the last send.
+    const [otpSendCount, setOtpSendCount] = useState(0)
+    const [secondsSinceSend, setSecondsSinceSend] = useState(0)
+    const [smsOptionUsed, setSmsOptionUsed] = useState(false)
+
+    useEffect(() => {
+        if (step !== 2 || otpSendCount === 0) return
+        setSecondsSinceSend(0)
+        const timer = setInterval(() => setSecondsSinceSend(s => s + 1), 1000)
+        return () => clearInterval(timer)
+    }, [step, otpSendCount])
+
+    const canResend = secondsSinceSend >= 10
+    const secondsLeft = Math.max(0, 10 - secondsSinceSend)
+    const showSmsOption = isMobile && !smsOptionUsed && otpSendCount >= 2 && canResend
 
     const handleSendOtp = async () => {
         if (!contact.trim()) return toast.error(t('auth.adminLogin.toasts.enterContact'))
-        const res = await dispatch(sendOtp({ contact: contact.trim(), contactType: contact.includes('@') ? 'EMAIL' : 'MOBILE' }))
-        if (sendOtp.fulfilled.match(res)) { toast.success(t('auth.adminLogin.toasts.otpSent')); setStep(2) }
+        const res = await dispatch(sendOtp({ contact: contact.trim(), contactType: isMobile ? 'MOBILE' : 'EMAIL' }))
+        if (sendOtp.fulfilled.match(res)) { toast.success(t('auth.adminLogin.toasts.otpSent')); setStep(2); setOtpSendCount(1) }
         else toast.error(res.payload || t('auth.adminLogin.toasts.failed'))
+    }
+
+    const handleResendOtp = async () => {
+        const res = await dispatch(sendOtp({ contact: contact.trim(), contactType: isMobile ? 'MOBILE' : 'EMAIL' }))
+        if (sendOtp.fulfilled.match(res)) { toast.success(t('auth.adminLogin.toasts.otpSent')); setOtpSendCount(c => c + 1) }
+        else toast.error(res.payload || t('auth.adminLogin.toasts.failed'))
+    }
+
+    const handleSendViaSms = async () => {
+        const res = await dispatch(sendOtp({ contact: contact.trim(), contactType: 'MOBILE', channel: 'SMS' }))
+        if (sendOtp.fulfilled.match(res)) {
+            toast.success(t('auth.adminLogin.toasts.otpSentSms'))
+            setSmsOptionUsed(true)
+            setOtpSendCount(c => c + 1)
+        } else toast.error(res.payload || t('auth.adminLogin.toasts.failed'))
     }
 
     const handleLogin = async () => {
@@ -61,7 +96,22 @@ export default function AdminLoginPage() {
                             <button onClick={handleLogin} disabled={isLoading} className="w-full bg-red-600 hover:bg-red-500 text-white font-semibold px-6 py-3 rounded-xl transition-all">
                                 {isLoading ? t('auth.adminLogin.verifying') : t('auth.adminLogin.loginBtn')}
                             </button>
-                            <button onClick={()=>setStep(1)} className="w-full text-primary-400 text-sm hover:text-white transition-colors">{t('auth.adminLogin.back')}</button>
+                            <div className="flex items-center justify-between">
+                                <button onClick={()=>{ setStep(1); setOtp(''); setOtpSendCount(0); setSmsOptionUsed(false) }}
+                                        className="text-primary-400 text-sm hover:text-white transition-colors">
+                                    {t('auth.adminLogin.back')}
+                                </button>
+                                <button onClick={handleResendOtp} disabled={!canResend || isLoading}
+                                        className="text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-red-400 hover:text-red-300 disabled:text-primary-500">
+                                    {canResend ? t('auth.adminLogin.resendOtp') : t('auth.adminLogin.resendIn', { seconds: secondsLeft })}
+                                </button>
+                            </div>
+                            {showSmsOption && (
+                                <button onClick={handleSendViaSms} disabled={isLoading}
+                                        className="w-full text-sm text-center text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                                    {t('auth.adminLogin.sendViaSms')}
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>

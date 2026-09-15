@@ -136,10 +136,14 @@
       "verifying": "Verifying...",
       "back": "← Back",
       "backHome": "← Back to Home",
+      "resendOtp": "Resend OTP",
+      "resendIn": "Resend in {{seconds}}s",
+      "sendViaSms": "Still no OTP? Send via SMS instead",
       "toasts": {
         "enterContact": "Enter admin email or mobile",
         "enter6Otp": "Enter 6-digit OTP",
         "otpSent": "OTP sent!",
+        "otpSentSms": "OTP sent via SMS!",
         "loginSuccess": "Admin login successful",
         "failed": "Failed",
         "loginFailed": "Login failed"
