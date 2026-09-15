@@ -93,7 +93,7 @@ export default function AdminLayout() {
                         <span className="bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full text-xs">{t('admin.sidebar.adminBadge')}</span>
                     </div>
                 </header>
-                <main className="flex-1 p-4 lg:p-8 overflow-auto"><Outlet /></main>
+                <main className="flex-1 p-4 lg:p-8 overflow-y-auto overflow-x-hidden"><Outlet /></main>
             </div>
         </div>
     )

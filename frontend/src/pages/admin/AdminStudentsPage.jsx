@@ -130,12 +130,12 @@ export default function AdminStudentsPage() {
                 <input className="input w-64 text-sm py-2" placeholder={t('adminStudents.searchPlaceholder')}
                        value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-            <div className="flex flex-wrap gap-2 mb-6">
-                <div className="flex items-center gap-2">
-                    <span className="text-primary-500 text-xs">{t('adminStudents.filters.membershipLabel')}</span>
+            <div className="overflow-x-auto mb-6 -mx-4 px-4 lg:mx-0 lg:px-0">
+                <div className="flex items-center gap-2 w-max">
+                    <span className="text-primary-500 text-xs shrink-0">{t('adminStudents.filters.membershipLabel')}</span>
                     {membershipFilters.map(({ v, l }) => (
                         <button key={v} onClick={() => { setMembershipFilter(v); setPage(0) }}
-                                className={`px-3 py-2 rounded-xl text-sm font-medium border transition-all
+                                className={`shrink-0 px-3 py-2 rounded-xl text-sm font-medium border transition-all
                 ${membershipFilter === v ? 'bg-amber-500/20 border-amber-400/60 text-amber-400' : 'border-primary-700/40 text-primary-400 hover:text-white'}`}>
                             {l}
                         </button>
