@@ -441,12 +441,12 @@ export default function BookingPage() {
                         {seatsLoading ? <div className="shimmer h-64 rounded-xl" /> : <SeatGrid seats={seats} selectedSeat={selectedSeat} onSelect={seat=>dispatch(selectSeat(seat))} t={t} />}
                     </div>
                     {selectedSeat && (
-                        <div className="card p-4 mb-6 border-amber-500/30 bg-amber-500/5 flex items-center justify-between">
-                            <div>
+                        <div className="card p-4 mb-6 border-amber-500/30 bg-amber-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="min-w-0">
                                 <p className="text-amber-400 font-semibold">{t('booking.seat.selectedSeat', { seatNumber: selectedSeat.seatNumber })}</p>
                                 <p className="text-primary-400 text-sm">{t('booking.seat.selectedInfo', { row: selectedSeat.row, shift: shiftLabel(selectedPlan.planType, selectedShift) })}</p>
                             </div>
-                            <button onClick={()=>setStep(3)} className="btn-primary px-5 py-2.5">{t('booking.seat.continue')}</button>
+                            <button onClick={()=>setStep(3)} className="btn-primary px-5 py-2.5 whitespace-nowrap">{t('booking.seat.continue')}</button>
                         </div>
                     )}
                     <button onClick={()=>setStep(1)} className="text-primary-400 text-sm hover:text-white transition-colors">{t('booking.seat.backToPlans')}</button>

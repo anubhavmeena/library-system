@@ -171,40 +171,40 @@ export default function DashboardPage() {
 
             {membership?.status === 'ACTIVE' && daysLeft <= 7 && daysLeft > 0 && (
                 <div className="card p-5 mb-8 border-amber-500/30 bg-amber-500/10">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                         <span className="text-2xl">⚠️</span>
-                        <div>
+                        <div className="flex-1 min-w-0">
                             <p className="text-amber-400 font-semibold">{t('dashboard.expiring.title', { count: daysLeft })}</p>
                             <p className="text-primary-400 text-sm">{t('dashboard.expiring.desc', { seatNumber: membership.seatNumber })}</p>
                         </div>
-                        <Link to="/student/membership" className="ml-auto btn-primary text-sm px-4 py-2 whitespace-nowrap">{t('dashboard.expiring.renew')}</Link>
+                        <Link to="/student/membership" className="sm:ml-auto btn-primary text-sm px-4 py-2 whitespace-nowrap text-center">{t('dashboard.expiring.renew')}</Link>
                     </div>
                 </div>
             )}
 
             {(displayStatus === 'GRACE' || displayStatus === 'GRACE_OVERDUE') && (
                 <div className="card p-5 mb-8 border-red-500/30 bg-red-500/10">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                         <span className="text-2xl">🔒</span>
-                        <div>
+                        <div className="flex-1 min-w-0">
                             <p className="text-red-400 font-semibold">{t('dashboard.duesBanner.title')}</p>
                             <p className="text-primary-400 text-sm">{t('dashboard.duesBanner.desc', { seatNumber: membership?.seatNumber })}</p>
                         </div>
-                        <Link to="/student/membership" className="ml-auto btn-primary text-sm px-4 py-2 whitespace-nowrap">{t('dashboard.duesBanner.cta')}</Link>
+                        <Link to="/student/membership" className="sm:ml-auto btn-primary text-sm px-4 py-2 whitespace-nowrap text-center">{t('dashboard.duesBanner.cta')}</Link>
                     </div>
                 </div>
             )}
 
             {displayStatus === 'PENDING' && membership?.pendingAmount > 0 && (
                 <div className="card p-5 mb-8 border-amber-500/30 bg-amber-500/10">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                         <span className="text-2xl">💳</span>
-                        <div>
+                        <div className="flex-1 min-w-0">
                             <p className="text-amber-400 font-semibold">{t('dashboard.pendingBanner.title')}</p>
                             <p className="text-primary-400 text-sm">{t('dashboard.pendingBanner.desc', { amount: formatCurrency(withConvenienceFee(membership.pendingAmount)) })}</p>
                         </div>
                         <button onClick={handlePayPending} disabled={payingPending}
-                                className="ml-auto btn-primary text-sm px-4 py-2 whitespace-nowrap disabled:opacity-50">
+                                className="sm:ml-auto btn-primary text-sm px-4 py-2 whitespace-nowrap disabled:opacity-50">
                             {payingPending ? t('dashboard.pendingBanner.processing') : t('dashboard.pendingBanner.cta')}
                         </button>
                     </div>

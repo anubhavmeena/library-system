@@ -185,7 +185,8 @@ export default function AdminRevenuePage() {
 
             {/* Revenue Heatmap */}
             <p className="text-primary-500 text-xs uppercase tracking-widest mb-3">{t('adminRevenue.revenueMap')}</p>
-            <div className="card p-4 mb-8">
+            <div className="card p-4 mb-8 overflow-x-auto">
+                <div className="min-w-[420px]">
                 {/* Weekday headers */}
                 <div className="grid grid-cols-7 gap-1.5 mb-1.5">
                     {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
@@ -219,6 +220,7 @@ export default function AdminRevenuePage() {
                         )
                     })}
                 </div>
+                </div>
                 {/* Legend */}
                 <div className="flex items-center gap-3 mt-4 justify-end">
                     <span className="text-primary-500 text-xs">{t('adminRevenue.legend.low')}</span>
@@ -239,7 +241,8 @@ export default function AdminRevenuePage() {
                 ) : !report?.dailyBreakdown?.length ? (
                     <p className="text-primary-500 text-sm text-center py-10">{t('adminRevenue.noData')}</p>
                 ) : (
-                    <table className="w-full text-sm">
+                    <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[420px]">
                         <thead>
                             <tr className="text-primary-500 text-xs uppercase tracking-wider border-b border-primary-700/40">
                                 <th className="text-left px-6 py-3">{t('adminRevenue.date')}</th>
@@ -275,8 +278,8 @@ export default function AdminRevenuePage() {
                                                 ) : !payments?.length ? (
                                                     <p className="text-primary-500 text-xs py-4 px-2">{t('adminRevenue.noPayments')}</p>
                                                 ) : (
-                                                    <div className="rounded-xl overflow-hidden border border-primary-700/30">
-                                                        <table className="w-full text-xs">
+                                                    <div className="rounded-xl overflow-x-auto border border-primary-700/30">
+                                                        <table className="w-full text-xs min-w-[520px]">
                                                             <thead>
                                                                 <tr className="text-primary-500 uppercase tracking-wider border-b border-primary-700/30 bg-primary-800/40">
                                                                     <th className="text-left px-4 py-2">{t('adminRevenue.student')}</th>
@@ -307,6 +310,7 @@ export default function AdminRevenuePage() {
                             })}
                         </tbody>
                     </table>
+                    </div>
                 )}
             </div>
 

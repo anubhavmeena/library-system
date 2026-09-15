@@ -174,7 +174,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="card p-6 lg:col-span-2">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center justify-between flex-wrap gap-2 mb-6">
                         <h2 className="section-title">{t('profile.personalDetails')}</h2>
                         {!editing ? (
                             <button onClick={() => setEditing(true)} className="btn-outline text-sm px-4 py-2">{t('profile.edit')}</button>

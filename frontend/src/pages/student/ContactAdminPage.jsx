@@ -42,15 +42,15 @@ export default function ContactAdminPage() {
                 ) : (
                     <div className="space-y-4">
                         {contact?.name && (
-                            <div className="flex items-center gap-3">
-                                <span className="text-primary-400 w-16 text-sm">Name</span>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                                <span className="text-primary-400 sm:w-16 text-sm">Name</span>
                                 <span className="text-white font-medium">{contact.name}</span>
                             </div>
                         )}
                         {contact?.mobile && (
-                            <div className="flex items-center gap-3">
-                                <span className="text-primary-400 w-16 text-sm">Mobile</span>
-                                <div className="flex items-center gap-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                                <span className="text-primary-400 sm:w-16 text-sm">Mobile</span>
+                                <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-white font-medium">{contact.mobile}</span>
                                     <a
                                         href={`tel:${contact.mobile}`}
@@ -70,10 +70,10 @@ export default function ContactAdminPage() {
                             </div>
                         )}
                         {contact?.email && (
-                            <div className="flex items-center gap-3">
-                                <span className="text-primary-400 w-16 text-sm">Email</span>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-white font-medium">{contact.email}</span>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                                <span className="text-primary-400 sm:w-16 text-sm">Email</span>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-white font-medium break-all">{contact.email}</span>
                                     <a
                                         href={`mailto:${contact.email}`}
                                         className="text-sm px-3 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition-colors"

@@ -269,19 +269,19 @@ export default function MembershipPage() {
                             {daysLeft <= 7 && <p className="text-amber-400 text-xs mt-3 text-center">{t('membership.expiringSoon')}</p>}
                         </div>
                     </div>
-                    <div className="mt-5 pt-5 border-t border-primary-700/30 flex items-center justify-between">
-                        <p className="text-primary-400 text-sm">Download your membership ID card as PDF</p>
+                    <div className="mt-5 pt-5 border-t border-primary-700/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <p className="text-primary-400 text-sm flex-1 min-w-0">Download your membership ID card as PDF</p>
                         <button
                             onClick={handleDownloadIdCard}
                             disabled={downloadingCard}
-                            className="btn-outline text-sm px-5 py-2.5"
+                            className="btn-outline text-sm px-5 py-2.5 whitespace-nowrap"
                         >
                             {downloadingCard ? 'Generating...' : 'Download ID Card'}
                         </button>
                     </div>
                     {!queuedMembership && daysLeft <= 7 && (
-                        <div className="mt-5 pt-5 border-t border-primary-700/30 flex items-center justify-between">
-                            <p className="text-amber-400 text-sm">Your membership is expiring soon — renew your seat now to keep it. It activates automatically when your current plan expires.</p>
+                        <div className="mt-5 pt-5 border-t border-primary-700/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <p className="text-amber-400 text-sm flex-1 min-w-0">Your membership is expiring soon — renew your seat now to keep it. It activates automatically when your current plan expires.</p>
                             <button onClick={() => setQueueFlow('select')} className="btn-primary text-sm px-5 py-2.5 whitespace-nowrap">
                                 Renew Seat
                             </button>
