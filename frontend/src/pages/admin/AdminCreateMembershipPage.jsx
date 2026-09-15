@@ -80,6 +80,14 @@ export default function AdminCreateMembershipPage() {
     const [sendingRequest, setSendingRequest] = useState(false)
     const [upiId, setUpiId]                 = useState(null)
 
+    // Old GRACE dues + pending fees left over from a previously released
+    // membership — carried over into the new total by default, unless waived.
+    // Declared before the effects below since one of them depends on effectivePrice.
+    const oldDuesAmount  = Number(selectedStudent?.duesAmount || 0)
+    const oldPendingAmount = Number(selectedStudent?.pendingAmount || 0)
+    const oldDuesTotal   = oldDuesAmount + oldPendingAmount
+    const effectivePrice = (selectedPlan?.price || 0) + (waiveOldDues ? 0 : oldDuesTotal)
+
     useEffect(() => {
         api.get('/admin/students?page=0&size=200')
             .then(r => setStudents(r.data.data?.students || []))
@@ -123,13 +131,6 @@ export default function AdminCreateMembershipPage() {
         : '—'
 
     const resolvedShift = selectedPlan?.planType === 'FULL_DAY' ? 'FULL_DAY' : selectedShift
-
-    // Old GRACE dues + pending fees left over from a previously released
-    // membership — carried over into the new total by default, unless waived.
-    const oldDuesAmount  = Number(selectedStudent?.duesAmount || 0)
-    const oldPendingAmount = Number(selectedStudent?.pendingAmount || 0)
-    const oldDuesTotal   = oldDuesAmount + oldPendingAmount
-    const effectivePrice = (selectedPlan?.price || 0) + (waiveOldDues ? 0 : oldDuesTotal)
 
     const filteredStudents = students.filter(s =>
         (s.displayStatus === 'NEW' || s.displayStatus === 'RELEASED') && (
