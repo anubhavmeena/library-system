@@ -102,7 +102,7 @@ export default function App() {
             <Route path="/admin" element={
                 <ProtectedRoute role="ADMIN"><AdminLayout /></ProtectedRoute>
             }>
-                <Route index             element={<Navigate to="/admin/dashboard" replace />} />
+                <Route index             element={<Navigate to="/admin/seats" replace />} />
                 <Route path="dashboard"  element={<AdminDashboardPage />} />
                 <Route path="students"   element={<AdminStudentsPage />} />
                 <Route path="students/:userId" element={<AdminStudentDetailPage />} />

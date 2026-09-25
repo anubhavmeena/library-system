@@ -59,7 +59,7 @@ export default function AdminLoginPage() {
     const handleLogin = async () => {
         if (otp.length !== 6) return toast.error(t('auth.adminLogin.toasts.enter6Otp'))
         const res = await dispatch(adminLogin({ contact: contact.trim(), otp }))
-        if (adminLogin.fulfilled.match(res)) { toast.success(t('auth.adminLogin.toasts.loginSuccess')); navigate('/admin/dashboard') }
+        if (adminLogin.fulfilled.match(res)) { toast.success(t('auth.adminLogin.toasts.loginSuccess')); navigate('/admin/seats') }
         else toast.error(res.payload || t('auth.adminLogin.toasts.loginFailed'))
     }
 

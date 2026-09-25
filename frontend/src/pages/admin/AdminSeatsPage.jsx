@@ -88,7 +88,7 @@ export default function AdminSeatsPage() {
     const [shift, setShift]         = useState('FULL_DAY')
     const [date, setDate]           = useState(new Date().toISOString().split('T')[0])
     const [selected, setSelected]   = useState(null)
-    const [viewMode, setViewMode]   = useState('default') // 'default' | 'expiry'
+    const [viewMode, setViewMode]   = useState('expiry') // 'default' | 'expiry'
     const [rotated, setRotated]     = useState(false)
     const [historyOpen, setHistoryOpen]       = useState(false)
     const [seatHistory, setSeatHistory]       = useState([])
