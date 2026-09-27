@@ -623,6 +623,7 @@
   },
   "adminStudentDetail": {
     "back": "Back to Students",
+    "payment": { "paidOn": "Paid on", "plan": "Plan", "seat": "Seat", "period": "Period", "pending": "Pending", "discount": "Discount", "invoice": "Invoice", "order": "Order", "ref": "Ref" },
     "notFound": "Student not found",
     "callStudent": "Call student",
     "takePhoto": "Take photo",

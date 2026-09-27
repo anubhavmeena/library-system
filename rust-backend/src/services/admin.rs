@@ -450,9 +450,18 @@ pub async fn delete_student(state: &Arc<AppState>, user_id: Uuid) -> crate::erro
 pub async fn get_student_payments(
     state: &Arc<AppState>,
     user_id: Uuid,
-) -> crate::error::Result<Vec<crate::models::membership::Payment>> {
-    sqlx::query_as::<_, crate::models::membership::Payment>(
-        "SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC",
+) -> crate::error::Result<Vec<StudentPaymentItem>> {
+    sqlx::query_as::<_, StudentPaymentItem>(
+        r#"SELECT p.id, p.membership_id, p.amount, p.pending_amount, p.payment_gateway,
+                  p.gateway_order_id, p.gateway_payment_id, p.invoice_id, p.status,
+                  p.coupon_code, p.discount_amount,
+                  p.created_at AS paid_at,
+                  mp.name AS plan_name, m.shift, m.seat_number, m.start_date, m.end_date
+           FROM payments p
+           LEFT JOIN memberships m       ON m.id = p.membership_id
+           LEFT JOIN membership_plans mp ON mp.id = m.plan_id
+           WHERE p.user_id = $1
+           ORDER BY p.created_at DESC"#,
     )
     .bind(user_id)
     .fetch_all(&state.db)

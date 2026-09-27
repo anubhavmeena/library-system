@@ -245,6 +245,30 @@ pub struct DailyPaymentItem {
     pub paid_at: Option<NaiveDateTime>,
 }
 
+/// A payment row for the admin student-detail page, joined with the
+/// membership/plan it paid for so the UI can show what and when.
+#[derive(Debug, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct StudentPaymentItem {
+    pub id: Uuid,
+    pub membership_id: Uuid,
+    pub amount: Decimal,
+    pub pending_amount: Option<Decimal>,
+    pub payment_gateway: Option<String>,
+    pub gateway_order_id: Option<String>,
+    pub gateway_payment_id: Option<String>,
+    pub invoice_id: Option<String>,
+    pub status: String,
+    pub coupon_code: Option<String>,
+    pub discount_amount: Option<Decimal>,
+    pub paid_at: Option<NaiveDateTime>,
+    pub plan_name: Option<String>,
+    pub shift: Option<String>,
+    pub seat_number: Option<String>,
+    pub start_date: Option<NaiveDate>,
+    pub end_date: Option<NaiveDate>,
+}
+
 #[derive(Debug, Serialize, FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct ExpiringMembershipItem {

@@ -619,6 +619,7 @@
   },
   "adminStudentDetail": {
     "back": "छात्रों की सूची पर वापस जाएं",
+    "payment": { "paidOn": "भुगतान तिथि", "plan": "प्लान", "seat": "सीट", "period": "अवधि", "pending": "बकाया", "discount": "छूट", "invoice": "चालान", "order": "ऑर्डर", "ref": "संदर्भ" },
     "notFound": "छात्र नहीं मिला",
     "callStudent": "छात्र को कॉल करें",
     "takePhoto": "फ़ोटो लें",
