@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
+import ThemedSelect from '../../components/common/ThemedSelect'
 import toast from 'react-hot-toast'
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 'all']
@@ -184,8 +185,8 @@ export default function AdminActivityLogsPage() {
         setPage(0)
     }
 
-    const withPageReset = (setter) => (e) => {
-        setter(e.target.value)
+    const withPageReset = (setter) => (value) => {
+        setter(value)
         setPage(0)
     }
 
@@ -198,40 +199,36 @@ export default function AdminActivityLogsPage() {
         setPage(0)
     }
 
-    const filterSelectClass = 'input block text-xs py-1.5 pl-2 pr-7 w-full min-w-[8rem] font-normal'
+    const allOption = { value: 'all', label: t('adminActivityLogs.all') }
 
     const columns = [
         {
             key: 'date',
             label: t('adminActivityLogs.table.date'),
             filter: (
-                <select value={dateFilter} onChange={withPageReset(setDateFilter)} className={filterSelectClass}>
-                    {DATE_FILTER_OPTIONS.map(o => (
-                        <option key={o} value={o}>{t(`adminActivityLogs.dateFilter.${o}`)}</option>
-                    ))}
-                </select>
+                <ThemedSelect value={dateFilter} onChange={withPageReset(setDateFilter)} className="min-w-[8rem]"
+                              ariaLabel={t('adminActivityLogs.table.date')}
+                              options={DATE_FILTER_OPTIONS.map(o => ({ value: o, label: t(`adminActivityLogs.dateFilter.${o}`) }))} />
             ),
         },
         {
             key: 'admin',
             label: t('adminActivityLogs.table.admin'),
             filter: (
-                <select value={adminFilter} onChange={withPageReset(setAdminFilter)} className={filterSelectClass}>
-                    <option value="all">{t('adminActivityLogs.all')}</option>
-                    {filterOptions.admins.map(a => (
-                        <option key={a.id} value={a.id}>{a.name}{a.mobile ? ` (${a.mobile})` : ''}</option>
-                    ))}
-                </select>
+                <ThemedSelect value={adminFilter} onChange={withPageReset(setAdminFilter)} className="min-w-[8rem]"
+                              ariaLabel={t('adminActivityLogs.table.admin')}
+                              options={[allOption, ...filterOptions.admins.map(a => ({
+                                  value: a.id, label: `${a.name}${a.mobile ? ` (${a.mobile})` : ''}`,
+                              }))]} />
             ),
         },
         {
             key: 'action',
             label: t('adminActivityLogs.table.action'),
             filter: (
-                <select value={actionFilter} onChange={withPageReset(setActionFilter)} className={filterSelectClass}>
-                    <option value="all">{t('adminActivityLogs.all')}</option>
-                    {filterOptions.actions.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
+                <ThemedSelect value={actionFilter} onChange={withPageReset(setActionFilter)} className="min-w-[8rem]"
+                              ariaLabel={t('adminActivityLogs.table.action')}
+                              options={[allOption, ...filterOptions.actions.map(a => ({ value: a, label: a }))]} />
             ),
         },
         { key: 'description', label: t('adminActivityLogs.table.description') },
@@ -321,12 +318,11 @@ export default function AdminActivityLogsPage() {
                         <div className="flex items-center gap-3">
                             <span className="text-primary-400 text-sm">{t('adminActivityLogs.page', { page: page + 1 })}</span>
                             <span className="text-primary-500 text-xs">{t('adminActivityLogs.perPage')}</span>
-                            <select value={pageSize} onChange={e => handlePageSizeChange(e.target.value)}
-                                    className="input text-sm py-1 w-24">
-                                {PAGE_SIZE_OPTIONS.map(n => (
-                                    <option key={n} value={n}>{n === 'all' ? t('adminActivityLogs.all') : n}</option>
-                                ))}
-                            </select>
+                            <div className="w-24">
+                                <ThemedSelect value={pageSize} onChange={handlePageSizeChange} ariaLabel={t('adminActivityLogs.perPage')}
+                                              className="text-sm"
+                                              options={PAGE_SIZE_OPTIONS.map(n => ({ value: n, label: n === 'all' ? t('adminActivityLogs.all') : String(n) }))} />
+                            </div>
                         </div>
                         <div className="flex gap-2">
                             <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={pageSize === 'all' || page === 0}
