@@ -839,6 +839,17 @@
     "next": "अगला",
     "toasts": {
       "loadFailed": "गतिविधि लॉग लोड करने में विफल"
+    },
+    "searchPlaceholder": "विवरण, एडमिन या कार्रवाई से लॉग खोजें…",
+    "noMatches": "वर्तमान खोज / फ़िल्टर से कोई लॉग मेल नहीं खाता",
+    "clearFilters": "फ़िल्टर हटाएँ",
+    "dateFilter": {
+      "all": "सभी",
+      "today": "आज",
+      "yesterday": "कल",
+      "last7": "पिछले 7 दिन",
+      "last30": "पिछले 30 दिन",
+      "thisMonth": "इस महीने"
     }
   },
   "adminRenewalPolls": {

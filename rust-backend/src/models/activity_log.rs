@@ -15,4 +15,21 @@ pub struct ActivityLogEntry {
     pub entity_id: Option<String>,
     pub description: String,
     pub created_at: NaiveDateTime,
+    /// Students mentioned by this entry, resolved at read time for linking.
+    #[sqlx(skip)]
+    pub students: Vec<LinkedStudent>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct LinkedStudent {
+    pub id: Uuid,
+    pub name: String,
+    pub mobile: Option<String>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+pub struct ActivityLogAdmin {
+    pub id: Uuid,
+    pub name: String,
+    pub mobile: Option<String>,
 }

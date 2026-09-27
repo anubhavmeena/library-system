@@ -792,10 +792,23 @@ pub async fn list_activity_logs(
         Some(s) => Some(s.parse::<i64>().unwrap_or(100).clamp(1, 1000)),
         None => Some(100),
     };
-    let (logs, total) = alog::list_activity_logs(&state, page, size).await?;
+    let non_empty = |key: &str| q.get(key).map(|s| s.trim()).filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("all"));
+    let date = |key: &str| non_empty(key).and_then(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok());
+    let filters = alog::ActivityLogFilters {
+        search: non_empty("q").map(String::from),
+        admin_id: non_empty("adminId").and_then(|s| Uuid::parse_str(s).ok()),
+        action: non_empty("action").map(String::from),
+        from: date("from"),
+        to: date("to"),
+    };
+    let (logs, total) = alog::list_activity_logs(&state, &filters, page, size).await?;
+    let (admins, actions) = alog::list_filter_options(&state).await?;
     Ok(ApiResponse::success(
         "Activity logs retrieved",
-        serde_json::json!({ "logs": logs, "total": total, "page": page, "size": size }),
+        serde_json::json!({
+            "logs": logs, "total": total, "page": page, "size": size,
+            "filters": { "admins": admins, "actions": actions },
+        }),
     ))
 }
 

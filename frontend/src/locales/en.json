@@ -860,6 +860,17 @@
     "next": "Next",
     "toasts": {
       "loadFailed": "Failed to load activity logs"
+    },
+    "searchPlaceholder": "Search logs by description, admin or action…",
+    "noMatches": "No logs match the current search / filters",
+    "clearFilters": "Clear filters",
+    "dateFilter": {
+      "all": "All",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "last7": "Last 7 days",
+      "last30": "Last 30 days",
+      "thisMonth": "This month"
     }
   },
   "adminRenewalPolls": {
