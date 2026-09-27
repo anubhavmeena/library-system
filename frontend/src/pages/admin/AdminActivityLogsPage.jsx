@@ -198,7 +198,7 @@ export default function AdminActivityLogsPage() {
         setPage(0)
     }
 
-    const filterSelectClass = 'input text-xs py-1 px-2 mt-1.5 w-full min-w-[7rem] font-normal'
+    const filterSelectClass = 'input block text-xs py-1.5 pl-2 pr-7 w-full min-w-[8rem] font-normal'
 
     const columns = [
         {
@@ -279,8 +279,8 @@ export default function AdminActivityLogsPage() {
                                 <tr className="border-b border-primary-700/40">
                                     {columns.map(col => (
                                         <th key={col.key} className="p-4 text-left text-primary-400 font-medium whitespace-nowrap align-top">
-                                            {col.label}
-                                            {col.filter}
+                                            <div>{col.label}</div>
+                                            {col.filter && <div className="mt-2">{col.filter}</div>}
                                         </th>
                                     ))}
                                 </tr>
