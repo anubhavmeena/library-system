@@ -849,7 +849,13 @@
       "yesterday": "कल",
       "last7": "पिछले 7 दिन",
       "last30": "पिछले 30 दिन",
-      "thisMonth": "इस महीने"
+      "thisMonth": "इस महीने",
+      "custom": "कस्टम तारीख / अवधि…"
+    },
+    "dateRange": {
+      "hint": "एक तारीख चुनें, या शुरू और अंत की तारीख",
+      "apply": "लागू करें",
+      "cancel": "रद्द करें"
     }
   },
   "adminRenewalPolls": {

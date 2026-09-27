@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 import ThemedSelect from '../../components/common/ThemedSelect'
+import DateRangePicker, { formatRangeLabel } from '../../components/common/DateRangePicker'
 import toast from 'react-hot-toast'
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 'all']
-const DATE_FILTER_OPTIONS = ['all', 'today', 'yesterday', 'last7', 'last30', 'thisMonth']
+const DATE_FILTER_OPTIONS = ['all', 'today', 'yesterday', 'last7', 'last30', 'thisMonth', 'custom']
 
 // Full class strings (not built dynamically) so Tailwind's purge keeps them.
 const BADGE = {
@@ -76,11 +77,14 @@ function formatIST(createdAt) {
     })
 }
 
+const todayInIST = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+
 // Inclusive IST [from, to] as YYYY-MM-DD for a date-filter option; the
 // backend compares against created_at shifted to IST.
-function dateRangeFor(option) {
+function dateRangeFor(option, customRange) {
     if (option === 'all') return {}
-    const todayIST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+    if (option === 'custom') return customRange
+    const todayIST = todayInIST()
     const daysAgo = (n) => {
         const d = new Date(`${todayIST}T00:00:00Z`)
         d.setUTCDate(d.getUTCDate() - n)
@@ -136,7 +140,8 @@ function linkifyStudents(text, students) {
 }
 
 export default function AdminActivityLogsPage() {
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
+    const dateLocale = i18n.language?.startsWith('hi') ? 'hi-IN' : 'en-IN'
     const [logs, setLogs]         = useState([])
     const [total, setTotal]       = useState(0)
     const [loading, setLoading]   = useState(true)
@@ -146,6 +151,9 @@ export default function AdminActivityLogsPage() {
     const [searchInput, setSearchInput] = useState('')
     const [search, setSearch]           = useState('')
     const [dateFilter, setDateFilter]   = useState('all')
+    const [customRange, setCustomRange] = useState({ from: null, to: null })
+    const [pickerOpen, setPickerOpen]   = useState(false)
+    const dateFilterRef = useRef(null)
     const [adminFilter, setAdminFilter] = useState('all')
     const [actionFilter, setActionFilter] = useState('all')
     const [filterOptions, setFilterOptions] = useState({ admins: [], actions: [] })
@@ -163,7 +171,7 @@ export default function AdminActivityLogsPage() {
 
     const fetchLogs = () => {
         setLoading(true)
-        const params = { page, size: pageSize, ...dateRangeFor(dateFilter) }
+        const params = { page, size: pageSize, ...dateRangeFor(dateFilter, customRange) }
         if (search) params.q = search
         if (adminFilter !== 'all') params.adminId = adminFilter
         if (actionFilter !== 'all') params.action = actionFilter
@@ -178,7 +186,7 @@ export default function AdminActivityLogsPage() {
             .finally(() => setLoading(false))
     }
 
-    useEffect(() => { fetchLogs() }, [page, pageSize, search, dateFilter, adminFilter, actionFilter])
+    useEffect(() => { fetchLogs() }, [page, pageSize, search, dateFilter, customRange, adminFilter, actionFilter])
 
     const handlePageSizeChange = (value) => {
         setPageSize(value === 'all' ? 'all' : Number(value))
@@ -194,6 +202,7 @@ export default function AdminActivityLogsPage() {
         setSearchInput('')
         setSearch('')
         setDateFilter('all')
+        setCustomRange({ from: null, to: null })
         setAdminFilter('all')
         setActionFilter('all')
         setPage(0)
@@ -206,9 +215,32 @@ export default function AdminActivityLogsPage() {
             key: 'date',
             label: t('adminActivityLogs.table.date'),
             filter: (
-                <ThemedSelect value={dateFilter} onChange={withPageReset(setDateFilter)} className="min-w-[8rem]"
-                              ariaLabel={t('adminActivityLogs.table.date')}
-                              options={DATE_FILTER_OPTIONS.map(o => ({ value: o, label: t(`adminActivityLogs.dateFilter.${o}`) }))} />
+                <div ref={dateFilterRef}>
+                    <ThemedSelect value={dateFilter} className="min-w-[8rem]"
+                                  onChange={v => v === 'custom' ? setPickerOpen(true) : withPageReset(setDateFilter)(v)}
+                                  ariaLabel={t('adminActivityLogs.table.date')}
+                                  options={DATE_FILTER_OPTIONS.map(o => ({
+                                      value: o,
+                                      label: o === 'custom' && dateFilter === 'custom' && customRange.from
+                                          ? formatRangeLabel(customRange.from, customRange.to, dateLocale)
+                                          : t(`adminActivityLogs.dateFilter.${o}`),
+                                  }))} />
+                    <DateRangePicker anchorRef={dateFilterRef} open={pickerOpen} onClose={() => setPickerOpen(false)}
+                                     from={dateFilter === 'custom' ? customRange.from : null}
+                                     to={dateFilter === 'custom' ? customRange.to : null}
+                                     maxDate={todayInIST()} locale={dateLocale}
+                                     labels={{
+                                         hint: t('adminActivityLogs.dateRange.hint'),
+                                         apply: t('adminActivityLogs.dateRange.apply'),
+                                         cancel: t('adminActivityLogs.dateRange.cancel'),
+                                     }}
+                                     onApply={range => {
+                                         setCustomRange(range)
+                                         setDateFilter('custom')
+                                         setPage(0)
+                                         setPickerOpen(false)
+                                     }} />
+                </div>
             ),
         },
         {

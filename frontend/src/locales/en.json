@@ -870,7 +870,13 @@
       "yesterday": "Yesterday",
       "last7": "Last 7 days",
       "last30": "Last 30 days",
-      "thisMonth": "This month"
+      "thisMonth": "This month",
+      "custom": "Custom date / range…"
+    },
+    "dateRange": {
+      "hint": "Pick a date, or a start and end date",
+      "apply": "Apply",
+      "cancel": "Cancel"
     }
   },
   "adminRenewalPolls": {
