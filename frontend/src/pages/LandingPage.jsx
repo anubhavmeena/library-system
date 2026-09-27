@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import { BookOpen, Clock, Wifi, Coffee, Users, Star, ArrowRight, CheckCircle2, Wind, Droplets, Newspaper, Car, MapPin, Camera, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Helmet } from 'react-helmet-async'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 import PhotoSlideshow from '../components/PhotoSlideshow'
+import { homePathFor } from '../utils/authHome'
 
 const FEATURE_ICONS = [Clock, Wifi, Coffee, Users, Wind, Droplets, Newspaper, Car, Camera, Zap]
 const FEATURE_KEYS  = ['flexibleShifts', 'wifi', 'refreshment', 'seats', 'ac', 'roCooler', 'newspaper', 'parking', 'cctv', 'chargingPoint']
@@ -27,6 +29,8 @@ const GALLERY_PHOTOS = [
 
 export default function LandingPage() {
     const { t } = useTranslation()
+    const { user, token } = useSelector(s => s.auth)
+    const isLoggedIn = Boolean(token && user)
 
     const features = FEATURE_KEYS.map((key, i) => ({
         icon: FEATURE_ICONS[i],
@@ -65,8 +69,14 @@ export default function LandingPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <LanguageSwitcher />
-                    <Link to="/admin/login" className="text-primary-400 hover:text-white text-sm transition-colors">{t('nav.admin')}</Link>
-                    <Link to="/login" className="btn-primary text-sm py-2 px-5">{t('nav.getStarted')}</Link>
+                    {isLoggedIn ? (
+                        <Link to={homePathFor(user)} className="btn-primary text-sm py-2 px-5">{t('nav.dashboard')}</Link>
+                    ) : (
+                        <>
+                            <Link to="/admin/login" className="text-primary-400 hover:text-white text-sm transition-colors">{t('nav.admin')}</Link>
+                            <Link to="/login" className="btn-primary text-sm py-2 px-5">{t('nav.getStarted')}</Link>
+                        </>
+                    )}
                 </div>
             </nav>
 

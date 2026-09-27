@@ -47,6 +47,7 @@ import AdminRenewalPollsPage from './pages/admin/AdminRenewalPollsPage'
 import FeedbackPage       from './pages/student/FeedbackPage'
 import StudentGalleryPage from './pages/student/StudentGalleryPage'
 import ContactAdminPage   from './pages/student/ContactAdminPage'
+import { homePathFor } from './utils/authHome'
 
 const PUBLIC_PATHS = new Set(['/', '/about', '/login', '/register', '/terms',
     '/privacy-policy', '/refund-policy', '/cancellation-policy'])
@@ -68,6 +69,14 @@ function ProtectedRoute({ children, role }) {
     return children
 }
 
+// Login pages only make sense when logged out — a still-valid session
+// (token in localStorage) goes straight to its home instead of re-doing OTP.
+function GuestRoute({ children }) {
+    const { user, token } = useSelector(s => s.auth)
+    if (token && user) return <Navigate to={homePathFor(user)} replace />
+    return children
+}
+
 export default function App() {
     return (
         <>
@@ -80,9 +89,9 @@ export default function App() {
             <Route path="/refund-policy"       element={<RefundPolicyPage />} />
             <Route path="/cancellation-policy" element={<CancellationPolicyPage />} />
             <Route path="/pay"                 element={<PayRedirectPage />} />
-            <Route path="/login"       element={<LoginPage />} />
-            <Route path="/register"    element={<RegisterPage />} />
-            <Route path="/admin/login" element={<AdminLoginPage />} />
+            <Route path="/login"       element={<GuestRoute><LoginPage /></GuestRoute>} />
+            <Route path="/register"    element={<GuestRoute><RegisterPage /></GuestRoute>} />
+            <Route path="/admin/login" element={<GuestRoute><AdminLoginPage /></GuestRoute>} />
 
             <Route path="/student" element={
                 <ProtectedRoute role="STUDENT"><StudentLayout /></ProtectedRoute>
