@@ -191,6 +191,8 @@ pub struct SeatMapSeat {
     pub other_shift_occupied: bool,
     pub display_status: Option<String>,
     pub pending_amount: Option<Decimal>,
+    /// Occupant's earliest non-PENDING membership start — drives the "New" badge.
+    pub first_membership_start: Option<NaiveDate>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -655,7 +657,7 @@ mod tests {
             seat_number: "A1".into(), is_occupied: true, is_active: true, student_id: Some(Uuid::new_v4()),
             student_name: Some("Alice".into()), student_mobile: None, student_gender: None,
             shift: Some("MORNING".into()), membership_end: None, other_shift_occupied: false,
-            display_status: Some("PAID".into()), pending_amount: None,
+            display_status: Some("PAID".into()), pending_amount: None, first_membership_start: None,
         };
         let json = serde_json::to_string(&seat).unwrap();
         assert!(json.contains("seatNumber"));

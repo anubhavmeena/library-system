@@ -10,6 +10,8 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3'
 import { parseISO, format } from 'date-fns'
 import { formatCurrency } from '../../utils/currency'
 import { toDevanagari } from '../../utils/transliterate'
+import NewBadge from '../../components/admin/NewBadge'
+import { isNewMember } from '../../utils/newMember'
 
 const DATE_PICKER_SX = {
     '& .MuiOutlinedInput-root': {
@@ -487,7 +489,12 @@ export default function AdminSeatsPage() {
 
             {selected && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setSelected(null)}>
-                    <div className={`card p-6 w-72 ${selected.isOccupied ? 'border-red-500/30' : selected.isActive === false ? 'border-primary-600/40' : 'border-emerald-500/30'}`} onClick={e => e.stopPropagation()}>
+                    <div className={`card relative p-6 w-72 ${selected.isOccupied ? 'border-red-500/30' : selected.isActive === false ? 'border-primary-600/40' : 'border-emerald-500/30'}`} onClick={e => e.stopPropagation()}>
+                        {selected.isOccupied && isNewMember(selected.firstMembershipStart) && (
+                            <NewBadge label={t('adminStudents.newBadge').toUpperCase()}
+                                title={t('adminStudents.newBadgeTitle', { date: selected.firstMembershipStart })}
+                                className="-top-1.5 -left-1.5 w-12 h-12" />
+                        )}
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
                                 <button onClick={() => speakSeatDetails(selected)}

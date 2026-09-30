@@ -1068,11 +1068,13 @@ pub async fn get_seat_map(
     // sb.end_date is reported separately from m.end_date because a GRACE membership's
     // seat_bookings.end_date is pushed to the far-future 9999-12-31 sentinel to hold the
     // seat indefinitely — the membership's real end_date is what expiry views must show.
-    let occupants = sqlx::query_as::<_, (Uuid, String, Uuid, String, Option<String>, Option<String>, NaiveDate, NaiveDate, String, Option<Decimal>)>(
+    let occupants = sqlx::query_as::<_, (Uuid, String, Uuid, String, Option<String>, Option<String>, NaiveDate, NaiveDate, String, Option<Decimal>, Option<NaiveDate>)>(
         "SELECT sb.seat_id, sb.shift, u.id, u.name, u.mobile, u.gender, sb.end_date, m.end_date, m.status,
                 (SELECT p.pending_amount FROM payments p
                  WHERE p.membership_id = m.id AND p.status = 'SUCCESS'
-                 ORDER BY p.created_at DESC LIMIT 1) AS pending_amount
+                 ORDER BY p.created_at DESC LIMIT 1) AS pending_amount,
+                (SELECT MIN(fm.start_date) FROM memberships fm
+                 WHERE fm.user_id = u.id AND fm.status != 'PENDING') AS first_membership_start
          FROM seat_bookings sb
          JOIN users u ON u.id = sb.user_id
          JOIN memberships m ON m.id = sb.membership_id
@@ -1089,10 +1091,10 @@ pub async fn get_seat_map(
     .fetch_all(&state.db)
     .await?;
 
-    let occupant_map: HashMap<Uuid, (Uuid, String, Option<String>, Option<String>, String, NaiveDate, String, Option<Decimal>)> = occupants
+    let occupant_map: HashMap<Uuid, (Uuid, String, Option<String>, Option<String>, String, NaiveDate, String, Option<Decimal>, Option<NaiveDate>)> = occupants
         .into_iter()
-        .map(|(seat_id, sb_shift, student_id, name, mobile, gender, _sb_end, membership_end, m_status, pending_amount)| {
-            (seat_id, (student_id, name, mobile, gender, sb_shift, membership_end, m_status, pending_amount))
+        .map(|(seat_id, sb_shift, student_id, name, mobile, gender, _sb_end, membership_end, m_status, pending_amount, first_start)| {
+            (seat_id, (student_id, name, mobile, gender, sb_shift, membership_end, m_status, pending_amount, first_start))
         })
         .collect();
 
@@ -1147,14 +1149,14 @@ pub async fn get_seat_map(
             seat_number: seat.seat_number.clone(),
             is_occupied,
             is_active: seat.is_active,
-            student_id: occ.map(|(id, _, _, _, _, _, _, _)| *id),
-            student_name: occ.map(|(_, n, _, _, _, _, _, _)| n.clone()),
-            student_mobile: occ.and_then(|(_, _, m, _, _, _, _, _)| m.clone()),
-            student_gender: occ.and_then(|(_, _, _, g, _, _, _, _)| g.clone()),
-            shift: occ.map(|(_, _, _, _, s, _, _, _)| s.clone()),
-            membership_end: occ.map(|(_, _, _, _, _, e, _, _)| *e),
+            student_id: occ.map(|(id, _, _, _, _, _, _, _, _)| *id),
+            student_name: occ.map(|(_, n, _, _, _, _, _, _, _)| n.clone()),
+            student_mobile: occ.and_then(|(_, _, m, _, _, _, _, _, _)| m.clone()),
+            student_gender: occ.and_then(|(_, _, _, g, _, _, _, _, _)| g.clone()),
+            shift: occ.map(|(_, _, _, _, s, _, _, _, _)| s.clone()),
+            membership_end: occ.map(|(_, _, _, _, _, e, _, _, _)| *e),
             other_shift_occupied: !is_occupied && other_shift_seat_ids.contains(&seat.id),
-            display_status: occ.map(|(_, _, _, _, _, end, status, pending)| {
+            display_status: occ.map(|(_, _, _, _, _, end, status, pending, _)| {
                 crate::services::membership::resolve_display_status(
                     Some(status),
                     Some(*end),
@@ -1164,7 +1166,8 @@ pub async fn get_seat_map(
                 )
                 .to_string()
             }),
-            pending_amount: occ.and_then(|(_, _, _, _, _, _, _, pending)| *pending),
+            pending_amount: occ.and_then(|(_, _, _, _, _, _, _, pending, _)| *pending),
+            first_membership_start: occ.and_then(|(_, _, _, _, _, _, _, _, first)| *first),
         };
         seats_by_row
             .entry(seat.row_label.clone())
