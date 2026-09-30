@@ -11,15 +11,15 @@ export default function NewBadge({ label, title, className = '' }) {
             {title && <title>{title}</title>}
             <defs>
                 <linearGradient id={`band-${id}`} x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%"   stopColor="#7dd3fc" />
-                    <stop offset="35%"  stopColor="#38bdf8" />
-                    <stop offset="100%" stopColor="#0284c7" />
+                    <stop offset="0%"   stopColor="#ff6f6b" />
+                    <stop offset="35%"  stopColor="#d42320" />
+                    <stop offset="100%" stopColor="#b01a18" />
                 </linearGradient>
             </defs>
             <g opacity="0.85">
                 {/* folded-back tails */}
-                <path d="M29 0 Q33 0 35.5 1.8 L40 5 L27 5 Z" fill="#075985" />
-                <path d="M0 29 Q0 33 1.8 35.5 L5 40 L5 27 Z" fill="#075985" />
+                <path d="M29 0 Q33 0 35.5 1.8 L40 5 L27 5 Z" fill="#6e1210" />
+                <path d="M0 29 Q0 33 1.8 35.5 L5 40 L5 27 Z" fill="#6e1210" />
                 {/* main band */}
                 <path d="M0 9 Q0 0 9 0 L33 0 L0 33 Z" fill={`url(#band-${id})`} />
             </g>
