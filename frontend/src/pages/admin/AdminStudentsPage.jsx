@@ -18,6 +18,18 @@ const STATUS_BADGE_CLASSES = {
     RELEASED:      'bg-red-950/70 text-red-300 border-red-900',
 }
 
+// "New" badge shows for the first 20 days after a student's first-ever
+// membership starts (renewals don't count — see first_membership_start).
+const NEW_MEMBER_DAYS = 20
+
+function isNewMember(firstStart) {
+    if (!firstStart) return false
+    const [y, m, d] = firstStart.split('-').map(Number)
+    const today = new Date()
+    const days = Math.floor((Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) - Date.UTC(y, m - 1, d)) / 86400000)
+    return days >= 0 && days < NEW_MEMBER_DAYS
+}
+
 export default function AdminStudentsPage() {
     const [students, setStudents] = useState([])
     const [total, setTotal]       = useState(0)
@@ -172,12 +184,20 @@ export default function AdminStudentsPage() {
                                 <tr key={s.id} className="hover:bg-primary-800/30 transition-colors">
                                     <td className="p-4">
                                         <div className="flex items-center gap-3">
-                                            {s.photoUrl
-                                                ? <img src={s.photoUrl} alt={s.name} className="w-9 h-9 rounded-full object-cover" />
-                                                : <div className="w-9 h-9 rounded-full bg-gradient-to-br from-red-400 to-primary-600 flex items-center justify-center text-sm font-bold text-white">
-                                                    {s.name?.[0]?.toUpperCase()}
-                                                </div>
-                                            }
+                                            <div className="relative shrink-0">
+                                                {s.photoUrl
+                                                    ? <img src={s.photoUrl} alt={s.name} className="w-9 h-9 rounded-full object-cover" />
+                                                    : <div className="w-9 h-9 rounded-full bg-gradient-to-br from-red-400 to-primary-600 flex items-center justify-center text-sm font-bold text-white">
+                                                        {s.name?.[0]?.toUpperCase()}
+                                                    </div>
+                                                }
+                                                {isNewMember(s.firstMembershipStart) && (
+                                                    <span title={t('adminStudents.newBadgeTitle', { date: s.firstMembershipStart })}
+                                                        className="absolute -top-1.5 -right-2.5 px-1 py-px rounded-full bg-emerald-500 text-white text-[9px] font-bold leading-tight uppercase ring-2 ring-primary-900">
+                                                        {t('adminStudents.newBadge')}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div>
                                                 <Link to={`/admin/students/${s.id}`}
                                                     className="block text-white font-medium hover:text-amber-400 hover:underline transition-colors">

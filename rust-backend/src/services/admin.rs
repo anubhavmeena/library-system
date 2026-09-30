@@ -129,6 +129,8 @@ const STUDENT_SELECT: &str = "
             LIMIT 1
         )) END AS seat_number, m.shift,
         m.start_date AS membership_start, m.end_date AS membership_end,
+        (SELECT MIN(fm.start_date) FROM memberships fm
+         WHERE fm.user_id = u.id AND fm.status != 'PENDING') AS first_membership_start,
         m.status AS membership_status,
         (m.end_date - CURRENT_DATE)::int AS days_remaining,
         CASE WHEN p.payment_gateway = 'CASH' THEN 'CASH'

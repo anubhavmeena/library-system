@@ -568,6 +568,8 @@
     },
     "empty": "कोई छात्र नहीं मिला",
     "joined": "जुड़े",
+    "newBadge": "नया",
+    "newBadgeTitle": "{{date}} से नए सदस्य",
     "shifts": { "MORNING": "6AM–2PM", "EVENING": "2PM–10PM", "FULL_DAY": "6AM–10PM" },
     "expires": "समाप्ति",
     "daysLeft": "{{count}}दि बचे",

@@ -25,6 +25,9 @@ pub struct StudentListItem {
     pub shift: Option<String>,
     pub membership_start: Option<NaiveDate>,
     pub membership_end: Option<NaiveDate>,
+    /// Start date of the student's earliest non-PENDING membership — drives the
+    /// "New" badge on the admin students list (renewals don't reset it).
+    pub first_membership_start: Option<NaiveDate>,
     pub membership_status: Option<String>,
     pub days_remaining: Option<i32>,
     pub payment_mode: Option<String>,
@@ -636,7 +639,7 @@ mod tests {
             aadhaar_url: None, is_active: true, gender: None, address: None, date_of_birth: None,
             joined_at: None, membership_id: None, membership_plan_id: None, plan_name: None,
             seat_number: None, shift: None, membership_start: None, membership_end: None,
-            membership_status: None, days_remaining: None, payment_mode: None, pending_amount: None,
+            first_membership_start: None, membership_status: None, days_remaining: None, payment_mode: None, pending_amount: None,
             dues_amount: None, current_status: Some("ACTIVE".into()), current_end_date: None,
             latest_ever_status: None, display_status: "PAID".to_string(),
         };

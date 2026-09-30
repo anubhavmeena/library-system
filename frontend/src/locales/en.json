@@ -572,6 +572,8 @@
     },
     "empty": "No students found",
     "joined": "Joined",
+    "newBadge": "New",
+    "newBadgeTitle": "New member since {{date}}",
     "shifts": { "MORNING": "6AM–2PM", "EVENING": "2PM–10PM", "FULL_DAY": "6AM–10PM" },
     "expires": "Expires",
     "daysLeft": "{{count}}d left",
