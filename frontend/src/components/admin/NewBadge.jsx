@@ -1,7 +1,7 @@
 import { useId } from 'react'
 
 // Corner seal "NEW" tag: straight top/left edges meeting in a rounded corner,
-// with a scalloped quarter-circle edge sweeping around the bottom-right.
+// with a scalloped edge sweeping around the bottom-right.
 // Absolutely positioned over the top-left corner of its (relative) parent.
 // Lobed edge follows a superellipse (fuller than a quarter circle, like a
 // rounded square corner) with SCALLOPS rounded lobes pushed outward.
