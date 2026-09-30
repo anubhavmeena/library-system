@@ -8,6 +8,7 @@ import { paymentModeInfo } from '../../utils/paymentMode'
 import { toDevanagari } from '../../utils/transliterate'
 import StudentActionsMenu from '../../components/admin/StudentActionsMenu'
 import PaymentHistoryItem from '../../components/admin/PaymentHistoryItem'
+import NewCornerRibbon from '../../components/admin/NewCornerRibbon'
 
 const STATUS_BADGE_CLASSES = {
     NEW:      'bg-blue-500/20 text-blue-400 border-blue-500/30',
@@ -192,10 +193,9 @@ export default function AdminStudentsPage() {
                                                     </div>
                                                 }
                                                 {isNewMember(s.firstMembershipStart) && (
-                                                    <span title={t('adminStudents.newBadgeTitle', { date: s.firstMembershipStart })}
-                                                        className="absolute -top-1.5 -right-2.5 px-1 py-px rounded-full bg-emerald-500 text-white text-[9px] font-bold leading-tight uppercase ring-2 ring-primary-900">
-                                                        {t('adminStudents.newBadge')}
-                                                    </span>
+                                                    <NewCornerRibbon label={t('adminStudents.newBadge').toUpperCase()}
+                                                        title={t('adminStudents.newBadgeTitle', { date: s.firstMembershipStart })}
+                                                        className="-top-1.5 -left-1.5 w-8 h-8" />
                                                 )}
                                             </div>
                                             <div>
