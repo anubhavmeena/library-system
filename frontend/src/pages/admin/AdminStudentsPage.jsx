@@ -195,7 +195,7 @@ export default function AdminStudentsPage() {
                                                 {isNewMember(s.firstMembershipStart) && (
                                                     <NewBadge label={t('adminStudents.newBadge').toUpperCase()}
                                                         title={t('adminStudents.newBadgeTitle', { date: s.firstMembershipStart })}
-                                                        className="-top-2.5 -right-2 w-7 h-7" />
+                                                        className="-top-1.5 -left-1.5 w-[30px] h-[30px]" />
                                                 )}
                                             </div>
                                             <div>
