@@ -9,6 +9,7 @@ import { toDevanagari } from '../../utils/transliterate'
 import StudentActionsMenu from '../../components/admin/StudentActionsMenu'
 import PaymentHistoryItem from '../../components/admin/PaymentHistoryItem'
 import NewBadge from '../../components/admin/NewBadge'
+import { isNewMember } from '../../utils/newMember'
 
 const STATUS_BADGE_CLASSES = {
     NEW:      'bg-blue-500/20 text-blue-400 border-blue-500/30',
@@ -17,18 +18,6 @@ const STATUS_BADGE_CLASSES = {
     GRACE:         'bg-orange-500/20 text-orange-400 border-orange-500/30',
     GRACE_OVERDUE: 'bg-red-500/20 text-red-400 border-red-500/30',
     RELEASED:      'bg-red-950/70 text-red-300 border-red-900',
-}
-
-// "New" badge shows for the first 20 days after a student's first-ever
-// membership starts (renewals don't count — see first_membership_start).
-const NEW_MEMBER_DAYS = 20
-
-function isNewMember(firstStart) {
-    if (!firstStart) return false
-    const [y, m, d] = firstStart.split('-').map(Number)
-    const today = new Date()
-    const days = Math.floor((Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) - Date.UTC(y, m - 1, d)) / 86400000)
-    return days >= 0 && days < NEW_MEMBER_DAYS
 }
 
 export default function AdminStudentsPage() {
@@ -309,12 +298,19 @@ export default function AdminStudentsPage() {
 
                         {/* Avatar + name */}
                         <div className="flex items-center gap-4 mb-5 pb-5 border-b border-primary-700/30">
-                            {detail.photoUrl
-                                ? <img src={detail.photoUrl} alt={detail.name} className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
-                                : <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-400 to-primary-600 flex items-center justify-center text-xl font-bold text-white flex-shrink-0">
-                                    {detail.name?.[0]?.toUpperCase()}
-                                </div>
-                            }
+                            <div className="relative flex-shrink-0">
+                                {detail.photoUrl
+                                    ? <img src={detail.photoUrl} alt={detail.name} className="w-14 h-14 rounded-full object-cover" />
+                                    : <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-400 to-primary-600 flex items-center justify-center text-xl font-bold text-white">
+                                        {detail.name?.[0]?.toUpperCase()}
+                                    </div>
+                                }
+                                {isNewMember(detail.firstMembershipStart) && (
+                                    <NewBadge label={t('adminStudents.newBadge').toUpperCase()}
+                                        title={t('adminStudents.newBadgeTitle', { date: detail.firstMembershipStart })}
+                                        className="-top-2 -left-2 w-11 h-11" />
+                                )}
+                            </div>
                             <div className="min-w-0">
                                 <p className="text-white font-bold text-lg truncate">{localizeName(detail.name)}</p>
                                 <p className="text-primary-400 text-sm">{detail.mobile}</p>

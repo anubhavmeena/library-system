@@ -7,6 +7,8 @@ import toast from 'react-hot-toast'
 import { paymentModeInfo } from '../../utils/paymentMode'
 import StudentActionsMenu from '../../components/admin/StudentActionsMenu'
 import PaymentHistoryItem from '../../components/admin/PaymentHistoryItem'
+import NewBadge from '../../components/admin/NewBadge'
+import { isNewMember } from '../../utils/newMember'
 
 const STATUS_BADGE_CLASSES = {
     NEW:      'bg-blue-500/20 text-blue-400 border-blue-500/30',
@@ -165,6 +167,11 @@ export default function AdminStudentDetailPage() {
                                 {student.name?.[0]?.toUpperCase()}
                             </div>
                         }
+                        {isNewMember(student.firstMembershipStart) && (
+                            <NewBadge label={t('adminStudents.newBadge').toUpperCase()}
+                                title={t('adminStudents.newBadgeTitle', { date: student.firstMembershipStart })}
+                                className="-top-2 -left-2 w-12 h-12" />
+                        )}
                         {uploadingPhoto && (
                             <div className="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center">
                                 <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
