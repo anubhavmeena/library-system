@@ -375,7 +375,7 @@ export default function AdminSeatsPage() {
                                         <button key={sn}
                                                 onClick={() => setSelected(seat)}
                                                 title={title}
-                                                className={`w-8 h-8 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center justify-center ${expiryClasses(days)} ${hasPending ? 'ring-2 ring-yellow-400' : ''}`}>
+                                                className={`w-8 h-8 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center justify-center ${expiryClasses(days)} ${hasPending ? 'ring-2 ring-inset ring-yellow-400' : ''}`}>
                                             <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center leading-none">{days}</span>
                                         </button>
                                     )
