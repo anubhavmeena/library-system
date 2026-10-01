@@ -9,6 +9,7 @@ import StudentActionsMenu from '../../components/admin/StudentActionsMenu'
 import PaymentHistoryItem from '../../components/admin/PaymentHistoryItem'
 import NewBadge from '../../components/admin/NewBadge'
 import { isNewMember } from '../../utils/newMember'
+import { formatCurrency } from '../../utils/currency'
 
 const STATUS_BADGE_CLASSES = {
     NEW:      'bg-blue-500/20 text-blue-400 border-blue-500/30',
@@ -200,6 +201,9 @@ export default function AdminStudentDetailPage() {
                                 <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_BADGE_CLASSES[student.displayStatus] || 'bg-primary-700/30 text-primary-400 border-primary-700/40'}`}>
                                     {t(`adminStudents.statusLabels.${student.displayStatus}`)}
                                 </span>
+                            )}
+                            {student.displayStatus === 'PENDING' && Number(student.pendingAmount) > 0 && (
+                                <span className="text-sm text-red-400 font-medium">{formatCurrency(student.pendingAmount)}</span>
                             )}
                         </div>
                     </div>
