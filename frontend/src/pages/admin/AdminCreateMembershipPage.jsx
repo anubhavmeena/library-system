@@ -103,7 +103,7 @@ export default function AdminCreateMembershipPage() {
     }, [])
 
     useEffect(() => {
-        if (selectedPlan) { setPaidAmount(String(effectivePrice)); setPendingAmount('0') }
+        if (selectedPlan) { setPaidAmount('0'); setPendingAmount(String(effectivePrice)) }
     }, [selectedPlan, effectivePrice])
 
     useEffect(() => { setWaiveOldDues(false) }, [selectedStudent?.id])
@@ -668,11 +668,11 @@ export default function AdminCreateMembershipPage() {
                                         </p>
                                     ) : (
                                         <div className="flex gap-3 flex-wrap">
-                                            <button type="button" onClick={() => setShowQrModal(true)}
-                                                    className="btn-ghost border border-sky-500/30 text-sky-300 px-4 py-2 rounded-xl text-xs font-medium">
+                                            <button type="button" onClick={() => setShowQrModal(true)} disabled={!(parseFloat(paidAmount) > 0)}
+                                                    className="btn-ghost border border-sky-500/30 text-sky-300 px-4 py-2 rounded-xl text-xs font-medium disabled:opacity-50">
                                                 📱 {t('adminNewMembership.step4.showQrCode')}
                                             </button>
-                                            <button type="button" onClick={handleSendPaymentRequest} disabled={sendingRequest}
+                                            <button type="button" onClick={handleSendPaymentRequest} disabled={sendingRequest || !(parseFloat(paidAmount) > 0)}
                                                     className="btn-ghost border border-emerald-500/30 text-emerald-300 px-4 py-2 rounded-xl text-xs font-medium disabled:opacity-50">
                                                 {sendingRequest ? t('adminNewMembership.step4.sending') : `💬 ${t('adminNewMembership.step4.sendPaymentRequest')}`}
                                             </button>
