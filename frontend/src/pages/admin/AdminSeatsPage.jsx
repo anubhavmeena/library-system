@@ -79,8 +79,6 @@ const daysToExpiry = (membershipEnd, today) => {
 const expiryClasses = (days) => {
     if (days < 0)   return 'bg-red-950/90 border-red-800 text-red-400 hover:bg-red-950'
     if (days <= 3)  return 'bg-red-500/60 border-red-400/80 text-red-100 hover:bg-red-500/80'
-    if (days <= 7)  return 'bg-orange-500/50 border-orange-400/70 text-orange-100 hover:bg-orange-500/70'
-    if (days <= 15) return 'bg-yellow-500/40 border-yellow-400/60 text-yellow-100 hover:bg-yellow-500/60'
     return 'bg-emerald-500/30 border-emerald-400/50 text-emerald-100 hover:bg-emerald-500/50'
 }
 
@@ -368,15 +366,20 @@ export default function AdminSeatsPage() {
 
                                 if (viewMode === 'expiry' && seat.isOccupied) {
                                     const days = daysToExpiry(seat.membershipEnd, date)
-                                    const title = days < 0
+                                    const hasPending = Number(seat.pendingAmount) > 0
+                                    const title = (days < 0
                                         ? `${sn} — ${seat.studentName} — ${Math.abs(days)}d overdue (grace, seat held)`
-                                        : `${sn} — ${seat.studentName} — ${days}d left`
+                                        : `${sn} — ${seat.studentName} — ${days}d left`)
+                                        + (hasPending ? ` — ${formatCurrency(seat.pendingAmount)} pending` : '')
                                     return (
                                         <button key={sn}
                                                 onClick={() => setSelected(seat)}
                                                 title={title}
-                                                className={`w-8 h-8 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center justify-center ${expiryClasses(days)}`}>
+                                                className={`relative w-8 h-8 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center justify-center ${expiryClasses(days)}`}>
                                             <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center leading-none">{days}</span>
+                                            {hasPending && (
+                                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-300 ring-2 ring-primary-900" />
+                                            )}
                                         </button>
                                     )
                                 }
@@ -464,9 +467,8 @@ export default function AdminSeatsPage() {
                         <div className="flex flex-wrap gap-6 mt-6 text-xs text-primary-400">
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-950/90 border border-red-800" />Overdue (grace, seat held)</div>
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-500/60 border border-red-400/80" />{t('adminSeats.legend.expiry.critical')}</div>
-                            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-orange-500/50 border border-orange-400/70" />{t('adminSeats.legend.expiry.warning')}</div>
-                            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-yellow-500/40 border border-yellow-400/60" />{t('adminSeats.legend.expiry.soon')}</div>
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/30 border border-emerald-400/50" />{t('adminSeats.legend.expiry.safe')}</div>
+                            <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-amber-300" />{t('adminSeats.legend.expiry.pending')}</div>
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/10 border border-emerald-500/20" />{t('adminSeats.legend.available')}</div>
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-primary-800/60 border border-primary-600/40" />{t('adminSeats.modal.unavailable')}</div>
                         </div>

@@ -666,9 +666,8 @@
       "occupied": "Occupied (click for details)",
       "expiry": {
         "critical": "≤ 3 days",
-        "warning": "4–7 days",
-        "soon": "8–15 days",
-        "safe": "16+ days"
+        "safe": "> 3 days",
+        "pending": "Fees pending"
       }
     },
     "modal": {
