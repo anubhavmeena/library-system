@@ -375,7 +375,7 @@ export default function AdminSeatsPage() {
                                         <button key={sn}
                                                 onClick={() => setSelected(seat)}
                                                 title={title}
-                                                className={`w-8 h-8 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center justify-center ${expiryClasses(days)} ${hasPending ? 'ring-2 ring-inset ring-yellow-400' : ''}`}>
+                                                className={`w-8 h-8 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center justify-center ${expiryClasses(days)} ${hasPending ? 'ring-1 ring-inset ring-yellow-400' : ''}`}>
                                             <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center leading-none">{days}</span>
                                         </button>
                                     )
@@ -465,7 +465,7 @@ export default function AdminSeatsPage() {
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-950/90 border border-red-800" />Overdue (grace, seat held)</div>
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-500/60 border border-red-400/80" />{t('adminSeats.legend.expiry.critical')}</div>
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/30 border border-emerald-400/50" />{t('adminSeats.legend.expiry.safe')}</div>
-                            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded border-2 border-yellow-400" />{t('adminSeats.legend.expiry.pending')}</div>
+                            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded border border-yellow-400" />{t('adminSeats.legend.expiry.pending')}</div>
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/10 border border-emerald-500/20" />{t('adminSeats.legend.available')}</div>
                             <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-primary-800/60 border border-primary-600/40" />{t('adminSeats.modal.unavailable')}</div>
                         </div>
