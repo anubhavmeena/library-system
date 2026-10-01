@@ -669,7 +669,7 @@
     },
     "modal": {
       "seat": "सीट {{seatNumber}}",
-      "student": "छात्र", "mobile": "मोबाइल", "shift": "शिफ्ट", "expires": "समाप्ति",
+      "student": "छात्र", "mobile": "मोबाइल", "shift": "शिफ्ट", "joined": "जुड़े", "expires": "समाप्ति",
       "daysLeft": "बचे दिन", "daysLeftValue": "{{days}} दिन",
       "vacant": "खाली", "vacantSince": "कब से खाली",
       "daysVacant": "कितने दिन से खाली", "daysVacantValue": "{{days}} दिन", "neverOccupied": "कभी नहीं भरी",

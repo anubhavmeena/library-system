@@ -673,7 +673,7 @@
     },
     "modal": {
       "seat": "Seat {{seatNumber}}",
-      "student": "Student", "mobile": "Mobile", "shift": "Shift", "expires": "Expires",
+      "student": "Student", "mobile": "Mobile", "shift": "Shift", "joined": "Joined", "expires": "Expires",
       "daysLeft": "Days Left", "daysLeftValue": "{{days}} days",
       "vacant": "Vacant", "vacantSince": "Vacant Since",
       "daysVacant": "Days Vacant", "daysVacantValue": "{{days}} days", "neverOccupied": "Never occupied",

@@ -538,6 +538,7 @@ export default function AdminSeatsPage() {
                                 { l: t('adminSeats.modal.mobile'),  v: selected.studentMobile || '—', call: selected.studentMobile || null },
                                 { l: 'Gender',                       v: selected.studentGender || '—' },
                                 { l: t('adminSeats.modal.shift'),   v: shiftLabel(selected.shift) },
+                                { l: t('adminSeats.modal.joined'),  v: selected.firstMembershipStart || '—' },
                                 { l: t('adminSeats.modal.expires'), v: selected.membershipEnd },
                                 { l: t('adminSeats.modal.daysLeft'), v: t('adminSeats.modal.daysLeftValue', { days: daysToExpiry(selected.membershipEnd, date) }) },
                             ] : [
