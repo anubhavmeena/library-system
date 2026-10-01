@@ -927,6 +927,8 @@
       "selectShift": "शिफ्ट चुनें",
       "startDate": "प्रारंभ तिथि",
       "days": "दिन",
+      "months_one": "{{count}} महीना",
+      "months_other": "{{count}} महीने",
       "fullDay": "पूरा दिन",
       "halfDay": "आधा दिन",
       "endDateLabel": "सदस्यता समाप्त:"

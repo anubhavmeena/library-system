@@ -133,7 +133,9 @@ Two daily `tokio-cron-scheduler` jobs, registered in `main.rs::start_scheduler`:
 
 A `GRACE` membership's linked `seat_bookings.end_date` is pushed to the sentinel `9999-12-31` to hold the seat indefinitely. **Never pass that sentinel as the upper bound to `seat::invalidate_seat_cache`** — it loops day-by-day and would hang. Always cap invalidation at `today` (or the real end date) when touching a GRACE-adjacent booking.
 
-Two distinct dues-clearing code paths intentionally differ (mirrors the Java backend): `admin::clear_dues` extends `end_date` by **+1 month from the membership's existing (stale) end_date**; `membership::verify_and_pay_dues` (student self-serve) extends by the **plan's `duration_days`** from that same stale end_date. Don't "fix" this inconsistency without checking both call sites' assumptions.
+Plan terms are **calendar months**, not raw day counts: every end date goes through `services::membership::plan_end_date(start, duration_days)`, which treats any `duration_days` that's a multiple of 30 as that many months (Oct 1 → Oct 31, Jan 15 → Feb 14, Jan 31 → Feb 28) and anything else as a plain inclusive day count. Don't compute an end date with `start + Duration::days(duration_days - 1)` — use the helper (the frontend mirrors it in `frontend/src/utils/planDates.js`). The Java and Go backends still use raw day counts.
+
+Two dues-clearing code paths (mirrors the Java backend): `admin::clear_dues` (and `admin::renew_seat`) extend by **one calendar month** starting the day after the membership's existing (stale) end_date; `membership::verify_and_pay_dues` (student self-serve) extends by the **plan's term** (`plan_end_date`) from that same day. For the standard 30-day plans these now land on the same date; they still differ for a non-monthly plan.
 
 `create_order`/`create_cash_membership` block if the user has an unresolved `GRACE` row or an existing `QUEUED` row. `create_cash_membership` also enforces `paid_amount + pending_amount == plan.price` exactly.
 

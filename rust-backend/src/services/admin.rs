@@ -392,7 +392,7 @@ pub async fn update_student(
                 .bind(plan_id)
                 .fetch_one(&state.db)
                 .await?;
-            let new_end = new_start + chrono::Duration::days(duration_days as i64 - 1);
+            let new_end = crate::services::membership::plan_end_date(new_start, duration_days);
 
             sqlx::query("UPDATE memberships SET start_date = $2, end_date = $3 WHERE id = $1")
                 .bind(mem_id)
@@ -842,7 +842,7 @@ async fn process_import_row(
     // If the sheet's date is so far in the past the membership would already
     // be expired, start from today so the student appears active on the seat map.
     let today = chrono::Local::now().date_naive();
-    if start_date + chrono::Duration::days(plan.duration_days as i64) < today {
+    if crate::services::membership::plan_end_date(start_date, plan.duration_days) < today {
         start_date = today;
     }
 
@@ -2051,7 +2051,7 @@ pub async fn create_cash_membership(
         ));
     }
 
-    let end_date = req.start_date + chrono::Duration::days(plan.duration_days as i64 - 1);
+    let end_date = crate::services::membership::plan_end_date(req.start_date, plan.duration_days);
 
     // Validate the seat is real and actually free *before* creating the membership —
     // otherwise a conflict discovered later leaves a membership claiming a seat_number
@@ -2693,8 +2693,7 @@ pub async fn renew_seat(state: &Arc<AppState>, membership_id: Uuid) -> crate::er
     .await?
     .ok_or_else(|| AppError::NotFound("No active membership found".into()))?;
 
-    let new_end = membership.end_date.checked_add_months(chrono::Months::new(1))
-        .ok_or_else(|| AppError::Internal("Date overflow computing renewal".into()))?;
+    let new_end = crate::services::membership::calendar_months_end(membership.end_date + chrono::Duration::days(1), 1);
 
     check_no_seat_conflict_on_extension(state, &membership, new_end).await?;
 
@@ -2885,8 +2884,7 @@ pub async fn clear_dues(
     let (mode_db, mode_label) = resolve_admin_payment_mode(payment_mode)?;
 
     let remainder = dues - amount_cleared;
-    let new_end = membership.end_date.checked_add_months(chrono::Months::new(1))
-        .ok_or_else(|| AppError::Internal("Date overflow computing dues clearance".into()))?;
+    let new_end = crate::services::membership::calendar_months_end(membership.end_date + chrono::Duration::days(1), 1);
 
     check_no_seat_conflict_on_extension(state, &membership, new_end).await?;
 

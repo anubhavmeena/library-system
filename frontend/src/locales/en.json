@@ -948,6 +948,8 @@
       "selectShift": "Select Shift",
       "startDate": "Start Date",
       "days": "days",
+      "months_one": "{{count}} month",
+      "months_other": "{{count}} months",
       "fullDay": "Full Day",
       "halfDay": "Half Day",
       "endDateLabel": "Membership ends:"

@@ -1211,7 +1211,7 @@ mod integration_tests {
             json!({ "studentId": user1, "planId": plan_id, "shift": "MORNING", "seatNumber": seat, "startDate": today, "paidAmount": price, "pendingAmount": "0", "paymentMode": "CASH" }),
         )).await.unwrap();
         let membership1_id = body_json(resp).await["data"]["membership_id"].as_str().unwrap().to_string();
-        let tenant1_end = today + Duration::days(days as i64 - 1);
+        let tenant1_end = crate::services::membership::plan_end_date(today, days);
 
         let (user2, _t2) = create_test_user(&state, "STUDENT", "PlanOverlap Tenant 2").await;
         let tenant2_start = tenant1_end + Duration::days(1);
@@ -1269,7 +1269,7 @@ mod integration_tests {
             "POST", "/api/admin/memberships/cash", Some(&admin),
             json!({ "studentId": user1, "planId": plan_id, "shift": "MORNING", "seatNumber": seat, "startDate": today, "paidAmount": price, "pendingAmount": "0", "paymentMode": "CASH" }),
         )).await.unwrap();
-        let tenant1_end = today + Duration::days(days as i64 - 1);
+        let tenant1_end = crate::services::membership::plan_end_date(today, days);
 
         // Tenant 2: the very next day after tenant 1 vacates, same seat/shift.
         let (user2, _t2) = create_test_user(&state, "STUDENT", "Overlap Tenant 2").await;
@@ -1447,7 +1447,7 @@ mod integration_tests {
             json!({ "studentId": user1, "planId": plan_id, "shift": "EVENING", "seatNumber": seat, "startDate": tenant1_start, "paidAmount": price, "pendingAmount": "0", "paymentMode": "CASH" }),
         )).await.unwrap();
         let membership1_id = body_json(resp).await["data"]["membership_id"].as_str().unwrap().to_string();
-        let tenant1_end = tenant1_start + Duration::days(days as i64 - 1);
+        let tenant1_end = crate::services::membership::plan_end_date(tenant1_start, days);
 
         // Tenant 2 legitimately took over the seat right after, and is still
         // ongoing today.
@@ -1505,7 +1505,7 @@ mod integration_tests {
             json!({ "studentId": user1, "planId": plan_id, "shift": "MORNING", "seatNumber": seat, "startDate": today, "paidAmount": price, "pendingAmount": "0", "paymentMode": "CASH" }),
         )).await.unwrap();
         let membership1_id = body_json(resp).await["data"]["membership_id"].as_str().unwrap().to_string();
-        let tenant1_end = today + Duration::days(days as i64 - 1);
+        let tenant1_end = crate::services::membership::plan_end_date(today, days);
 
         let (user2, _t2) = create_test_user(&state, "STUDENT", "GraceOverlap Tenant 2").await;
         let tenant2_start = tenant1_end + Duration::days(1);
@@ -1564,7 +1564,7 @@ mod integration_tests {
             json!({ "studentId": user1, "planId": plan_id, "shift": "MORNING", "seatNumber": seat_conflict, "startDate": tenant1_start, "paidAmount": price, "pendingAmount": "0", "paymentMode": "CASH" }),
         )).await.unwrap();
         let membership1_id = body_json(resp).await["data"]["membership_id"].as_str().unwrap().to_string();
-        let tenant1_end = tenant1_start + Duration::days(days as i64 - 1);
+        let tenant1_end = crate::services::membership::plan_end_date(tenant1_start, days);
 
         let (user2, _t2) = create_test_user(&state, "STUDENT", "SweepOverlap Tenant 2").await;
         let tenant2_start = tenant1_end + Duration::days(1);

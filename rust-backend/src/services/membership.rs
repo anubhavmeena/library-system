@@ -6,7 +6,7 @@ use crate::{
     },
     services::{ids, notification, payment, settings},
 };
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use redis::AsyncCommands;
 use rust_decimal::Decimal;
 use std::sync::Arc;
@@ -335,7 +335,7 @@ pub async fn create_order(
     let today = chrono::Local::now().date_naive();
     let (start_date, status, inherited_shift, inherited_seat) =
         determine_start_date(state, user_id, today).await?;
-    let end_date = start_date + chrono::Duration::days(plan.duration_days as i64 - 1);
+    let end_date = plan_end_date(start_date, plan.duration_days);
 
     let membership_status = if status == "QUEUED" { "QUEUED" } else { "PENDING" };
 
@@ -724,7 +724,8 @@ pub async fn verify_and_pay_dues(
         .await?;
 
     let dues_paid = membership.checkout_amount.unwrap_or(membership.dues_amount.unwrap_or_default());
-    let new_end_date = membership.end_date + chrono::Duration::days(plan.duration_days as i64);
+    // The new term starts the day after the stale end_date.
+    let new_end_date = plan_end_date(membership.end_date + chrono::Duration::days(1), plan.duration_days);
 
     let payment_rec = sqlx::query_as::<_, Payment>(
         "INSERT INTO payments (membership_id, user_id, amount, payment_gateway, gateway_order_id, gateway_payment_id, invoice_id, status)
@@ -991,6 +992,35 @@ pub async fn get_payment_history(
     .map_err(AppError::Database)
 }
 
+/// Last day of a membership that starts on `start` and runs `months` calendar
+/// months: the day before the same date `months` later (Oct 1 → Oct 31,
+/// Jan 15 → Feb 14). When that date doesn't exist in the target month
+/// (Jan 31 → "Feb 31"), chrono clamps to the month's last day, and the
+/// membership ends on that last day instead (Jan 31 → Feb 28), so the next
+/// term starts on the 1st rather than eating a day of February.
+pub fn calendar_months_end(start: NaiveDate, months: u32) -> NaiveDate {
+    let same_day = start
+        .checked_add_months(chrono::Months::new(months))
+        .expect("membership end date out of range");
+    if same_day.day() < start.day() {
+        same_day
+    } else {
+        same_day - chrono::Duration::days(1)
+    }
+}
+
+/// Last day of a plan's term. Plans store `duration_days`, but any multiple
+/// of 30 is treated as that many calendar months (30 → 1 month, 90 → 3), so
+/// a "30 Days" plan covers a full month whether it has 28, 30 or 31 days.
+/// Any other duration is a plain day count, inclusive of `start`.
+pub fn plan_end_date(start: NaiveDate, duration_days: i32) -> NaiveDate {
+    if duration_days > 0 && duration_days % 30 == 0 {
+        calendar_months_end(start, (duration_days / 30) as u32)
+    } else {
+        start + chrono::Duration::days(duration_days as i64 - 1)
+    }
+}
+
 /// Resolves the start date/status for a new order, and — when this is a queued
 /// renewal (an ACTIVE membership not yet past its end date exists) — the
 /// seat/shift to inherit from that membership, ignoring whatever the request
@@ -1022,6 +1052,45 @@ async fn determine_start_date(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn d(s: &str) -> NaiveDate {
+        s.parse().unwrap()
+    }
+
+    #[test]
+    fn plan_end_date_uses_calendar_months_for_multiples_of_30() {
+        assert_eq!(plan_end_date(d("2026-10-01"), 30), d("2026-10-31"));
+        assert_eq!(plan_end_date(d("2026-11-01"), 30), d("2026-11-30"));
+        assert_eq!(plan_end_date(d("2027-02-01"), 30), d("2027-02-28"));
+        assert_eq!(plan_end_date(d("2026-01-15"), 30), d("2026-02-14"));
+        assert_eq!(plan_end_date(d("2026-12-20"), 30), d("2027-01-19"));
+        assert_eq!(plan_end_date(d("2026-10-01"), 90), d("2026-12-31"));
+    }
+
+    #[test]
+    fn plan_end_date_clamps_to_month_end_when_day_missing() {
+        assert_eq!(plan_end_date(d("2027-01-31"), 30), d("2027-02-28"));
+        assert_eq!(plan_end_date(d("2027-01-29"), 30), d("2027-02-28"));
+        assert_eq!(plan_end_date(d("2028-01-30"), 30), d("2028-02-29"));
+        assert_eq!(plan_end_date(d("2026-03-31"), 30), d("2026-04-30"));
+        assert_eq!(plan_end_date(d("2026-08-31"), 90), d("2026-11-30"));
+    }
+
+    #[test]
+    fn plan_end_date_keeps_day_count_for_other_durations() {
+        assert_eq!(plan_end_date(d("2026-10-01"), 15), d("2026-10-15"));
+        assert_eq!(plan_end_date(d("2026-10-01"), 1), d("2026-10-01"));
+    }
+
+    #[test]
+    fn back_to_back_monthly_terms_stay_on_the_same_date() {
+        let mut start = d("2026-01-15");
+        for _ in 0..12 {
+            start = plan_end_date(start, 30) + chrono::Duration::days(1);
+            assert_eq!(start.day(), 15);
+        }
+        assert_eq!(start, d("2027-01-15"));
+    }
 
     fn today() -> NaiveDate {
         chrono::Local::now().date_naive()

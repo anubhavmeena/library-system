@@ -9,6 +9,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3'
 import { parseISO, format, addDays } from 'date-fns'
 import { formatCurrency } from '../../utils/currency'
 import { paymentModeInfo } from '../../utils/paymentMode'
+import { planEndDate, planMonths } from '../../utils/planDates'
 import UpiQrModal from '../../components/admin/UpiQrModal'
 
 const DATE_PICKER_SX = {
@@ -127,7 +128,7 @@ export default function AdminCreateMembershipPage() {
     }, [step, selectedPlan, selectedShift, startDate])
 
     const endDate = selectedPlan && startDate
-        ? format(addDays(parseISO(startDate), selectedPlan.durationDays), 'yyyy-MM-dd')
+        ? planEndDate(startDate, selectedPlan.durationDays)
         : '—'
 
     const resolvedShift = selectedPlan?.planType === 'FULL_DAY' ? 'FULL_DAY' : selectedShift
@@ -393,7 +394,7 @@ export default function AdminCreateMembershipPage() {
                                         <p className="font-semibold text-base mb-1">{p.name}</p>
                                         <p className="text-amber-400 text-lg font-bold">{formatCurrency(p.price)}</p>
                                         <p className="text-xs text-primary-500 mt-1">
-                                            {p.durationDays} {t('adminNewMembership.step2.days')} · {p.planType === 'FULL_DAY' ? t('adminNewMembership.step2.fullDay') : t('adminNewMembership.step2.halfDay')}
+                                            {planMonths(p.durationDays) ? t('adminNewMembership.step2.months', { count: planMonths(p.durationDays) }) : `${p.durationDays} ${t('adminNewMembership.step2.days')}`} · {p.planType === 'FULL_DAY' ? t('adminNewMembership.step2.fullDay') : t('adminNewMembership.step2.halfDay')}
                                         </p>
                                     </button>
                                 ))}
