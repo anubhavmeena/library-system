@@ -458,7 +458,9 @@ pub async fn get_student_payments(
                   p.gateway_order_id, p.gateway_payment_id, p.invoice_id, p.status,
                   p.coupon_code, p.discount_amount,
                   p.created_at AS paid_at,
-                  mp.name AS plan_name, m.shift, m.seat_number, m.start_date, m.end_date
+                  mp.name AS plan_name, m.shift, m.seat_number,
+                  -- the term this payment bought, not the membership's whole span
+                  p.period_start AS start_date, p.period_end AS end_date
            FROM payments p
            LEFT JOIN memberships m       ON m.id = p.membership_id
            LEFT JOIN membership_plans mp ON mp.id = m.plan_id
@@ -2107,8 +2109,8 @@ pub async fn create_cash_membership(
 
     let invoice_id = crate::services::ids::generate_invoice_id();
     sqlx::query(
-        "INSERT INTO payments (membership_id, user_id, amount, pending_amount, payment_gateway, invoice_id, status)
-         VALUES ($1, $2, $3, $4, $5, $6, 'SUCCESS')",
+        "INSERT INTO payments (membership_id, user_id, amount, pending_amount, payment_gateway, invoice_id, status, period_start, period_end)
+         VALUES ($1, $2, $3, $4, $5, $6, 'SUCCESS', $7, $8)",
     )
     .bind(membership.id)
     .bind(req.user_id)
@@ -2116,6 +2118,8 @@ pub async fn create_cash_membership(
     .bind(req.pending_amount)
     .bind(mode_db)
     .bind(&invoice_id)
+    .bind(req.start_date)
+    .bind(end_date)
     .execute(&state.db)
     .await?;
 
@@ -2749,20 +2753,25 @@ pub async fn mark_membership_pending(
         )));
     }
 
-    let latest_gateway: Option<String> = sqlx::query_scalar(
+    // The replacement row keeps the voided row's period.
+    let latest: Option<(String, Option<NaiveDate>, Option<NaiveDate>)> = sqlx::query_as(
         "DELETE FROM payments WHERE id = (
             SELECT id FROM payments WHERE membership_id = $1 ORDER BY created_at DESC LIMIT 1
-         ) RETURNING payment_gateway",
+         ) RETURNING payment_gateway, period_start, period_end",
     )
     .bind(membership_id)
     .fetch_optional(&state.db)
     .await?;
+    let (latest_gateway, period_start, period_end) = match latest {
+        Some((g, ps, pe)) => (Some(g), ps, pe),
+        None => (None, None, None),
+    };
 
     let paid_amount = (plan.price - pending_amount).max(Decimal::ZERO);
 
     sqlx::query(
-        "INSERT INTO payments (membership_id, user_id, amount, pending_amount, payment_gateway, invoice_id, status)
-         VALUES ($1, $2, $3, $4, $5, $6, 'SUCCESS')",
+        "INSERT INTO payments (membership_id, user_id, amount, pending_amount, payment_gateway, invoice_id, status, period_start, period_end)
+         VALUES ($1, $2, $3, $4, $5, $6, 'SUCCESS', $7, $8)",
     )
     .bind(membership_id)
     .bind(membership.user_id)
@@ -2770,6 +2779,8 @@ pub async fn mark_membership_pending(
     .bind(pending_amount)
     .bind(latest_gateway.unwrap_or_else(|| "CASH".to_string()))
     .bind(ids::generate_invoice_id())
+    .bind(period_start)
+    .bind(period_end)
     .execute(&state.db)
     .await?;
 
@@ -2807,25 +2818,32 @@ pub async fn mark_membership_grace(state: &Arc<AppState>, membership_id: Uuid) -
         .fetch_one(&state.db)
         .await?;
 
-    let latest_gateway: Option<String> = sqlx::query_scalar(
+    // The replacement row keeps the voided row's period.
+    let latest: Option<(String, Option<NaiveDate>, Option<NaiveDate>)> = sqlx::query_as(
         "DELETE FROM payments WHERE id = (
             SELECT id FROM payments WHERE membership_id = $1 ORDER BY created_at DESC LIMIT 1
-         ) RETURNING payment_gateway",
+         ) RETURNING payment_gateway, period_start, period_end",
     )
     .bind(membership_id)
     .fetch_optional(&state.db)
     .await?;
+    let (latest_gateway, period_start, period_end) = match latest {
+        Some((g, ps, pe)) => (Some(g), ps, pe),
+        None => (None, None, None),
+    };
 
     // Void the incorrect payment with a zero-amount corrected row — the real
     // amount owed lives in memberships.dues_amount, not payments.pending_amount.
     sqlx::query(
-        "INSERT INTO payments (membership_id, user_id, amount, pending_amount, payment_gateway, invoice_id, status)
-         VALUES ($1, $2, 0, 0, $3, $4, 'SUCCESS')",
+        "INSERT INTO payments (membership_id, user_id, amount, pending_amount, payment_gateway, invoice_id, status, period_start, period_end)
+         VALUES ($1, $2, 0, 0, $3, $4, 'SUCCESS', $5, $6)",
     )
     .bind(membership_id)
     .bind(membership.user_id)
     .bind(latest_gateway.unwrap_or_else(|| "CASH".to_string()))
     .bind(ids::generate_invoice_id())
+    .bind(period_start)
+    .bind(period_end)
     .execute(&state.db)
     .await?;
 
@@ -2890,8 +2908,8 @@ pub async fn clear_dues(
 
     let invoice_id = ids::generate_invoice_id();
     sqlx::query(
-        "INSERT INTO payments (membership_id, user_id, amount, pending_amount, payment_gateway, invoice_id, status)
-         VALUES ($1, $2, $3, $4, $5, $6, 'SUCCESS')",
+        "INSERT INTO payments (membership_id, user_id, amount, pending_amount, payment_gateway, invoice_id, status, period_start, period_end)
+         VALUES ($1, $2, $3, $4, $5, $6, 'SUCCESS', $7, $8)",
     )
     .bind(membership_id)
     .bind(membership.user_id)
@@ -2899,6 +2917,8 @@ pub async fn clear_dues(
     .bind(remainder)
     .bind(mode_db)
     .bind(&invoice_id)
+    .bind(membership.end_date + chrono::Duration::days(1))
+    .bind(new_end)
     .execute(&state.db)
     .await?;
 

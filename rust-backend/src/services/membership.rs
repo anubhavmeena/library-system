@@ -466,8 +466,8 @@ pub async fn verify_payment(
     let charge_amount = membership.checkout_amount.unwrap_or_default();
 
     let payment_rec = sqlx::query_as::<_, Payment>(
-        "INSERT INTO payments (membership_id, user_id, amount, payment_gateway, gateway_order_id, gateway_payment_id, invoice_id, status, coupon_code, discount_amount)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'SUCCESS', $8, $9) RETURNING *",
+        "INSERT INTO payments (membership_id, user_id, amount, payment_gateway, gateway_order_id, gateway_payment_id, invoice_id, status, coupon_code, discount_amount, period_start, period_end)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'SUCCESS', $8, $9, $10, $11) RETURNING *",
     )
     .bind(membership_id)
     .bind(user_id)
@@ -478,6 +478,8 @@ pub async fn verify_payment(
     .bind(ids::generate_invoice_id())
     .bind(&membership.coupon_code)
     .bind(membership.discount_amount)
+    .bind(membership.start_date)
+    .bind(membership.end_date)
     .fetch_one(&state.db)
     .await?;
 
@@ -728,8 +730,8 @@ pub async fn verify_and_pay_dues(
     let new_end_date = plan_end_date(membership.end_date + chrono::Duration::days(1), plan.duration_days);
 
     let payment_rec = sqlx::query_as::<_, Payment>(
-        "INSERT INTO payments (membership_id, user_id, amount, payment_gateway, gateway_order_id, gateway_payment_id, invoice_id, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'SUCCESS') RETURNING *",
+        "INSERT INTO payments (membership_id, user_id, amount, payment_gateway, gateway_order_id, gateway_payment_id, invoice_id, status, period_start, period_end)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'SUCCESS', $8, $9) RETURNING *",
     )
     .bind(membership_id)
     .bind(user_id)
@@ -738,6 +740,8 @@ pub async fn verify_and_pay_dues(
     .bind(order_id)
     .bind(payment_id)
     .bind(ids::generate_invoice_id())
+    .bind(membership.end_date + chrono::Duration::days(1))
+    .bind(new_end_date)
     .fetch_one(&state.db)
     .await?;
 
