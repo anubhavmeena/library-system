@@ -114,7 +114,7 @@ Your reserved seat is *{seat}*. Renew now to keep it!
     {
         key: 'PENDING_FEE_REMINDER',
         label: 'Pending Fee Reminder',
-        description: 'Manual admin reminder for a student with an outstanding cash balance.',
+        description: 'Sent automatically every 4 days until an outstanding cash balance is cleared, or manually by an admin. Turning off the student message also stops the automatic reminders.',
         previewStudent: `💰 Pending Fee Reminder
 
 Hi {name},

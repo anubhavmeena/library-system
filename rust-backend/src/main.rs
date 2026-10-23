@@ -111,6 +111,16 @@ async fn start_scheduler(state: Arc<AppState>) {
     sched.add(reminder_job).await.expect("Failed to add reminder job");
     sched.add(expiry_job).await.expect("Failed to add expiry job");
     sched.add(grace_reminder_job).await.expect("Failed to add grace dues reminder job");
+    let s5 = state.clone();
+    let pending_fee_job = Job::new_async("0 0 9 * * *", move |_uuid, _lock| {
+        let s = s5.clone();
+        Box::pin(async move {
+            services::admin::run_pending_fee_reminder_job(s).await;
+        })
+    })
+    .expect("Failed to create pending fee reminder cron job");
+
     sched.add(poll_job).await.expect("Failed to add renewal poll job");
+    sched.add(pending_fee_job).await.expect("Failed to add pending fee reminder job");
     sched.start().await.expect("Failed to start scheduler");
 }

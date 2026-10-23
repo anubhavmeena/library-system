@@ -1817,23 +1817,125 @@ pub async fn send_pending_fee_reminders(
         });
     }
 
-    // Admin summary copy
-    if count > 0 {
-        let admin_msg = format!(
-            "Pending Fee Reminders Sent! {count} student(s) notified about outstanding dues."
-        );
-        if !state.config.admin_whatsapp.is_empty() {
-            notification::send_whatsapp_to(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
-        }
-        notification::send_email_to(
-            state,
-            &state.config.admin_email.clone(),
-            &format!("Pending Fee Reminders Sent — {count} student(s)"),
-            &admin_msg,
+    notify_admin_pending_fee_reminders_sent(state, count).await;
+
+    Ok(count)
+}
+
+async fn notify_admin_pending_fee_reminders_sent(state: &Arc<AppState>, count: i64) {
+    if count == 0 {
+        return;
+    }
+    let admin_msg = format!(
+        "Pending Fee Reminders Sent! {count} student(s) notified about outstanding dues."
+    );
+    if !state.config.admin_whatsapp.is_empty() {
+        notification::send_whatsapp_to(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
+    }
+    notification::send_email_to(
+        state,
+        &state.config.admin_email.clone(),
+        &format!("Pending Fee Reminders Sent — {count} student(s)"),
+        &admin_msg,
+    ).await;
+}
+
+/// Whether a student with pending fees should get the automatic recurring
+/// reminder today, given how many days it's been since their oldest
+/// still-pending payment: every 4th day (4, 8, 12, ...) until cleared. Day 0
+/// is skipped — that's the day the admin just recorded the partial payment.
+fn pending_fee_reminder_due(days_since_payment: i64) -> bool {
+    days_since_payment >= 4 && days_since_payment % 4 == 0
+}
+
+/// Automatic recurring pending-fee reminder (see `run_pending_fee_reminder_job`).
+/// Unlike `send_pending_fee_reminders` above (the admin manual/bulk-send
+/// button, which messages every pending-fee student on every call), this only
+/// fires on the `pending_fee_reminder_due` checkpoints, counted from the IST
+/// date of the student's oldest payment that still has a `pending_amount`.
+/// Same released-student exclusion as the manual "Send to All" and
+/// `get_pending_fees`, and gated on the PENDING_FEE_REMINDER setting's
+/// send-to-student toggle so it can be switched off from Settings. Sends
+/// sequentially, like the scheduled grace-dues job, to stay well under
+/// WhatsApp rate limits.
+pub async fn send_scheduled_pending_fee_reminders(state: &Arc<AppState>) -> crate::error::Result<i64> {
+    let setting = settings::setting_for(state, "PENDING_FEE_REMINDER").await;
+    if !setting.send_to_student {
+        return Ok(0);
+    }
+
+    let rows: Vec<(Uuid, String, Option<String>, Option<String>, Option<Decimal>, NaiveDate)> = sqlx::query_as(
+        "SELECT u.id, u.name, u.mobile, u.email, SUM(p.pending_amount),
+                (MIN(p.created_at) + INTERVAL '5 hours 30 minutes')::date
+         FROM users u
+         JOIN payments p ON p.user_id = u.id
+         LEFT JOIN LATERAL (
+             SELECT status FROM memberships
+             WHERE user_id = u.id AND status != 'PENDING'
+             ORDER BY
+                 CASE WHEN status = 'GRACE' THEN 0 WHEN status = 'ACTIVE' THEN 1 ELSE 2 END,
+                 CASE WHEN status IN ('ACTIVE', 'GRACE') THEN end_date END DESC,
+                 created_at DESC
+             LIMIT 1
+         ) m ON true
+         WHERE p.pending_amount > 0 AND p.status = 'SUCCESS'
+           AND (m.status IS NULL OR m.status != 'EXPIRED')
+         GROUP BY u.id, u.name, u.mobile, u.email",
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    let today = chrono::Local::now().date_naive();
+    let due: Vec<_> = rows
+        .into_iter()
+        .filter(|(.., since)| pending_fee_reminder_due((today - *since).num_days()))
+        .collect();
+
+    let count = due.len() as i64;
+    let app_settings = settings::get_app_settings(state).await.ok();
+    let upi_id = app_settings.as_ref().and_then(|s| s.upi_id.clone()).filter(|v| !v.is_empty());
+    let payee_name = settings::upi_payee_name(app_settings.as_ref());
+    for (user_id, name, mobile, email, pending, _since) in &due {
+        send_one_pending_fee_reminder(
+            state, &LogMeta::auto(*user_id, nlog::PENDING_FEE_REMINDER), name,
+            mobile.as_deref(), email.as_deref(), pending.unwrap_or_default(),
+            upi_id.as_deref(), &payee_name,
         ).await;
     }
 
+    notify_admin_pending_fee_reminders_sent(state, count).await;
+
     Ok(count)
+}
+
+pub async fn run_pending_fee_reminder_job(state: Arc<AppState>) {
+    tracing::info!("Running pending fee reminder scheduler job");
+    match send_scheduled_pending_fee_reminders(&state).await {
+        Ok(n) => tracing::info!("Sent {n} pending fee reminders"),
+        Err(e) => tracing::error!("Pending fee reminder job error: {e}"),
+    }
+}
+
+#[cfg(test)]
+mod pending_fee_reminder_tests {
+    use super::pending_fee_reminder_due;
+
+    #[test]
+    fn first_reminder_on_day_four() {
+        assert!(!pending_fee_reminder_due(0));
+        assert!(!pending_fee_reminder_due(1));
+        assert!(!pending_fee_reminder_due(3));
+        assert!(pending_fee_reminder_due(4));
+    }
+
+    #[test]
+    fn repeats_every_four_days() {
+        assert!(!pending_fee_reminder_due(5));
+        assert!(!pending_fee_reminder_due(7));
+        assert!(pending_fee_reminder_due(8));
+        assert!(pending_fee_reminder_due(12));
+        assert!(pending_fee_reminder_due(116));
+    }
 }
 
 pub async fn send_direct_message(
