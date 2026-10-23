@@ -20,6 +20,21 @@ const STATUS_BADGE_CLASSES = {
     RELEASED:      'bg-red-950/70 text-red-300 border-red-900',
 }
 
+// notification_logs.sent_at is a naive UTC timestamp (Postgres NOW() on a UTC
+// server), so append "Z" before converting to IST — same as the activity log.
+function formatIST(ts) {
+    if (!ts) return ''
+    const date = new Date(ts.endsWith('Z') ? ts : `${ts}Z`)
+    if (Number.isNaN(date.getTime())) return ts
+    return date.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true,
+    })
+}
+
+const CHANNEL_LABELS = { WHATSAPP: 'WhatsApp', EMAIL: 'Email' }
+
 export default function AdminStudentDetailPage() {
     const { userId } = useParams()
     const navigate = useNavigate()
@@ -38,6 +53,10 @@ export default function AdminStudentDetailPage() {
 
     const [seatHistory, setSeatHistory]               = useState([])
     const [seatHistoryLoading, setSeatHistoryLoading] = useState(true)
+
+    const [notifications, setNotifications]               = useState([])
+    const [notificationsLoading, setNotificationsLoading] = useState(true)
+    const [expandedNotification, setExpandedNotification] = useState(null)
 
     const fetchStudent = async () => {
         setLoading(true)
@@ -97,6 +116,16 @@ export default function AdminStudentDetailPage() {
     }
 
     useEffect(fetchSeatHistory, [userId])
+
+    const fetchNotifications = () => {
+        setNotificationsLoading(true)
+        api.get(`/admin/students/${userId}/notifications`)
+            .then(r => setNotifications(r.data.data || []))
+            .catch(() => setNotifications([]))
+            .finally(() => setNotificationsLoading(false))
+    }
+
+    useEffect(fetchNotifications, [userId])
 
     const handleSave = async () => {
         setSaving(true)
@@ -211,7 +240,7 @@ export default function AdminStudentDetailPage() {
                 <div className="flex-shrink-0">
                     <StudentActionsMenu
                         student={student}
-                        onMutated={() => { fetchStudent(); fetchSeatHistory(); fetchPayments() }}
+                        onMutated={() => { fetchStudent(); fetchSeatHistory(); fetchPayments(); fetchNotifications() }}
                         onDeleted={() => navigate('/admin/students')}
                     />
                 </div>
@@ -318,7 +347,7 @@ export default function AdminStudentDetailPage() {
             </div>
 
             {/* Seat History */}
-            <div className="card p-6">
+            <div className="card p-6 mb-6">
                 <h2 className="section-title text-lg mb-4">{t('adminStudentDetail.seatHistory.title')}</h2>
                 {seatHistoryLoading ? (
                     <div className="shimmer h-16 rounded-xl" />
@@ -340,6 +369,66 @@ export default function AdminStudentDetailPage() {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Notification History — every reminder/message sent in the last 30 days */}
+            <div className="card p-6">
+                <div className="flex items-baseline justify-between mb-4 gap-2">
+                    <h2 className="section-title text-lg">{t('adminStudentDetail.notifications.title')}</h2>
+                    <span className="text-primary-500 text-xs">{t('adminStudentDetail.notifications.subtitle')}</span>
+                </div>
+                {notificationsLoading ? (
+                    <div className="shimmer h-16 rounded-xl" />
+                ) : notifications.length === 0 ? (
+                    <p className="text-primary-500 text-xs text-center py-3">{t('adminStudentDetail.notifications.empty')}</p>
+                ) : (
+                    <div className="space-y-2">
+                        {notifications.map(n => {
+                            const sent = n.status === 'SENT'
+                            const expanded = expandedNotification === n.id
+                            const channels = (n.channel || '').split(',').filter(Boolean)
+                                .map(c => CHANNEL_LABELS[c] || c).join(' + ')
+                            return (
+                                <div key={n.id} className="rounded-lg bg-primary-800/40 border border-primary-700/30 px-3 py-2.5 text-xs">
+                                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                                        <span className="text-white font-semibold">
+                                            {t(`adminStudentDetail.notifications.events.${n.event}`, { defaultValue: n.event || '—' })}
+                                        </span>
+                                        <span className={`flex-shrink-0 px-2 py-0.5 rounded-full font-medium border ${sent
+                                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                            : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
+                                            {t(`adminStudentDetail.notifications.status.${sent ? 'SENT' : 'FAILED'}`)}
+                                        </span>
+                                    </div>
+                                    <div className="text-primary-400 space-y-0.5">
+                                        <p>
+                                            {formatIST(n.sentAt)}
+                                            {' · '}
+                                            {n.triggerType === 'MANUAL'
+                                                ? t('adminStudentDetail.notifications.manual', { name: n.sentBy || '—' })
+                                                : t('adminStudentDetail.notifications.auto')}
+                                        </p>
+                                        {(channels || n.recipient) && (
+                                            <p>{channels}{channels && n.recipient ? ' → ' : ''}{n.recipient}</p>
+                                        )}
+                                        {n.errorMessage && <p className="text-red-400">{n.errorMessage}</p>}
+                                        {n.message && (
+                                            <>
+                                                <p className={`text-primary-300 whitespace-pre-wrap break-words ${expanded ? '' : 'line-clamp-2'}`}>
+                                                    {n.message}
+                                                </p>
+                                                <button onClick={() => setExpandedNotification(expanded ? null : n.id)}
+                                                    className="text-amber-400 hover:text-amber-300">
+                                                    {t(`adminStudentDetail.notifications.${expanded ? 'showLess' : 'showMore'}`)}
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        })}
                     </div>
                 )}
             </div>

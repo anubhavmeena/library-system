@@ -33,7 +33,10 @@ impl IntoResponse for AppError {
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized".into()),
             AppError::Forbidden => (StatusCode::FORBIDDEN, "Forbidden".into()),
             AppError::Conflict(m) => (StatusCode::CONFLICT, m.clone()),
-            AppError::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m.clone()),
+            AppError::Internal(m) => {
+                tracing::error!("Internal error: {m}");
+                (StatusCode::INTERNAL_SERVER_ERROR, m.clone())
+            }
             AppError::Database(e) => {
                 tracing::error!("DB error: {e}");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Database error".into())

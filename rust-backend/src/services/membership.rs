@@ -4,7 +4,7 @@ use crate::{
     models::membership::{
         CreateOrderResponse, Membership, MembershipPlan, MembershipWithPlan, Payment, PlanWithFee,
     },
-    services::{ids, notification, payment, settings},
+    services::{ids, notification, notification_log::{self as nlog, LogMeta}, payment, settings},
 };
 use chrono::{Datelike, NaiveDate};
 use redis::AsyncCommands;
@@ -786,7 +786,7 @@ pub async fn verify_and_pay_dues(
         payment_method: state.config.payment_gateway.clone(),
     };
     tokio::spawn(async move {
-        notification::send_payment_receipt_typed(&state2, &receipt_event, "GRACE_DUES_CLEARED").await
+        notification::send_payment_receipt_typed(&state2, &receipt_event, "GRACE_DUES_CLEARED", None).await
     });
 
     let pending_amount = sum_pending_amount(state, user_id).await?;
@@ -946,7 +946,10 @@ pub async fn verify_and_pay_pending(
             &format!("Your pending library fee of Rs.{charge_amount:.0} has been cleared. Thank you! - Target Zone Library Team"),
             &pf_setting, true,
         );
-        notification::send_direct_message(state, user.mobile.as_deref(), user.email.as_deref(), &msg).await;
+        notification::send_direct_message(
+            state, &LogMeta::auto(user.id, nlog::PENDING_FEE_CLEARED),
+            user.mobile.as_deref(), user.email.as_deref(), &msg,
+        ).await;
     }
     if pf_setting.send_to_admin {
         let seat = current.as_ref().and_then(|m| m.seat_number.as_deref()).unwrap_or("—");
@@ -955,9 +958,9 @@ pub async fn verify_and_pay_pending(
             user.name
         );
         if !state.config.admin_whatsapp.is_empty() {
-            notification::send_direct_message(state, Some(&state.config.admin_whatsapp.clone()), None, &admin_msg).await;
+            notification::send_whatsapp_to(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
         }
-        notification::send_direct_message(state, None, Some(&state.config.admin_email.clone()), &admin_msg).await;
+        notification::send_email_to(state, &state.config.admin_email.clone(), "Message from Target Zone", &admin_msg).await;
     }
 
     let s = state.clone();
@@ -975,7 +978,7 @@ pub async fn verify_and_pay_pending(
         payment_method: state.config.payment_gateway.clone(),
     };
     tokio::spawn(async move {
-        notification::send_payment_receipt_typed(&s, &receipt_event, "PENDING_FEE_CLEARED").await
+        notification::send_payment_receipt_typed(&s, &receipt_event, "PENDING_FEE_CLEARED", None).await
     });
 
     current.ok_or_else(|| AppError::Internal("Membership not found after clearing pending amount".into()))

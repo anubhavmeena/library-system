@@ -126,7 +126,7 @@ pub async fn register(
     let u = user.clone();
     let s = state.clone();
     tokio::spawn(async move {
-        notification::send_welcome(&s, &u.name, u.mobile.as_deref(), u.email.as_deref()).await;
+        notification::send_welcome(&s, u.id, &u.name, u.mobile.as_deref(), u.email.as_deref()).await;
     });
 
     Ok((token, User { role, ..user }))

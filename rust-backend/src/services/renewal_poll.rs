@@ -1,6 +1,6 @@
 use crate::{
     app_state::AppState, error::AppError, models::renewal_poll::RenewalPollEntry, models::user::User,
-    services::notification,
+    services::{notification, notification_log::{self as nlog, LogMeta}},
 };
 use chrono::NaiveDate;
 use std::sync::Arc;
@@ -66,8 +66,9 @@ async fn send_scheduled_renewal_polls(state: &Arc<AppState>) -> crate::error::Re
         let s = state.clone();
         let n = name.clone();
         let m = mobile.clone();
+        let meta = LogMeta::auto(user_id, nlog::RENEWAL_POLL);
         tokio::spawn(async move {
-            if let Some(wamid) = notification::send_renewal_poll(&s, &m, &n).await {
+            if let Some(wamid) = notification::send_renewal_poll(&s, &meta, &m, &n, end_date).await {
                 let _ = sqlx::query("UPDATE renewal_polls SET wa_message_id = $1 WHERE id = $2")
                     .bind(&wamid)
                     .bind(poll_id)
@@ -154,9 +155,9 @@ pub async fn list_renewal_polls(
 /// again) rather than inserting a new one — a fresh INSERT would violate the
 /// (membership_id, end_date) semantics the scheduler's NOT EXISTS gate
 /// relies on, since neither value changes on a resend.
-pub async fn resend_poll(state: &Arc<AppState>, poll_id: Uuid) -> crate::error::Result<()> {
-    let row: Option<(Uuid, String, Option<String>)> = sqlx::query_as(
-        "SELECT rp.user_id, u.name, u.mobile
+pub async fn resend_poll(state: &Arc<AppState>, poll_id: Uuid, sent_by: &str) -> crate::error::Result<()> {
+    let row: Option<(Uuid, String, Option<String>, NaiveDate)> = sqlx::query_as(
+        "SELECT rp.user_id, u.name, u.mobile, rp.end_date
          FROM renewal_polls rp JOIN users u ON u.id = rp.user_id
          WHERE rp.id = $1",
     )
@@ -165,7 +166,7 @@ pub async fn resend_poll(state: &Arc<AppState>, poll_id: Uuid) -> crate::error::
     .await
     .map_err(AppError::Database)?;
 
-    let Some((_user_id, name, mobile)) = row else {
+    let Some((user_id, name, mobile, end_date)) = row else {
         return Err(AppError::NotFound(format!("Renewal poll {poll_id} not found")));
     };
     let mobile = mobile.ok_or_else(|| AppError::BadRequest("Student has no mobile on file".into()))?;
@@ -178,7 +179,8 @@ pub async fn resend_poll(state: &Arc<AppState>, poll_id: Uuid) -> crate::error::
     .await
     .map_err(AppError::Database)?;
 
-    if let Some(wamid) = notification::send_renewal_poll(state, &mobile, &name).await {
+    let meta = LogMeta::manual(user_id, nlog::RENEWAL_POLL, sent_by);
+    if let Some(wamid) = notification::send_renewal_poll(state, &meta, &mobile, &name, end_date).await {
         sqlx::query("UPDATE renewal_polls SET wa_message_id = $1 WHERE id = $2")
             .bind(&wamid)
             .bind(poll_id)
@@ -197,7 +199,7 @@ pub async fn resend_poll(state: &Arc<AppState>, poll_id: Uuid) -> crate::error::
 /// bypasses gating" convention as send_renewal_reminders bypassing
 /// reminder_sent) — an admin deliberately triggering a send wants a record
 /// of that send, not a silent no-op because the scheduler already fired.
-pub async fn send_individual_poll(state: &Arc<AppState>, user_id: Uuid) -> crate::error::Result<()> {
+pub async fn send_individual_poll(state: &Arc<AppState>, user_id: Uuid, sent_by: &str) -> crate::error::Result<()> {
     let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
         .bind(user_id)
         .fetch_optional(&state.db)
@@ -232,7 +234,8 @@ pub async fn send_individual_poll(state: &Arc<AppState>, user_id: Uuid) -> crate
     .await
     .map_err(AppError::Database)?;
 
-    if let Some(wamid) = notification::send_renewal_poll(state, &mobile, &user.name).await {
+    let meta = LogMeta::manual(user_id, nlog::RENEWAL_POLL, sent_by);
+    if let Some(wamid) = notification::send_renewal_poll(state, &meta, &mobile, &user.name, end_date).await {
         sqlx::query("UPDATE renewal_polls SET wa_message_id = $1 WHERE id = $2")
             .bind(&wamid)
             .bind(poll_id)

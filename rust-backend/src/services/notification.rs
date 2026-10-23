@@ -1,4 +1,5 @@
 use crate::app_state::AppState;
+use crate::services::notification_log::{self as nlog, Delivery, LogMeta};
 use crate::services::{ids, settings};
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
@@ -77,12 +78,14 @@ https://targetzone.co.in",
     ), &settings, true);
 
     if settings.send_to_student {
+        let mut delivery = Delivery::default();
         if let Some(ref mobile) = info.user_mobile {
-            send_whatsapp(state, mobile, &whatsapp_msg).await;
+            delivery.whatsapp = Some((mobile.clone(), send_whatsapp_result(state, mobile, &whatsapp_msg).await));
         }
         if let Some(ref email) = info.user_email {
-            send_email(state, email, "Your Library Seat is Confirmed!", &email_body).await;
+            delivery.email = Some((email.clone(), send_email_result(state, email, "Your Library Seat is Confirmed!", &email_body).await));
         }
+        nlog::record(state, &LogMeta::auto(info.user_id, nlog::BOOKING_CONFIRMED), &delivery, &whatsapp_msg).await;
     }
 
     let admin_msg = settings::apply_hindi(&format!(
@@ -110,7 +113,7 @@ async fn send_student_id_card_best_effort(state: &Arc<AppState>, info: &BookingI
     let Some(ref mobile) = info.user_mobile else { return };
     if let Err(e) = send_student_id_card(
         state, info.user_id, info.membership_id, &info.user_name,
-        Some(mobile.as_str()), info.user_email.as_deref(),
+        Some(mobile.as_str()), info.user_email.as_deref(), None,
     ).await {
         tracing::warn!("{e}");
     }
@@ -118,7 +121,8 @@ async fn send_student_id_card_best_effort(state: &Arc<AppState>, info: &BookingI
 
 /// Renders and sends a student's ID card (WhatsApp image template + email PDF
 /// attachment). Shared by the automatic post-booking send above and the
-/// admin-triggered on-demand resend in `services::admin::send_id_card`.
+/// admin-triggered on-demand resend in `services::admin::send_id_card`
+/// (`sent_by` = that admin's name, for the notification log).
 pub async fn send_student_id_card(
     state: &Arc<AppState>,
     user_id: Uuid,
@@ -126,6 +130,7 @@ pub async fn send_student_id_card(
     user_name: &str,
     mobile: Option<&str>,
     email: Option<&str>,
+    sent_by: Option<&str>,
 ) -> Result<(), String> {
     let pdf = crate::services::idcard::generate(state, user_id)
         .await
@@ -145,16 +150,19 @@ pub async fn send_student_id_card(
         Err(e) => { tracing::warn!("ID card image generation failed for {user_id}: {e}"); None }
     };
 
+    let mut delivery = Delivery::default();
+    let image_hosted = image_link.is_some();
     if let Some(link) = image_link {
         let params = vec![user_name.to_string()];
         if settings.send_to_student {
             if let Some(mobile) = mobile {
-                send_image_template(
+                let ok = send_image_template(
                     state, mobile, &link, &params,
                     &state.config.meta_id_card_image_template_name.clone(),
                     &state.config.meta_id_card_image_language.clone(),
                     Some(user_id), "STUDENT_ID_CARD",
                 ).await;
+                delivery.whatsapp = Some((mobile.to_string(), ok));
             }
         }
         if settings.send_to_admin {
@@ -177,8 +185,18 @@ pub async fn send_student_id_card(
                 &format!("Dear {user_name},\n\nPlease find your library ID card attached.\n\nID No.: {id_number}"),
                 &settings, true,
             );
-            send_email_with_attachment(state, email, "Your Target Zone Library ID Card", &body, &pdf, &pdf_name).await;
+            let ok = send_email_with_attachment(state, email, "Your Target Zone Library ID Card", &body, &pdf, &pdf_name).await;
+            delivery.email = Some((email.to_string(), ok));
         }
+        if !image_hosted {
+            if let Some(mobile) = mobile {
+                delivery.whatsapp = Some((mobile.to_string(), false));
+            }
+        }
+        nlog::record(
+            state, &LogMeta::by(user_id, nlog::ID_CARD, sent_by), &delivery,
+            &format!("ID card {id_number}"),
+        ).await;
     }
 
     Ok(())
@@ -215,10 +233,17 @@ async fn host_generated_file(state: &Arc<AppState>, subdir: &str, filename: &str
 // real attachment too.
 
 pub async fn send_payment_receipt(state: &Arc<AppState>, info: &PaymentReceiptInfo) {
-    send_payment_receipt_typed(state, info, "PAYMENT_RECEIPT").await;
+    send_payment_receipt_typed(state, info, "PAYMENT_RECEIPT", None).await;
 }
 
-pub async fn send_payment_receipt_typed(state: &Arc<AppState>, info: &PaymentReceiptInfo, _receipt_type: &str) {
+/// `sent_by` is the admin's name when an admin explicitly re-sent this
+/// receipt, for the notification log; `None` for the automatic send.
+pub async fn send_payment_receipt_typed(
+    state: &Arc<AppState>,
+    info: &PaymentReceiptInfo,
+    _receipt_type: &str,
+    sent_by: Option<&str>,
+) {
     let settings = settings::setting_for(state, "PAYMENT_RECEIPT").await;
 
     let pdf = match crate::services::receipt::build_receipt_pdf(info) {
@@ -242,15 +267,17 @@ pub async fn send_payment_receipt_typed(state: &Arc<AppState>, info: &PaymentRec
         pending_str.clone(),
     ];
 
+    let mut delivery = Delivery::default();
     if let Some(ref link) = receipt_link {
         if settings.send_to_student {
             if let Some(ref mobile) = info.user_mobile {
-                send_document_template(
+                let ok = send_document_template(
                     state, mobile, link, &attachment_name, &body_params,
                     &state.config.meta_receipt_template_name.clone(),
                     &state.config.meta_receipt_language.clone(),
                     Some(info.user_id), "PAYMENT_RECEIPT",
                 ).await;
+                delivery.whatsapp = Some((mobile.clone(), ok));
             }
         }
         if settings.send_to_admin {
@@ -274,7 +301,7 @@ pub async fn send_payment_receipt_typed(state: &Arc<AppState>, info: &PaymentRec
         );
         if settings.send_to_student {
             if let Some(ref mobile) = info.user_mobile {
-                send_whatsapp(state, mobile, &fallback).await;
+                delivery.whatsapp = Some((mobile.clone(), send_whatsapp_result(state, mobile, &fallback).await));
             }
         }
         if settings.send_to_admin {
@@ -293,8 +320,13 @@ pub async fn send_payment_receipt_typed(state: &Arc<AppState>, info: &PaymentRec
                 ),
                 &settings, true,
             );
-            send_email_with_attachment(state, email, &format!("Payment Receipt — Invoice {}", info.invoice_id), &body, &pdf, &attachment_name).await;
+            let ok = send_email_with_attachment(state, email, &format!("Payment Receipt — Invoice {}", info.invoice_id), &body, &pdf, &attachment_name).await;
+            delivery.email = Some((email.clone(), ok));
         }
+        nlog::record(
+            state, &LogMeta::by(info.user_id, nlog::PAYMENT_RECEIPT, sent_by), &delivery,
+            &format!("Payment receipt {} — paid Rs.{paid_str}, pending Rs.{pending_str}", info.invoice_id),
+        ).await;
     }
 }
 
@@ -311,8 +343,8 @@ pub async fn send_document_template(
     language: &str,
     user_id: Option<Uuid>,
     event: &str,
-) {
-    send_meta_document_or_image(state, mobile, "document", url, Some(filename), body_params, template_name, language, user_id, event).await;
+) -> bool {
+    send_meta_document_or_image(state, mobile, "document", url, Some(filename), body_params, template_name, language, user_id, event).await
 }
 
 /// Meta template send with an image-header attachment (e.g. "id_card").
@@ -325,8 +357,8 @@ pub async fn send_image_template(
     language: &str,
     user_id: Option<Uuid>,
     event: &str,
-) {
-    send_meta_document_or_image(state, mobile, "image", url, None, body_params, template_name, language, user_id, event).await;
+) -> bool {
+    send_meta_document_or_image(state, mobile, "image", url, None, body_params, template_name, language, user_id, event).await
 }
 
 async fn send_meta_document_or_image(
@@ -340,10 +372,10 @@ async fn send_meta_document_or_image(
     language: &str,
     user_id: Option<Uuid>,
     event: &str,
-) {
+) -> bool {
     if state.config.meta_whatsapp_token.is_empty() {
         tracing::info!("[DEV] WhatsApp ({template_name} template) → {mobile} | Event: {event} | url={url} params={body_params:?}");
-        return;
+        return true;
     }
 
     let clean_to = mobile.trim_start_matches('+');
@@ -374,19 +406,21 @@ async fn send_meta_document_or_image(
     });
 
     let url_meta = format!("https://graph.facebook.com/v18.0/{}/messages", state.config.meta_whatsapp_phone_id);
+    let _ = user_id;
     match state.http.post(&url_meta).bearer_auth(&state.config.meta_whatsapp_token).json(&body).send().await {
-        Err(e) => tracing::error!("Meta {template_name} send network error to {mobile}: {e}"),
+        Err(e) => { tracing::error!("Meta {template_name} send network error to {mobile}: {e}"); false }
         Ok(r) if !r.status().is_success() => {
             let status = r.status();
             let resp_body = r.text().await.unwrap_or_default();
             tracing::error!("Meta {template_name} rejected: {status} for {mobile} — {resp_body}");
+            false
         }
         Ok(r) => {
             let resp_body = r.text().await.unwrap_or_default();
             tracing::info!("Meta {template_name} template sent to {mobile} | Event: {event} | response: {resp_body}");
+            true
         }
     }
-    let _ = user_id;
 }
 
 /// Sends the "seat_renewal_confirmation" Meta template (Yes/No quick-reply
@@ -399,12 +433,22 @@ async fn send_meta_document_or_image(
 /// needed — no header/button components like send_meta_document_or_image.
 pub async fn send_renewal_poll(
     state: &Arc<AppState>,
+    meta: &LogMeta,
     mobile: &str,
     student_name: &str,
+    end_date: NaiveDate,
 ) -> Option<String> {
+    let (ok, wamid) = send_renewal_poll_inner(state, mobile, student_name).await;
+    let delivery = Delivery { whatsapp: Some((mobile.to_string(), ok)), email: None };
+    nlog::record(state, meta, &delivery, &format!("Renewal poll (Yes/No) — membership ends {end_date}")).await;
+    wamid
+}
+
+/// (delivered?, wamid). Dev mode counts as delivered with no wamid.
+async fn send_renewal_poll_inner(state: &Arc<AppState>, mobile: &str, student_name: &str) -> (bool, Option<String>) {
     if state.config.meta_whatsapp_token.is_empty() {
         tracing::info!("[DEV] WhatsApp (renewal poll) → {mobile} | student={student_name}");
-        return None;
+        return (true, None);
     }
 
     let clean_to = mobile.trim_start_matches('+');
@@ -425,12 +469,12 @@ pub async fn send_renewal_poll(
 
     let url = format!("https://graph.facebook.com/v18.0/{}/messages", state.config.meta_whatsapp_phone_id);
     match state.http.post(&url).bearer_auth(&state.config.meta_whatsapp_token).json(&body).send().await {
-        Err(e) => { tracing::error!("Meta renewal poll send network error to {mobile}: {e}"); None }
+        Err(e) => { tracing::error!("Meta renewal poll send network error to {mobile}: {e}"); (false, None) }
         Ok(r) if !r.status().is_success() => {
             let status = r.status();
             let resp_body = r.text().await.unwrap_or_default();
             tracing::error!("Meta renewal poll rejected: {status} for {mobile} — {resp_body}");
-            None
+            (false, None)
         }
         Ok(r) => {
             let resp_body = r.text().await.unwrap_or_default();
@@ -438,7 +482,7 @@ pub async fn send_renewal_poll(
                 .ok()
                 .and_then(|v| v["messages"][0]["id"].as_str().map(|s| s.to_string()));
             tracing::info!("Meta renewal poll sent to {mobile} | wamid={wamid:?}");
-            wamid
+            (true, wamid)
         }
     }
 }
@@ -447,19 +491,21 @@ fn sanitize_param(param: &str) -> String {
     param.replace(['\n', '\r', '\t'], " ").split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-pub async fn send_welcome(state: &Arc<AppState>, name: &str, mobile: Option<&str>, email: Option<&str>) {
+pub async fn send_welcome(state: &Arc<AppState>, user_id: Uuid, name: &str, mobile: Option<&str>, email: Option<&str>) {
     let settings = settings::setting_for(state, "USER_REGISTERED").await;
     let msg = settings::apply_hindi(&format!(
         "👋 Welcome to Target Zone, {}!\nYour account has been created. Start your study journey today!",
         name
     ), &settings, true);
     if settings.send_to_student {
+        let mut delivery = Delivery::default();
         if let Some(m) = mobile {
-            send_whatsapp(state, m, &msg).await;
+            delivery.whatsapp = Some((m.to_string(), send_whatsapp_result(state, m, &msg).await));
         }
         if let Some(e) = email {
-            send_email(state, e, "Welcome to Target Zone", &msg).await;
+            delivery.email = Some((e.to_string(), send_email_result(state, e, "Welcome to Target Zone", &msg).await));
         }
+        nlog::record(state, &LogMeta::auto(user_id, nlog::WELCOME), &delivery, &msg).await;
     }
 
     let admin_msg = settings::apply_hindi(&format!(
@@ -493,6 +539,7 @@ pub async fn send_seat_assistance(
 
 pub async fn send_renewal_reminder(
     state: &Arc<AppState>,
+    meta: &LogMeta,
     name: &str,
     mobile: Option<&str>,
     email: Option<&str>,
@@ -506,22 +553,27 @@ pub async fn send_renewal_reminder(
         urgency, name, end_date, days_left
     ), &settings, true);
     if settings.send_to_student {
+        let mut delivery = Delivery::default();
         if let Some(m) = mobile {
-            send_whatsapp(state, m, &msg).await;
+            delivery.whatsapp = Some((m.to_string(), send_whatsapp_result(state, m, &msg).await));
         }
         if let Some(e) = email {
-            send_email(state, e, "Membership Renewal Reminder", &msg).await;
+            delivery.email = Some((e.to_string(), send_email_result(state, e, "Membership Renewal Reminder", &msg).await));
         }
+        nlog::record(state, meta, &delivery, &msg).await;
     }
 }
 
+/// Plain-text WhatsApp + email to a student, recorded in their
+/// notification log under `meta`.
 pub async fn send_direct_message(
     state: &Arc<AppState>,
+    meta: &LogMeta,
     mobile: Option<&str>,
     email: Option<&str>,
     message: &str,
 ) {
-    send_direct_message_result(state, mobile, email, message).await;
+    send_direct_message_result(state, meta, mobile, email, message).await;
 }
 
 /// Same as `send_direct_message` but reports whether every attempted
@@ -530,21 +582,20 @@ pub async fn send_direct_message(
 /// was nowhere to deliver the reminder.
 pub async fn send_direct_message_result(
     state: &Arc<AppState>,
+    meta: &LogMeta,
     mobile: Option<&str>,
     email: Option<&str>,
     message: &str,
 ) -> bool {
-    let mut attempted = false;
-    let mut all_ok = true;
+    let mut delivery = Delivery::default();
     if let Some(m) = mobile {
-        attempted = true;
-        all_ok &= send_whatsapp_result(state, m, message).await;
+        delivery.whatsapp = Some((m.to_string(), send_whatsapp_result(state, m, message).await));
     }
     if let Some(e) = email {
-        attempted = true;
-        all_ok &= send_email_result(state, e, "Message from Target Zone", message).await;
+        delivery.email = Some((e.to_string(), send_email_result(state, e, "Message from Target Zone", message).await));
     }
-    attempted && all_ok
+    nlog::record(state, meta, &delivery, message).await;
+    delivery.ok()
 }
 
 pub async fn send_seat_expired(state: &Arc<AppState>, user_name: &str, seat_number: &str) {
@@ -558,24 +609,29 @@ pub async fn send_seat_expired(state: &Arc<AppState>, user_name: &str, seat_numb
     send_email(state, &state.config.admin_email.clone(), "Seat Now Available", &msg).await;
 }
 
+/// `recipients` are (user_id, mobile, email); `sent_by` is the admin who
+/// sent the broadcast, for each student's notification log.
 pub async fn send_broadcast(
     state: &Arc<AppState>,
-    recipients: &[(Option<String>, Option<String>)],
+    recipients: &[(Uuid, Option<String>, Option<String>)],
     message: &str,
+    sent_by: &str,
 ) -> usize {
     let settings = settings::setting_for(state, "ADMIN_BROADCAST").await;
     let body = settings::apply_hindi(message, &settings, true);
 
     let mut count = 0;
     if settings.send_to_student {
-        for (mobile, email) in recipients {
+        for (user_id, mobile, email) in recipients {
+            let mut delivery = Delivery::default();
             if let Some(ref m) = mobile {
-                send_whatsapp(state, m, &body).await;
+                delivery.whatsapp = Some((m.clone(), send_whatsapp_result(state, m, &body).await));
                 count += 1;
             }
             if let Some(ref e) = email {
-                send_email(state, e, "Announcement from Target Zone", &body).await;
+                delivery.email = Some((e.clone(), send_email_result(state, e, "Announcement from Target Zone", &body).await));
             }
+            nlog::record(state, &LogMeta::manual(*user_id, nlog::BROADCAST, sent_by), &delivery, &body).await;
         }
     }
 
@@ -884,10 +940,10 @@ pub async fn send_email_with_attachment(
     body: &str,
     attachment_bytes: &[u8],
     attachment_filename: &str,
-) {
+) -> bool {
     if state.config.sendgrid_api_key.is_empty() {
         tracing::info!("[DEV] Email → {to} [{subject}] with attachment {attachment_filename} ({} bytes): {body}", attachment_bytes.len());
-        return;
+        return true;
     }
 
     use base64::Engine;
@@ -914,35 +970,10 @@ pub async fn send_email_with_attachment(
         .send()
         .await
     {
-        Err(e) => tracing::error!("SendGrid (attachment) network error: {e}"),
-        Ok(r) if !r.status().is_success() => tracing::error!("SendGrid (attachment) rejected: {} for {to} [{subject}]", r.status()),
-        Ok(_) => tracing::info!("SendGrid email with attachment sent to {to} [{subject}]"),
+        Err(e) => { tracing::error!("SendGrid (attachment) network error: {e}"); false }
+        Ok(r) if !r.status().is_success() => { tracing::error!("SendGrid (attachment) rejected: {} for {to} [{subject}]", r.status()); false }
+        Ok(_) => { tracing::info!("SendGrid email with attachment sent to {to} [{subject}]"); true }
     }
-}
-
-pub async fn log_notification(
-    db: &sqlx::PgPool,
-    user_id: Option<uuid::Uuid>,
-    recipient: &str,
-    message: &str,
-    event: &str,
-    channel: &str,
-    status: &str,
-    error: Option<&str>,
-) {
-    let _ = sqlx::query(
-        "INSERT INTO notification_logs (user_id, recipient, message, event, channel, status, error_message)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)",
-    )
-    .bind(user_id)
-    .bind(recipient)
-    .bind(message)
-    .bind(event)
-    .bind(channel)
-    .bind(status)
-    .bind(error)
-    .execute(db)
-    .await;
 }
 
 #[cfg(test)]

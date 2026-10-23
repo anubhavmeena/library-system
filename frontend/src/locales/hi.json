@@ -637,6 +637,36 @@
       "title": "सीट इतिहास",
       "empty": "कोई सीट इतिहास नहीं मिला।"
     },
+    "notifications": {
+      "title": "सूचना इतिहास",
+      "subtitle": "पिछले 30 दिन",
+      "empty": "पिछले 30 दिनों में कोई रिमाइंडर या संदेश नहीं भेजा गया।",
+      "auto": "स्वचालित",
+      "manual": "{{name}} द्वारा भेजा गया",
+      "showMore": "संदेश देखें",
+      "showLess": "संदेश छिपाएँ",
+      "status": {
+        "SENT": "भेजा गया",
+        "FAILED": "विफल"
+      },
+      "events": {
+        "RENEWAL_REMINDER": "नवीनीकरण रिमाइंडर",
+        "RENEWAL_POLL": "नवीनीकरण पोल",
+        "PENDING_FEE_REMINDER": "बकाया शुल्क रिमाइंडर",
+        "GRACE_DUES_REMINDER": "ग्रेस बकाया रिमाइंडर",
+        "DIRECT_MESSAGE": "सीधा संदेश",
+        "BROADCAST": "प्रसारण",
+        "BOOKING_CONFIRMED": "बुकिंग पुष्टि",
+        "PAYMENT_RECEIPT": "भुगतान रसीद",
+        "ID_CARD": "आईडी कार्ड",
+        "WELCOME": "स्वागत संदेश",
+        "PENDING_FEE_CLEARED": "बकाया शुल्क चुकता",
+        "GRACE_DUES_CLEARED": "ग्रेस बकाया चुकता",
+        "MEMBERSHIP_GRACE": "ग्रेस अवधि सूचना",
+        "SEAT_RELEASED": "सीट रिलीज़",
+        "PAYMENT_CLAIM": "भुगतान दावा अपडेट"
+      }
+    },
     "toasts": {
       "loadFailed": "छात्र विवरण लोड करने में विफल",
       "saved": "छात्र विवरण सहेजा गया",

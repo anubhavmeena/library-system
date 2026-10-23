@@ -5,7 +5,7 @@ use crate::{
         membership::Membership,
         payment_claim::{AdminPaymentClaimItem, PaymentClaim},
     },
-    services::{admin, notification, upi_pay, user as user_svc},
+    services::{admin, notification, notification_log::{self as nlog, LogMeta}, upi_pay, user as user_svc},
 };
 use rust_decimal::Decimal;
 use std::sync::Arc;
@@ -258,7 +258,10 @@ pub async fn review_claim(
                 claim.amount_claimed
             )
         };
-        notification::send_direct_message(state, user.mobile.as_deref(), user.email.as_deref(), &msg).await;
+        notification::send_direct_message(
+            state, &LogMeta::auto(user.id, nlog::PAYMENT_CLAIM),
+            user.mobile.as_deref(), user.email.as_deref(), &msg,
+        ).await;
     }
 
     Ok(updated)

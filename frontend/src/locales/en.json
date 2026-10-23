@@ -641,6 +641,36 @@
       "title": "Seat History",
       "empty": "No seat history found."
     },
+    "notifications": {
+      "title": "Notification History",
+      "subtitle": "Last 30 days",
+      "empty": "No reminders or messages sent in the last 30 days.",
+      "auto": "Automatic",
+      "manual": "Sent by {{name}}",
+      "showMore": "Show message",
+      "showLess": "Hide message",
+      "status": {
+        "SENT": "Sent",
+        "FAILED": "Failed"
+      },
+      "events": {
+        "RENEWAL_REMINDER": "Renewal Reminder",
+        "RENEWAL_POLL": "Renewal Poll",
+        "PENDING_FEE_REMINDER": "Pending Fee Reminder",
+        "GRACE_DUES_REMINDER": "Grace Dues Reminder",
+        "DIRECT_MESSAGE": "Direct Message",
+        "BROADCAST": "Broadcast",
+        "BOOKING_CONFIRMED": "Booking Confirmation",
+        "PAYMENT_RECEIPT": "Payment Receipt",
+        "ID_CARD": "ID Card",
+        "WELCOME": "Welcome Message",
+        "PENDING_FEE_CLEARED": "Pending Fee Cleared",
+        "GRACE_DUES_CLEARED": "Grace Dues Cleared",
+        "MEMBERSHIP_GRACE": "Grace Period Notice",
+        "SEAT_RELEASED": "Seat Released",
+        "PAYMENT_CLAIM": "Payment Claim Update"
+      }
+    },
     "toasts": {
       "loadFailed": "Failed to load student details",
       "saved": "Student details saved",

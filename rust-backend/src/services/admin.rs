@@ -6,7 +6,7 @@ use crate::{
         membership::{Membership, MembershipPlan},
         user::User,
     },
-    services::{ids, notification, reminder_jobs, settings, upi_pay},
+    services::{ids, notification, notification_log::{self as nlog, LogMeta}, reminder_jobs, settings, upi_pay},
 };
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
@@ -579,7 +579,10 @@ pub async fn clear_pending_fees(
             &format!("Your pending library fee of Rs.{amount_cleared:.0} has been cleared. Thank you! - Target Zone Library Team"),
             &pf_setting, true,
         );
-        notification::send_direct_message(state, user.mobile.as_deref(), user.email.as_deref(), &msg).await;
+        notification::send_direct_message(
+            state, &LogMeta::auto(user_id, nlog::PENDING_FEE_CLEARED),
+            user.mobile.as_deref(), user.email.as_deref(), &msg,
+        ).await;
     }
     if pf_setting.send_to_admin {
         let seat = membership.as_ref().and_then(|m| m.seat_number.as_deref()).unwrap_or("\u{2014}");
@@ -587,9 +590,9 @@ pub async fn clear_pending_fees(
             "Pending Fee Cleared\nStudent: {}\nSeat: {seat}\nAmount: Rs.{amount_cleared:.0}", user.name
         );
         if !state.config.admin_whatsapp.is_empty() {
-            notification::send_direct_message(state, Some(&state.config.admin_whatsapp.clone()), None, &admin_msg).await;
+            notification::send_whatsapp_to(state, &state.config.admin_whatsapp.clone(), &admin_msg).await;
         }
-        notification::send_direct_message(state, None, Some(&state.config.admin_email.clone()), &admin_msg).await;
+        notification::send_email_to(state, &state.config.admin_email.clone(), "Message from Target Zone", &admin_msg).await;
     }
 
     let s = state.clone();
@@ -607,7 +610,7 @@ pub async fn clear_pending_fees(
         payment_method: mode_label.into(),
     };
     tokio::spawn(async move {
-        notification::send_payment_receipt_typed(&s, &receipt_event, "DUES_CLEARED").await
+        notification::send_payment_receipt_typed(&s, &receipt_event, "DUES_CLEARED", None).await
     });
 
     Ok(())
@@ -1333,9 +1336,11 @@ pub async fn get_expiring_memberships(
     .map_err(AppError::Database)
 }
 
+/// `sent_by` is the triggering admin's name, for the notification log.
 pub async fn send_renewal_reminders(
     state: &Arc<AppState>,
     user_ids: Option<Vec<Uuid>>,
+    sent_by: &str,
 ) -> crate::error::Result<i64> {
     // Treat empty vec the same as None (send to all) — matches frontend behaviour
     let user_ids = user_ids.filter(|v| !v.is_empty());
@@ -1344,9 +1349,9 @@ pub async fn send_renewal_reminders(
     // ignores `reminder_sent` (empty/no ids sends to everyone expiring within
     // 7 days regardless of the flag, matching Java's `sendBulkReminders`) and
     // never sets `reminder_sent` itself; only the daily scheduler job does.
-    let rows: Vec<(Uuid, String, Option<String>, Option<String>, NaiveDate)> = if let Some(ids) = &user_ids {
+    let rows: Vec<(Uuid, Uuid, String, Option<String>, Option<String>, NaiveDate)> = if let Some(ids) = &user_ids {
         sqlx::query_as(
-            "SELECT m.id, u.name, u.mobile, u.email, m.end_date
+            "SELECT m.id, u.id, u.name, u.mobile, u.email, m.end_date
              FROM memberships m JOIN users u ON u.id = m.user_id
              WHERE m.status = 'ACTIVE' AND m.user_id = ANY($1::uuid[])",
         )
@@ -1355,7 +1360,7 @@ pub async fn send_renewal_reminders(
         .await?
     } else {
         sqlx::query_as(
-            "SELECT m.id, u.name, u.mobile, u.email, m.end_date
+            "SELECT m.id, u.id, u.name, u.mobile, u.email, m.end_date
              FROM memberships m JOIN users u ON u.id = m.user_id
              WHERE m.status = 'ACTIVE'
                AND m.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'",
@@ -1367,15 +1372,16 @@ pub async fn send_renewal_reminders(
     let mut count = 0i64;
     let today = chrono::Local::now().date_naive();
 
-    for (_mid, name, mobile, email, end_date) in &rows {
+    for (_mid, user_id, name, mobile, email, end_date) in &rows {
         let days_left = (*end_date - today).num_days().max(0);
         let s = state.clone();
+        let meta = LogMeta::manual(*user_id, nlog::RENEWAL_REMINDER, sent_by);
         let n = name.clone();
         let m = mobile.clone();
         let e = email.clone();
         let ed = *end_date;
         tokio::spawn(async move {
-            notification::send_renewal_reminder(&s, &n, m.as_deref(), e.as_deref(), days_left, ed).await;
+            notification::send_renewal_reminder(&s, &meta, &n, m.as_deref(), e.as_deref(), days_left, ed).await;
         });
         count += 1;
     }
@@ -1411,8 +1417,8 @@ async fn notify_admin_reminders_sent(state: &Arc<AppState>, count: i64) {
 /// same membership is never reminded twice by the unattended scheduler.
 /// Mirrors Java's `ExpiryReminderScheduler.sendExpiryReminders`.
 async fn send_scheduled_renewal_reminders(state: &Arc<AppState>) -> crate::error::Result<i64> {
-    let rows: Vec<(Uuid, String, Option<String>, Option<String>, NaiveDate)> = sqlx::query_as(
-        "SELECT m.id, u.name, u.mobile, u.email, m.end_date
+    let rows: Vec<(Uuid, Uuid, String, Option<String>, Option<String>, NaiveDate)> = sqlx::query_as(
+        "SELECT m.id, u.id, u.name, u.mobile, u.email, m.end_date
          FROM memberships m JOIN users u ON u.id = m.user_id
          WHERE m.status = 'ACTIVE'
            AND m.reminder_sent = false
@@ -1424,7 +1430,7 @@ async fn send_scheduled_renewal_reminders(state: &Arc<AppState>) -> crate::error
     let mut count = 0i64;
     let today = chrono::Local::now().date_naive();
 
-    for (mid, name, mobile, email, end_date) in &rows {
+    for (mid, user_id, name, mobile, email, end_date) in &rows {
         let days_left = (*end_date - today).num_days();
         if days_left != 7 && days_left != 3 {
             continue;
@@ -1436,12 +1442,13 @@ async fn send_scheduled_renewal_reminders(state: &Arc<AppState>) -> crate::error
             .await?;
 
         let s = state.clone();
+        let meta = LogMeta::auto(*user_id, nlog::RENEWAL_REMINDER);
         let n = name.clone();
         let m = mobile.clone();
         let e = email.clone();
         let ed = *end_date;
         tokio::spawn(async move {
-            notification::send_renewal_reminder(&s, &n, m.as_deref(), e.as_deref(), days_left, ed).await;
+            notification::send_renewal_reminder(&s, &meta, &n, m.as_deref(), e.as_deref(), days_left, ed).await;
         });
         count += 1;
     }
@@ -1506,6 +1513,7 @@ pub async fn get_grace_dues_students(
 pub async fn send_grace_dues_reminders(
     state: &Arc<AppState>,
     user_ids: Option<Vec<Uuid>>,
+    sent_by: &str,
 ) -> crate::error::Result<i64> {
     let ids_filter = user_ids.filter(|v| !v.is_empty());
 
@@ -1541,9 +1549,10 @@ pub async fn send_grace_dues_reminders(
         let setting = setting.clone();
         let upi_id = upi_id.clone();
         let payee_name = payee_name.clone();
+        let meta = LogMeta::manual(user_id, nlog::GRACE_DUES_REMINDER, sent_by);
         tokio::spawn(async move {
             let ok = send_one_grace_dues_reminder(
-                &state, user_id, membership_id, &name, mobile.as_deref(), email.as_deref(), dues,
+                &state, &meta, membership_id, &name, mobile.as_deref(), email.as_deref(), dues,
                 &setting, upi_id.as_deref(), &payee_name,
             ).await;
             reminder_jobs::record_result(&state, job_id, ok).await;
@@ -1560,7 +1569,7 @@ pub async fn send_grace_dues_reminders(
 /// build the exact same message + UPI pay link instead of duplicating it.
 async fn send_one_grace_dues_reminder(
     state: &Arc<AppState>,
-    user_id: Uuid,
+    meta: &LogMeta,
     membership_id: Uuid,
     name: &str,
     mobile: Option<&str>,
@@ -1576,7 +1585,7 @@ in outstanding dues. Please clear your dues soon to avoid losing your seat. - Ta
     );
     if let Some(vpa) = upi_id {
         let payload = upi_pay::PayLinkPayload {
-            user_id,
+            user_id: meta.user_id,
             claim_type: Some("DUES".to_string()),
             membership_id: Some(membership_id),
             amount: dues,
@@ -1590,7 +1599,7 @@ in outstanding dues. Please clear your dues soon to avoid losing your seat. - Ta
     }
     let msg = settings::apply_hindi(&text, setting, true);
     if setting.send_to_student {
-        notification::send_direct_message_result(state, mobile, email, &msg).await
+        notification::send_direct_message_result(state, meta, mobile, email, &msg).await
     } else {
         true
     }
@@ -1654,8 +1663,8 @@ pub async fn send_scheduled_grace_dues_reminders(state: &Arc<AppState>) -> crate
     let payee_name = settings::upi_payee_name(app_settings.as_ref());
     for (user_id, membership_id, name, mobile, email, dues, _end_date) in &due {
         send_one_grace_dues_reminder(
-            state, *user_id, *membership_id, name, mobile.as_deref(), email.as_deref(), *dues,
-            &setting, upi_id.as_deref(), &payee_name,
+            state, &LogMeta::auto(*user_id, nlog::GRACE_DUES_REMINDER), *membership_id, name,
+            mobile.as_deref(), email.as_deref(), *dues, &setting, upi_id.as_deref(), &payee_name,
         ).await;
     }
 
@@ -1714,7 +1723,7 @@ mod grace_reminder_tests {
 /// `send_pending_fee_reminders`'s spawned per-recipient tasks.
 async fn send_one_pending_fee_reminder(
     state: &Arc<AppState>,
-    user_id: Uuid,
+    meta: &LogMeta,
     name: &str,
     mobile: Option<&str>,
     email: Option<&str>,
@@ -1728,7 +1737,7 @@ Please visit the library or contact us to clear your dues. - Target Zone Library
     );
     if let Some(vpa) = upi_id {
         let payload = upi_pay::PayLinkPayload {
-            user_id,
+            user_id: meta.user_id,
             claim_type: Some("PENDING_FEE".to_string()),
             membership_id: None,
             amount,
@@ -1740,12 +1749,13 @@ Please visit the library or contact us to clear your dues. - Target Zone Library
             msg.push_str(&format!("\n\nPay via UPI: {link}"));
         }
     }
-    notification::send_direct_message_result(state, mobile, email, &msg).await
+    notification::send_direct_message_result(state, meta, mobile, email, &msg).await
 }
 
 pub async fn send_pending_fee_reminders(
     state: &Arc<AppState>,
     user_ids: Option<Vec<Uuid>>,
+    sent_by: &str,
 ) -> crate::error::Result<i64> {
     // Treat empty vec the same as None (send to all) — matches frontend behaviour
     let ids = user_ids.filter(|v| !v.is_empty());
@@ -1797,9 +1807,10 @@ pub async fn send_pending_fee_reminders(
         let state = state.clone();
         let upi_id = upi_id.clone();
         let payee_name = payee_name.clone();
+        let meta = LogMeta::manual(user_id, nlog::PENDING_FEE_REMINDER, sent_by);
         tokio::spawn(async move {
             let ok = send_one_pending_fee_reminder(
-                &state, user_id, &name, mobile.as_deref(), email.as_deref(), amount,
+                &state, &meta, &name, mobile.as_deref(), email.as_deref(), amount,
                 upi_id.as_deref(), &payee_name,
             ).await;
             reminder_jobs::record_result(&state, job_id, ok).await;
@@ -1829,6 +1840,7 @@ pub async fn send_direct_message(
     state: &Arc<AppState>,
     user_id: Uuid,
     message: &str,
+    sent_by: &str,
 ) -> crate::error::Result<()> {
     let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
         .bind(user_id)
@@ -1836,14 +1848,17 @@ pub async fn send_direct_message(
         .await?
         .ok_or_else(|| AppError::NotFound("User not found".into()))?;
 
-    notification::send_direct_message(state, user.mobile.as_deref(), user.email.as_deref(), message).await;
+    notification::send_direct_message(
+        state, &LogMeta::manual(user_id, nlog::DIRECT_MESSAGE, sent_by),
+        user.mobile.as_deref(), user.email.as_deref(), message,
+    ).await;
     Ok(())
 }
 
 /// Re-sends the student's most recent successful payment receipt on demand
 /// (admin "Send Payment Receipt" action) — same PDF/WhatsApp-template pipeline
 /// `clear_pending_fees`/`create_membership` fire automatically after a payment.
-pub async fn send_latest_receipt(state: &Arc<AppState>, user_id: Uuid) -> crate::error::Result<()> {
+pub async fn send_latest_receipt(state: &Arc<AppState>, user_id: Uuid, sent_by: &str) -> crate::error::Result<()> {
     let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
         .bind(user_id)
         .fetch_optional(&state.db)
@@ -1876,14 +1891,14 @@ pub async fn send_latest_receipt(state: &Arc<AppState>, user_id: Uuid) -> crate:
         valid_upto: membership.as_ref().map(|m| m.end_date),
         payment_method: payment.payment_gateway.clone().unwrap_or_default(),
     };
-    notification::send_payment_receipt_typed(state, &receipt_event, "ADMIN_RESEND").await;
+    notification::send_payment_receipt_typed(state, &receipt_event, "ADMIN_RESEND", Some(sent_by)).await;
     Ok(())
 }
 
 /// Sends the student's ID card on demand (admin "Send ID Card" action) —
 /// requires a current ACTIVE/GRACE membership, since the ID number and card
 /// layout are derived from it.
-pub async fn send_id_card(state: &Arc<AppState>, user_id: Uuid) -> crate::error::Result<()> {
+pub async fn send_id_card(state: &Arc<AppState>, user_id: Uuid, sent_by: &str) -> crate::error::Result<()> {
     let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
         .bind(user_id)
         .fetch_optional(&state.db)
@@ -1898,7 +1913,7 @@ pub async fn send_id_card(state: &Arc<AppState>, user_id: Uuid) -> crate::error:
         .ok_or_else(|| AppError::BadRequest("Student has no active or grace membership to issue an ID card for".into()))?;
 
     notification::send_student_id_card(
-        state, user_id, membership.id, &user.name, Some(&mobile), user.email.as_deref(),
+        state, user_id, membership.id, &user.name, Some(&mobile), user.email.as_deref(), Some(sent_by),
     )
     .await
     .map_err(AppError::BadRequest)
@@ -1907,6 +1922,7 @@ pub async fn send_id_card(state: &Arc<AppState>, user_id: Uuid) -> crate::error:
 pub async fn broadcast(
     state: &Arc<AppState>,
     message: &str,
+    sent_by: &str,
 ) -> crate::error::Result<BroadcastMessage> {
     // Matches Java's `findStudentsWithActiveMemberships` exactly: STUDENT role,
     // a mobile on file, and an EXISTS check (not a JOIN) so a student is
@@ -1914,8 +1930,8 @@ pub async fn broadcast(
     // membership row. `end_date >= CURRENT_DATE` additionally excludes a
     // membership that's ACTIVE in name only because today's grace-transition
     // cron hasn't run yet.
-    let users: Vec<(Option<String>, Option<String>)> = sqlx::query_as(
-        "SELECT u.mobile, u.email FROM users u
+    let users: Vec<(Uuid, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT u.id, u.mobile, u.email FROM users u
          WHERE u.role = 'STUDENT'
            AND u.mobile IS NOT NULL
            AND EXISTS (
@@ -1927,7 +1943,7 @@ pub async fn broadcast(
     .fetch_all(&state.db)
     .await?;
 
-    let recipient_count = users.iter().filter(|(m, _)| m.is_some()).count() as i32;
+    let recipient_count = users.iter().filter(|(_, m, _)| m.is_some()).count() as i32;
 
     let bcast = sqlx::query_as::<_, BroadcastMessage>(
         "INSERT INTO broadcast_messages (id, message, recipient_count, sent_at) VALUES (gen_random_uuid(), $1, $2, NOW()) RETURNING *",
@@ -1939,8 +1955,9 @@ pub async fn broadcast(
 
     let s = state.clone();
     let msg = message.to_string();
+    let sent_by = sent_by.to_string();
     tokio::spawn(async move {
-        notification::send_broadcast(&s, &users, &msg).await;
+        notification::send_broadcast(&s, &users, &msg, &sent_by).await;
     });
 
     Ok(bcast)
@@ -2680,7 +2697,10 @@ pub async fn release_seat(
             .await?;
         if let Some(user) = user {
             let msg = "Your library seat has been released due to non-payment. Please contact the library or clear your dues to book again. - Target Zone Library Team".to_string();
-            notification::send_direct_message(state, user.mobile.as_deref(), user.email.as_deref(), &msg).await;
+            notification::send_direct_message(
+                state, &LogMeta::auto(user.id, nlog::SEAT_RELEASED),
+                user.mobile.as_deref(), user.email.as_deref(), &msg,
+            ).await;
         }
     }
 
@@ -2955,7 +2975,10 @@ pub async fn clear_dues(
             &format!("Your outstanding dues of Rs.{amount_cleared:.0} have been cleared and your membership is active again. - Target Zone Library Team"),
             &gd_setting, true,
         );
-        notification::send_direct_message(state, user.mobile.as_deref(), user.email.as_deref(), &msg).await;
+        notification::send_direct_message(
+            state, &LogMeta::auto(user.id, nlog::GRACE_DUES_CLEARED),
+            user.mobile.as_deref(), user.email.as_deref(), &msg,
+        ).await;
     }
 
     let s = state.clone();
@@ -2973,7 +2996,7 @@ pub async fn clear_dues(
         payment_method: mode_label.into(),
     };
     tokio::spawn(async move {
-        notification::send_payment_receipt_typed(&s, &receipt_event, "GRACE_DUES_CLEARED").await
+        notification::send_payment_receipt_typed(&s, &receipt_event, "GRACE_DUES_CLEARED", None).await
     });
 
     Ok(())
@@ -3454,7 +3477,10 @@ You have {grace_days} day(s) grace period to clear your dues before your seat is
                         ),
                         &setting, true,
                     );
-                    notification::send_direct_message(&s, user.mobile.as_deref(), user.email.as_deref(), &msg).await;
+                    notification::send_direct_message(
+                        &s, &LogMeta::auto(user.id, nlog::MEMBERSHIP_GRACE),
+                        user.mobile.as_deref(), user.email.as_deref(), &msg,
+                    ).await;
                 }
                 if setting.send_to_admin && !s.config.admin_whatsapp.is_empty() {
                     let admin_msg = format!("Membership Grace Started: {uname} now owes Rs.{dues:.0} in dues.");

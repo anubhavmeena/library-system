@@ -9,7 +9,8 @@ use crate::{
     },
     response::ApiResponse,
     services::{
-        activity_log as alog, admin as svc, coupon as coupon_svc, reminder_jobs, renewal_poll as poll_svc,
+        activity_log as alog, admin as svc, coupon as coupon_svc, notification_log as nlog, reminder_jobs,
+        renewal_poll as poll_svc,
         settings as settings_svc, user as user_svc,
     },
 };
@@ -255,7 +256,7 @@ pub async fn send_reminders(
     admin: AdminUser,
     Json(req): Json<SendRemindersRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    let count = svc::send_renewal_reminders(&state, req.user_ids).await?;
+    let count = svc::send_renewal_reminders(&state, req.user_ids, &admin.0.name).await?;
     alog::log_activity(&state, &admin.0, "SEND_REMINDERS", "membership", None,
         format!("Sent renewal reminders to {count} student(s)")).await;
     Ok(ApiResponse::success(
@@ -270,7 +271,7 @@ pub async fn send_pending_fee_reminders(
     body: Option<Json<SendRemindersRequest>>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let user_ids = body.and_then(|Json(b)| b.user_ids);
-    let count = svc::send_pending_fee_reminders(&state, user_ids).await?;
+    let count = svc::send_pending_fee_reminders(&state, user_ids, &admin.0.name).await?;
     alog::log_activity(&state, &admin.0, "SEND_REMINDERS", "student", None,
         format!("Sent pending-fee reminders to {count} student(s)")).await;
     Ok(ApiResponse::success(
@@ -285,7 +286,7 @@ pub async fn send_direct_message(
     Path(user_id): Path<Uuid>,
     Json(req): Json<DirectMessageRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    svc::send_direct_message(&state, user_id, &req.message).await?;
+    svc::send_direct_message(&state, user_id, &req.message, &admin.0.name).await?;
     let label = alog::user_label(&state, user_id).await;
     alog::log_activity(&state, &admin.0, "SEND_MESSAGE", "student", Some(user_id.to_string()),
         format!("Sent a direct message to {label}")).await;
@@ -297,7 +298,7 @@ pub async fn send_receipt(
     admin: AdminUser,
     Path(user_id): Path<Uuid>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    svc::send_latest_receipt(&state, user_id).await?;
+    svc::send_latest_receipt(&state, user_id, &admin.0.name).await?;
     let label = alog::user_label(&state, user_id).await;
     alog::log_activity(&state, &admin.0, "SEND_RECEIPT", "student", Some(user_id.to_string()),
         format!("Sent payment receipt to {label}")).await;
@@ -309,7 +310,7 @@ pub async fn send_id_card(
     admin: AdminUser,
     Path(user_id): Path<Uuid>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    svc::send_id_card(&state, user_id).await?;
+    svc::send_id_card(&state, user_id, &admin.0.name).await?;
     let label = alog::user_label(&state, user_id).await;
     alog::log_activity(&state, &admin.0, "SEND_ID_CARD", "student", Some(user_id.to_string()),
         format!("Sent ID card to {label}")).await;
@@ -321,7 +322,7 @@ pub async fn send_individual_renewal_poll(
     admin: AdminUser,
     Path(user_id): Path<Uuid>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    poll_svc::send_individual_poll(&state, user_id).await?;
+    poll_svc::send_individual_poll(&state, user_id, &admin.0.name).await?;
     let label = alog::user_label(&state, user_id).await;
     alog::log_activity(&state, &admin.0, "SEND_RENEWAL_POLL", "student", Some(user_id.to_string()),
         format!("Sent renewal poll to {label}")).await;
@@ -333,7 +334,7 @@ pub async fn broadcast(
     admin: AdminUser,
     Json(req): Json<BroadcastRequest>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    let bcast = svc::broadcast(&state, &req.message).await?;
+    let bcast = svc::broadcast(&state, &req.message, &admin.0.name).await?;
     alog::log_activity(&state, &admin.0, "BROADCAST", "broadcast", Some(bcast.id.to_string()),
         format!("Sent broadcast message to {} member(s)", bcast.recipient_count)).await;
     Ok(ApiResponse::success(
@@ -737,13 +738,40 @@ pub async fn send_grace_dues_reminders(
     body: Option<Json<SendRemindersRequest>>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let user_ids = body.and_then(|Json(b)| b.user_ids);
-    let count = svc::send_grace_dues_reminders(&state, user_ids).await?;
+    let count = svc::send_grace_dues_reminders(&state, user_ids, &admin.0.name).await?;
     alog::log_activity(&state, &admin.0, "SEND_REMINDERS", "membership", None,
         format!("Sent grace-dues reminders to {count} student(s)")).await;
     Ok(ApiResponse::success(
         "Grace dues reminders sending",
         format!("Sending grace dues reminders to {count} student(s)"),
     ))
+}
+
+/// Every reminder sent (auto or manual) in the last 30 days for one Reminders
+/// page tab: `type` = renewal | pendingFee | graceDues.
+pub async fn reminder_log(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Query(q): Query<std::collections::HashMap<String, String>>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let events: &[&str] = match q.get("type").map(|s| s.as_str()) {
+        Some("renewal") => &[nlog::RENEWAL_REMINDER, nlog::RENEWAL_POLL],
+        Some("pendingFee") => &[nlog::PENDING_FEE_REMINDER],
+        Some("graceDues") => &[nlog::GRACE_DUES_REMINDER],
+        _ => return Err(AppError::BadRequest("type must be renewal, pendingFee or graceDues".into())),
+    };
+    let logs = nlog::list_by_events(&state, events, 30).await?;
+    Ok(ApiResponse::success("Reminder log retrieved", logs))
+}
+
+/// Every notification of any kind sent to a student in the last 30 days.
+pub async fn student_notifications(
+    State(state): State<Arc<AppState>>,
+    _admin: AdminUser,
+    Path(user_id): Path<Uuid>,
+) -> crate::error::Result<impl axum::response::IntoResponse> {
+    let logs = nlog::list_for_user(&state, user_id, 30).await?;
+    Ok(ApiResponse::success("Student notifications retrieved", logs))
 }
 
 /// Latest bulk-reminder job (grace-dues / pending-fee) of each type, so the
@@ -839,7 +867,7 @@ pub async fn resend_renewal_poll(
     admin: AdminUser,
     Path(poll_id): Path<Uuid>,
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
-    poll_svc::resend_poll(&state, poll_id).await?;
+    poll_svc::resend_poll(&state, poll_id, &admin.0.name).await?;
     alog::log_activity(
         &state,
         &admin.0,

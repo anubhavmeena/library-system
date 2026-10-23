@@ -2,6 +2,7 @@ pub mod activity_log;
 pub mod admin;
 pub mod coupon;
 pub mod membership;
+pub mod notification_log;
 pub mod payment_claim;
 pub mod renewal_poll;
 pub mod seat;

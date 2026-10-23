@@ -8,6 +8,7 @@ pub mod jwt;
 pub mod mailbox;
 pub mod membership;
 pub mod notification;
+pub mod notification_log;
 pub mod otp;
 pub mod payment;
 pub mod payment_claim;
