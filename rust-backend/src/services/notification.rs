@@ -36,6 +36,16 @@ pub struct PaymentReceiptInfo {
     pub payment_method: String,
 }
 
+/// "WiFi: <name> | Password: <pw>" from the admin Settings page, or None when
+/// no WiFi name is configured (so the line is simply left out).
+fn wifi_details(name: Option<&str>, password: Option<&str>) -> Option<String> {
+    let name = name.map(str::trim).filter(|n| !n.is_empty())?;
+    match password.map(str::trim).filter(|p| !p.is_empty()) {
+        Some(pw) => Some(format!("WiFi: {name} | Password: {pw}")),
+        None => Some(format!("WiFi: {name}")),
+    }
+}
+
 fn format_shift(shift: &str) -> &'static str {
     match shift.to_uppercase().as_str() {
         "MORNING" => "Morning (6AM-2PM)",
@@ -49,12 +59,17 @@ pub async fn send_booking_confirmed(state: &Arc<AppState>, info: &BookingInfo) {
     let name = if info.user_name.is_empty() { "Student" } else { &info.user_name };
     let shift_label = format_shift(&info.shift);
     let seat = info.seat_number.as_deref().unwrap_or("N/A");
+    // Best-effort — a settings read failure just omits the WiFi line.
+    let app = settings::get_app_settings(state).await.ok();
+    let wifi = app.as_ref().and_then(|a| wifi_details(a.wifi_name.as_deref(), a.wifi_password.as_deref()));
+    let wifi_whatsapp = wifi.as_ref().map(|w| format!("{w}. ")).unwrap_or_default();
+    let wifi_email = wifi.as_ref().map(|w| format!("{w}\n\n")).unwrap_or_default();
 
     let whatsapp_msg = settings::apply_hindi(&format!(
         "Booking Confirmed! Hi {}, Target Zone Library - Membership Details: \
-Plan: {} | Seat: {} | Shift: {} | From: {} | To: {} | Paid: Rs.{:.0}. \
+Plan: {} | Seat: {} | Shift: {} | From: {} | To: {} | Paid: Rs.{:.0}. {}\
 Please carry a valid ID on your first visit. Happy studying! - Target Zone Library",
-        name, info.plan_name, seat, shift_label, info.start_date, info.end_date, info.amount_paid
+        name, info.plan_name, seat, shift_label, info.start_date, info.end_date, info.amount_paid, wifi_whatsapp
     ), &settings, true);
 
     let email_body = settings::apply_hindi(&format!(
@@ -70,11 +85,12 @@ Amount Paid : Rs.{:.0}\n\n\
 Library Timings:\n\
   Morning Shift : 6:00 AM - 2:00 PM\n\
   Evening Shift : 2:00 PM - 10:00 PM\n\n\
+{}\
 Please carry a valid photo ID on your first visit.\n\n\
 Best regards,\n\
 Target Zone Library Team\n\
 https://targetzone.co.in",
-        name, info.plan_name, seat, shift_label, info.start_date, info.end_date, info.amount_paid
+        name, info.plan_name, seat, shift_label, info.start_date, info.end_date, info.amount_paid, wifi_email
     ), &settings, true);
 
     if settings.send_to_student {
@@ -997,6 +1013,23 @@ mod pure_fn_tests {
     fn format_shift_unknown_value_falls_back_to_full_day() {
         assert_eq!(format_shift("NOT_A_SHIFT"), "Full Day (6AM-10PM)");
         assert_eq!(format_shift(""), "Full Day (6AM-10PM)");
+    }
+
+    #[test]
+    fn wifi_details_includes_name_and_password() {
+        assert_eq!(wifi_details(Some("TZ-Lib"), Some("secret1")).as_deref(), Some("WiFi: TZ-Lib | Password: secret1"));
+    }
+
+    #[test]
+    fn wifi_details_omits_blank_password() {
+        assert_eq!(wifi_details(Some(" TZ-Lib "), Some("  ")).as_deref(), Some("WiFi: TZ-Lib"));
+        assert_eq!(wifi_details(Some("TZ-Lib"), None).as_deref(), Some("WiFi: TZ-Lib"));
+    }
+
+    #[test]
+    fn wifi_details_none_without_name() {
+        assert_eq!(wifi_details(None, Some("secret1")), None);
+        assert_eq!(wifi_details(Some(" "), Some("secret1")), None);
     }
 
     #[test]
