@@ -1752,6 +1752,11 @@ Please visit the library or contact us to clear your dues. - Target Zone Library
     notification::send_direct_message_result(state, meta, mobile, email, &msg).await
 }
 
+/// Students owing less than this (₹) are skipped by the automatic recurring
+/// reminder and the bulk "Send to All" — not worth nagging over small change.
+/// An admin explicitly picking a student still sends regardless of amount.
+const MIN_PENDING_FEE_REMINDER_AMOUNT: i64 = 100;
+
 pub async fn send_pending_fee_reminders(
     state: &Arc<AppState>,
     user_ids: Option<Vec<Uuid>>,
@@ -1790,8 +1795,10 @@ pub async fn send_pending_fee_reminders(
              ) m ON true
              WHERE p.pending_amount > 0 AND p.status = 'SUCCESS'
                AND (m.status IS NULL OR m.status != 'EXPIRED')
-             GROUP BY u.id, u.name, u.mobile, u.email",
+             GROUP BY u.id, u.name, u.mobile, u.email
+             HAVING SUM(p.pending_amount) >= $1",
         )
+        .bind(Decimal::from(MIN_PENDING_FEE_REMINDER_AMOUNT))
         .fetch_all(&state.db)
         .await?
     };
@@ -1880,8 +1887,10 @@ pub async fn send_scheduled_pending_fee_reminders(state: &Arc<AppState>) -> crat
          ) m ON true
          WHERE p.pending_amount > 0 AND p.status = 'SUCCESS'
            AND (m.status IS NULL OR m.status != 'EXPIRED')
-         GROUP BY u.id, u.name, u.mobile, u.email",
+         GROUP BY u.id, u.name, u.mobile, u.email
+         HAVING SUM(p.pending_amount) >= $1",
     )
+    .bind(Decimal::from(MIN_PENDING_FEE_REMINDER_AMOUNT))
     .fetch_all(&state.db)
     .await?;
 
