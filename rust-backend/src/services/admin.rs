@@ -176,8 +176,12 @@ const STUDENT_SELECT: &str = "
         ORDER BY created_at DESC LIMIT 1
     ) le ON true";
 
+// Also sums what the matched students owe (partial-payment pending_amount +
+// grace dues_amount) so the Pending/Grace tabs can show a total for the whole
+// filtered set, not just the loaded page.
 const STUDENT_COUNT_FROM: &str = "
-    SELECT COUNT(*) FROM users u
+    SELECT COUNT(*), COALESCE(SUM(COALESCE(ps.pending_amount, 0) + COALESCE(m.dues_amount, 0)), 0)::numeric
+    FROM users u
     LEFT JOIN LATERAL (
         -- SELECT * (not just status) so the seat-number search predicate below
         -- can read m.seat_number/m.id, matching STUDENT_SELECT's `m` lateral.
@@ -223,7 +227,7 @@ pub async fn list_students(
     membership_status: Option<&str>,
     sort_by: Option<&str>,
     sort_dir: Option<&str>,
-) -> crate::error::Result<(Vec<StudentListItem>, i64)> {
+) -> crate::error::Result<(Vec<StudentListItem>, i64, Decimal)> {
     let offset = page * size;
     let pattern = search.map(|s| format!("%{s}%"));
 
@@ -283,11 +287,11 @@ pub async fn list_students(
              AND (u.name ILIKE $1 OR u.mobile ILIKE $1 OR u.email ILIKE $1
                   OR UPPER(COALESCE({SEAT_NUMBER_EXPR}, '')) LIKE $2)"
         );
-        let total: i64 = sqlx::query_scalar(&count_sql)
+        let (total, pending_total): (i64, Decimal) = sqlx::query_as(&count_sql)
             .bind(pat).bind(&seat_pat).fetch_one(&state.db).await?;
 
         attach_display_status(state, &mut users).await;
-        Ok((users, total))
+        Ok((users, total, pending_total))
     } else {
         let sql = format!(
             "{STUDENT_SELECT} WHERE u.role = 'STUDENT' {filter}
@@ -298,11 +302,11 @@ pub async fn list_students(
             .fetch_all(&state.db).await?;
 
         let count_sql = format!("{STUDENT_COUNT_FROM} WHERE u.role = 'STUDENT' {filter}");
-        let total: i64 = sqlx::query_scalar(&count_sql)
+        let (total, pending_total): (i64, Decimal) = sqlx::query_as(&count_sql)
             .fetch_one(&state.db).await?;
 
         attach_display_status(state, &mut users).await;
-        Ok((users, total))
+        Ok((users, total, pending_total))
     }
 }
 

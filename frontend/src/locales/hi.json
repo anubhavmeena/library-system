@@ -543,6 +543,7 @@
   "adminStudents": {
     "title": "छात्र",
     "subtitle": "{{total}} में से {{count}} छात्र लोड हुए",
+    "pendingTotal": "कुल {{amount}} बकाया",
     "refresh": "रिफ्रेश",
     "searchPlaceholder": "🔍 नाम, मोबाइल, ईमेल, सीट खोजें...",
     "filters": {

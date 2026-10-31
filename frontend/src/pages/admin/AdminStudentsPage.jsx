@@ -23,6 +23,7 @@ const STATUS_BADGE_CLASSES = {
 export default function AdminStudentsPage() {
     const [students, setStudents] = useState([])
     const [total, setTotal]       = useState(0)
+    const [pendingTotal, setPendingTotal] = useState(0)
     const [loading, setLoading]   = useState(true)
     const [page, setPage]             = useState(0)
     const [pageSize, setPageSize]     = useState(20)
@@ -45,6 +46,7 @@ export default function AdminStudentsPage() {
             const res = await api.get(`/admin/students?page=${page}&size=${pageSize}&sortBy=${sortBy}&sortDir=${sortDir}${membershipFilter ? `&membershipStatus=${membershipFilter}` : ''}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`)
             setStudents(res.data.data.students || [])
             setTotal(res.data.data.total || 0)
+            setPendingTotal(Number(res.data.data.pendingTotal) || 0)
         } catch { toast.error(t('adminStudents.toasts.loadFailed')) }
         finally { setLoading(false) }
     }
@@ -124,7 +126,11 @@ export default function AdminStudentsPage() {
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h1 className="page-header">{t('adminStudents.title')}</h1>
-                    <p className="text-primary-400">{t('adminStudents.subtitle', { count: students.length, total })}</p>
+                    <p className="text-primary-400">{t('adminStudents.subtitle', { count: students.length, total })}
+                        {['PENDING', 'GRACE', 'GRACE_OVERDUE'].includes(membershipFilter) && (
+                            <> · <span className="text-red-400 font-semibold">{t('adminStudents.pendingTotal', { amount: formatCurrency(pendingTotal) })}</span></>
+                        )}
+                    </p>
                 </div>
                 <button onClick={fetchStudents} className="btn-ghost border border-primary-700/40 text-sm px-4 py-2 rounded-xl">↻ {t('adminStudents.refresh')}</button>
             </div>

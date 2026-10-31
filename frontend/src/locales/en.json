@@ -547,6 +547,7 @@
   "adminStudents": {
     "title": "Students",
     "subtitle": "{{count}} students loaded of {{total}} students",
+    "pendingTotal": "{{amount}} pending in total",
     "refresh": "Refresh",
     "searchPlaceholder": "🔍 Search name, mobile, email, seat...",
     "filters": {

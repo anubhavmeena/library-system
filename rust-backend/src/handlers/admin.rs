@@ -40,7 +40,7 @@ pub async fn list_students(
 ) -> crate::error::Result<impl axum::response::IntoResponse> {
     let page = q.page.unwrap_or(0).max(0);
     let size = q.size.unwrap_or(20);
-    let (students, total) = svc::list_students(
+    let (students, total, pending_total) = svc::list_students(
         &state, page, size,
         q.search.as_deref(),
         q.status.as_deref(),
@@ -50,7 +50,7 @@ pub async fn list_students(
     ).await?;
     Ok(ApiResponse::success(
         "Students retrieved",
-        serde_json::json!({ "students": students, "total": total, "page": page, "size": size }),
+        serde_json::json!({ "students": students, "total": total, "pendingTotal": pending_total, "page": page, "size": size }),
     ))
 }
 
